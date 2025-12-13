@@ -119,6 +119,7 @@ export const RecurringTransactionForm = ({ onSuccess }: RecurringTransactionForm
         type: data.type,
         category_id: data.category_id,
         account_id: data.account_id,
+        date: startDate.toISOString().split('T')[0],
         transaction_date: startDate.toISOString().split('T')[0],
         notes: data.notes,
         tags: tags,
@@ -131,7 +132,7 @@ export const RecurringTransactionForm = ({ onSuccess }: RecurringTransactionForm
         payment_method: 'pix',
         status: 'concluida',
         is_recurring: true
-      })
+      } as any)
 
       // Depois, criar a transação recorrente
       const nextExecutionDate = calculateNextExecutionDate(startDate, data.frequency)
@@ -147,7 +148,7 @@ export const RecurringTransactionForm = ({ onSuccess }: RecurringTransactionForm
         auto_create: autoCreate,
         is_active: true,
         execution_count: 0
-      })
+      } as any)
 
       onSuccess?.()
     } catch (error) {

@@ -1,14 +1,33 @@
-import { Database } from '@/integrations/supabase/types';
-
-// Tipos baseados na tabela tasks do Supabase
-export type Task = Database['public']['Tables']['tasks']['Row'];
-export type TaskInsert = Database['public']['Tables']['tasks']['Insert'];
-export type TaskUpdate = Database['public']['Tables']['tasks']['Update'];
+// Tipos para tarefas - definidos localmente para evitar dependência de enums do banco
 
 // Enums para prioridade, status e categoria
-export type TaskPriority = Database['public']['Enums']['task_priority'];
-export type TaskStatus = Database['public']['Enums']['task_status'];
-export type TaskCategory = Database['public']['Enums']['task_category'];
+export type TaskPriority = 'baixa' | 'media' | 'alta';
+export type TaskStatus = 'pendente' | 'concluida';
+export type TaskCategory = 'comercial' | 'marketing' | 'financeiro' | 'social_media' | 'empresarial';
+
+// Interface base para Task
+export interface Task {
+  id: string;
+  user_id: string | null;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  due_date: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  category: string | null;
+  created_by: string | null;
+  contact_id: string | null;
+  deal_id: string | null;
+  assigned_to: string | null;
+  image_url: string | null;
+  position: number;
+}
+
+export type TaskInsert = Omit<Task, 'id' | 'created_at' | 'updated_at'>;
+export type TaskUpdate = Partial<TaskInsert>;
 
 // Tipos para atribuições múltiplas
 export interface TaskAssignment {

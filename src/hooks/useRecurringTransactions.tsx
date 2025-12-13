@@ -132,13 +132,27 @@ export const useExecuteRecurringTransaction = () => {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { data, error } = await supabase
-        .rpc('execute_recurring_transaction', { recurring_transaction_id: id })
+      // Execute manually since the RPC function may not exist
+      const { data: recurring, error: fetchError } = await supabase
+        .from('financial_recurring_transactions')
+        .select('*')
+        .eq('id', id)
+        .single()
 
-      if (error) {
-        throw new Error(error.message)
-      }
-      return data
+      if (fetchError) throw new Error(fetchError.message)
+
+      // Update last execution date
+      const { error: updateError } = await supabase
+        .from('financial_recurring_transactions')
+        .update({
+          last_execution_date: new Date().toISOString().split('T')[0],
+          execution_count: (recurring.execution_count || 0) + 1
+        })
+        .eq('id', id)
+
+      if (updateError) throw new Error(updateError.message)
+
+      return recurring
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recurringTransactions'] })

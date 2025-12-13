@@ -216,6 +216,7 @@ export type Database = {
         Row: {
           assigned_to: string | null
           contact_id: string | null
+          contact_name: string | null
           created_at: string | null
           description: string | null
           expected_close_date: string | null
@@ -235,6 +236,7 @@ export type Database = {
         Insert: {
           assigned_to?: string | null
           contact_id?: string | null
+          contact_name?: string | null
           created_at?: string | null
           description?: string | null
           expected_close_date?: string | null
@@ -254,6 +256,7 @@ export type Database = {
         Update: {
           assigned_to?: string | null
           contact_id?: string | null
+          contact_name?: string | null
           created_at?: string | null
           description?: string | null
           expected_close_date?: string | null
@@ -276,6 +279,75 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_follow_ups: {
+        Row: {
+          completed: boolean | null
+          completed_at: string | null
+          completed_notes: string | null
+          contact_id: string | null
+          created_at: string | null
+          deal_id: string | null
+          description: string | null
+          id: string
+          notes: string | null
+          scheduled_date: string
+          scheduled_time: string | null
+          status: string | null
+          type: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          completed?: boolean | null
+          completed_at?: string | null
+          completed_notes?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          deal_id?: string | null
+          description?: string | null
+          id?: string
+          notes?: string | null
+          scheduled_date: string
+          scheduled_time?: string | null
+          status?: string | null
+          type?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          completed?: boolean | null
+          completed_at?: string | null
+          completed_notes?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          deal_id?: string | null
+          description?: string | null
+          id?: string
+          notes?: string | null
+          scheduled_date?: string
+          scheduled_time?: string | null
+          status?: string | null
+          type?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_follow_ups_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_follow_ups_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "crm_deals"
             referencedColumns: ["id"]
           },
         ]
@@ -427,27 +499,39 @@ export type Database = {
       }
       financial_accounts: {
         Row: {
+          account_number: string | null
           balance: number | null
+          bank_name: string | null
           created_at: string | null
+          current_balance: number | null
           id: string
+          initial_balance: number | null
           is_active: boolean | null
           name: string
           type: string | null
           user_id: string | null
         }
         Insert: {
+          account_number?: string | null
           balance?: number | null
+          bank_name?: string | null
           created_at?: string | null
+          current_balance?: number | null
           id?: string
+          initial_balance?: number | null
           is_active?: boolean | null
           name: string
           type?: string | null
           user_id?: string | null
         }
         Update: {
+          account_number?: string | null
           balance?: number | null
+          bank_name?: string | null
           created_at?: string | null
+          current_balance?: number | null
           id?: string
+          initial_balance?: number | null
           is_active?: boolean | null
           name?: string
           type?: string | null
@@ -455,29 +539,122 @@ export type Database = {
         }
         Relationships: []
       }
+      financial_attachments: {
+        Row: {
+          created_at: string | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          file_type: string | null
+          id: string
+          transaction_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          transaction_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          transaction_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financial_attachments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "financial_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      financial_budgets: {
+        Row: {
+          amount: number
+          category_id: string | null
+          created_at: string | null
+          id: string
+          period_end: string
+          period_start: string
+          status: string | null
+          user_id: string | null
+        }
+        Insert: {
+          amount: number
+          category_id?: string | null
+          created_at?: string | null
+          id?: string
+          period_end: string
+          period_start: string
+          status?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          category_id?: string | null
+          created_at?: string | null
+          id?: string
+          period_end?: string
+          period_start?: string
+          status?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financial_budgets_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "financial_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       financial_categories: {
         Row: {
           color: string | null
           created_at: string | null
+          icon: string | null
           id: string
           name: string
+          parent_id: string | null
           type: string
         }
         Insert: {
           color?: string | null
           created_at?: string | null
+          icon?: string | null
           id?: string
           name: string
+          parent_id?: string | null
           type: string
         }
         Update: {
           color?: string | null
           created_at?: string | null
+          icon?: string | null
           id?: string
           name?: string
+          parent_id?: string | null
           type?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "financial_categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "financial_categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       financial_recurring_transactions: {
         Row: {
@@ -583,8 +760,10 @@ export type Database = {
           metadata: Json | null
           notes: string | null
           payment_method: string | null
+          recurrence_id: string | null
           status: string | null
           tags: string[] | null
+          total_costs: number | null
           transaction_date: string | null
           type: string
           user_id: string | null
@@ -604,8 +783,10 @@ export type Database = {
           metadata?: Json | null
           notes?: string | null
           payment_method?: string | null
+          recurrence_id?: string | null
           status?: string | null
           tags?: string[] | null
+          total_costs?: number | null
           transaction_date?: string | null
           type: string
           user_id?: string | null
@@ -625,8 +806,10 @@ export type Database = {
           metadata?: Json | null
           notes?: string | null
           payment_method?: string | null
+          recurrence_id?: string | null
           status?: string | null
           tags?: string[] | null
+          total_costs?: number | null
           transaction_date?: string | null
           type?: string
           user_id?: string | null
@@ -747,8 +930,10 @@ export type Database = {
           id: string
           message: string | null
           read: boolean | null
+          task_id: string | null
           title: string
           type: string | null
+          updated_at: string | null
           user_id: string | null
         }
         Insert: {
@@ -756,8 +941,10 @@ export type Database = {
           id?: string
           message?: string | null
           read?: boolean | null
+          task_id?: string | null
           title: string
           type?: string | null
+          updated_at?: string | null
           user_id?: string | null
         }
         Update: {
@@ -765,11 +952,21 @@ export type Database = {
           id?: string
           message?: string | null
           read?: boolean | null
+          task_id?: string | null
           title?: string
           type?: string | null
+          updated_at?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "notifications_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -815,13 +1012,20 @@ export type Database = {
           created_at: string | null
           date: string
           ended_at: string | null
+          final_calls: number | null
+          final_contacts: number | null
+          finished_at: string | null
           goal_calls: number | null
           goal_contacts: number | null
           id: string
+          is_paused: boolean | null
           notes: string | null
+          paused_at: string | null
           session_id: string | null
           started_at: string | null
           status: string | null
+          total_paused_time: number | null
+          updated_at: string | null
           user_id: string | null
         }
         Insert: {
@@ -831,13 +1035,20 @@ export type Database = {
           created_at?: string | null
           date: string
           ended_at?: string | null
+          final_calls?: number | null
+          final_contacts?: number | null
+          finished_at?: string | null
           goal_calls?: number | null
           goal_contacts?: number | null
           id?: string
+          is_paused?: boolean | null
           notes?: string | null
+          paused_at?: string | null
           session_id?: string | null
           started_at?: string | null
           status?: string | null
+          total_paused_time?: number | null
+          updated_at?: string | null
           user_id?: string | null
         }
         Update: {
@@ -847,13 +1058,20 @@ export type Database = {
           created_at?: string | null
           date?: string
           ended_at?: string | null
+          final_calls?: number | null
+          final_contacts?: number | null
+          finished_at?: string | null
           goal_calls?: number | null
           goal_contacts?: number | null
           id?: string
+          is_paused?: boolean | null
           notes?: string | null
+          paused_at?: string | null
           session_id?: string | null
           started_at?: string | null
           status?: string | null
+          total_paused_time?: number | null
+          updated_at?: string | null
           user_id?: string | null
         }
         Relationships: [
@@ -916,6 +1134,7 @@ export type Database = {
           id: string
           is_paused: boolean | null
           notes: string | null
+          result: Json | null
           script_id: string | null
           started_at: string | null
           total_pause_time: number | null
@@ -931,6 +1150,7 @@ export type Database = {
           id?: string
           is_paused?: boolean | null
           notes?: string | null
+          result?: Json | null
           script_id?: string | null
           started_at?: string | null
           total_pause_time?: number | null
@@ -946,6 +1166,7 @@ export type Database = {
           id?: string
           is_paused?: boolean | null
           notes?: string | null
+          result?: Json | null
           script_id?: string | null
           started_at?: string | null
           total_pause_time?: number | null
@@ -966,6 +1187,7 @@ export type Database = {
           call_type: string | null
           contact_id: string | null
           created_at: string | null
+          crm_deal_id: string | null
           deal_id: string | null
           description: string | null
           duration_minutes: number | null
@@ -975,12 +1197,14 @@ export type Database = {
           scheduled_at: string
           status: string | null
           title: string
+          updated_at: string | null
           user_id: string | null
         }
         Insert: {
           call_type?: string | null
           contact_id?: string | null
           created_at?: string | null
+          crm_deal_id?: string | null
           deal_id?: string | null
           description?: string | null
           duration_minutes?: number | null
@@ -990,12 +1214,14 @@ export type Database = {
           scheduled_at: string
           status?: string | null
           title: string
+          updated_at?: string | null
           user_id?: string | null
         }
         Update: {
           call_type?: string | null
           contact_id?: string | null
           created_at?: string | null
+          crm_deal_id?: string | null
           deal_id?: string | null
           description?: string | null
           duration_minutes?: number | null
@@ -1005,6 +1231,7 @@ export type Database = {
           scheduled_at?: string
           status?: string | null
           title?: string
+          updated_at?: string | null
           user_id?: string | null
         }
         Relationships: [
@@ -1016,10 +1243,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "sales_calls_deal_id_fkey"
-            columns: ["deal_id"]
+            foreignKeyName: "sales_calls_crm_deal_id_fkey"
+            columns: ["crm_deal_id"]
             isOneToOne: false
-            referencedRelation: "deals"
+            referencedRelation: "crm_deals"
             referencedColumns: ["id"]
           },
         ]
@@ -1162,6 +1389,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_daily_goals: {
+        Row: {
+          created_at: string | null
+          default_goal_calls: number | null
+          default_goal_contacts: number | null
+          id: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          default_goal_calls?: number | null
+          default_goal_contacts?: number | null
+          id?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          default_goal_calls?: number | null
+          default_goal_contacts?: number | null
+          id?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
