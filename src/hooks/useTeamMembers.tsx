@@ -5,7 +5,7 @@ export interface TeamMember {
   id: string;
   email: string;
   full_name: string | null;
-  role: 'admin' | 'dono' | 'vendedor' | 'gestor_trafego';
+  role: string;
 }
 
 const fetchTeamMembers = async (): Promise<TeamMember[]> => {
