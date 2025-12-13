@@ -83,7 +83,7 @@ const { profile } = useUserProfile()
                     </Tooltip>
                     <div className="flex flex-col">
                         <h1 className="text-lg font-semibold text-foreground">Olá, Visão Geral</h1>
-                        <p className="text-sm text-muted-foreground">SVM Smart Value Marketing</p>
+                        <p className="text-sm text-muted-foreground">DashMed Pro</p>
                     </div>
                 </div>
                 

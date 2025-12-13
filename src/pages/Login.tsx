@@ -294,8 +294,8 @@ const Login = () => {
       </div>
       <div className="hidden bg-muted lg:flex items-center justify-center p-12 text-center">
         <div className="space-y-4">
-            <img src={svmLogo} alt="SVM Logo" className="w-24 h-24 mx-auto" />
-            <h1 className="text-3xl font-bold text-foreground">SVM Smart Value Marketing</h1>
+            <img src={svmLogo} alt="DashMed Pro Logo" className="w-24 h-24 mx-auto" />
+            <h1 className="text-3xl font-bold text-foreground">DashMed Pro</h1>
             <p className="text-muted-foreground">
                 A plataforma completa para impulsionar o seu negócio.
             </p>
