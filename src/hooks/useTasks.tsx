@@ -13,29 +13,12 @@ const fetchTasks = async (userId: string): Promise<TaskWithCRM[]> => {
 
   if (error) {
     console.error('Erro ao buscar tarefas:', error);
-    // Fallback: buscar sem joins
-    const { data: fallbackData, error: fallbackError } = await supabase
-      .from('tasks')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    if (fallbackError) throw new Error(`Erro ao buscar tarefas: ${fallbackError.message}`);
-    
-    return (fallbackData || []).map(task => ({
-      ...task,
-      completed_at: task.completed_at || null,
-      position: task.position || 0,
-      created_by_profile: null,
-      assigned_to_profile: null,
-      assignments: [],
-      my_assignment: null,
-    })) as TaskWithCRM[];
+    throw new Error(`Erro ao buscar tarefas: ${error.message}`);
   }
 
   return (data || []).map(task => ({
     ...task,
     completed_at: task.completed_at || null,
-    position: task.position || 0,
     assignments: [],
     my_assignment: null,
   })) as TaskWithCRM[];
@@ -57,7 +40,6 @@ const fetchTaskById = async (taskId: string): Promise<TaskWithCRM | null> => {
   return {
     ...data,
     completed_at: data.completed_at || null,
-    position: data.position || 0,
     assignments: [],
     my_assignment: null,
   } as TaskWithCRM;
@@ -67,6 +49,7 @@ const fetchTaskById = async (taskId: string): Promise<TaskWithCRM | null> => {
 export function useTasks() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { teamMembers } = useTeamMembers();
 
   // Query para buscar todas as tarefas
   const {
@@ -97,7 +80,6 @@ export function useTasks() {
           user_id: user?.id,
           created_by: user?.id,
           status: 'pendente',
-          position: 0,
         })
         .select()
         .single();
@@ -188,8 +170,31 @@ export function useTasks() {
     },
   });
 
+  // Mutation para reordenar tarefas (placeholder)
+  const reorderTasksMutation = useMutation({
+    mutationFn: async (taskIds: string[]) => {
+      // Sem coluna position no banco, apenas retorna
+      return taskIds;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+
+  // Mutation para atualizar assignment
+  const updateAssignmentMutation = useMutation({
+    mutationFn: async ({ assignmentId, data }: { assignmentId: string; data: UpdateAssignmentData }) => {
+      // Placeholder - implementar quando tabela task_assignments tiver coluna status
+      return { assignmentId, data };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+
   return {
     tasks,
+    teamMembers,
     isLoading,
     error,
     createTask: createTaskMutation.mutateAsync,
@@ -197,9 +202,13 @@ export function useTasks() {
     deleteTask: deleteTaskMutation.mutateAsync,
     completeTask: completeTaskMutation.mutateAsync,
     reopenTask: reopenTaskMutation.mutateAsync,
+    reorderTasks: reorderTasksMutation.mutateAsync,
+    updateAssignment: updateAssignmentMutation.mutateAsync,
     isCreating: createTaskMutation.isPending,
     isUpdating: updateTaskMutation.isPending,
     isDeleting: deleteTaskMutation.isPending,
+    isReordering: reorderTasksMutation.isPending,
+    isUpdatingAssignment: updateAssignmentMutation.isPending,
     fetchTaskById,
   };
 }

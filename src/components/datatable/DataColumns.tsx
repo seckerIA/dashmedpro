@@ -11,9 +11,12 @@ export interface Profile {
   id: string;
   email: string;
   full_name: string | null;
-  role: 'admin' | 'dono' | 'vendedor' | 'gestor_trafego';
-  is_active: boolean;
-  created_at: string;
+  role: string;
+  is_active: boolean | null;
+  created_at: string | null;
+  avatar_url?: string | null;
+  invited_by?: string | null;
+  updated_at?: string | null;
 }
 
 const getRoleLabel = (role: string) => {
