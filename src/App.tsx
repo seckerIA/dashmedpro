@@ -13,6 +13,7 @@ import CalculadoraROI from "./pages/CalculadoraROI";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import ResetPassword from "./pages/ResetPassword";
 import TeamManagement from "./pages/TeamManagement";
 import Tasks from "./pages/Tasks";
 import TasksDebug from "./pages/TasksDebug";
@@ -101,6 +102,7 @@ const AppRoutes = () => {
     return (
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );
