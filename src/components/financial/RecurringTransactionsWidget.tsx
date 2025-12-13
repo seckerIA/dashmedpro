@@ -118,20 +118,22 @@ export const RecurringTransactionsWidget = () => {
               const handleCreateSchedule = async () => {
                 if (!user?.id) return
                 
-                const startDate = new Date(t.transaction_date)
+                const startDate = new Date(t.transaction_date || t.date)
                 const nextDate = addMonths(startDate, 1)
                 
                 await createRecurring.mutateAsync({
                   user_id: user.id,
                   template_transaction_id: t.id,
-                  frequency: 'mensal',
-                  start_date: format(startDate, 'yyyy-MM-dd'),
-                  next_execution_date: format(nextDate, 'yyyy-MM-dd'),
+                  frequency: 'monthly',
+                  amount: t.amount,
+                  type: t.type,
+                  description: t.description || '',
+                  account_id: t.account_id || null,
+                  category_id: t.category_id || null,
+                  next_date: format(nextDate, 'yyyy-MM-dd'),
                   is_active: true,
                   execution_count: 0,
                   auto_create: true,
-                  end_date: null,
-                  last_execution_date: null
                 })
               }
 
