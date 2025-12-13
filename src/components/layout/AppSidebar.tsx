@@ -120,14 +120,14 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
               <div className="p-2 bg-primary/10 rounded-lg transition-all duration-300">
                 <img 
                   src={svmLogo} 
-                  alt="SVM Logo" 
+                  alt="DashMed Pro Logo" 
                   className="w-8 h-8 transition-smooth"
                 />
               </div>
               {!isCollapsed && (
                 <div className="flex flex-col">
-                  <span className="text-white font-bold text-lg">SVM</span>
-                  <span className="text-white/70 text-xs">Smart Value Marketing</span>
+                  <span className="text-white font-bold text-lg">DashMed Pro</span>
+                  <span className="text-white/70 text-xs">Gestão Inteligente</span>
                 </div>
               )}
             </div>

@@ -75,7 +75,7 @@ const PlaceholderPage = ({ title, description, icon: Icon }: PlaceholderPageProp
             <div className="p-4 rounded-lg bg-gradient-accent">
               <h4 className="font-medium text-card-foreground mb-2">Interface Intuitiva</h4>
               <p className="text-sm text-muted-foreground">
-                Design moderno e fácil de usar, seguindo os padrões da plataforma SVM
+                Design moderno e fácil de usar, seguindo os padrões da plataforma DashMed Pro
               </p>
             </div>
             <div className="p-4 rounded-lg bg-gradient-accent">
