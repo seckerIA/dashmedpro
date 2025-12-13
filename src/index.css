@@ -1,0 +1,112 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* SVM Nexus Dark Theme - Inspired by the CRM images */
+    --background: 220 13% 9%;
+    --foreground: 220 9% 98%;
+
+    --card: 220 13% 11%;
+    --card-foreground: 220 9% 98%;
+
+    --popover: 220 13% 11%;
+    --popover-foreground: 220 9% 98%;
+
+    /* SVM Red Primary - Enhanced for dark theme */
+    --primary: 0 100% 50%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 220 13% 15%;
+    --secondary-foreground: 220 9% 98%;
+
+    --muted: 220 13% 15%;
+    --muted-foreground: 220 9% 65%;
+
+    --accent: 0 100% 50%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 13% 20%;
+    --input: 220 13% 15%;
+    --ring: 0 100% 50%;
+
+    --radius: 0.75rem;
+
+    /* Sidebar - Consistent with main theme */
+    --sidebar-background: 220 13% 9%;
+    --sidebar-foreground: 220 9% 98%;
+    --sidebar-primary: 0 100% 50%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 220 13% 15%;
+    --sidebar-accent-foreground: 220 9% 98%;
+    --sidebar-border: 220 13% 20%;
+    --sidebar-ring: 0 100% 50%;
+
+    /* SVM Nexus Gradients - Dark theme optimized */
+    --gradient-primary: linear-gradient(135deg, hsl(0 100% 50%), hsl(0 100% 40%));
+    --gradient-card: linear-gradient(145deg, hsl(220 13% 11%), hsl(220 13% 13%));
+    --gradient-accent: linear-gradient(90deg, hsl(0 100% 50% / 0.1), hsl(0 100% 50% / 0.05));
+    --gradient-dark: linear-gradient(145deg, hsl(220 13% 9%), hsl(220 13% 11%));
+
+    /* SVM Nexus Shadows - Enhanced for dark theme */
+    --shadow-brand: 0 8px 32px -8px hsl(0 100% 50% / 0.3);
+    --shadow-card: 0 4px 16px -4px hsl(220 13% 0% / 0.3);
+    --shadow-glow: 0 0 20px hsl(0 100% 50% / 0.2);
+
+    /* SVM Animations - Smoother for modern feel */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-brand: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    --transition-bounce: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+    /* Enhanced Status Colors for Dark Theme */
+    --success: 142 76% 45%;
+    --success-foreground: 0 0% 98%;
+    --warning: 38 92% 55%;
+    --warning-foreground: 0 0% 9%;
+    --info: 199 89% 55%;
+    --info-foreground: 0 0% 98%;
+    
+    /* Financial Colors - Enhanced contrast */
+    --positive: 142 76% 45%;
+    --negative: 0 84% 65%;
+    --neutral: 220 9% 65%;
+
+    /* Chart Colors - Nexus Style */
+    --chart-1: 0 100% 50%;
+    --chart-2: 142 76% 45%;
+    --chart-3: 38 92% 55%;
+    --chart-4: 199 89% 55%;
+    --chart-5: 280 100% 70%;
+    --chart-6: 60 100% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Animações customizadas para o widget de tarefas */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

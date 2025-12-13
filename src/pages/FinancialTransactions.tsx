@@ -1,0 +1,398 @@
+import { useState } from "react"
+import { useNavigate } from "react-router-dom"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { 
+  Plus, 
+  Search, 
+  Edit, 
+  Trash2, 
+  Eye,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Calendar,
+  DollarSign,
+  Filter,
+  Download
+} from "lucide-react"
+import { useFinancialTransactions } from "@/hooks/useFinancialTransactions"
+import { useDeleteFinancialTransaction } from "@/hooks/useFinancialTransactionMutations"
+import { useUserProfile } from "@/hooks/useUserProfile"
+import { format } from "date-fns"
+import { ptBR } from "date-fns/locale"
+import { FinancialTransactionWithDetails } from "@/types/financial"
+
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+  }).format(value)
+}
+
+const FinancialTransactions = () => {
+  const navigate = useNavigate()
+  const { transactions, isLoading } = useFinancialTransactions()
+  const deleteTransaction = useDeleteFinancialTransaction()
+  const { isAdmin } = useUserProfile()
+  
+  const [searchTerm, setSearchTerm] = useState("")
+  const [filterType, setFilterType] = useState<"all" | "entrada" | "saida">("all")
+  const [selectedTransaction, setSelectedTransaction] = useState<FinancialTransactionWithDetails | null>(null)
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false)
+
+  // Debug logs
+  console.log('FinancialTransactions - transactions:', transactions)
+  console.log('FinancialTransactions - isLoading:', isLoading)
+
+  // Filtrar transações
+  const filteredTransactions = transactions?.filter(transaction => {
+    const matchesSearch = transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         transaction.category?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         transaction.account?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    
+    const matchesType = filterType === "all" || transaction.type === filterType
+    
+    return matchesSearch && matchesType
+  }) || []
+
+  const handleDelete = async (id: string) => {
+    if (confirm('Tem certeza que deseja excluir esta transação?')) {
+      await deleteTransaction.mutateAsync(id)
+    }
+  }
+
+  const handleEdit = (transaction: FinancialTransactionWithDetails) => {
+    console.log('Editar transação:', transaction)
+    // Navegar para o formulário de edição com os dados da transação
+    navigate(`/financeiro/editar-transacao/${transaction.id}`, { state: { transaction } })
+  }
+
+  const handleViewDetails = (transaction: FinancialTransactionWithDetails) => {
+    setSelectedTransaction(transaction)
+    setIsDetailsOpen(true)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Transações Financeiras</h1>
+              <p className="text-muted-foreground">Gerencie todas as transações financeiras</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-background p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Transações Financeiras</h1>
+            <p className="text-muted-foreground">Gerencie todas as transações financeiras</p>
+          </div>
+          <Button onClick={() => navigate('/financeiro/nova-transacao')}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nova Transação
+          </Button>
+        </div>
+
+        {/* Filtros */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Filtros</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por descrição, categoria ou conta..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant={filterType === "all" ? "default" : "outline"}
+                  onClick={() => setFilterType("all")}
+                  size="sm"
+                >
+                  Todas
+                </Button>
+                <Button
+                  variant={filterType === "entrada" ? "default" : "outline"}
+                  onClick={() => setFilterType("entrada")}
+                  size="sm"
+                >
+                  <ArrowUpRight className="w-4 h-4 mr-1" />
+                  Receitas
+                </Button>
+                <Button
+                  variant={filterType === "saida" ? "default" : "outline"}
+                  onClick={() => setFilterType("saida")}
+                  size="sm"
+                >
+                  <ArrowDownLeft className="w-4 h-4 mr-1" />
+                  Despesas
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tabela de Transações */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Transações ({filteredTransactions.length})</CardTitle>
+                <CardDescription>
+                  {filterType === "all" ? "Todas as transações" : 
+                   filterType === "entrada" ? "Apenas receitas" : "Apenas despesas"}
+                </CardDescription>
+              </div>
+              <Button variant="outline" size="sm">
+                <Download className="w-4 h-4 mr-2" />
+                Exportar
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {filteredTransactions.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <DollarSign className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>Nenhuma transação encontrada</p>
+                <p className="text-sm">Crie sua primeira transação para começar</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Descrição</TableHead>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead>Conta</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead className="text-right">Valor</TableHead>
+                      <TableHead className="text-center">Custos</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredTransactions.map((transaction) => (
+                      <TableRow key={transaction.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-muted-foreground" />
+                            {format(new Date(transaction.transaction_date), 'dd/MM/yyyy', { locale: ptBR })}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{transaction.description}</div>
+                            {transaction.notes && (
+                              <div className="text-sm text-muted-foreground truncate max-w-xs">
+                                {transaction.notes}
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {transaction.category?.name || 'Sem categoria'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {transaction.account?.name || 'Sem conta'}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {transaction.type === 'entrada' ? (
+                              <>
+                                <ArrowUpRight className="w-4 h-4 text-emerald-500" />
+                                <span className="text-sm text-emerald-500">Receita</span>
+                              </>
+                            ) : (
+                              <>
+                                <ArrowDownLeft className="w-4 h-4 text-red-500" />
+                                <span className="text-sm text-red-500">Despesa</span>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className={`font-semibold ${
+                            transaction.type === 'entrada' ? 'text-emerald-500' : 'text-red-500'
+                          }`}>
+                            {transaction.type === 'entrada' ? '+' : '-'} {formatCurrency(transaction.amount)}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {transaction.type === 'entrada' && transaction.has_costs ? (
+                            <Badge variant="outline" className="text-xs text-orange-500 border-orange-500/20">
+                              R$ {formatCurrency(transaction.total_costs || 0)}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={transaction.status === 'concluida' ? "default" : "secondary"}>
+                            {transaction.status || 'concluída'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleViewDetails(transaction)}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleEdit(transaction)}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            {isAdmin && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleDelete(transaction.id)}
+                                disabled={deleteTransaction.isPending}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Modal de Detalhes */}
+        <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Detalhes da Transação</DialogTitle>
+              <DialogDescription>
+                Informações completas da transação selecionada
+              </DialogDescription>
+            </DialogHeader>
+            {selectedTransaction && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Descrição</label>
+                    <p className="text-sm">{selectedTransaction.description}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Valor</label>
+                    <p className={`text-sm font-semibold ${
+                      selectedTransaction.type === 'entrada' ? 'text-emerald-500' : 'text-red-500'
+                    }`}>
+                      {formatCurrency(selectedTransaction.amount)}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Data</label>
+                    <p className="text-sm">
+                      {format(new Date(selectedTransaction.transaction_date), 'dd/MM/yyyy', { locale: ptBR })}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Tipo</label>
+                    <p className="text-sm">
+                      {selectedTransaction.type === 'entrada' ? 'Receita' : 'Despesa'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Categoria</label>
+                    <p className="text-sm">{selectedTransaction.category?.name || 'Sem categoria'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Conta</label>
+                    <p className="text-sm">{selectedTransaction.account?.name || 'Sem conta'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Método de Pagamento</label>
+                    <p className="text-sm">{selectedTransaction.payment_method || 'Não informado'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Status</label>
+                    <p className="text-sm">{selectedTransaction.status || 'concluída'}</p>
+                  </div>
+                  {selectedTransaction.type === 'entrada' && selectedTransaction.has_costs && (
+                    <>
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">Custos Totais</label>
+                        <p className="text-sm font-semibold text-orange-500">
+                          R$ {formatCurrency(selectedTransaction.total_costs || 0)}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">Lucro Líquido</label>
+                        <p className="text-sm font-semibold text-blue-500">
+                          R$ {formatCurrency((selectedTransaction.amount || 0) - (selectedTransaction.total_costs || 0))}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+                {selectedTransaction.notes && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Observações</label>
+                    <p className="text-sm">{selectedTransaction.notes}</p>
+                  </div>
+                )}
+                {selectedTransaction.tags && selectedTransaction.tags.length > 0 && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Tags</label>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {selectedTransaction.tags.map((tag, index) => (
+                        <Badge key={index} variant="secondary" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
+    </div>
+  )
+}
+
+export default FinancialTransactions
