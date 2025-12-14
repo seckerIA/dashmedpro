@@ -29,7 +29,8 @@ import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/hooks/useAuth"
 import { useToast } from "@/hooks/use-toast"
 import { useUserProfile } from "@/hooks/useUserProfile"
-import svmLogo from "@/assets/svm-logo.png"
+import dashmedLogo from "@/assets/dashmed-logo.png"
+import { ThemeToggle } from "@/components/ui/theme-toggle"
 
 type NavigationItem = {
   title: string;
@@ -115,19 +116,19 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
       <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
         <ScrollArea className="h-full">
           <div className="p-4 space-y-6">
-            {/* Logo Section - Conta Azul Inspired */}
+            {/* Logo Section - DashMed Pro */}
             <div className={`flex items-center gap-3 p-4 ${isCollapsed ? 'justify-center' : ''}`}>
-              <div className="p-2 bg-primary/10 rounded-lg transition-all duration-300">
+              <div className="p-2 bg-white/10 rounded-lg transition-all duration-300">
                 <img 
-                  src={svmLogo} 
-                  alt="SVM Logo" 
+                  src={dashmedLogo} 
+                  alt="DashMed Pro Logo" 
                   className="w-8 h-8 transition-smooth"
                 />
               </div>
               {!isCollapsed && (
                 <div className="flex flex-col">
-                  <span className="text-white font-bold text-lg">SVM</span>
-                  <span className="text-white/70 text-xs">Smart Value Marketing</span>
+                  <span className="text-white font-bold text-lg">DASHMED PRO</span>
+                  <span className="text-white/70 text-xs">DashMed Pro</span>
                 </div>
               )}
             </div>
@@ -260,6 +261,11 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
 
             {/* Settings and User Section - Bottom */}
             <div className="space-y-1 pt-6 border-t border-white/10">
+              {/* Theme Toggle */}
+              <div className={isCollapsed ? "flex justify-center" : ""}>
+                <ThemeToggle isCollapsed={isCollapsed} />
+              </div>
+              
               {/* Settings */}
               <Tooltip>
                 <TooltipTrigger asChild>

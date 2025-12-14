@@ -8,7 +8,92 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* SVM Nexus Dark Theme - Inspired by the CRM images */
+    /* DashMed Pro Light Theme - Default */
+    --background: 0 0% 100%;
+    --foreground: 220 13% 9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 13% 9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 13% 9%;
+
+    /* DashMed Pro Blue Primary */
+    --primary: 210 100% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 90% 35%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 220 13% 96%;
+    --muted-foreground: 220 9% 45%;
+
+    --accent: 210 100% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 90%;
+    --input: 220 13% 96%;
+    --ring: 210 100% 50%;
+
+    --radius: 0.75rem;
+
+    /* Sidebar - Light theme */
+    --sidebar-background: 220 90% 35%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 210 100% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 90% 40%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 220 90% 30%;
+    --sidebar-ring: 210 100% 50%;
+
+    /* DashMed Pro Gradients - Light theme */
+    --gradient-primary: linear-gradient(135deg, hsl(210 100% 50%), hsl(220 90% 35%));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(220 13% 98%));
+    --gradient-accent: linear-gradient(90deg, hsl(210 100% 50% / 0.1), hsl(210 100% 50% / 0.05));
+    --gradient-dark: linear-gradient(145deg, hsl(220 90% 35%), hsl(220 90% 30%));
+
+    /* DashMed Pro Shadows - Light theme */
+    --shadow-brand: 0 8px 32px -8px hsl(210 100% 50% / 0.3);
+    --shadow-card: 0 4px 16px -4px hsl(220 13% 0% / 0.1);
+    --shadow-glow: 0 0 20px hsl(210 100% 50% / 0.2);
+
+    /* DashMed Pro Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-brand: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    --transition-bounce: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+    /* Status Colors */
+    --success: 142 76% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 43 96% 56%;
+    --warning-foreground: 0 0% 9%;
+    --info: 210 100% 50%;
+    --info-foreground: 0 0% 100%;
+    
+    /* Financial Colors */
+    --positive: 142 76% 45%;
+    --negative: 0 84% 60%;
+    --neutral: 220 9% 45%;
+
+    /* Gold for special highlights */
+    --gold: 43 96% 56%;
+    --gold-foreground: 0 0% 9%;
+
+    /* Chart Colors - DashMed Pro Style */
+    --chart-1: 210 100% 50%;
+    --chart-2: 220 90% 35%;
+    --chart-3: 43 96% 56%;
+    --chart-4: 142 76% 45%;
+    --chart-5: 0 84% 60%;
+    --chart-6: 199 89% 55%;
+  }
+
+  .dark {
+    /* DashMed Pro Dark Theme */
     --background: 220 13% 9%;
     --foreground: 220 9% 98%;
 
@@ -18,74 +103,71 @@ All colors MUST be HSL.
     --popover: 220 13% 11%;
     --popover-foreground: 220 9% 98%;
 
-    /* SVM Red Primary - Enhanced for dark theme */
-    --primary: 0 100% 50%;
-    --primary-foreground: 0 0% 98%;
+    /* DashMed Pro Blue Primary - Enhanced for dark theme */
+    --primary: 210 100% 55%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 13% 15%;
+    --secondary: 220 90% 40%;
     --secondary-foreground: 220 9% 98%;
 
     --muted: 220 13% 15%;
     --muted-foreground: 220 9% 65%;
 
-    --accent: 0 100% 50%;
-    --accent-foreground: 0 0% 98%;
+    --accent: 210 100% 55%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 84% 65%;
+    --destructive-foreground: 0 0% 100%;
 
     --border: 220 13% 20%;
     --input: 220 13% 15%;
-    --ring: 0 100% 50%;
+    --ring: 210 100% 55%;
 
-    --radius: 0.75rem;
-
-    /* Sidebar - Consistent with main theme */
+    /* Sidebar - Dark theme */
     --sidebar-background: 220 13% 9%;
     --sidebar-foreground: 220 9% 98%;
-    --sidebar-primary: 0 100% 50%;
-    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-primary: 210 100% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 220 13% 15%;
     --sidebar-accent-foreground: 220 9% 98%;
     --sidebar-border: 220 13% 20%;
-    --sidebar-ring: 0 100% 50%;
+    --sidebar-ring: 210 100% 55%;
 
-    /* SVM Nexus Gradients - Dark theme optimized */
-    --gradient-primary: linear-gradient(135deg, hsl(0 100% 50%), hsl(0 100% 40%));
+    /* DashMed Pro Gradients - Dark theme */
+    --gradient-primary: linear-gradient(135deg, hsl(210 100% 55%), hsl(220 90% 40%));
     --gradient-card: linear-gradient(145deg, hsl(220 13% 11%), hsl(220 13% 13%));
-    --gradient-accent: linear-gradient(90deg, hsl(0 100% 50% / 0.1), hsl(0 100% 50% / 0.05));
+    --gradient-accent: linear-gradient(90deg, hsl(210 100% 55% / 0.1), hsl(210 100% 55% / 0.05));
     --gradient-dark: linear-gradient(145deg, hsl(220 13% 9%), hsl(220 13% 11%));
 
-    /* SVM Nexus Shadows - Enhanced for dark theme */
-    --shadow-brand: 0 8px 32px -8px hsl(0 100% 50% / 0.3);
+    /* DashMed Pro Shadows - Dark theme */
+    --shadow-brand: 0 8px 32px -8px hsl(210 100% 55% / 0.3);
     --shadow-card: 0 4px 16px -4px hsl(220 13% 0% / 0.3);
-    --shadow-glow: 0 0 20px hsl(0 100% 50% / 0.2);
+    --shadow-glow: 0 0 20px hsl(210 100% 55% / 0.2);
 
-    /* SVM Animations - Smoother for modern feel */
-    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-brand: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    --transition-bounce: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-
-    /* Enhanced Status Colors for Dark Theme */
+    /* Status Colors - Dark theme */
     --success: 142 76% 45%;
-    --success-foreground: 0 0% 98%;
-    --warning: 38 92% 55%;
+    --success-foreground: 0 0% 100%;
+    --warning: 43 96% 60%;
     --warning-foreground: 0 0% 9%;
-    --info: 199 89% 55%;
-    --info-foreground: 0 0% 98%;
+    --info: 210 100% 55%;
+    --info-foreground: 0 0% 100%;
     
-    /* Financial Colors - Enhanced contrast */
+    /* Financial Colors - Dark theme */
     --positive: 142 76% 45%;
     --negative: 0 84% 65%;
     --neutral: 220 9% 65%;
 
-    /* Chart Colors - Nexus Style */
-    --chart-1: 0 100% 50%;
-    --chart-2: 142 76% 45%;
-    --chart-3: 38 92% 55%;
-    --chart-4: 199 89% 55%;
-    --chart-5: 280 100% 70%;
-    --chart-6: 60 100% 50%;
+    /* Gold for special highlights - Dark theme */
+    --gold: 43 96% 60%;
+    --gold-foreground: 0 0% 9%;
+
+    /* Chart Colors - Dark theme */
+    --chart-1: 210 100% 55%;
+    --chart-2: 220 90% 40%;
+    --chart-3: 43 96% 60%;
+    --chart-4: 142 76% 45%;
+    --chart-5: 0 84% 65%;
+    --chart-6: 199 89% 55%;
   }
 }
 

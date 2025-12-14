@@ -70,6 +70,11 @@ export default {
           DEFAULT: "hsl(var(--info))",
           foreground: "hsl(var(--info-foreground))",
         },
+        // Gold for special highlights
+        gold: {
+          DEFAULT: "hsl(var(--gold))",
+          foreground: "hsl(var(--gold-foreground))",
+        },
         // Financial Colors
         positive: "hsl(var(--positive))",
         negative: "hsl(var(--negative))",

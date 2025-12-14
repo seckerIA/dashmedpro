@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, LogIn, UserPlus, Loader2 } from 'lucide-react';
-import svmLogo from "@/assets/svm-logo.png";
+import dashmedLogo from "@/assets/dashmed-logo.png";
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -129,7 +129,7 @@ const Login = () => {
           <Card className="border-0 shadow-none">
             <CardHeader className="text-left space-y-2">
                 <div className="flex items-center gap-3">
-                    <img src={svmLogo} alt="SVM Logo" className="w-10 h-10" />
+                    <img src={dashmedLogo} alt="DashMed Pro Logo" className="w-10 h-10" />
                     <div>
                         <CardTitle className="text-2xl font-bold text-foreground">Bem-vindo</CardTitle>
                         <CardDescription>
@@ -294,8 +294,8 @@ const Login = () => {
       </div>
       <div className="hidden bg-muted lg:flex items-center justify-center p-12 text-center">
         <div className="space-y-4">
-            <img src={svmLogo} alt="SVM Logo" className="w-24 h-24 mx-auto" />
-            <h1 className="text-3xl font-bold text-foreground">SVM Smart Value Marketing</h1>
+            <img src={dashmedLogo} alt="DashMed Pro Logo" className="w-24 h-24 mx-auto" />
+            <h1 className="text-3xl font-bold text-foreground">DashMed Pro</h1>
             <p className="text-muted-foreground">
                 A plataforma completa para impulsionar o seu negócio.
             </p>
