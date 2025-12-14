@@ -1,25 +1,3 @@
 {
-  "mcpServers": {
-    "supabase": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@supabase/mcp-server-supabase",
-        "--project-ref=npcgtjrgxxrhvrptkzip"
-      ],
-      "env": {
-        "SUPABASE_ACCESS_TOKEN": "sbp_b4d3dbfd9417245795a50baf8e2e43f28ba6f0b8"
-      }
-    },
-    "github": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-github"
-      ],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "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"
-      }
-    }
-  }
+  "mcpServers": {}
 }

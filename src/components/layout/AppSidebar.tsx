@@ -113,16 +113,16 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
 
   return (
     <TooltipProvider delayDuration={0}>
-      <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-        <ScrollArea className="h-full">
-          <div className="p-4 space-y-6">
+      <div className={`flex h-full flex-col bg-sidebar text-sidebar-foreground ${isCollapsed ? 'w-full' : ''}`}>
+        <ScrollArea className="flex-1">
+          <div className={`${isCollapsed ? 'p-1 space-y-4' : 'p-4 space-y-6'}`}>
             {/* Logo Section - DashMed Pro */}
-            <div className={`flex items-center gap-3 p-4 ${isCollapsed ? 'justify-center' : ''}`}>
-              <div className="p-2 bg-white/10 rounded-lg transition-all duration-300">
+            <div className={`flex items-center ${isCollapsed ? 'justify-center p-1' : 'gap-3 p-4'}`}>
+              <div className={`${isCollapsed ? 'p-1.5' : 'p-2'} bg-white/10 rounded-lg transition-all duration-300`}>
                 <img 
                   src={dashmedLogo} 
                   alt="DashMed Pro Logo" 
-                  className="w-8 h-8 transition-smooth"
+                  className={`${isCollapsed ? 'w-6 h-6' : 'w-8 h-8'} transition-smooth`}
                 />
               </div>
               {!isCollapsed && (
@@ -134,7 +134,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
             </div>
 
             {/* Navigation Items - Grouped with Separators */}
-            <div className="space-y-6">
+            <div className={isCollapsed ? 'space-y-3' : 'space-y-6'}>
               {navigationGroups.map((group, groupIndex) => {
                 // Filtrar itens do grupo baseado nas permissões
                 const filteredItems = group.items.filter(item => {
@@ -180,17 +180,17 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                     
                     {/* Separator for collapsed state */}
                     {isCollapsed && groupIndex > 0 && (
-                      <div className="h-px bg-white/10 my-2" />
+                      <div className="h-px bg-white/10 my-1" />
                     )}
                     
                     {/* Group Items */}
                     {filteredItems.map((item) => {
                     const active = isActive(item.url)
                     const linkContent = (
-                      <div className={`flex items-center justify-between ${isCollapsed ? 'justify-center' : ''}`}>
-                        <div className="flex items-center gap-3">
+                      <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+                        <div className={`flex items-center ${isCollapsed ? '' : 'gap-3'}`}>
                           <item.icon className={`
-                            w-5 h-5 transition-all duration-200
+                            ${isCollapsed ? 'w-5 h-5' : 'w-5 h-5'} transition-all duration-200
                             ${active ? 'text-white' : 'text-white/70 group-hover:text-white'}
                           `} />
                           {!isCollapsed && (
@@ -226,7 +226,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                             to={item.url} 
                             end={item.url === "/"} 
                             className={`
-                              block p-3 rounded-lg transition-all duration-200 group relative
+                              block ${isCollapsed ? 'p-2' : 'p-3'} rounded-lg transition-all duration-200 group relative w-full
                               ${active 
                                 ? 'bg-white/10 text-white' 
                                 : 'text-white/70 hover:bg-white/5 hover:text-white'
@@ -234,7 +234,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                             `}
                           >
                             {linkContent}
-                            {active && (
+                            {active && !isCollapsed && (
                               <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full" />
                             )}
                           </NavLink>
@@ -258,45 +258,52 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
               );
               })}
             </div>
+          </div>
+        </ScrollArea>
 
-            {/* Settings and User Section - Bottom */}
-            <div className="space-y-1 pt-6 border-t border-white/10">
-              {/* Theme Toggle */}
-              <div className={isCollapsed ? "flex justify-center" : ""}>
-                <ThemeToggle isCollapsed={isCollapsed} />
+        {/* Settings and User Section - Bottom - Fixed at bottom */}
+        <div className={`flex-shrink-0 border-t border-white/10 ${isCollapsed ? 'p-1 space-y-1' : 'p-4 space-y-1'}`}>
+          {/* Theme Toggle */}
+          <ThemeToggle isCollapsed={isCollapsed} />
+          
+          {/* Settings */}
+          {(() => {
+            const active = isActive('/configuracoes');
+            const linkContent = (
+              <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+                <div className={`flex items-center ${isCollapsed ? '' : 'gap-3'}`}>
+                  <Settings className={`
+                    w-5 h-5 transition-all duration-200
+                    ${active ? 'text-white' : 'text-white/70 group-hover:text-white'}
+                  `} />
+                  {!isCollapsed && (
+                    <span className={`
+                      font-medium transition-all duration-200
+                      ${active ? 'text-white' : 'text-white/70 group-hover:text-white'}
+                    `}>
+                      Configurações
+                    </span>
+                  )}
+                </div>
               </div>
-              
-              {/* Settings */}
+            );
+            
+            return (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <NavLink 
                     to="/configuracoes" 
-                    className={({ isActive: active }) => `
-                      block p-3 rounded-lg transition-all duration-200 group relative
+                    className={`
+                      block ${isCollapsed ? 'p-2' : 'p-3'} rounded-lg transition-all duration-200 group relative w-full
                       ${active 
                         ? 'bg-white/10 text-white' 
                         : 'text-white/70 hover:bg-white/5 hover:text-white'
                       }
                     `}
                   >
-                    {({ isActive: active }) => (
-                      <div className={`flex items-center gap-3 ${isCollapsed ? 'justify-center' : ''}`}>
-                        <Settings className={`
-                          w-5 h-5 transition-all duration-200
-                          ${active ? 'text-white' : 'text-white/70 group-hover:text-white'}
-                        `} />
-                        {!isCollapsed && (
-                          <span className={`
-                            font-medium transition-all duration-200
-                            ${active ? 'text-white' : 'text-white/70 group-hover:text-white'}
-                          `}>
-                            Configurações
-                          </span>
-                        )}
-                        {active && (
-                          <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full" />
-                        )}
-                      </div>
+                    {linkContent}
+                    {active && !isCollapsed && (
+                      <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full" />
                     )}
                   </NavLink>
                 </TooltipTrigger>
@@ -306,27 +313,27 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                   </TooltipContent>
                 )}
               </Tooltip>
-              
-              {/* User info and logout */}
-              {!isCollapsed && (
-                <div className="p-3 mt-4 bg-white/5 rounded-lg">
-                  <div className="text-xs text-white/60 mb-2 truncate">
-                    {user?.email}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleSignOut}
-                    className="w-full justify-start p-2 h-8 hover:bg-white/10 text-white/70 hover:text-white"
-                  >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Sair
-                  </Button>
-                </div>
-              )}
+            );
+          })()}
+          
+          {/* User info and logout */}
+          {!isCollapsed && (
+            <div className="mt-4 p-3 bg-white/5 rounded-lg">
+              <div className="text-xs text-white/60 mb-2 truncate">
+                {user?.email}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSignOut}
+                className="w-full justify-start p-2 h-8 hover:bg-white/10 text-white/70 hover:text-white"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Sair
+              </Button>
             </div>
-          </div>
-        </ScrollArea>
+          )}
+        </div>
       </div>
     </TooltipProvider>
   )

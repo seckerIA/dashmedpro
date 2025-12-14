@@ -113,6 +113,7 @@ const AppRoutes = () => {
     <AppLayout>
       <Routes>
         <Route path="/login" element={<Navigate to="/" replace />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/" element={<Dashboard />} />
         <Route path="/calculadora" element={<CalculadoraSelection />} />
         <Route path="/calculadora-precificacao" element={<Calculadora />} />

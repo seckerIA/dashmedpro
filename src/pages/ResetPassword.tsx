@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Loader2, KeyRound, ArrowLeft } from 'lucide-react';
-import svmLogo from "@/assets/svm-logo.png";
+import dashmedLogo from "@/assets/dashmed-logo.png";
 import { Link } from 'react-router-dom';
 
 const ResetPassword = () => {
@@ -17,34 +17,71 @@ const ResetPassword = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
-    // Check if we're in recovery mode (came from email link)
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      // Check URL hash for recovery token
+    // Simple check: if user is on reset-password page, allow reset
+    const checkRecoveryMode = async () => {
+      // Check URL for errors first (expired token, etc)
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const error = hashParams.get('error');
+      const errorCode = hashParams.get('error_code');
+      
+      // If there's an error in URL (like expired token), show invalid link
+      if (error || errorCode === 'otp_expired') {
+        setIsRecoveryMode(false);
+        return;
+      }
+      
+      // Check URL for recovery token
       const type = hashParams.get('type');
       const accessToken = hashParams.get('access_token');
       
-      if (type === 'recovery' && accessToken) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const queryType = urlParams.get('type');
+      const queryToken = urlParams.get('token');
+      
+      const hasRecoveryToken = type === 'recovery' || queryType === 'recovery' || accessToken || queryToken;
+      
+      // Check if user has a session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      // Simple: If has recovery token OR user is logged in on reset-password page → allow reset
+      // User can be logged in - we'll handle logout after password reset
+      if (hasRecoveryToken || session) {
         setIsRecoveryMode(true);
-      } else if (session) {
-        // User is already logged in via recovery link
-        setIsRecoveryMode(true);
+        
+        // Capture email for later use (if session exists)
+        if (session?.user?.email) {
+          setUserEmail(session.user.email);
+        }
+        return;
       }
+      
+      // No token and no session = invalid
+      setIsRecoveryMode(false);
     };
     
-    checkSession();
+    checkRecoveryMode();
 
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
+    // Listen for recovery events
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && window.location.pathname === '/reset-password')) {
+        // Check for errors first
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const error = hashParams.get('error');
+        if (error) {
+          setIsRecoveryMode(false);
+          return;
+        }
+        
         setIsRecoveryMode(true);
+        if (session?.user?.email) {
+          setUserEmail(session.user.email);
+        }
       }
     });
 
@@ -88,15 +125,55 @@ const ResetPassword = () => {
         return;
       }
 
+      // Check if updateUser created a session automatically
+      const { data: { session: newSession } } = await supabase.auth.getSession();
+      
+      if (newSession?.user) {
+        // Session was created automatically by updateUser - redirect to dashboard
+        toast({
+          title: 'Senha redefinida com sucesso!',
+          description: 'Redirecionando para o dashboard...',
+        });
+        navigate('/');
+        return;
+      }
+      
+      // No automatic session - need to login manually with captured email
+      const emailToUse = userEmail;
+      
+      if (!emailToUse) {
+        // If we don't have email, redirect to login
+        toast({
+          title: 'Senha redefinida!',
+          description: 'Faça login com sua nova senha.',
+        });
+        navigate('/login');
+        return;
+      }
+      
+      // Login with captured email and new password
       toast({
         title: 'Senha redefinida com sucesso!',
-        description: 'Você será redirecionado para o dashboard.',
+        description: 'Fazendo login automaticamente...',
       });
       
-      // Redirect to dashboard after success
-      setTimeout(() => {
-        navigate('/');
-      }, 1500);
+      const { error: loginError } = await supabase.auth.signInWithPassword({
+        email: emailToUse,
+        password: password,
+      });
+      
+      if (loginError) {
+        toast({
+          variant: 'destructive',
+          title: 'Erro ao fazer login',
+          description: 'Senha redefinida, mas houve erro no login automático. Faça login manualmente.',
+        });
+        navigate('/login');
+        return;
+      }
+      
+      // Success - redirect to dashboard
+      navigate('/');
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -108,15 +185,23 @@ const ResetPassword = () => {
     }
   };
 
-  if (!isRecoveryMode) {
+  // Check for expired/invalid token errors in URL
+  const hashParamsForError = new URLSearchParams(window.location.hash.substring(1));
+  const error = hashParamsForError.get('error');
+  const errorCode = hashParamsForError.get('error_code');
+  const isExpired = errorCode === 'otp_expired' || error === 'access_denied';
+  
+  if (!isRecoveryMode || isExpired) {
     return (
       <div className="w-full min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center space-y-2">
-            <img src={svmLogo} alt="Logo" className="w-16 h-16 mx-auto" />
-            <CardTitle className="text-2xl font-bold text-foreground">Link Inválido</CardTitle>
+            <img src={dashmedLogo} alt="Logo" className="w-16 h-16 mx-auto" />
+            <CardTitle className="text-2xl font-bold text-foreground">Link Expirado ou Inválido</CardTitle>
             <CardDescription>
-              O link de redefinição de senha é inválido ou expirou.
+              {isExpired 
+                ? 'O link de redefinição de senha expirou. Links de recuperação são válidos por tempo limitado.'
+                : 'O link de redefinição de senha é inválido.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -142,7 +227,7 @@ const ResetPassword = () => {
           <Card className="border-0 shadow-none">
             <CardHeader className="text-left space-y-2">
               <div className="flex items-center gap-3">
-                <img src={svmLogo} alt="Logo" className="w-10 h-10" />
+                <img src={dashmedLogo} alt="Logo" className="w-10 h-10" />
                 <div>
                   <CardTitle className="text-2xl font-bold text-foreground">Nova Senha</CardTitle>
                   <CardDescription>
@@ -225,7 +310,7 @@ const ResetPassword = () => {
       </div>
       <div className="hidden bg-muted lg:flex items-center justify-center p-12 text-center">
         <div className="space-y-4">
-          <img src={svmLogo} alt="DashMed Pro Logo" className="w-24 h-24 mx-auto" />
+          <img src={dashmedLogo} alt="DashMed Pro Logo" className="w-24 h-24 mx-auto" />
           <h1 className="text-3xl font-bold text-foreground">DashMed Pro</h1>
           <p className="text-muted-foreground">
             Redefina sua senha para continuar acessando a plataforma.

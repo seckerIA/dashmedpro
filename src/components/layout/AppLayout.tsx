@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react"
+import { ReactNode, useState, useRef } from "react"
 import { AppSidebar } from "./AppSidebar"
 import { Button } from "@/components/ui/button"
 import { AlignJustify, Search, ChevronDown } from "lucide-react"
@@ -7,6 +7,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
+import type { ImperativePanelHandle } from "react-resizable-panels"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -20,7 +21,8 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
-const { profile } = useUserProfile()
+  const sidebarRef = useRef<ImperativePanelHandle>(null)
+  const { profile } = useUserProfile()
   const displayName = profile?.full_name || profile?.email || 'Usuário'
   const displayRole = profile?.role || 'vendedor'
   const initials = (profile?.full_name || profile?.email || 'U')
@@ -30,6 +32,14 @@ const { profile } = useUserProfile()
     .slice(0, 2)
     .join('')
     .toUpperCase()
+
+  const toggleSidebar = () => {
+    if (isCollapsed) {
+      sidebarRef.current?.expand()
+    } else {
+      sidebarRef.current?.collapse()
+    }
+  }
 
   return (
     <TooltipProvider>
@@ -41,10 +51,11 @@ const { profile } = useUserProfile()
             }}
         >
         <ResizablePanel
+            ref={sidebarRef}
             defaultSize={20}
-            collapsedSize={4}
+            collapsedSize={3}
             collapsible={true}
-            minSize={15}
+            minSize={3}
             maxSize={20}
             onCollapse={() => {
                 setIsCollapsed(true)
@@ -69,7 +80,7 @@ const { profile } = useUserProfile()
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button
-                                onClick={() => setIsCollapsed(!isCollapsed)}
+                                onClick={toggleSidebar}
                                 className="p-2 hover:bg-muted rounded-lg transition-all duration-200"
                                 variant="ghost"
                                 size="icon"
@@ -82,7 +93,7 @@ const { profile } = useUserProfile()
                         </TooltipContent>
                     </Tooltip>
                     <div className="flex flex-col">
-                        <h1 className="text-lg font-semibold text-foreground">Olá, Visão Geral</h1>
+                        <h1 className="text-lg font-semibold text-foreground">Olá, {displayName}</h1>
                         <p className="text-sm text-muted-foreground">DashMed Pro</p>
                     </div>
                 </div>
