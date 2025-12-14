@@ -106,13 +106,20 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, forceOp
         contactData.service = undefined;
       }
       
+      // Garantir que o campo 'name' seja preenchido (obrigatório no banco)
+      // Usar full_name como name, pois name é obrigatório na tabela crm_contacts
+      const contactDataWithName = {
+        ...contactData,
+        name: contactData.full_name, // name é obrigatório, usar full_name como valor
+      };
+      
       if (contact) {
         console.log('✏️ Atualizando contato existente:', contact.id);
         // Atualizar contato existente
         await updateContact({
           contactId: contact.id,
           data: {
-            ...contactData,
+            ...contactDataWithName,
             updated_at: new Date().toISOString(),
           },
         });
@@ -123,7 +130,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, forceOp
       } else {
         console.log('➕ Criando novo contato...');
         // Criar novo contato
-        const newContact = await createContact(contactData as any);
+        const newContact = await createContact(contactDataWithName as any);
         console.log('✅ Contato criado:', newContact);
         
         // Criar contrato automaticamente se solicitado
