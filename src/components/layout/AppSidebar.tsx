@@ -17,7 +17,7 @@ import {
   Compass,
   Calendar
 } from "lucide-react"
-import { NavLink, useLocation } from "react-router-dom"
+import { NavLink, useLocation, useNavigate } from "react-router-dom"
 import {
   Tooltip,
   TooltipContent,
@@ -88,6 +88,7 @@ interface AppSidebarProps {
 
 export function AppSidebar({ isCollapsed }: AppSidebarProps) {
   const location = useLocation()
+  const navigate = useNavigate()
   const { signOut, user } = useAuth()
   const { toast } = useToast()
   const { isAdmin, isVendedor, isGestorTrafego, profile, isLoading: isLoadingProfile } = useUserProfile()
@@ -127,11 +128,16 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
         title: "Logout realizado",
         description: "Você foi desconectado com sucesso.",
       });
+      // Pequeno delay para garantir que o estado seja atualizado antes do redirecionamento
+      setTimeout(() => {
+        navigate('/login', { replace: true });
+      }, 100);
     } catch (error) {
+      console.error('Erro ao fazer logout:', error);
       toast({
         variant: "destructive",
         title: "Erro ao fazer logout",
-        description: "Tente novamente.",
+        description: error instanceof Error ? error.message : "Tente novamente.",
       });
     }
   };

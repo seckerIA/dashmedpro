@@ -48,6 +48,7 @@ import { X, Plus, HandCoins, Phone, Mail, Copy, MoreVertical, Settings, Trash2, 
 import { useCRM } from "@/hooks/useCRM";
 import { useToast } from "@/hooks/use-toast";
 import { CRMDeal, CRMContact, PIPELINE_STAGES } from "@/types/crm";
+import { formatCurrency, formatCurrencyInput } from "@/lib/currency";
 
 const dealSchema = z.object({
   title: z.string().min(2, "Título deve ter pelo menos 2 caracteres"),
@@ -109,7 +110,7 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
     defaultValues: {
       title: deal?.title || "",
       description: deal?.description || "",
-      value: (deal?.value?.toString() || "") as any,
+      value: deal?.value ? formatCurrency(deal.value) : ("" as any),
       stage: deal?.stage || "lead_novo",
       expected_close_date: deal?.expected_close_date 
         ? new Date(deal.expected_close_date).toISOString().split('T')[0]
@@ -315,23 +316,10 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
     }
   };
 
-  const formatCurrency = (value: string) => {
-    // Remove tudo que não é número
-    const numbers = value.replace(/[^\d]/g, "");
-    if (!numbers) return "";
-    
-    // Converte para número e formata
-    const num = parseInt(numbers) / 100;
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 0,
-    }).format(num);
-  };
-
   const handleValueChange = (value: string) => {
-    const formatted = formatCurrency(value);
-    form.setValue("value", value as any);
+    // Usar formatCurrencyInput do lib/currency para formatação correta
+    const formatted = formatCurrencyInput(value);
+    form.setValue("value", formatted as any);
   };
 
   const isLoading = isCreatingDeal || isUpdatingDeal;
@@ -439,9 +427,8 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
                   <FormControl>
                     <Input 
                       placeholder="R$ 0,00"
-                      value={field.value}
+                      value={field.value || ""}
                       onChange={(e) => {
-                        field.onChange(e.target.value);
                         handleValueChange(e.target.value);
                       }}
                     />
@@ -648,7 +635,7 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
                     {selectedContact.service_value && (
                       <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg p-3 border-2 border-emerald-200 dark:border-emerald-700 shadow-sm">
                         <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
-                          💰 Valor: R$ {selectedContact.service_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          💰 Valor: {formatCurrency(selectedContact.service_value)}
                         </span>
                       </div>
                     )}
@@ -844,7 +831,7 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-muted-foreground">Valor do Serviço:</span>
                         <span className="text-sm font-semibold text-green-600">
-                          R$ {selectedContact.service_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          {formatCurrency(selectedContact.service_value)}
                         </span>
                       </div>
                     )}

@@ -6,10 +6,20 @@
  * Formata um número como moeda brasileira
  */
 export const formatCurrency = (value: number | string | null | undefined): string => {
-  if (!value && value !== 0) return "";
+  if (value === null || value === undefined) return "";
+  if (value === 0) return "R$ 0,00";
   
-  const numericValue = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(numericValue)) return "";
+  // Converter string para número, removendo caracteres não numéricos se necessário
+  let numericValue: number;
+  if (typeof value === 'string') {
+    // Remover espaços e caracteres especiais, manter apenas números, vírgula e ponto
+    const cleanValue = value.replace(/[^\d,.-]/g, '').replace(',', '.');
+    numericValue = parseFloat(cleanValue);
+  } else {
+    numericValue = value;
+  }
+  
+  if (isNaN(numericValue) || numericValue === 0) return "R$ 0,00";
   
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',

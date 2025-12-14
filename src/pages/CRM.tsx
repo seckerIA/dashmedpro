@@ -34,6 +34,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { CRMDealWithContact } from "@/types/crm";
+import { formatCurrency } from "@/lib/currency";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -272,14 +273,6 @@ const CRM = () => {
   const conversionRate = deals.length > 0 
     ? ((wonDeals / deals.length) * 100).toFixed(1)
     : '0';
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 0,
-    }).format(value);
-  };
 
   const handleScheduleCall = (deal: CRMDealWithContact) => {
     setDealForCall(deal);

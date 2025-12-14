@@ -37,7 +37,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      // Tentar fazer logout no Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      // Ignorar erro de "session missing" - significa que já não há sessão
+      if (error && !error.message.includes('session missing') && !error.message.includes('Session not found')) {
+        console.error('Erro ao fazer logout:', error);
+        throw error;
+      }
+    } catch (error: any) {
+      // Se o erro for sobre sessão faltando, ignorar e continuar
+      if (error?.message?.includes('session missing') || error?.message?.includes('Session not found')) {
+        console.log('Sessão já estava ausente, continuando com logout...');
+      } else {
+        console.error('Erro ao fazer logout:', error);
+      }
+    } finally {
+      // Sempre atualizar o estado e limpar dados locais
+      setSession(null);
+      setUser(null);
+      
+      // Limpar dados do Supabase no localStorage
+      const supabaseKeys = Object.keys(localStorage).filter(key => 
+        key.startsWith('sb-') || key.includes('supabase')
+      );
+      supabaseKeys.forEach(key => localStorage.removeItem(key));
+    }
   };
 
   const value = {

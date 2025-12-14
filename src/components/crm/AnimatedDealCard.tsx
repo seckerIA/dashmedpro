@@ -113,9 +113,9 @@ export function AnimatedDealCard({
       
       <div className="relative p-4 space-y-3">
         {/* Header */}
-        <div className="flex items-start justify-between">
-          <div className="flex-1 cursor-pointer" onClick={onClick}>
-            <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex-1 cursor-pointer min-w-0" onClick={onClick}>
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               {deal.needs_follow_up && (
                 <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-orange-500/10 text-orange-600 border-orange-500/20">
                   <Clock className="w-3 h-3 mr-1" />
@@ -132,29 +132,41 @@ export function AnimatedDealCard({
                 </Badge>
               )}
             </div>
-            <h4 className="font-semibold text-sm text-foreground line-clamp-1 transition-colors duration-150 group-hover:text-primary">
-              {deal.title}
-            </h4>
+            <div className="flex items-center gap-3">
+              <h4 className="font-semibold text-sm text-foreground line-clamp-1 transition-colors duration-150 group-hover:text-primary">
+                {deal.title}
+              </h4>
+              <span className="text-sm font-bold text-green-700 tabular-nums whitespace-nowrap">
+                {formatCurrency(deal.value ?? 0)}
+              </span>
+            </div>
             {deal.contact && (
-              <div className="space-y-1">
+              <div className="space-y-1 mt-1">
                 <p className="text-xs text-muted-foreground flex items-center gap-1 transition-all duration-150">
-                  <User className="w-3 h-3" />
+                  <User className="w-3 h-3 flex-shrink-0" />
                   <span className="group-hover:text-foreground transition-colors duration-150">
                     {deal.contact.full_name}
                   </span>
                 </p>
                 {deal.contact.service && (
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-2 mt-1">
                     {(() => {
                       const serviceConfig = getServiceConfig(deal.contact.service);
                       if (!serviceConfig) return null;
                       return (
-                        <Badge 
-                          variant="secondary" 
-                          className={`text-xs px-2 py-0.5 ${serviceConfig.bgColor} ${serviceConfig.textColor} border-0 font-medium`}
-                        >
-                          {serviceConfig.label}
-                        </Badge>
+                        <>
+                          <Badge 
+                            variant="secondary" 
+                            className={`text-xs px-2 py-0.5 ${serviceConfig.bgColor} ${serviceConfig.textColor} border-0 font-medium flex-shrink-0`}
+                          >
+                            {serviceConfig.label}
+                          </Badge>
+                          {deal.contact.service_value !== null && deal.contact.service_value !== undefined && (
+                            <span className="text-xs font-semibold text-green-600 tabular-nums whitespace-nowrap">
+                              {formatCurrency(deal.contact.service_value)}
+                            </span>
+                          )}
+                        </>
                       );
                     })()}
                   </div>
@@ -163,7 +175,7 @@ export function AnimatedDealCard({
             )}
           </div>
           
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 flex-shrink-0">
             {deal.probability && (
               <Badge 
                 variant="secondary" 
@@ -242,14 +254,11 @@ export function AnimatedDealCard({
               willChange: 'transform',
             }}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-green-600 uppercase tracking-wide">Valor do Serviço</span>
-              <div className="flex items-center gap-1 text-xl font-bold text-green-700">
-                <DollarSign className="w-4 h-4" />
-                <span className="tabular-nums">
-                  {formatCurrency(displayedServiceValue)}
-                </span>
-              </div>
+            <div className="flex items-center justify-between w-full">
+              <span className="text-xs font-medium text-green-600 uppercase tracking-wide whitespace-nowrap">Valor do Serviço</span>
+              <span className="text-xl font-bold text-green-700 tabular-nums whitespace-nowrap flex-shrink-0">
+                {formatCurrency(displayedServiceValue)}
+              </span>
             </div>
           </div>
         )}
