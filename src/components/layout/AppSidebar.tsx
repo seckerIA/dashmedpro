@@ -163,6 +163,19 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
               {navigationGroups.map((group, groupIndex) => {
                 // Filtrar itens do grupo baseado nas permissões
                 const filteredItems = group.items.filter(item => {
+                  // Abas ocultas temporariamente (não exibir para nenhum cargo)
+                  const hiddenUrls = [
+                    '/comercial/guia-prospeccao', // Guia de Prospecção
+                    '/calculadora', // Calculadora
+                    '/funil-vendas', // Funil de Vendas
+                    '/email-marketing', // E-mail Marketing
+                    '/landing-pages', // Landing Pages
+                    '/relatorios', // Relatórios
+                  ];
+                  if (hiddenUrls.includes(item.url)) {
+                    return false;
+                  }
+                  
                   // Se o item tem adminOnly, só mostrar para admin/dono
                   if (item.adminOnly === true) {
                     // Se ainda está carregando o perfil, não mostrar ainda (evita flash)
