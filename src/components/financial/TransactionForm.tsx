@@ -318,11 +318,12 @@ const TransactionForm = () => {
         return
       }
 
-      const transactionData: Omit<FinancialTransaction, 'id' | 'created_at' | 'updated_at'> = {
+      const transactionData = {
         user_id: user.id,
         type: formData.type,
         description: formData.description.trim(),
         amount: parseFloat(formData.amount) / 100, // Converte de centavos para reais
+        date: formData.transaction_date,
         transaction_date: formData.transaction_date,
         category_id: formData.category_id,
         account_id: formData.account_id,

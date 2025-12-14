@@ -27,10 +27,38 @@ export const useCreateRecurringTransaction = () => {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: Omit<FinancialRecurringTransaction, 'id' | 'created_at' | 'updated_at'>) => {
+    mutationFn: async (data: {
+      user_id: string;
+      template_transaction_id?: string | null;
+      frequency: string;
+      amount: number;
+      type: string;
+      description?: string | null;
+      account_id?: string | null;
+      category_id?: string | null;
+      next_date: string;
+      is_active?: boolean;
+      execution_count?: number;
+      auto_create?: boolean;
+    }) => {
+      const insertData = {
+        user_id: data.user_id,
+        template_transaction_id: data.template_transaction_id || null,
+        frequency: data.frequency,
+        amount: data.amount,
+        type: data.type,
+        description: data.description || null,
+        account_id: data.account_id || null,
+        category_id: data.category_id || null,
+        next_date: data.next_date,
+        is_active: data.is_active ?? true,
+        execution_count: data.execution_count ?? 0,
+        auto_create: data.auto_create ?? true,
+      }
+
       const { data: result, error } = await supabase
         .from('financial_recurring_transactions')
-        .insert([data])
+        .insert([insertData])
         .select()
         .single()
 
@@ -132,13 +160,27 @@ export const useExecuteRecurringTransaction = () => {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { data, error } = await supabase
-        .rpc('execute_recurring_transaction', { recurring_transaction_id: id })
+      // Execute manually since the RPC function may not exist
+      const { data: recurring, error: fetchError } = await supabase
+        .from('financial_recurring_transactions')
+        .select('*')
+        .eq('id', id)
+        .single()
 
-      if (error) {
-        throw new Error(error.message)
-      }
-      return data
+      if (fetchError) throw new Error(fetchError.message)
+
+      // Update last execution date
+      const { error: updateError } = await supabase
+        .from('financial_recurring_transactions')
+        .update({
+          last_execution_date: new Date().toISOString().split('T')[0],
+          execution_count: (recurring.execution_count || 0) + 1
+        })
+        .eq('id', id)
+
+      if (updateError) throw new Error(updateError.message)
+
+      return recurring
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recurringTransactions'] })

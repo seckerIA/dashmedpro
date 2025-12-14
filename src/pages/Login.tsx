@@ -18,8 +18,46 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
+  const [sendingResetEmail, setSendingResetEmail] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSendingResetEmail(true);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        toast({
+          variant: 'destructive',
+          title: 'Erro ao enviar email',
+          description: error.message,
+        });
+        return;
+      }
+
+      toast({
+        title: 'Email enviado!',
+        description: 'Verifique sua caixa de entrada para redefinir sua senha.',
+      });
+      setForgotPasswordMode(false);
+      setForgotPasswordEmail('');
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro inesperado',
+        description: 'Tente novamente em alguns instantes.',
+      });
+    } finally {
+      setSendingResetEmail(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,6 +160,75 @@ const Login = () => {
     }
   };
 
+  // Forgot Password Mode
+  if (forgotPasswordMode) {
+    return (
+      <div className="w-full min-h-screen lg:grid lg:grid-cols-2">
+        <div className="flex items-center justify-center py-12">
+          <div className="mx-auto grid w-[350px] gap-6">
+            <Card className="border-0 shadow-none">
+              <CardHeader className="text-left space-y-2">
+                <div className="flex items-center gap-3">
+                  <img src={svmLogo} alt="Logo" className="w-10 h-10" />
+                  <div>
+                    <CardTitle className="text-2xl font-bold text-foreground">Recuperar Senha</CardTitle>
+                    <CardDescription>
+                      Digite seu email para receber o link de recuperação
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleForgotPassword} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="forgot-email">Email</Label>
+                    <Input
+                      id="forgot-email"
+                      type="email"
+                      value={forgotPasswordEmail}
+                      onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                      placeholder="seu@email.com"
+                      required
+                    />
+                  </div>
+
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={sendingResetEmail}
+                  >
+                    {sendingResetEmail ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    Enviar Link de Recuperação
+                  </Button>
+
+                  <Button 
+                    type="button"
+                    variant="ghost" 
+                    className="w-full" 
+                    onClick={() => setForgotPasswordMode(false)}
+                  >
+                    Voltar para o Login
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+        <div className="hidden bg-muted lg:flex items-center justify-center p-12 text-center">
+          <div className="space-y-4">
+            <img src={svmLogo} alt="DashMed Pro Logo" className="w-24 h-24 mx-auto" />
+            <h1 className="text-3xl font-bold text-foreground">DashMed Pro</h1>
+            <p className="text-muted-foreground">
+              Recupere o acesso à sua conta.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full min-h-screen lg:grid lg:grid-cols-2">
       <div className="flex items-center justify-center py-12">
@@ -162,9 +269,13 @@ const Login = () => {
                     <div className="space-y-2">
                         <div className="flex items-center">
                             <Label htmlFor="login-password">Senha</Label>
-                            <a href="#" className="ml-auto inline-block text-sm underline">
+                            <button 
+                              type="button"
+                              onClick={() => setForgotPasswordMode(true)}
+                              className="ml-auto inline-block text-sm underline hover:text-primary"
+                            >
                                 Esqueceu sua senha?
-                            </a>
+                            </button>
                         </div>
                       <div className="relative">
                         <Input
