@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(supabase --version:*)",
+      "Bash(supabase status:*)",
+      "Bash(where:*)",
+      "Bash(irm:*)",
+      "Bash(iex)",
+      "Bash(npm install:*)",
+      "Bash(npx supabase:*)",
+      "Bash(cat:*)",
+      "Bash(npm run dev:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

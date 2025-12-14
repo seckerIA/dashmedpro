@@ -5,7 +5,7 @@
 1. **Arquivo de configuração criado**: `.cursor/mcp.json`
 2. **MCP Server do Supabase configurado** com suas credenciais
 3. **MCP Server do GitHub configurado** com suas credenciais
-4. **Project Ref**: `npcgtjrgxxrhvrptkzip`
+4. **Project Ref**: `rpcixpbmtpyrnzlsuuus`
 5. **Access Tokens**: Configurados (ocultos por segurança)
 
 ## 🔄 Próximos passos:
@@ -61,7 +61,7 @@ O arquivo `.cursor/mcp.json` contém:
       "args": [
         "-y",
         "@supabase/mcp-server-supabase",
-        "--project-ref=npcgtjrgxxrhvrptkzip"
+        "--project-ref=rpcixpbmtpyrnzlsuuus"
       ],
       "env": {
         "SUPABASE_ACCESS_TOKEN": "seu_token_supabase"

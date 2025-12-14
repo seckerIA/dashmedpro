@@ -1,3 +1,4 @@
+import React from "react"
 import { 
   BarChart3, 
   Calculator, 
@@ -89,11 +90,35 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
   const location = useLocation()
   const { signOut, user } = useAuth()
   const { toast } = useToast()
-  const { isAdmin, isVendedor, isGestorTrafego } = useUserProfile()
+  const { isAdmin, isVendedor, isGestorTrafego, profile, isLoading: isLoadingProfile } = useUserProfile()
   
   const currentPath = location.pathname
 
   const isActive = (path: string) => currentPath === path
+  
+  // Debug: verificar permissões (remover em produção)
+  React.useEffect(() => {
+    if (profile) {
+      console.log('Sidebar Debug - Profile Loaded:', { 
+        profileId: profile.id,
+        email: profile.email,
+        fullName: profile.full_name,
+        role: profile.role, 
+        isActive: profile.is_active,
+        isAdmin, 
+        isVendedor, 
+        isGestorTrafego,
+        isLoadingProfile,
+        userId: user?.id,
+        hasAdminOnlyItems: navigationGroups.some(g => g.items.some(i => i.adminOnly === true))
+      });
+    } else if (!isLoadingProfile) {
+      console.warn('Sidebar Debug - No Profile Found:', {
+        userId: user?.id,
+        isLoadingProfile
+      });
+    }
+  }, [profile, isAdmin, isVendedor, isGestorTrafego, isLoadingProfile, user?.id]);
   
   const handleSignOut = async () => {
     try {
@@ -139,8 +164,17 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                 // Filtrar itens do grupo baseado nas permissões
                 const filteredItems = group.items.filter(item => {
                   // Se o item tem adminOnly, só mostrar para admin/dono
-                  if (item.adminOnly && !isAdmin) {
-                    return false;
+                  if (item.adminOnly === true) {
+                    // Se ainda está carregando o perfil, não mostrar ainda (evita flash)
+                    if (isLoadingProfile || !profile) {
+                      return false;
+                    }
+                    // Verificar se é admin ou dono - verificação direta do role
+                    const userRole = profile.role;
+                    const userIsAdmin = userRole === 'admin' || userRole === 'dono';
+                    if (!userIsAdmin) {
+                      return false;
+                    }
                   }
                   
                   // Vendedores NÃO podem ver:

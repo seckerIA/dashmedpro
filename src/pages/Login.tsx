@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Eye, EyeOff, LogIn, UserPlus, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, LogIn, UserPlus, Loader2, RefreshCw } from 'lucide-react';
 import dashmedLogo from "@/assets/dashmed-logo.png";
 
 const Login = () => {
@@ -65,24 +65,51 @@ const Login = () => {
     }
   };
 
+  const clearSupabaseCache = () => {
+    // Limpar todas as chaves do Supabase do localStorage
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.includes('supabase') || key.includes('sb-') || key.startsWith('supabase.auth.token'))) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    
+    // Limpar sessão do Supabase
+    supabase.auth.signOut();
+    
+    toast({
+      title: 'Cache limpo',
+      description: 'Credenciais antigas foram removidas. Tente fazer login novamente.',
+    });
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
-        toast({
-          variant: 'destructive',
-          title: 'Erro no login',
-          description: error.message === 'Invalid login credentials' 
-            ? 'Credenciais inválidas. Verifique seu email e senha.'
-            : error.message,
-        });
+        // Se erro de credenciais inválidas, pode ser cache antigo
+        if (error.message === 'Invalid login credentials' || error.status === 400) {
+          toast({
+            variant: 'destructive',
+            title: 'Credenciais inválidas',
+            description: 'Se você baixou uma nova versão do projeto, clique em "Limpar Cache" e tente novamente.',
+          });
+        } else {
+          toast({
+            variant: 'destructive',
+            title: 'Erro no login',
+            description: error.message,
+          });
+        }
         return;
       }
 

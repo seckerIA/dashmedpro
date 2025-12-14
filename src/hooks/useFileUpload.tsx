@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from '@/hooks/use-toast'
 
+// URL do Supabase para edge functions
+const SUPABASE_URL = "https://rpcixpbmtpyrnzlsuuus.supabase.co"
+
 export interface UploadedFile {
   id: string
   name: string
@@ -81,7 +84,7 @@ export const useFileUpload = () => {
       try {
         const fileContent = await fileToBase64(file)
         
-        const response = await fetch(`https://npcgtjrgxxrhvrptkzip.supabase.co/functions/v1/upload-to-google-drive`, {
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/upload-to-google-drive`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

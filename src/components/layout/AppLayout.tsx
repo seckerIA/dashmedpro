@@ -25,6 +25,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { profile } = useUserProfile()
   const displayName = profile?.full_name || profile?.email || 'Usuário'
   const displayRole = profile?.role || 'vendedor'
+
   const initials = (profile?.full_name || profile?.email || 'U')
     .split(' ')
     .map((n) => n?.[0] || '')

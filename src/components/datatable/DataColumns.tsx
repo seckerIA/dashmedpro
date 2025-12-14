@@ -40,7 +40,9 @@ const getRoleColor = (role: string) => {
 };
 
 export const getColumns = (
-  handleToggleActive: (userId: string, currentStatus: boolean) => void
+  handleToggleActive: (userId: string, currentStatus: boolean) => void,
+  handleDelete: (userId: string) => void,
+  handleEdit: (profile: Profile) => void
 ): ColumnDef<Profile>[] => [
   {
     id: "select",
@@ -120,6 +122,6 @@ export const getColumns = (
   },
   {
     id: "actions",
-    cell: ({ row }) => <DataTableRowActions row={row} handleToggleActive={handleToggleActive} />,
+    cell: ({ row }) => <DataTableRowActions row={row} handleToggleActive={handleToggleActive} handleDelete={handleDelete} handleEdit={handleEdit} />,
   },
 ]

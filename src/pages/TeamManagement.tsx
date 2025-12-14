@@ -20,6 +20,7 @@ const TeamManagement = () => {
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -32,7 +33,7 @@ const TeamManagement = () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -58,9 +59,58 @@ const TeamManagement = () => {
     setLoading(true);
 
     try {
-      // Chama edge function para criar usuário
-      const { data, error } = await supabase.functions.invoke('create-team-user', {
-        body: formData
+      if (editingProfile) {
+        // Atualizar usuário existente
+        await handleUpdateUser();
+      } else {
+        // Criar novo usuário
+        const { data, error } = await supabase.functions.invoke('create-team-user', {
+          body: formData
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        toast({
+          title: 'Usuário criado com sucesso!',
+          description: `${formData.full_name || formData.email} foi adicionado à equipe.`,
+        });
+      }
+
+      setFormData({ email: '', password: '', full_name: '', role: 'vendedor' });
+      setEditingProfile(null);
+      setDialogOpen(false);
+      fetchProfiles();
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: editingProfile ? 'Erro ao atualizar usuário' : 'Erro ao criar usuário',
+        description: error.message || (editingProfile ? 'Não foi possível atualizar o usuário.' : 'Não foi possível criar o usuário.'),
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editingProfile) return;
+
+    try {
+      // Chama edge function para atualizar usuário
+      const updateData: any = {
+        userId: editingProfile.id,
+        full_name: formData.full_name || null,
+        role: formData.role
+      };
+
+      // Adiciona senha apenas se foi fornecida
+      if (formData.password && formData.password.trim() !== '') {
+        updateData.password = formData.password;
+      }
+
+      const { data, error } = await supabase.functions.invoke('update-team-user', {
+        body: updateData
       });
 
       if (error) {
@@ -68,22 +118,23 @@ const TeamManagement = () => {
       }
 
       toast({
-        title: 'Usuário criado com sucesso!',
-        description: `${formData.full_name || formData.email} foi adicionado à equipe.`,
+        title: 'Usuário atualizado com sucesso!',
+        description: `Os dados de ${formData.full_name || formData.email} foram atualizados.`,
       });
-
-      setFormData({ email: '', password: '', full_name: '', role: 'vendedor' });
-      setDialogOpen(false);
-      fetchProfiles();
     } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Erro ao criar usuário',
-        description: error.message || 'Não foi possível criar o usuário.',
-      });
-    } finally {
-      setLoading(false);
+      throw error;
     }
+  };
+
+  const handleEdit = (profile: Profile) => {
+    setEditingProfile(profile);
+    setFormData({
+      email: profile.email,
+      password: '', // Não preencher senha por segurança
+      full_name: profile.full_name || '',
+      role: (profile.role || 'vendedor') as Profile['role']
+    });
+    setDialogOpen(true);
   };
 
   const handleToggleActive = async (userId: string, currentActive: boolean) => {
@@ -112,6 +163,36 @@ const TeamManagement = () => {
     }
   };
 
+  const handleDelete = async (userId: string) => {
+    try {
+      setLoading(true);
+      
+      // Chama edge function para excluir usuário
+      const { data, error } = await supabase.functions.invoke('delete-team-user', {
+        body: { userId }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: 'Usuário excluído com sucesso!',
+        description: 'O usuário foi removido permanentemente da equipe.',
+      });
+
+      fetchProfiles();
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao excluir usuário',
+        description: error.message || 'Não foi possível excluir o usuário.',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getRoleLabel = (role: string) => {
     const labels = {
       admin: 'Administrador',
@@ -132,7 +213,7 @@ const TeamManagement = () => {
     return colors[role as keyof typeof colors] || 'secondary';
   };
 
-  const columns = getColumns(handleToggleActive);
+  const columns = getColumns(handleToggleActive, handleDelete, handleEdit);
 
   return (
     <div className="space-y-6">
@@ -144,7 +225,13 @@ const TeamManagement = () => {
           </p>
         </div>
         
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) {
+            setEditingProfile(null);
+            setFormData({ email: '', password: '', full_name: '', role: 'vendedor' });
+          }
+        }}>
           <DialogTrigger asChild>
             <Button>
               <UserPlus className="mr-2 h-4 w-4" />
@@ -154,9 +241,11 @@ const TeamManagement = () => {
           <DialogContent className="sm:max-w-md">
             <form onSubmit={handleCreateUser}>
               <DialogHeader>
-                <DialogTitle>Adicionar Novo Membro</DialogTitle>
+                <DialogTitle>{editingProfile ? 'Editar Membro' : 'Adicionar Novo Membro'}</DialogTitle>
                 <DialogDescription>
-                  Preencha os dados para criar um novo usuário na equipe.
+                  {editingProfile 
+                    ? 'Atualize os dados do membro da equipe.' 
+                    : 'Preencha os dados para criar um novo usuário na equipe.'}
                 </DialogDescription>
               </DialogHeader>
               
@@ -180,19 +269,23 @@ const TeamManagement = () => {
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     placeholder="email@exemplo.com"
                     required
+                    disabled={!!editingProfile}
                   />
+                  {editingProfile && (
+                    <p className="text-xs text-muted-foreground">O email não pode ser alterado.</p>
+                  )}
                 </div>
                 
                 <div className="grid gap-2">
-                  <Label htmlFor="password">Senha *</Label>
+                  <Label htmlFor="password">Senha {editingProfile ? '(deixe em branco para não alterar)' : '*'}</Label>
                   <div className="relative">
                     <Input
                       id="password"
                       type={showPassword ? 'text' : 'password'}
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      placeholder="Senha temporária"
-                      required
+                      placeholder={editingProfile ? "Deixe em branco para manter a senha atual" : "Senha temporária"}
+                      required={!editingProfile}
                     />
                     <Button
                       type="button"
@@ -216,6 +309,7 @@ const TeamManagement = () => {
                       <SelectValue placeholder="Selecione uma função" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="admin">Administrador</SelectItem>
                       <SelectItem value="dono">Dono</SelectItem>
                       <SelectItem value="vendedor">Vendedor</SelectItem>
                       <SelectItem value="gestor_trafego">Gestor de Tráfego</SelectItem>
@@ -225,8 +319,22 @@ const TeamManagement = () => {
               </div>
               
               <DialogFooter>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => {
+                    setDialogOpen(false);
+                    setEditingProfile(null);
+                    setFormData({ email: '', password: '', full_name: '', role: 'vendedor' });
+                  }}
+                  disabled={loading}
+                >
+                  Cancelar
+                </Button>
                 <Button type="submit" disabled={loading}>
-                  {loading ? 'Criando...' : 'Criar Usuário'}
+                  {loading 
+                    ? (editingProfile ? 'Atualizando...' : 'Criando...') 
+                    : (editingProfile ? 'Atualizar Usuário' : 'Criar Usuário')}
                 </Button>
               </DialogFooter>
             </form>

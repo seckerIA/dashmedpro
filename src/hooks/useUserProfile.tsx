@@ -5,24 +5,79 @@ import { useAuth } from './useAuth';
 export function useUserProfile() {
   const { user } = useAuth();
 
-  const { data: profile, isLoading, error } = useQuery({
+  const { data: profile, isLoading, error, refetch } = useQuery({
     queryKey: ['user-profile', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+      try {
+        // Primeiro, tentar buscar do profiles com colunas específicas para evitar erro 406
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by')
+          .eq('id', user.id)
+          .single();
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('useUserProfile - erro ao buscar:', error);
-        throw error;
+        if (profileError && profileError.code !== 'PGRST116') {
+          console.error('useUserProfile - erro ao buscar profile:', {
+            code: profileError.code,
+            message: profileError.message,
+            details: profileError.details,
+            hint: profileError.hint
+          });
+          
+          // Se erro 406, tentar buscar apenas colunas básicas
+          if (profileError.code === 'PGRST116' || profileError.message?.includes('406') || profileError.code === '406') {
+            const { data: basicData, error: basicError } = await supabase
+              .from('profiles')
+              .select('id, email, full_name, role')
+              .eq('id', user.id)
+              .single();
+            
+            if (basicError && basicError.code !== 'PGRST116') {
+              throw basicError;
+            }
+            return basicData;
+          }
+          throw profileError;
+        }
+
+        // Se profile existe mas não tem role, tentar buscar de user_roles como fallback
+        if (profileData && !profileData.role) {
+          console.log('useUserProfile - Profile sem role, tentando buscar de user_roles');
+          const { data: roleData, error: roleError } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user.id)
+            .limit(1)
+            .single();
+
+          if (!roleError && roleData) {
+            profileData.role = roleData.role;
+            console.log('useUserProfile - Role encontrado em user_roles:', roleData.role);
+          } else if (roleError) {
+            console.warn('useUserProfile - Erro ao buscar role de user_roles:', roleError);
+          }
+        }
+
+        if (profileData) {
+          console.log('useUserProfile - Profile carregado com sucesso:', {
+            id: profileData.id,
+            email: profileData.email,
+            fullName: profileData.full_name,
+            role: profileData.role
+          });
+        }
+
+        return profileData;
+      } catch (err: any) {
+        console.error('useUserProfile - erro completo:', err);
+        throw err;
       }
-      return data;
     },
     enabled: !!user?.id,
+    retry: 2,
+    retryDelay: 1000,
   });
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'dono';
@@ -37,5 +92,6 @@ export function useUserProfile() {
     isVendedor,
     isGestorTrafego,
     role: profile?.role,
+    refetch,
   };
 }

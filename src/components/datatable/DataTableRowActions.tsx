@@ -26,11 +26,15 @@ import { Profile } from "./DataColumns"
 interface DataTableRowActionsProps<TData> {
   row: Row<TData>,
   handleToggleActive: (userId: string, currentStatus: boolean) => void;
+  handleDelete: (userId: string) => void;
+  handleEdit: (profile: Profile) => void;
 }
 
 export function DataTableRowActions<TData>({
   row,
-  handleToggleActive
+  handleToggleActive,
+  handleDelete,
+  handleEdit
 }: DataTableRowActionsProps<TData>) {
     const profile = row.original as Profile
     const [showToggleAlert, setShowToggleAlert] = useState(false)
@@ -49,7 +53,7 @@ export function DataTableRowActions<TData>({
             </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-[160px]">
-            <DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => handleEdit(profile)}>
             <Edit className="mr-2 h-4 w-4" />
             Editar
             </DropdownMenuItem>
@@ -103,7 +107,10 @@ export function DataTableRowActions<TData>({
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
                     <AlertDialogAction
                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        // onClick={() => handleDelete(profile.id)} // TODO: Implement delete functionality
+                        onClick={() => {
+                          handleDelete(profile.id);
+                          setShowDeleteAlert(false);
+                        }}
                     >
                         Excluir
                     </AlertDialogAction>
