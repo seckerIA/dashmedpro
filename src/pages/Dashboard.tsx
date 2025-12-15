@@ -12,6 +12,8 @@ import { ConversionChart } from "@/components/charts/ConversionChart"
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics"
 import { useFinancialMetrics } from "@/hooks/useFinancialMetrics"
 import { useUserProfile } from "@/hooks/useUserProfile"
+import { MetricCard } from "@/components/dashboard/MetricCard"
+import { PipelineFunnelCard } from "@/components/dashboard/PipelineFunnelCard"
 import { 
   Calculator, 
   TrendingUp, 
@@ -106,191 +108,105 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Top Metrics - Nexus Style */}
+      {/* Top Metrics - Métricas Financeiras */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Saldo Total</p>
-                <p className="text-2xl font-bold text-positive">{formatCurrency(financialMetrics?.totalBalance || 0)}</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <CreditCard className="w-3 h-3 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">financeiro</span>
-                </div>
-              </div>
-              <div className="p-3 bg-positive/10 rounded-xl">
-                <DollarSign className="w-5 h-5 text-positive" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <MetricCard
+          title="Saldo Total"
+          value={formatCurrency(financialMetrics?.totalBalance || 0)}
+          variant="green"
+          icon={DollarSign}
+          trend={{
+            value: financialMetrics?.profitMargin || 0,
+            label: "margem bruta"
+          }}
+        />
 
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Receita do Mês</p>
-                <p className="text-2xl font-bold text-chart-1">{formatCurrency(financialMetrics?.monthRevenue || 0)}</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <ArrowUpRight className="w-3 h-3 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">entradas</span>
-                </div>
-              </div>
-              <div className="p-3 bg-chart-1/10 rounded-xl">
-                <ArrowUpRight className="w-5 h-5 text-chart-1" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <MetricCard
+          title="Receita do Mês"
+          value={formatCurrency(financialMetrics?.monthRevenue || 0)}
+          variant="purple"
+          icon={ArrowUpRight}
+          trend={{
+            value: 0,
+            label: "entradas"
+          }}
+        />
 
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Despesas do Mês</p>
-                <p className="text-2xl font-bold text-negative">{formatCurrency(financialMetrics?.monthExpenses || 0)}</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <ArrowDownLeft className="w-3 h-3 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">saídas</span>
-                </div>
-              </div>
-              <div className="p-3 bg-negative/10 rounded-xl">
-                <ArrowDownLeft className="w-5 h-5 text-negative" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <MetricCard
+          title="Despesas do Mês"
+          value={formatCurrency(financialMetrics?.monthExpenses || 0)}
+          variant="cyan"
+          icon={ArrowDownLeft}
+          trend={{
+            value: 0,
+            label: "saídas"
+          }}
+        />
 
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Lucro do Mês</p>
-                <p className="text-2xl font-bold text-info">{formatCurrency(financialMetrics?.monthNetProfit || 0)}</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <TrendingUp className="w-3 h-3 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">{financialMetrics?.netProfitMargin?.toFixed(1) || '0'}% margem</span>
-                </div>
-              </div>
-              <div className="p-3 bg-info/10 rounded-xl">
-                <Activity className="w-5 h-5 text-info" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <MetricCard
+          title="Lucro do Mês"
+          value={formatCurrency(financialMetrics?.monthNetProfit || 0)}
+          variant="yellow"
+          icon={Activity}
+          trend={{
+            value: financialMetrics?.netProfitMargin || 0,
+            label: "margem líquida"
+          }}
+        />
       </div>
 
       {/* CRM Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Valor Total Fechado</p>
-                <p className="text-2xl font-bold text-positive">{formatCurrency(metrics?.totalClosedValue || 0)}</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <TrendingUp className="w-3 h-3 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">{metrics?.wonDeals || 0} contratos</span>
-                </div>
-              </div>
-              <div className="p-3 bg-positive/10 rounded-xl">
-                <Target className="w-5 h-5 text-positive" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <MetricCard
+          title="Valor Total Fechado"
+          value={formatCurrency(metrics?.totalClosedValue || 0)}
+          variant="green"
+          icon={Target}
+          trend={{
+            value: metrics?.wonDeals || 0,
+            label: `${metrics?.wonDeals || 0} contratos ganhos`
+          }}
+        />
 
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Valor em Pipeline</p>
-                <p className="text-2xl font-bold text-chart-1">{formatCurrency(metrics?.totalPipelineValue || 0)}</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <Target className="w-3 h-3 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">{metrics?.activeDeals || 0} ativos</span>
-                </div>
-              </div>
-              <div className="p-3 bg-chart-1/10 rounded-xl">
-                <PieChart className="w-5 h-5 text-chart-1" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <MetricCard
+          title="Valor em Pipeline"
+          value={formatCurrency(metrics?.totalPipelineValue || 0)}
+          variant="purple"
+          icon={PieChart}
+          trend={{
+            value: metrics?.activeDeals || 0,
+            label: `${metrics?.activeDeals || 0} negócios ativos`
+          }}
+        />
 
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total de Contatos</p>
-                <p className="text-2xl font-bold text-warning">{metrics?.totalContacts || 0}</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <Users className="w-3 h-3 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">cadastrados</span>
-                </div>
-              </div>
-              <div className="p-3 bg-warning/10 rounded-xl">
-                <Users className="w-5 h-5 text-warning" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <MetricCard
+          title="Total de Contatos"
+          value={metrics?.totalContacts || 0}
+          variant="yellow"
+          icon={Users}
+          trend={{
+            value: 0,
+            label: "contatos cadastrados"
+          }}
+        />
 
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Taxa de Conversão</p>
-                <p className="text-2xl font-bold text-info">{metrics?.conversionRate.toFixed(1) || '0.0'}%</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <TrendingUp className="w-3 h-3 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">{metrics?.wonDeals || 0} ganhos</span>
-                </div>
-              </div>
-              <div className="p-3 bg-info/10 rounded-xl">
-                <TrendingUp className="w-5 h-5 text-info" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <MetricCard
+          title="Taxa de Conversão"
+          value={`${metrics?.conversionRate.toFixed(1) || '0.0'}%`}
+          variant="cyan"
+          icon={TrendingUp}
+          trend={{
+            value: metrics?.wonDeals || 0,
+            label: `${metrics?.wonDeals || 0} negócios ganhos`
+          }}
+        />
       </div>
 
       {/* Funil Section */}
-      <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-        <CardHeader>
-          <CardTitle className="text-foreground">Valores e Conversão do Funil</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Lead Novo</p>
-              <p className="text-xl font-bold text-foreground">{metrics?.dealsByStage.lead_novo?.count || 0} negócios</p>
-              <p className="text-sm text-positive">{formatCurrency(metrics?.dealsByStage.lead_novo?.value || 0)}</p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Qualificado</p>
-              <p className="text-xl font-bold text-foreground">{metrics?.dealsByStage.qualificado?.count || 0} negócios</p>
-              <p className="text-sm text-positive">{formatCurrency(metrics?.dealsByStage.qualificado?.value || 0)}</p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Apresentação</p>
-              <p className="text-xl font-bold text-foreground">{metrics?.dealsByStage.apresentacao?.count || 0} negócios</p>
-              <p className="text-sm text-positive">{formatCurrency(metrics?.dealsByStage.apresentacao?.value || 0)}</p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Cliente Fechado</p>
-              <p className="text-xl font-bold text-foreground">{metrics?.dealsByStage.fechado_ganho?.count || 0} negócios</p>
-              <p className="text-sm text-positive">{formatCurrency(metrics?.dealsByStage.fechado_ganho?.value || 0)}</p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Cliente Perdido</p>
-              <p className="text-xl font-bold text-foreground">{metrics?.dealsByStage.fechado_perdido?.count || 0} negócios</p>
-              <p className="text-sm text-negative">{formatCurrency(metrics?.dealsByStage.fechado_perdido?.value || 0)}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <PipelineFunnelCard
+        dealsByStage={metrics?.dealsByStage || {}}
+        formatCurrency={formatCurrency}
+      />
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
