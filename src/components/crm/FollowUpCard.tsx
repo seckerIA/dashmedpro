@@ -67,7 +67,7 @@ export function FollowUpCard({ deal, followUp, onClick, onCompleteFollowUp, onEd
             <h4 className="font-semibold text-xs text-foreground line-clamp-1 group-hover:text-primary transition-colors duration-200">
               {deal.title}
             </h4>
-            {deal.contact && (
+            {deal.contact && deal.contact.full_name && (
               <div className="space-y-1 mt-1">
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <User className="w-3 h-3" />

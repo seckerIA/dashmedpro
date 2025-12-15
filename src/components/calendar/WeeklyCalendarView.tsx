@@ -103,12 +103,12 @@ export function WeeklyCalendarView({
                 <div className="space-y-2 max-h-[300px] overflow-y-auto">
                   {dayCalls.map((call) => {
                     const statusColors = CALL_STATUS_COLORS[call.status];
-                    const initials = call.contact.full_name
-                      .split(' ')
+                    const initials = call.contact?.full_name
+                      ?.split(' ')
                       .map(n => n[0])
                       .join('')
                       .toUpperCase()
-                      .slice(0, 2);
+                      .slice(0, 2) || '??';
 
                     return (
                       <div
@@ -139,7 +139,7 @@ export function WeeklyCalendarView({
                             {initials}
                           </div>
                           <p className={`text-[10px] line-clamp-1 flex-1 ${statusColors.text} opacity-80`}>
-                            {call.contact.full_name}
+                            {call.contact?.full_name || 'Sem contato'}
                           </p>
                         </div>
 

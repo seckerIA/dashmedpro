@@ -174,12 +174,12 @@ export function DailyCallsList({ calls, onEditCall, onViewCall }: DailyCallsList
                 .sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at))
                 .map((call) => {
                   const statusColors = CALL_STATUS_COLORS[call.status];
-                  const initials = call.contact.full_name
-                    .split(' ')
+                  const initials = call.contact?.full_name
+                    ?.split(' ')
                     .map(n => n[0])
                     .join('')
                     .toUpperCase()
-                    .slice(0, 2);
+                    .slice(0, 2) || '??';
 
                   return (
                     <Card 
@@ -206,14 +206,14 @@ export function DailyCallsList({ calls, onEditCall, onViewCall }: DailyCallsList
                                 <div className="flex items-center gap-2 mt-1">
                                   <User className="w-3 h-3 text-muted-foreground" />
                                   <span className="text-sm text-muted-foreground truncate">
-                                    {call.contact.full_name}
+                                    {call.contact?.full_name || 'Sem contato'}
                                   </span>
                                 </div>
-                                {call.contact.company && (
+                                {call.contact?.company && (
                                   <div className="flex items-center gap-2 mt-1">
                                     <Building2 className="w-3 h-3 text-muted-foreground" />
                                     <span className="text-xs text-muted-foreground truncate">
-                                      {call.contact.company}
+                                      {call.contact?.company}
                                     </span>
                                   </div>
                                 )}

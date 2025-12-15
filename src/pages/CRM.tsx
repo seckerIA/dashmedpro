@@ -495,7 +495,8 @@ const CRM = () => {
             onWhatsApp={(deal) => {
               if (deal.contact?.phone) {
                 const phone = deal.contact.phone.replace(/\D/g, '');
-                const message = encodeURIComponent(`Olá ${deal.contact.full_name}, tudo bem? Gostaria de fazer um follow-up sobre ${deal.title}.`);
+                const contactName = deal.contact?.full_name || 'cliente';
+                const message = encodeURIComponent(`Olá ${contactName}, tudo bem? Gostaria de fazer um follow-up sobre ${deal.title}.`);
                 window.open(`https://wa.me/55${phone}?text=${message}`);
               } else {
                 toast({

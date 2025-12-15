@@ -41,7 +41,7 @@ export function DealWonModal({ open, deal, onConfirm, onCancel }: DealWonModalPr
               <p className="font-semibold text-foreground">
                 {deal.title}
               </p>
-              {deal.contact && (
+              {deal.contact?.full_name && (
                 <p className="text-sm text-muted-foreground">
                   Cliente: {deal.contact.full_name}
                 </p>

@@ -45,12 +45,12 @@ export function CallDetailsModal({ call, open, onOpenChange, onEdit }: CallDetai
   if (!call) return null;
 
   const statusColors = CALL_STATUS_COLORS[call.status];
-  const initials = call.contact.full_name
-    .split(' ')
+  const initials = call.contact?.full_name
+    ?.split(' ')
     .map(n => n[0])
     .join('')
     .toUpperCase()
-    .slice(0, 2);
+    .slice(0, 2) || '??';
 
   const handleMarkAsCompleted = async () => {
     setIsProcessing(true);
@@ -142,12 +142,12 @@ export function CallDetailsModal({ call, open, onOpenChange, onEdit }: CallDetai
               <h3 className="font-semibold text-lg">{call.title}</h3>
               <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
                 <User className="w-4 h-4" />
-                <span>{call.contact.full_name}</span>
+                <span>{call.contact?.full_name || 'Sem contato'}</span>
               </div>
-              {call.contact.company && (
+              {call.contact?.company && (
                 <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
                   <Building2 className="w-4 h-4" />
-                  <span>{call.contact.company}</span>
+                  <span>{call.contact?.company}</span>
                 </div>
               )}
             </div>

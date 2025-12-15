@@ -76,7 +76,7 @@ export function GlobalSearch({ onSelectDeal, onSelectContact }: GlobalSearchProp
                   <div className="flex-1 space-y-1">
                     <p className="text-sm font-medium leading-none">{deal.title}</p>
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      {deal.contact && (
+                      {deal.contact?.full_name && (
                         <span className="flex items-center gap-1">
                           <User className="h-3 w-3" />
                           {deal.contact.full_name}

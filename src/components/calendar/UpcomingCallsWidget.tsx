@@ -85,12 +85,12 @@ export function UpcomingCallsWidget() {
           ) : (
             <>
               {upcomingCalls.map((call) => {
-                const initials = call.contact.full_name
-                  .split(' ')
+                const initials = call.contact?.full_name
+                  ?.split(' ')
                   .map(n => n[0])
                   .join('')
                   .toUpperCase()
-                  .slice(0, 2);
+                  .slice(0, 2) || '??';
                 const isSoon = isCallSoon(call.scheduled_at);
 
                 return (
@@ -125,7 +125,7 @@ export function UpcomingCallsWidget() {
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground truncate">
-                        {call.contact.full_name}
+                        {call.contact?.full_name || 'Sem contato'}
                       </p>
                       <div className="flex items-center gap-3 mt-1">
                         <span className="text-xs text-muted-foreground flex items-center gap-1">

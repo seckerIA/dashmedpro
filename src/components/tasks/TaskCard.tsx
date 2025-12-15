@@ -206,7 +206,7 @@ export function TaskCard({ task, onEdit, onDelete, onToggleComplete, onToggleAss
                     <Building2 className="h-4 w-4 text-green-600" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-green-900 truncate">
-                        {task.contact.full_name || task.contact.email}
+                        {task.contact?.full_name || task.contact?.email || 'Sem contato'}
                       </p>
                       {task.contact.company && (
                         <p className="text-xs text-green-700 truncate">

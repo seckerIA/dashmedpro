@@ -140,7 +140,7 @@ export function AnimatedDealCard({
                 {formatCurrency(deal.value ?? 0)}
               </span>
             </div>
-            {deal.contact && (
+            {deal.contact?.full_name && (
               <div className="space-y-1 mt-1">
                 <p className="text-xs text-muted-foreground flex items-center gap-1 transition-all duration-150">
                   <User className="w-3 h-3 flex-shrink-0" />

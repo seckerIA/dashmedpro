@@ -61,7 +61,7 @@ export function DealCard({ deal, onClick, onEdit, onDelete, onScheduleCall, isDe
                 <h4 className="font-semibold text-sm text-foreground line-clamp-1">
                   {deal.title}
                 </h4>
-                {deal.contact && (
+                {deal.contact?.full_name && (
                   <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                     <User className="w-3 h-3" />
                     {deal.contact.full_name}
