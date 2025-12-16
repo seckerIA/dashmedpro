@@ -71,7 +71,7 @@ export function ObjectionCard({ card, onEdit, isEditable = false }: ObjectionCar
               <Button 
                 onClick={() => setIsEditing(true)}
                 size="sm"
-                className="w-full bg-red-600 hover:bg-red-700 text-white font-medium transition-colors"
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium transition-colors"
               >
                 Editar Objeção
               </Button>

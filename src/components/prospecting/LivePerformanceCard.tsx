@@ -41,7 +41,7 @@ export function LivePerformanceCard() {
       {/* Botão Toggle Flutuante */}
       <motion.button
         onClick={handleToggleModal}
-        className="fixed bottom-8 right-8 z-50 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg hover:shadow-xl transition-all duration-300 bg-red-600 cursor-pointer hover:bg-red-700"
+        className="fixed bottom-8 right-8 z-50 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg hover:shadow-xl transition-all duration-300 bg-primary cursor-pointer hover:bg-primary/90"
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
         initial={{ scale: 0 }}
@@ -88,14 +88,14 @@ export function LivePerformanceCard() {
             <div className="w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
                 <Card
                   className={cn(
-                    "relative w-full overflow-hidden border-red-500/50 bg-gradient-to-br from-red-900 via-red-800 to-red-900 p-8 shadow-2xl backdrop-blur-xl",
+                    "relative w-full overflow-hidden border-primary/50 bg-gradient-to-br from-primary/20 via-primary/10 to-primary/20 p-8 shadow-2xl backdrop-blur-xl",
                     todayMetrics?.is_paused && "border-yellow-500/50"
                   )}
                 >
                   {/* Botão de Fechar */}
                   <button
                     onClick={handleCloseModal}
-                    className="absolute top-4 right-4 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-red-800 hover:bg-red-700 transition-colors"
+                    className="absolute top-4 right-4 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-primary/80 hover:bg-primary transition-colors"
                   >
                     <X className="h-4 w-4 text-white" />
                   </button>
@@ -123,7 +123,7 @@ export function LivePerformanceCard() {
                         <h2 className="text-2xl font-bold text-white">
                           Performance Diária
                         </h2>
-                        <p className="text-sm text-red-200">
+                        <p className="text-sm text-foreground/80">
                           {todayMetrics ? 'Acompanhe seu progresso em tempo real' : 'Inicie um expediente para começar'}
                   </p>
                 </div>
@@ -134,7 +134,7 @@ export function LivePerformanceCard() {
                           animate={{ scale: 1, opacity: 1 }}
                           transition={{ duration: 0.5 }}
                         >
-                          <Clock className="h-4 w-4 text-red-400" />
+                          <Clock className="h-4 w-4 text-primary" />
                           <span className="font-mono text-sm font-semibold text-white">
                             {'0h 0m'}
                           </span>
@@ -187,10 +187,10 @@ export function LivePerformanceCard() {
                       </div>
                     ) : (
                       <div className="text-center py-8">
-                        <p className="text-lg text-red-200 mb-4">
+                        <p className="text-lg text-foreground/80 mb-4">
                           Nenhum expediente ativo encontrado
                         </p>
-                        <p className="text-sm text-red-300 mb-6">
+                        <p className="text-sm text-foreground/70 mb-6">
                           Vá para a página de Prospecção e inicie um expediente para ver suas métricas aqui
                         </p>
                         <Button
@@ -209,7 +209,7 @@ export function LivePerformanceCard() {
                     {todayMetrics && (
                       <>
                         {/* Progress Bars */}
-                        <div className="space-y-4 rounded-xl border border-red-600 bg-black p-6 backdrop-blur-sm">
+                        <div className="space-y-4 rounded-xl border border-primary/50 bg-card/50 p-6 backdrop-blur-sm">
                           <div className="space-y-2">
                             <div className="flex justify-between items-center font-semibold">
                               <span className="text-white">Atendimentos Realizados</span>
@@ -228,24 +228,24 @@ export function LivePerformanceCard() {
 
                         {/* Conversion Rate */}
                         <motion.div
-                          className="flex items-center justify-between rounded-xl border border-red-600 bg-black p-6 backdrop-blur-sm"
+                          className="flex items-center justify-between rounded-xl border border-primary/50 bg-card/50 p-6 backdrop-blur-sm"
                           initial={{ y: 20, opacity: 0 }}
                           animate={{ y: 0, opacity: 1 }}
                           transition={{ delay: 0.2 }}
                         >
                           <div className="flex items-center gap-3">
-                            <div className="rounded-full bg-red-800/30 p-3">
-                              <TrendingUp className="h-6 w-6 text-red-400" />
-                      </div>
+                            <div className="rounded-full bg-primary/30 p-3">
+                              <TrendingUp className="h-6 w-6 text-primary" />
+                            </div>
                             <div>
-                              <p className="text-sm text-red-200">Taxa de Conversão</p>
+                              <p className="text-sm text-foreground/80">Taxa de Conversão</p>
                               <p className="text-2xl font-bold text-white">
                                 {conversionRate.toFixed(1)}%
                               </p>
                       </div>
                     </div>
                           <motion.div
-                            className="text-4xl font-bold text-red-400"
+                            className="text-4xl font-bold text-primary"
                             animate={{
                               scale: [1, 1.1, 1],
                             }}
@@ -261,7 +261,7 @@ export function LivePerformanceCard() {
 
                         {/* Motivational Message */}
                         <motion.div
-                          className="rounded-xl border border-red-600 bg-black p-4 text-center backdrop-blur-sm"
+                          className="rounded-xl border border-primary/50 bg-card/50 p-4 text-center backdrop-blur-sm"
                           initial={{ scale: 0.95 }}
                           animate={{ scale: 1 }}
                           transition={{
@@ -279,24 +279,24 @@ export function LivePerformanceCard() {
                         {/* Stats Grid */}
                         <div className="grid grid-cols-2 gap-4">
                           <motion.div
-                            className="rounded-lg border border-red-600 bg-black p-4 backdrop-blur-sm"
+                            className="rounded-lg border border-primary/50 bg-card/50 p-4 backdrop-blur-sm"
                             whileHover={{ scale: 1.05 }}
                           >
                             <div className="flex items-center gap-2">
-                              <Phone className="h-5 w-5 text-red-400" />
-                              <span className="text-sm text-red-200">Atendimentos</span>
+                              <Phone className="h-5 w-5 text-primary" />
+                              <span className="text-sm text-foreground/80">Atendimentos</span>
                             </div>
                             <p className="mt-1 text-2xl font-bold text-white">
                               {totalCalls}
                             </p>
                           </motion.div>
                           <motion.div
-                            className="rounded-lg border border-red-600 bg-black p-4 backdrop-blur-sm"
+                            className="rounded-lg border border-primary/50 bg-card/50 p-4 backdrop-blur-sm"
                             whileHover={{ scale: 1.05 }}
                           >
                             <div className="flex items-center gap-2">
-                              <Users className="h-5 w-5 text-red-400" />
-                              <span className="text-sm text-red-200">Contatos</span>
+                              <Users className="h-5 w-5 text-primary" />
+                              <span className="text-sm text-foreground/80">Contatos</span>
                   </div>
                             <p className="mt-1 text-2xl font-bold text-white">
                               {totalContacts}

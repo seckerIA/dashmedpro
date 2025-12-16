@@ -125,20 +125,20 @@ All colors MUST be HSL.
     --popover: 240 12% 8%;
     --popover-foreground: 220 9% 98%;
 
-    /* PRIMARY: Vermelho vibrante */
-    --primary: 0 84% 58%;
+    /* PRIMARY: Azul vibrante (igual ao tema claro) */
+    --primary: 210 100% 50%;
     --primary-foreground: 0 0% 100%;
 
-    /* SECONDARY: Vermelho mais escuro */
-    --secondary: 0 70% 45%;
+    /* SECONDARY: Azul mais escuro (igual ao tema claro) */
+    --secondary: 220 90% 35%;
     --secondary-foreground: 0 0% 100%;
 
     /* Muted neutro */
     --muted: 240 10% 12%;
     --muted-foreground: 220 9% 65%;
 
-    /* ACCENT: Vermelho para highlights */
-    --accent: 0 84% 58%;
+    /* ACCENT: Azul para highlights (igual ao tema claro) */
+    --accent: 210 100% 50%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 65%;
@@ -147,35 +147,35 @@ All colors MUST be HSL.
     /* Border mais sutil */
     --border: 240 10% 15%;
     --input: 240 10% 12%;
-    --ring: 0 84% 58%;
+    --ring: 210 100% 50%;
 
     /* Sidebar - Dark theme (black, slightly different from dashboard background) */
     --sidebar-background: 240 8% 10%;
     --sidebar-foreground: 220 9% 98%;
-    --sidebar-primary: 0 84% 58%;
+    --sidebar-primary: 210 100% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 8% 14%;
     --sidebar-accent-foreground: 220 9% 98%;
     --sidebar-border: 240 8% 8%;
-    --sidebar-ring: 0 84% 58%;
+    --sidebar-ring: 210 100% 50%;
 
-    /* DashMed Pro Gradients - Red Dark */
-    --gradient-primary: linear-gradient(135deg, hsl(0 84% 58%), hsl(0 70% 50%));
+    /* DashMed Pro Gradients - Blue Dark */
+    --gradient-primary: linear-gradient(135deg, hsl(210 100% 50%), hsl(220 90% 35%));
     --gradient-card: linear-gradient(145deg, hsl(240 12% 8%), hsl(240 12% 10%));
-    --gradient-accent: linear-gradient(90deg, hsl(0 84% 58% / 0.1), hsl(0 84% 58% / 0.05));
+    --gradient-accent: linear-gradient(90deg, hsl(210 100% 50% / 0.1), hsl(210 100% 50% / 0.05));
     --gradient-dark: linear-gradient(145deg, hsl(240 15% 6%), hsl(240 12% 8%));
 
-    /* DashMed Pro Shadows - Red Glow */
-    --shadow-brand: 0 8px 32px -8px hsl(0 84% 58% / 0.3);
+    /* DashMed Pro Shadows - Blue Glow */
+    --shadow-brand: 0 8px 32px -8px hsl(210 100% 50% / 0.3);
     --shadow-card: 0 4px 16px -4px hsl(240 10% 0% / 0.5);
-    --shadow-glow: 0 0 20px hsl(0 84% 58% / 0.25);
+    --shadow-glow: 0 0 20px hsl(210 100% 50% / 0.25);
 
     /* Status Colors - Dark theme */
     --success: 142 76% 45%;
     --success-foreground: 0 0% 100%;
     --warning: 43 96% 60%;
     --warning-foreground: 0 0% 9%;
-    --info: 0 84% 58%;
+    --info: 210 100% 50%;
     --info-foreground: 0 0% 100%;
 
     /* Financial Colors - Dark theme */
@@ -187,13 +187,13 @@ All colors MUST be HSL.
     --gold: 43 96% 60%;
     --gold-foreground: 0 0% 9%;
 
-    /* Chart Colors - Red + Colorful */
-    --chart-1: 0 84% 58%;  /* Red principal */
+    /* Chart Colors - Blue + Colorful */
+    --chart-1: 210 100% 50%;  /* Blue principal */
     --chart-2: 199 89% 55%;  /* Cyan */
     --chart-3: 45 93% 58%;   /* Yellow */
     --chart-4: 330 80% 60%;  /* Pink */
     --chart-5: 142 76% 45%;  /* Green */
-    --chart-6: 0 70% 50%;  /* Red secundário */
+    --chart-6: 220 90% 35%;  /* Blue secundário */
   }
 }
 

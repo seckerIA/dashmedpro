@@ -30,7 +30,7 @@ import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/hooks/useAuth"
 import { useToast } from "@/hooks/use-toast"
 import { useUserProfile } from "@/hooks/useUserProfile"
-import dashmedLogo from "@/assets/dashmed-logo.png"
+import dashmedLogo from "@/assets/imgdashmed-logo.png"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 
 type NavigationItem = {
@@ -156,27 +156,18 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                 transition-all duration-300
               `}
             >
-              <div
-                className={`
-                  ${isCollapsed ? 'p-2' : 'p-3'}
-                  bg-white/10 rounded-xl
-                  flex items-center justify-center
-                  transition-all duration-300
-                `}
-              >
-                <img 
-                  src={dashmedLogo} 
-                  alt="DashMed Pro Logo" 
-                  className={`${isCollapsed ? 'w-10 h-10' : 'w-12 h-12'} transition-smooth`}
-                />
-              </div>
+              <img 
+                src={dashmedLogo} 
+                alt="DashMed Pro Logo" 
+                className={`${isCollapsed ? 'w-10 h-10' : 'w-12 h-12'} transition-smooth`}
+              />
               {!isCollapsed && (
                 <div className="flex flex-col">
                   <span className="text-white font-semibold text-xl tracking-wide">
                     DASHMED PRO
                   </span>
                   <span className="text-white/60 text-sm">
-                    DashMed Pro
+                    Dashboard
                   </span>
                 </div>
               )}
@@ -338,7 +329,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
         </ScrollArea>
 
         {/* Settings and User Section - Bottom - Fixed at bottom */}
-        <div className={`flex-shrink-0 border-t border-white/10 ${isCollapsed ? 'p-1 space-y-1' : 'p-4 space-y-1'}`}>
+        <div className={`flex-shrink-0 border-t border-white/10 ${isCollapsed ? 'p-1 space-y-2.5' : 'p-4 space-y-2.5'}`}>
           {/* Theme Toggle */}
           <ThemeToggle isCollapsed={isCollapsed} />
           
