@@ -12,6 +12,7 @@ import Calculadora from "./pages/Calculadora";
 import CalculadoraSelection from "./pages/CalculadoraSelection";
 import CalculadoraROI from "./pages/CalculadoraROI";
 import PlaceholderPage from "./pages/PlaceholderPage";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
@@ -32,7 +33,7 @@ import {
   Mail, 
   FileText, 
   BarChart3,
-  Settings
+  Settings as SettingsIcon
 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -227,13 +228,7 @@ const AppRoutes = () => {
         />
         <Route 
           path="/configuracoes" 
-          element={
-            <PlaceholderPage 
-              title="Configurações" 
-              description="Configurações da plataforma e preferências"
-              icon={Settings}
-            />
-          } 
+          element={<Settings />} 
         />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />

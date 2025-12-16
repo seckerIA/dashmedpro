@@ -120,9 +120,14 @@ export function AppLayout({ children }: AppLayoutProps) {
 
               <div className="flex items-center gap-4">
                 <div className="hidden md:flex items-center gap-6 text-sm">
-                  <button className="text-primary font-medium border-b border-primary/60">
+                  <a 
+                    href="https://wa.me/5524999409021" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-primary font-medium border-b border-primary/60 hover:border-primary transition-colors cursor-pointer"
+                  >
                     Ajuda
-                  </button>
+                  </a>
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground">Comunicações</span>
                     <NotificationBell />
