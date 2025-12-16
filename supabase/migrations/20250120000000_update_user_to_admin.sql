@@ -85,3 +85,8 @@ SELECT
 FROM public.profiles p
 JOIN auth.users u ON u.id = p.id
 WHERE p.email = 'filipesenna59@gmail.com' OR u.email = 'filipesenna59@gmail.com';
+
+
+
+
+

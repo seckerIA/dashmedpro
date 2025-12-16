@@ -12,8 +12,11 @@ import { ConversionChart } from "@/components/charts/ConversionChart"
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics"
 import { useFinancialMetrics } from "@/hooks/useFinancialMetrics"
 import { useUserProfile } from "@/hooks/useUserProfile"
-import { MetricCard } from "@/components/dashboard/MetricCard"
+import { MetricCard, QuickActionCard } from "@/components/dashboard/MetricCard"
 import { PipelineFunnelCard } from "@/components/dashboard/PipelineFunnelCard"
+import { SalesChart } from "@/components/dashboard/SalesChart"
+import { StatsPanel } from "@/components/dashboard/StatsPanel"
+import { CustomerTable } from "@/components/dashboard/CustomerTable"
 import { 
   Calculator, 
   TrendingUp, 
@@ -79,37 +82,10 @@ const Dashboard = () => {
 
   // Dashboard completo para Admin/Dono
   return (
-    <div className="min-h-screen space-y-6 bg-background">
-      {/* Header Section - Nexus Style */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-gradient-to-br from-primary/20 to-primary/10 rounded-xl border border-primary/20">
-            <BarChart3 className="w-6 h-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Nexus CRM</h1>
-            <p className="text-sm text-muted-foreground">Buscar por cliente, empresa</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button 
-            className="bg-primary hover:bg-primary/90 text-primary-foreground"
-            onClick={() => navigate('/financeiro/nova-transacao')}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Nova Transação
-          </Button>
-          <Button variant="outline" size="icon">
-            <Bell className="w-4 h-4" />
-          </Button>
-          <Button variant="outline" size="icon">
-            <MoreHorizontal className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
+    <div className="min-h-screen space-y-4 sm:space-y-6 lg:space-y-8 bg-background font-sans px-3 sm:px-4 lg:px-6">
 
       {/* Top Metrics - Métricas Financeiras */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6 animate-fade-in">
         <MetricCard
           title="Saldo Total"
           value={formatCurrency(financialMetrics?.totalBalance || 0)}
@@ -124,7 +100,7 @@ const Dashboard = () => {
         <MetricCard
           title="Receita do Mês"
           value={formatCurrency(financialMetrics?.monthRevenue || 0)}
-          variant="purple"
+          variant="red"
           icon={ArrowUpRight}
           trend={{
             value: 0,
@@ -156,7 +132,7 @@ const Dashboard = () => {
       </div>
 
       {/* CRM Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6 animate-fade-in animation-delay-200">
         <MetricCard
           title="Valor Total Fechado"
           value={formatCurrency(metrics?.totalClosedValue || 0)}
@@ -171,7 +147,7 @@ const Dashboard = () => {
         <MetricCard
           title="Valor em Pipeline"
           value={formatCurrency(metrics?.totalPipelineValue || 0)}
-          variant="purple"
+          variant="red"
           icon={PieChart}
           trend={{
             value: metrics?.activeDeals || 0,
@@ -208,110 +184,91 @@ const Dashboard = () => {
         formatCurrency={formatCurrency}
       />
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardHeader>
-            <CardTitle className="text-foreground">Leads Gerados no Mês</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <LeadsChart data={metrics?.monthlyLeads} />
-          </CardContent>
-        </Card>
+      {/* Charts Section - Novo Layout com SalesChart + StatsPanel */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
+        {/* Coluna Esquerda (2/3 width) - Gráficos */}
+        <div className="lg:col-span-2 space-y-3 sm:space-y-4 lg:space-y-6">
+          {/* Novo: SalesChart */}
+          <SalesChart
+            data={metrics?.monthlyRevenue.map(m => ({
+              name: m.month,
+              current: m.closed / 1000, // k format
+            })) || []}
+            title="Faturamento Fechado ao Longo do Tempo"
+          />
 
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardHeader>
-            <CardTitle className="text-foreground">Faturamento Projetado vs. Fechado</CardTitle>
-            <div className="flex gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-chart-1 rounded-full"></div>
-                <span className="text-muted-foreground">Faturamento Projetado</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-chart-2 rounded-full"></div>
-                <span className="text-muted-foreground">Faturamento Fechado</span>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <RevenueChart data={metrics?.monthlyRevenue} />
-          </CardContent>
-        </Card>
+          {/* Manter: LeadsChart */}
+          <Card className="bg-card rounded-2xl border border-border">
+            <CardHeader className="p-3 sm:p-4 lg:p-6">
+              <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Leads Gerados no Mês</CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 sm:p-4 lg:p-6">
+              <LeadsChart data={metrics?.monthlyLeads} />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Coluna Direita (1/3 width) - Novo: StatsPanel */}
+        <div>
+          <StatsPanel
+            totalIntake={metrics?.totalContacts || 0}
+            newCustomers={{
+              value: metrics?.totalContacts || 0,
+              change: 1
+            }}
+            repeatCustomers={metrics?.wonDeals || 0}
+            totalRevenue={`${((financialMetrics?.monthRevenue || 0) / 1000).toFixed(0)}k`}
+            distributionData={
+              metrics?.servicesInterest.slice(0, 4).map((s, i) => ({
+                name: s.service,
+                value: Math.round((s.count / (metrics.totalContacts || 1)) * 100),
+                color: ['#8B5CF6', '#06B6D4', '#F59E0B', '#10B981'][i]
+              })) || []
+            }
+          />
+        </div>
       </div>
 
       {/* Performance Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
         <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardHeader>
-            <CardTitle className="text-foreground">Serviços de Interesse</CardTitle>
+          <CardHeader className="p-3 sm:p-4 lg:p-6">
+            <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Serviços de Interesse</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
             <ServicesChart data={metrics?.servicesInterest} />
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardHeader>
-            <CardTitle className="text-foreground">Taxa de Conversão por Etapa</CardTitle>
+          <CardHeader className="p-3 sm:p-4 lg:p-6">
+            <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Taxa de Conversão por Etapa</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
             <ConversionChart data={metrics?.conversionByStage} />
           </CardContent>
         </Card>
       </div>
 
-      {/* Business Cards Section - Últimos Deals Atualizados */}
+      {/* Últimos Deals - Novo: CustomerTable */}
       {metrics && metrics.recentDeals && metrics.recentDeals.length > 0 && (
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardHeader>
-            <CardTitle className="text-foreground">Últimas Atualizações do Pipeline</CardTitle>
-            <CardDescription>Os 5 deals mais recentes ou atualizados</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              {metrics.recentDeals.map((deal) => {
-                const stageInfo = PIPELINE_STAGES.find(s => s.value === deal.stage);
-                return (
-                  <Card key={deal.id} className="bg-muted/20 border-border/50 hover:shadow-md transition-shadow">
-                    <CardContent className="p-4">
-                      <div className="space-y-3">
-                        <div>
-                          <h4 className="font-semibold text-sm text-foreground line-clamp-1">{deal.title}</h4>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {deal.contact?.full_name || 'Sem contato'}
-                          </p>
-                        </div>
-                        {deal.value && (
-                          <p className="text-lg font-bold text-positive">{formatCurrency(deal.value)}</p>
-                        )}
-                        {stageInfo && (
-                          <Badge 
-                            variant="secondary" 
-                            className={`text-xs ${stageInfo.bgColor} ${stageInfo.textColor} border-primary/20`}
-                          >
-                            {stageInfo.label}
-                          </Badge>
-                        )}
-                        {deal.contact?.service && (
-                          <Badge 
-                            variant="outline" 
-                            className="text-xs"
-                          >
-                            {deal.contact.service}
-                          </Badge>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+        <CustomerTable
+          customers={metrics.recentDeals.map(deal => ({
+            id: deal.id,
+            customer: deal.contact?.full_name || 'Sem contato',
+            date: new Date(deal.updated_at).toLocaleDateString('pt-BR'),
+            invoicedAmount: formatCurrency(deal.value || 0),
+            status: deal.stage === 'fechado_ganho' ? 'Paid' as const :
+                    deal.stage === 'negociacao' ? 'Shipped' as const :
+                    deal.stage === 'proposta' ? 'Delivered' as const :
+                    'Pending' as const
+          }))}
+          title="Últimas Atualizações do Pipeline"
+        />
       )}
 
       {/* Agenda Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
         <TodayTasksWidget />
         <UpcomingCallsWidget />
       </div>
@@ -333,159 +290,63 @@ const VendedorDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen space-y-6 bg-background">
-      {/* Header Section */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-gradient-to-br from-primary/20 to-primary/10 rounded-xl border border-primary/20">
-            <Target className="w-6 h-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Meu Desempenho</h1>
-            <p className="text-sm text-muted-foreground">Acompanhe suas metas e resultados</p>
-          </div>
-        </div>
+    <div className="min-h-screen space-y-4 sm:space-y-6 lg:space-y-8 bg-background font-sans px-3 sm:px-4 lg:px-6">
+
+      {/* Métricas do Vendedor - MELHORAR com MetricCard colorido */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6 animate-fade-in">
+        <MetricCard
+          title="Meu Pipeline"
+          value={`${metrics?.activeDeals || 0} negócios`}
+          variant="red"
+          icon={Target}
+          trend={{ value: 0, label: "ativos" }}
+        />
+        <MetricCard
+          title="Negócios Fechados"
+          value={metrics?.wonDeals || 0}
+          variant="green"
+          icon={TrendingUp}
+          trend={{ value: 0, label: "este mês" }}
+        />
+        <MetricCard
+          title="Taxa de Conversão"
+          value={`${metrics?.conversionRate.toFixed(1)}%`}
+          variant="cyan"
+          icon={BarChart3}
+          trend={{ value: 0, label: "desempenho" }}
+        />
       </div>
 
-      {/* Métricas do Vendedor - APENAS SUAS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Meu Pipeline */}
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Meu Pipeline</p>
-                <p className="text-2xl font-bold text-chart-1">
-                  {metrics?.activeDeals || 0} negócios
-                </p>
-                <div className="flex items-center gap-1 mt-1">
-                  <Target className="w-3 h-3 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">ativos</span>
-                </div>
-              </div>
-              <div className="p-3 bg-chart-1/10 rounded-xl">
-                <Target className="w-5 h-5 text-chart-1" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Negócios Fechados */}
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Negócios Fechados</p>
-                <p className="text-2xl font-bold text-positive">{metrics?.wonDeals || 0}</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <TrendingUp className="w-3 h-3 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">este mês</span>
-                </div>
-              </div>
-              <div className="p-3 bg-positive/10 rounded-xl">
-                <TrendingUp className="w-5 h-5 text-positive" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Taxa de Conversão */}
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Taxa de Conversão</p>
-                <p className="text-2xl font-bold text-info">{metrics?.conversionRate.toFixed(1) || '0.0'}%</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <BarChart3 className="w-3 h-3 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">desempenho</span>
-                </div>
-              </div>
-              <div className="p-3 bg-info/10 rounded-xl">
-                <BarChart3 className="w-5 h-5 text-info" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Total de Contatos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Meus Contatos</p>
-                <p className="text-2xl font-bold text-warning">{metrics?.totalContacts || 0}</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <Users className="w-3 h-3 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">cadastrados</span>
-                </div>
-              </div>
-              <div className="p-3 bg-warning/10 rounded-xl">
-                <Users className="w-5 h-5 text-warning" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Lead Novo */}
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Lead Novo</p>
-                <p className="text-2xl font-bold text-foreground">{metrics?.dealsByStage.lead_novo?.count || 0}</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <span className="text-xs text-muted-foreground">negócios</span>
-                </div>
-              </div>
-              <div className="p-3 bg-blue-500/10 rounded-xl">
-                <Users className="w-5 h-5 text-blue-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Qualificado */}
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Qualificado</p>
-                <p className="text-2xl font-bold text-foreground">{metrics?.dealsByStage.qualificado?.count || 0}</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <span className="text-xs text-muted-foreground">negócios</span>
-                </div>
-              </div>
-              <div className="p-3 bg-purple-500/10 rounded-xl">
-                <Target className="w-5 h-5 text-purple-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Apresentação */}
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Apresentação</p>
-                <p className="text-2xl font-bold text-foreground">{metrics?.dealsByStage.apresentacao?.count || 0}</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <span className="text-xs text-muted-foreground">negócios</span>
-                </div>
-              </div>
-              <div className="p-3 bg-orange-500/10 rounded-xl">
-                <BarChart3 className="w-5 h-5 text-orange-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Pipeline por Etapa - MELHORAR com MetricCard colorido */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6 animate-fade-in animation-delay-200">
+        <MetricCard
+          title="Meus Contatos"
+          value={metrics?.totalContacts || 0}
+          variant="yellow"
+          icon={Users}
+        />
+        <MetricCard
+          title="Lead Novo"
+          value={metrics?.dealsByStage.lead_novo?.count || 0}
+          variant="red"
+          icon={Users}
+        />
+        <MetricCard
+          title="Qualificado"
+          value={metrics?.dealsByStage.qualificado?.count || 0}
+          variant="cyan"
+          icon={Target}
+        />
+        <MetricCard
+          title="Apresentação"
+          value={metrics?.dealsByStage.apresentacao?.count || 0}
+          variant="yellow"
+          icon={BarChart3}
+        />
       </div>
 
       {/* Minhas Tarefas e Compromissos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
         <TodayTasksWidget />
         <UpcomingCallsWidget />
       </div>
@@ -493,12 +354,12 @@ const VendedorDashboard = () => {
       {/* Meus Leads Recentes */}
       {metrics && metrics.recentDeals && metrics.recentDeals.length > 0 && (
         <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardHeader>
-            <CardTitle className="text-foreground">Minhas Últimas Atualizações</CardTitle>
-            <CardDescription>Seus 5 negócios mais recentes</CardDescription>
+          <CardHeader className="p-3 sm:p-4 lg:p-6">
+            <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Minhas Últimas Atualizações</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Seus 5 negócios mais recentes</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3 lg:gap-4">
               {metrics.recentDeals.map((deal) => {
                 const stageInfo = PIPELINE_STAGES.find(s => s.value === deal.stage);
                 return (
@@ -537,52 +398,40 @@ const VendedorDashboard = () => {
         </Card>
       )}
 
-      {/* Acesso rápido ao CRM */}
-      <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-        <CardHeader>
-          <CardTitle className="text-foreground">Acesso Rápido</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <button
-              onClick={() => navigate('/crm')}
-              className="flex flex-col items-center justify-center p-6 bg-muted/20 hover:bg-muted/40 rounded-xl border border-border transition-all hover:scale-105 hover:shadow-lg"
-            >
-              <div className="p-3 bg-blue-500/10 rounded-xl mb-3">
-                <Users className="w-6 h-6 text-blue-500" />
-              </div>
-              <span className="text-sm font-medium text-foreground">CRM</span>
-            </button>
-            <button
-              onClick={() => navigate('/tarefas')}
-              className="flex flex-col items-center justify-center p-6 bg-muted/20 hover:bg-muted/40 rounded-xl border border-border transition-all hover:scale-105 hover:shadow-lg"
-            >
-              <div className="p-3 bg-purple-500/10 rounded-xl mb-3">
-                <Target className="w-6 h-6 text-purple-500" />
-              </div>
-              <span className="text-sm font-medium text-foreground">Tarefas</span>
-            </button>
-            <button
-              onClick={() => navigate('/calendar')}
-              className="flex flex-col items-center justify-center p-6 bg-muted/20 hover:bg-muted/40 rounded-xl border border-border transition-all hover:scale-105 hover:shadow-lg"
-            >
-              <div className="p-3 bg-orange-500/10 rounded-xl mb-3">
-                <Calendar className="w-6 h-6 text-orange-500" />
-              </div>
-              <span className="text-sm font-medium text-foreground">Calendário</span>
-            </button>
-            <button
-              onClick={() => navigate('/comercial/guia-prospeccao')}
-              className="flex flex-col items-center justify-center p-6 bg-muted/20 hover:bg-muted/40 rounded-xl border border-border transition-all hover:scale-105 hover:shadow-lg"
-            >
-              <div className="p-3 bg-green-500/10 rounded-xl mb-3">
-                <TrendingUp className="w-6 h-6 text-green-500" />
-              </div>
-              <span className="text-sm font-medium text-foreground">Prospecção</span>
-            </button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* NOVO - Acesso Rápido com QuickActionCard */}
+      <div className="space-y-2 sm:space-y-3 lg:space-y-4">
+        <h3 className="text-sm sm:text-base lg:text-lg font-semibold text-foreground">Acesso Rápido</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
+          <QuickActionCard
+            title="CRM"
+            description="Gerenciar contatos"
+            variant="red"
+            icon={Users}
+            onClick={() => navigate('/crm')}
+          />
+          <QuickActionCard
+            title="Tarefas"
+            description="Ver tarefas"
+            variant="cyan"
+            icon={Target}
+            onClick={() => navigate('/tarefas')}
+          />
+          <QuickActionCard
+            title="Calendário"
+            description="Ver agenda"
+            variant="yellow"
+            icon={Calendar}
+            onClick={() => navigate('/calendar')}
+          />
+          <QuickActionCard
+            title="Prospecção"
+            description="Guia completo"
+            variant="green"
+            icon={TrendingUp}
+            onClick={() => navigate('/comercial/guia-prospeccao')}
+          />
+        </div>
+      </div>
     </div>
   );
 };

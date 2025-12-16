@@ -67,3 +67,8 @@ Após completar as ações manuais, teste:
 3. **Excluir usuário** - Deve usar `delete-team-user`
 4. **Upload de arquivo** - Deve usar `upload-to-google-drive`
 5. **Verificar que todas as requisições vão para `rpcixpbmtpyrnzlsuuus.supabase.co`**
+
+
+
+
+

@@ -1,6 +1,7 @@
 import { LucideIcon } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { CardVariant, designTokens } from '@/lib/design-tokens';
+import { CardVariant } from '@/lib/design-tokens';
 
 interface MetricCardProps {
   title: string;
@@ -15,6 +16,30 @@ interface MetricCardProps {
   className?: string;
 }
 
+// Simplified to 2 alternating neutral color schemes
+const getVariantColors = (variant: CardVariant) => {
+  // Alternate between 2 color schemes based on variant
+  // Group 1: green, red -> Scheme 1 (slate)
+  // Group 2: cyan, yellow -> Scheme 2 (zinc)
+  const isGroup1 = variant === 'green' || variant === 'red';
+  
+  if (isGroup1) {
+    // Scheme 1 - Slate tones
+    return {
+      gradient: 'from-slate-50/30 via-slate-50/15 to-slate-50/30 dark:from-slate-900/20 dark:via-slate-900/10 dark:to-slate-900/20',
+      iconColor: 'text-slate-600 dark:text-slate-400',
+      borderAccent: 'from-slate-400/30 to-slate-500/30 dark:from-slate-600/30 dark:to-slate-500/30',
+    };
+  } else {
+    // Scheme 2 - Zinc tones
+    return {
+      gradient: 'from-zinc-50/30 via-zinc-50/15 to-zinc-50/30 dark:from-zinc-900/20 dark:via-zinc-900/10 dark:to-zinc-900/20',
+      iconColor: 'text-zinc-600 dark:text-zinc-400',
+      borderAccent: 'from-zinc-400/30 to-zinc-500/30 dark:from-zinc-600/30 dark:to-zinc-500/30',
+    };
+  }
+};
+
 export function MetricCard({
   title,
   value,
@@ -24,89 +49,73 @@ export function MetricCard({
   illustration,
   className,
 }: MetricCardProps) {
-  const variantStyles = designTokens.cardVariants[variant];
   const isPositive = trend && trend.value >= 0;
+  const colors = getVariantColors(variant);
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
       className={cn(
-        'relative overflow-hidden rounded-2xl p-6 transition-all duration-300',
-        'hover:scale-[1.02] hover:shadow-2xl',
-        variantStyles.bg,
-        variantStyles.shadow,
-        'group cursor-pointer',
+        'relative overflow-hidden rounded-2xl border bg-gradient-to-br text-card-foreground shadow-lg p-3 sm:p-4 lg:p-5 backdrop-blur-sm',
+        'hover:shadow-xl transition-all duration-300',
+        colors.gradient,
         className
       )}
     >
-      {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(255,255,255,0.3),transparent)]" />
-      </div>
-
       {/* Content */}
-      <div className="relative z-10 flex items-start justify-between">
-        <div className="flex-1">
-          {/* Title */}
-          <p className={cn(
-            'text-sm font-medium mb-2',
-            variant === 'yellow' ? 'text-gray-900' : 'text-white/90'
-          )}>
+      <div className="relative z-10 flex flex-col h-full">
+        {/* Header with Icon */}
+        <div className="flex items-start justify-between mb-2 sm:mb-3 lg:mb-4">
+          <p className="text-xs sm:text-sm font-medium text-muted-foreground">
             {title}
           </p>
-
-          {/* Value */}
-          <h3 className={cn(
-            'text-3xl font-bold mb-3 transition-transform duration-300 group-hover:scale-105',
-            variant === 'yellow' ? 'text-gray-900' : 'text-white'
+          <div className={cn(
+            'p-2 rounded-lg bg-background/50 backdrop-blur-sm',
+            'transition-transform duration-300 hover:scale-110'
           )}>
-            {value}
-          </h3>
-
-          {/* Trend */}
-          {trend && (
-            <div className={cn(
-              'inline-flex items-center gap-1 text-sm font-medium px-2 py-1 rounded-lg',
-              variant === 'yellow' ? 'bg-white/20 text-gray-900' : 'bg-white/10 text-white'
-            )}>
-              <span className={cn(
-                'font-semibold',
-                isPositive ? 'text-green-300' : 'text-red-300'
-              )}>
-                {isPositive ? '▲' : '▼'} {Math.abs(trend.value)}%
-              </span>
-              <span className="opacity-80">{trend.label}</span>
-            </div>
-          )}
+            <Icon className={cn('h-4 w-4 sm:h-5 sm:w-5', colors.iconColor)} />
+          </div>
         </div>
 
-        {/* Icon or Illustration */}
-        <div className="flex flex-col items-end gap-2">
-          <div className={cn(
-            'p-3 rounded-xl transition-all duration-300',
-            'group-hover:scale-110 group-hover:rotate-6',
-            variant === 'yellow' ? 'bg-white/20' : 'bg-white/10'
-          )}>
-            <Icon className={cn(
-              'h-6 w-6',
-              variant === 'yellow' ? 'text-gray-900' : 'text-white'
-            )} />
-          </div>
+        {/* Value */}
+        <h3 className="text-xl sm:text-2xl lg:text-3xl font-semibold mb-2 sm:mb-3 text-foreground">
+          {value}
+        </h3>
 
-          {illustration && (
+        {/* Trend */}
+        {trend && (
+          <div className="mt-auto">
+            <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+              <span className={cn(
+                'font-medium',
+                isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+              )}>
+                {isPositive ? '↑' : '↓'} {Math.abs(trend.value)}%
+              </span>
+              <span className="text-muted-foreground/80">{trend.label}</span>
+            </div>
+          </div>
+        )}
+
+        {illustration && (
+          <div className="mt-4 opacity-60">
             <img
               src={illustration}
               alt={title}
-              className="h-24 w-24 object-contain opacity-90 transition-transform duration-300 group-hover:scale-110"
+              className="h-16 w-16 object-contain"
             />
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* Animated shine effect on hover */}
-      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-      </div>
-    </div>
+      {/* Subtle border accent */}
+      <div className={cn(
+        'absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r',
+        colors.borderAccent
+      )} />
+    </motion.div>
   );
 }
 
@@ -128,33 +137,43 @@ export function QuickActionCard({
   onClick,
   className,
 }: QuickActionCardProps) {
-  const variantStyles = designTokens.cardVariants[variant];
+  const colors = getVariantColors(variant);
 
   return (
-    <button
+    <motion.button
       onClick={onClick}
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
       className={cn(
-        'relative overflow-hidden rounded-xl p-5 text-left transition-all duration-300',
-        'hover:scale-[1.02] hover:shadow-xl',
-        'bg-card border border-border',
-        'group',
+        'relative overflow-hidden rounded-2xl border bg-gradient-to-br text-card-foreground shadow-lg p-3 sm:p-4 lg:p-5 backdrop-blur-sm',
+        'hover:shadow-xl transition-all duration-300',
+        'text-left',
+        colors.gradient,
         className
       )}
     >
-      <div className="relative z-10 flex items-start gap-4">
+      <div className="relative z-10 flex items-start gap-2 sm:gap-3 lg:gap-4">
         <div className={cn(
-          'p-3 rounded-lg',
-          variantStyles.bg,
-          'transition-transform duration-300 group-hover:scale-110'
+          'p-2 sm:p-3 rounded-lg bg-background/50 backdrop-blur-sm',
+          'transition-transform duration-300 hover:scale-110'
         )}>
-          <Icon className="h-5 w-5 text-white" />
+          <Icon className={cn('h-4 w-4 sm:h-5 sm:w-5', colors.iconColor)} />
         </div>
 
         <div className="flex-1">
-          <h4 className="font-semibold text-foreground mb-1">{title}</h4>
-          <p className="text-sm text-muted-foreground">{description}</p>
+          <h4 className="text-sm sm:text-base font-semibold text-foreground mb-1">{title}</h4>
+          <p className="text-xs sm:text-sm text-muted-foreground">{description}</p>
         </div>
       </div>
-    </button>
+
+      {/* Subtle border accent */}
+      <div className={cn(
+        'absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r',
+        colors.borderAccent
+      )} />
+    </motion.button>
   );
 }

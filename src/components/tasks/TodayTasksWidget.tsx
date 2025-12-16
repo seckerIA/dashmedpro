@@ -100,18 +100,18 @@ export function TodayTasksWidget() {
 
   return (
       <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-      <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold text-foreground">Tarefas de Hoje</CardTitle>
-          <div className="flex items-center gap-3">
-            <Badge variant="outline" className="text-sm bg-primary/10 text-primary border-primary/20">
-              <Target className="h-4 w-4 mr-1" />
+      <CardHeader className="p-3 sm:p-4 lg:p-6 pb-3 sm:pb-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <CardTitle className="text-sm sm:text-base lg:text-lg font-semibold text-foreground">Tarefas de Hoje</CardTitle>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Badge variant="outline" className="text-xs sm:text-sm bg-primary/10 text-primary border-primary/20">
+              <Target className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
               {pendingTasks} pendente{pendingTasks !== 1 ? 's' : ''}
             </Badge>
             <Link to="/tarefas">
-              <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80">
-                <ArrowRight className="h-4 w-4 mr-2" />
-                Ver todas
+              <Button variant="ghost" size="sm" className="text-xs sm:text-sm text-primary hover:text-primary/80">
+                <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Ver todas</span>
               </Button>
             </Link>
           </div>
@@ -119,22 +119,22 @@ export function TodayTasksWidget() {
         
         {/* Progress Bar */}
         {totalTasks > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
+          <div className="space-y-1 sm:space-y-2 mt-2 sm:mt-3">
+            <div className="flex items-center justify-between text-xs sm:text-sm">
               <span className="text-muted-foreground">Progresso de hoje</span>
               <span className="font-medium text-foreground">
                 {completedTasks}/{totalTasks} concluída{completedTasks !== 1 ? 's' : ''}
               </span>
             </div>
-            <Progress value={progressPercentage} className="h-2" />
+            <Progress value={progressPercentage} className="h-1.5 sm:h-2" />
           </div>
         )}
       </CardHeader>
       
-      <CardContent className="space-y-4">
+      <CardContent className="p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4">
         
         {todayTasks.length > 0 ? (
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             {todayTasks.slice(0, 3).map((task, index) => {
               const priorityConfig = getPriorityConfig(task.priority || '');
               const overdue = task.due_date ? isOverdue(task.due_date) : false;
@@ -144,7 +144,7 @@ export function TodayTasksWidget() {
                 <div
                   key={task.id}
                   className={cn(
-                    "flex items-center gap-3 p-3 rounded-lg border transition-all",
+                    "flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border transition-all",
                     isCompleted 
                       ? "bg-muted/30 border-border" 
                       : "bg-muted/20 border-border hover:bg-muted/40 hover:border-primary/50"
@@ -153,12 +153,13 @@ export function TodayTasksWidget() {
                   <Checkbox
                     checked={isCompleted}
                     onCheckedChange={() => !isCompleted && handleToggleComplete(task.id)}
+                    className="h-4 w-4 sm:h-5 sm:w-5"
                   />
                   
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-1 sm:gap-2 mb-0.5 sm:mb-1">
                       <p className={cn(
-                        "font-medium text-sm truncate",
+                        "font-medium text-xs sm:text-sm truncate",
                         isCompleted && "line-through text-muted-foreground"
                       )}>
                         {task.title}
@@ -167,7 +168,7 @@ export function TodayTasksWidget() {
                         <Badge 
                           variant="outline"
                           className={cn(
-                            "text-xs",
+                            "text-[10px] sm:text-xs",
                             task.priority === 'alta' && "border-red-300 text-red-700",
                             task.priority === 'media' && "border-yellow-300 text-yellow-700",
                             task.priority === 'baixa' && "border-gray-300 text-gray-700"
@@ -178,23 +179,23 @@ export function TodayTasksWidget() {
                       )}
                     </div>
                     
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-xs text-muted-foreground">
                       {task.due_date && (
                         <div className={cn(
                           "flex items-center gap-1",
                           overdue && !isCompleted && "text-red-600 font-medium"
                         )}>
-                          <Clock className="h-3 w-3" />
+                          <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                           <span>{formatTime(task.due_date)}</span>
                           {overdue && !isCompleted && (
-                            <AlertCircle className="h-3 w-3 ml-1" />
+                            <AlertCircle className="h-2.5 w-2.5 sm:h-3 sm:w-3 ml-0.5 sm:ml-1" />
                           )}
                         </div>
                       )}
                       
                       {task.assigned_to && (
                         <div className="flex items-center gap-1">
-                          <User className="h-3 w-3" />
+                          <User className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                           <span className="truncate">
                             Atribuído
                           </span>
@@ -207,10 +208,10 @@ export function TodayTasksWidget() {
             })}
             
             {todayTasks.length > 3 && (
-              <div className="text-center pt-3">
+              <div className="text-center pt-2 sm:pt-3">
                 <Link to="/tarefas">
-                  <Button variant="outline" size="sm" className="w-full">
-                    <Plus className="h-4 w-4 mr-2" />
+                  <Button variant="outline" size="sm" className="w-full text-xs sm:text-sm">
+                    <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                     Ver mais {todayTasks.length - 3} tarefa{todayTasks.length - 3 !== 1 ? 's' : ''}
                   </Button>
                 </Link>
@@ -219,17 +220,17 @@ export function TodayTasksWidget() {
             
           </div>
         ) : (
-          <div className="text-center py-8 text-muted-foreground">
-            <CheckCircle2 className="h-12 w-12 mx-auto mb-4 text-positive" />
-            <p className="font-medium mb-2">
+          <div className="text-center py-6 sm:py-8 text-muted-foreground">
+            <CheckCircle2 className="h-8 w-8 sm:h-12 sm:w-12 mx-auto mb-3 sm:mb-4 text-positive" />
+            <p className="text-sm sm:text-base font-medium mb-1 sm:mb-2">
               Nenhuma tarefa para hoje!
             </p>
-            <p className="text-sm mb-4">
+            <p className="text-xs sm:text-sm mb-3 sm:mb-4">
               Você está em dia com suas tarefas. 🎉
             </p>
             <Link to="/tarefas">
-              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                <Plus className="h-4 w-4 mr-2" />
+              <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs sm:text-sm">
+                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                 Criar nova tarefa
               </Button>
             </Link>

@@ -19,7 +19,7 @@ import TeamManagement from "./pages/TeamManagement";
 import Tasks from "./pages/Tasks";
 import TasksDebug from "./pages/TasksDebug";
 import CRM from "./pages/CRM";
-import Calendar from "./pages/Calendar";
+import MedicalCalendar from "./pages/MedicalCalendar";
 import Financial from "./pages/Financial";
 import FinancialTransactions from "./pages/FinancialTransactions";
 import TransactionForm from "./components/financial/TransactionForm";
@@ -181,7 +181,7 @@ const AppRoutes = () => {
           } 
         />
         <Route path="/crm" element={<CRM />} />
-        <Route path="/calendar" element={<Calendar />} />
+        <Route path="/calendar" element={<MedicalCalendar />} />
         <Route path="/comercial/guia-prospeccao" element={<ProspectingGuide />} />
         <Route 
           path="/email-marketing" 
@@ -243,7 +243,7 @@ const AppRoutes = () => {
 };
 
 const App = () => (
-  <ThemeProvider attribute="class" defaultTheme="light" storageKey="dashmed-theme">
+  <ThemeProvider attribute="class" defaultTheme="dark" storageKey="dashmed-theme">
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <TooltipProvider>

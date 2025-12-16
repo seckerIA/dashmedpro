@@ -19,14 +19,13 @@ export function useDailyReport() {
     const checkAndCleanOldData = async () => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const todayISO = today.toISOString().split('T')[0];
 
       // Verificar se há sessões de dias anteriores que precisam ser limpas
       const { data: oldSessions, error: sessionsError } = await supabase
         .from('prospecting_sessions')
         .select('*')
         .eq('user_id', user.id)
-        .lt('completed_at', today.toISOString());
+        .lt('ended_at', today.toISOString());
 
       if (sessionsError) {
         console.error('Erro ao verificar sessões antigas:', sessionsError);
@@ -40,7 +39,7 @@ export function useDailyReport() {
           .from('prospecting_sessions')
           .delete()
           .eq('user_id', user.id)
-          .lt('completed_at', today.toISOString());
+          .lt('ended_at', today.toISOString());
 
         if (deleteError) {
           console.error('Erro ao limpar sessões antigas:', deleteError);
@@ -189,7 +188,7 @@ export function useDailyReport() {
           .from('prospecting_sessions')
           .delete()
           .eq('user_id', user.id)
-          .gte('completed_at', todayISO);
+          .gte('ended_at', todayISO);
 
         if (deleteError) {
           console.error('Erro ao limpar sessões:', deleteError);
@@ -400,7 +399,7 @@ export function useDailyReport() {
         .from('prospecting_sessions')
         .delete()
         .eq('user_id', user.id)
-        .lt('completed_at', today.toISOString());
+        .lt('ended_at', today.toISOString());
 
       if (sessionsError) throw sessionsError;
 
@@ -442,5 +441,3 @@ export function useDailyReport() {
     isClearingData: clearOldData.isPending,
   };
 }
-
-

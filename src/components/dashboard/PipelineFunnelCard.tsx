@@ -46,11 +46,11 @@ const stageConfig: Record<string, { variant: CardVariant; label: string; gradien
 export function PipelineFunnelCard({ dealsByStage, formatCurrency }: PipelineFunnelCardProps) {
   return (
     <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-      <CardHeader>
-        <CardTitle className="text-foreground">Valores e Conversão do Funil</CardTitle>
+      <CardHeader className="p-3 sm:p-4 lg:p-6">
+        <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Valores e Conversão do Funil</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <CardContent className="p-3 sm:p-4 lg:p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3 lg:gap-4">
           {Object.entries(stageConfig).map(([key, config]) => {
             const stageData = dealsByStage[key] || { count: 0, value: 0 };
             const isLost = key === 'fechado_perdido';
@@ -59,7 +59,7 @@ export function PipelineFunnelCard({ dealsByStage, formatCurrency }: PipelineFun
               <div
                 key={key}
                 className={cn(
-                  "relative overflow-hidden rounded-xl p-4 transition-all duration-300",
+                  "relative overflow-hidden rounded-xl p-3 sm:p-4 transition-all duration-300",
                   "hover:scale-[1.02] hover:shadow-lg",
                   "bg-gradient-to-br",
                   config.gradient,
@@ -72,15 +72,15 @@ export function PipelineFunnelCard({ dealsByStage, formatCurrency }: PipelineFun
                 </div>
 
                 {/* Content */}
-                <div className="relative z-10 space-y-2">
-                  <p className="text-sm font-medium text-muted-foreground">
+                <div className="relative z-10 space-y-1 sm:space-y-2">
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">
                     {config.label}
                   </p>
-                  <p className="text-xl font-bold text-foreground">
+                  <p className="text-base sm:text-lg lg:text-xl font-bold text-foreground">
                     {stageData.count} negócio{stageData.count !== 1 ? 's' : ''}
                   </p>
                   <p className={cn(
-                    "text-sm font-semibold",
+                    "text-xs sm:text-sm font-semibold",
                     isLost ? "text-negative" : "text-positive"
                   )}>
                     {formatCurrency(stageData.value)}

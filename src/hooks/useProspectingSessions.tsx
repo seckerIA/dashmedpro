@@ -23,8 +23,8 @@ export function useProspectingSessions() {
         .from('prospecting_sessions')
         .select('*')
         .eq('user_id', user.id)
-        .gte('completed_at', todayISO)
-        .order('completed_at', { ascending: false });
+        .gte('ended_at', todayISO)
+        .order('ended_at', { ascending: false });
 
       if (error) throw error;
       return data;

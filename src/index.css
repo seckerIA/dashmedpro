@@ -1,3 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+@import './styles/fullcalendar-custom.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -41,13 +44,13 @@ All colors MUST be HSL.
     --radius: 0.75rem;
 
     /* Sidebar - Light theme */
-    --sidebar-background: 220 90% 35%;
+    --sidebar-background: 240 8% 15%;
     --sidebar-foreground: 0 0% 100%;
     --sidebar-primary: 210 100% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 90% 40%;
+    --sidebar-accent: 240 8% 20%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 220 90% 30%;
+    --sidebar-border: 240 8% 12%;
     --sidebar-ring: 210 100% 50%;
 
     /* DashMed Pro Gradients - Light theme */
@@ -90,68 +93,91 @@ All colors MUST be HSL.
     --chart-4: 142 76% 45%;
     --chart-5: 0 84% 60%;
     --chart-6: 199 89% 55%;
+
+    /* New Design System - Card Colors */
+    --card-red: 0 84% 58%;
+    --card-red-light: 0 84% 68%;
+    --card-red-foreground: 210 40% 98%;
+
+    --card-cyan: 188 94% 43%;
+    --card-cyan-light: 188 94% 53%;
+    --card-cyan-foreground: 210 40% 98%;
+
+    --card-yellow: 38 92% 50%;
+    --card-yellow-light: 38 92% 60%;
+    --card-yellow-foreground: 222 47% 11%;
+
+    --card-green: 142 76% 36%;
+    --card-green-light: 142 76% 46%;
+    --card-green-foreground: 210 40% 98%;
   }
 
   .dark {
-    /* DashMed Pro Dark Theme */
-    --background: 220 13% 9%;
+    /* DashMed Pro Purple Dark Theme - Inspired by dash 1 & 2 */
+    /* Fundo quase preto com toque roxo */
+    --background: 240 15% 6%;
     --foreground: 220 9% 98%;
 
-    --card: 220 13% 11%;
+    /* Cards ainda mais escuros */
+    --card: 240 12% 8%;
     --card-foreground: 220 9% 98%;
 
-    --popover: 220 13% 11%;
+    --popover: 240 12% 8%;
     --popover-foreground: 220 9% 98%;
 
-    /* DashMed Pro Blue Primary - Enhanced for dark theme */
-    --primary: 210 100% 55%;
+    /* PRIMARY: Vermelho vibrante */
+    --primary: 0 84% 58%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 90% 40%;
-    --secondary-foreground: 220 9% 98%;
+    /* SECONDARY: Vermelho mais escuro */
+    --secondary: 0 70% 45%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 220 13% 15%;
+    /* Muted neutro */
+    --muted: 240 10% 12%;
     --muted-foreground: 220 9% 65%;
 
-    --accent: 210 100% 55%;
+    /* ACCENT: Vermelho para highlights */
+    --accent: 0 84% 58%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 65%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 13% 20%;
-    --input: 220 13% 15%;
-    --ring: 210 100% 55%;
+    /* Border mais sutil */
+    --border: 240 10% 15%;
+    --input: 240 10% 12%;
+    --ring: 0 84% 58%;
 
-    /* Sidebar - Dark theme */
-    --sidebar-background: 220 13% 9%;
+    /* Sidebar - Dark theme (black, slightly different from dashboard background) */
+    --sidebar-background: 240 8% 10%;
     --sidebar-foreground: 220 9% 98%;
-    --sidebar-primary: 210 100% 55%;
+    --sidebar-primary: 0 84% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 13% 15%;
+    --sidebar-accent: 240 8% 14%;
     --sidebar-accent-foreground: 220 9% 98%;
-    --sidebar-border: 220 13% 20%;
-    --sidebar-ring: 210 100% 55%;
+    --sidebar-border: 240 8% 8%;
+    --sidebar-ring: 0 84% 58%;
 
-    /* DashMed Pro Gradients - Dark theme */
-    --gradient-primary: linear-gradient(135deg, hsl(210 100% 55%), hsl(220 90% 40%));
-    --gradient-card: linear-gradient(145deg, hsl(220 13% 11%), hsl(220 13% 13%));
-    --gradient-accent: linear-gradient(90deg, hsl(210 100% 55% / 0.1), hsl(210 100% 55% / 0.05));
-    --gradient-dark: linear-gradient(145deg, hsl(220 13% 9%), hsl(220 13% 11%));
+    /* DashMed Pro Gradients - Red Dark */
+    --gradient-primary: linear-gradient(135deg, hsl(0 84% 58%), hsl(0 70% 50%));
+    --gradient-card: linear-gradient(145deg, hsl(240 12% 8%), hsl(240 12% 10%));
+    --gradient-accent: linear-gradient(90deg, hsl(0 84% 58% / 0.1), hsl(0 84% 58% / 0.05));
+    --gradient-dark: linear-gradient(145deg, hsl(240 15% 6%), hsl(240 12% 8%));
 
-    /* DashMed Pro Shadows - Dark theme */
-    --shadow-brand: 0 8px 32px -8px hsl(210 100% 55% / 0.3);
-    --shadow-card: 0 4px 16px -4px hsl(220 13% 0% / 0.3);
-    --shadow-glow: 0 0 20px hsl(210 100% 55% / 0.2);
+    /* DashMed Pro Shadows - Red Glow */
+    --shadow-brand: 0 8px 32px -8px hsl(0 84% 58% / 0.3);
+    --shadow-card: 0 4px 16px -4px hsl(240 10% 0% / 0.5);
+    --shadow-glow: 0 0 20px hsl(0 84% 58% / 0.25);
 
     /* Status Colors - Dark theme */
     --success: 142 76% 45%;
     --success-foreground: 0 0% 100%;
     --warning: 43 96% 60%;
     --warning-foreground: 0 0% 9%;
-    --info: 210 100% 55%;
+    --info: 0 84% 58%;
     --info-foreground: 0 0% 100%;
-    
+
     /* Financial Colors - Dark theme */
     --positive: 142 76% 45%;
     --negative: 0 84% 65%;
@@ -161,13 +187,13 @@ All colors MUST be HSL.
     --gold: 43 96% 60%;
     --gold-foreground: 0 0% 9%;
 
-    /* Chart Colors - Dark theme */
-    --chart-1: 210 100% 55%;
-    --chart-2: 220 90% 40%;
-    --chart-3: 43 96% 60%;
-    --chart-4: 142 76% 45%;
-    --chart-5: 0 84% 65%;
-    --chart-6: 199 89% 55%;
+    /* Chart Colors - Red + Colorful */
+    --chart-1: 0 84% 58%;  /* Red principal */
+    --chart-2: 199 89% 55%;  /* Cyan */
+    --chart-3: 45 93% 58%;   /* Yellow */
+    --chart-4: 330 80% 60%;  /* Pink */
+    --chart-5: 142 76% 45%;  /* Green */
+    --chart-6: 0 70% 50%;  /* Red secundário */
   }
 }
 
@@ -177,7 +203,25 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+  }
+}
+
+/* New Design System - Component Classes */
+@layer components {
+  .glass {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .card-hover {
+    @apply transition-all duration-300 hover:scale-[1.02] hover:shadow-xl;
+  }
+
+  .transition-smooth {
+    @apply transition-all duration-300 ease-in-out;
   }
 }
 
@@ -195,8 +239,8 @@ All colors MUST be HSL.
 
 /* Design System Gradients - New Dashboard Cards */
 @layer utilities {
-  .bg-gradient-purple {
-    background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+  .bg-gradient-red {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
   }
 
   .bg-gradient-cyan {
@@ -211,8 +255,8 @@ All colors MUST be HSL.
     background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   }
 
-  .shadow-card-purple {
-    box-shadow: 0 8px 32px -8px rgba(168, 85, 247, 0.3);
+  .shadow-card-red {
+    box-shadow: 0 8px 32px -8px rgba(239, 68, 68, 0.3);
   }
 
   .shadow-card-cyan {
@@ -225,5 +269,35 @@ All colors MUST be HSL.
 
   .shadow-card-green {
     box-shadow: 0 8px 32px -8px rgba(16, 185, 129, 0.3);
+  }
+
+  /* New Design System - Text Gradients */
+  .text-gradient-red {
+    @apply bg-gradient-to-r from-red-400 to-red-600 bg-clip-text text-transparent;
+  }
+
+  .text-gradient-cyan {
+    @apply bg-gradient-to-r from-cyan-400 to-cyan-600 bg-clip-text text-transparent;
+  }
+
+  .text-gradient-yellow {
+    @apply bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent;
+  }
+
+  .text-gradient-green {
+    @apply bg-gradient-to-r from-green-400 to-green-600 bg-clip-text text-transparent;
+  }
+
+  /* New Design System - Animation Delays */
+  .animation-delay-200 {
+    animation-delay: 200ms;
+  }
+
+  .animation-delay-400 {
+    animation-delay: 400ms;
+  }
+
+  .animation-delay-600 {
+    animation-delay: 600ms;
   }
 }

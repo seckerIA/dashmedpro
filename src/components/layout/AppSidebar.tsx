@@ -144,28 +144,46 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
 
   return (
     <TooltipProvider delayDuration={0}>
-      <div className={`flex h-full flex-col bg-sidebar text-sidebar-foreground ${isCollapsed ? 'w-full' : ''}`}>
+      <div className={`flex h-full flex-col bg-sidebar text-sidebar-foreground font-sans ${isCollapsed ? 'w-full' : ''}`}>
         <ScrollArea className="flex-1">
-          <div className={`${isCollapsed ? 'p-1 space-y-4' : 'p-4 space-y-6'}`}>
+          <div className={`${isCollapsed ? 'p-1 space-y-3' : 'p-4 space-y-4'}`}>
             {/* Logo Section - DashMed Pro */}
-            <div className={`flex items-center ${isCollapsed ? 'justify-center p-1' : 'gap-3 p-4'}`}>
-              <div className={`${isCollapsed ? 'p-1.5' : 'p-2'} bg-white/10 rounded-lg transition-all duration-300`}>
+            <div
+              className={`
+                flex items-center
+                ${isCollapsed ? 'justify-center px-3 py-3' : 'gap-4 px-5 py-4'}
+                rounded-2xl bg-white/5 shadow-sm
+                transition-all duration-300
+              `}
+            >
+              <div
+                className={`
+                  ${isCollapsed ? 'p-2' : 'p-3'}
+                  bg-white/10 rounded-xl
+                  flex items-center justify-center
+                  transition-all duration-300
+                `}
+              >
                 <img 
                   src={dashmedLogo} 
                   alt="DashMed Pro Logo" 
-                  className={`${isCollapsed ? 'w-6 h-6' : 'w-8 h-8'} transition-smooth`}
+                  className={`${isCollapsed ? 'w-10 h-10' : 'w-12 h-12'} transition-smooth`}
                 />
               </div>
               {!isCollapsed && (
                 <div className="flex flex-col">
-                  <span className="text-white font-bold text-lg">DASHMED PRO</span>
-                  <span className="text-white/70 text-xs">DashMed Pro</span>
+                  <span className="text-white font-semibold text-xl tracking-wide">
+                    DASHMED PRO
+                  </span>
+                  <span className="text-white/60 text-sm">
+                    DashMed Pro
+                  </span>
                 </div>
               )}
             </div>
 
             {/* Navigation Items - Grouped with Separators */}
-            <div className={isCollapsed ? 'space-y-3' : 'space-y-6'}>
+            <div className={isCollapsed ? 'space-y-2.5' : 'space-y-4'}>
               {navigationGroups.map((group, groupIndex) => {
                 // Filtrar itens do grupo baseado nas permissões
                 const filteredItems = group.items.filter(item => {
@@ -224,8 +242,8 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                   <div key={group.label} className="space-y-1">
                     {/* Group Label */}
                     {!isCollapsed && (
-                      <div className="px-3 mb-2">
-                        <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">
+                      <div className="px-3 mb-1.5">
+                        <span className="text-xs font-semibold text-white/35 uppercase tracking-[0.18em]">
                           {group.label}
                         </span>
                       </div>
@@ -238,75 +256,80 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                     
                     {/* Group Items */}
                     {filteredItems.map((item) => {
-                    const active = isActive(item.url)
-                    const linkContent = (
-                      <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
-                        <div className={`flex items-center ${isCollapsed ? '' : 'gap-3'}`}>
-                          <item.icon className={`
-                            ${isCollapsed ? 'w-5 h-5' : 'w-5 h-5'} transition-all duration-200
-                            ${active ? 'text-white' : 'text-white/70 group-hover:text-white'}
-                          `} />
-                          {!isCollapsed && (
-                            <span className={`
-                              font-medium transition-all duration-200
-                              ${active ? 'text-white' : 'text-white/70 group-hover:text-white'}
-                            `}>
-                              {item.title}
-                            </span>
+                      const active = isActive(item.url)
+                      const linkContent = (
+                        <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} w-full`}>
+                          <div className={`flex items-center ${isCollapsed ? '' : 'gap-4'}`}>
+                            <item.icon
+                              className={`
+                                w-7 h-7 transition-all duration-200
+                                ${active ? 'text-white' : 'text-white/70 group-hover:text-white'}
+                                group-hover:scale-105
+                              `}
+                            />
+                            {!isCollapsed && (
+                              <span
+                                className={`
+                                  text-lg font-medium transition-colors duration-200
+                                  ${active ? 'text-white' : 'text-white/70 group-hover:text-white'}
+                                `}
+                              >
+                                {item.title}
+                              </span>
+                            )}
+                          </div>
+                          {!isCollapsed && item.badge && (
+                            <Badge
+                              variant={item.variant === 'new' ? 'default' : 'secondary'}
+                              className={`
+                                text-[10px] px-2 h-5 rounded-full border
+                                ${item.variant === 'new' 
+                                  ? 'bg-primary/15 text-primary border-primary/30' 
+                                  : 'bg-white/10 text-white border-white/20'
+                                }
+                              `}
+                            >
+                              {item.badge}
+                            </Badge>
                           )}
                         </div>
-                        {!isCollapsed && item.badge && (
-                          <Badge 
-                            variant={item.variant === 'new' ? 'default' : 'secondary'} 
-                            className={`
-                              text-xs px-2 py-0 h-5 
-                              ${item.variant === 'new' 
-                                ? 'bg-primary/20 text-primary-foreground border-primary/30' 
-                                : 'bg-white/20 text-white border-white/30'
-                              }
-                            `}
-                          >
-                            {item.badge}
-                          </Badge>
-                        )}
-                      </div>
-                    );
-                    
-                    return (
-                      <Tooltip key={item.title}>
-                        <TooltipTrigger asChild>
-                          <NavLink 
-                            to={item.url} 
-                            end={item.url === "/"} 
-                            className={`
-                              block ${isCollapsed ? 'p-2' : 'p-3'} rounded-lg transition-all duration-200 group relative w-full
-                              ${active 
-                                ? 'bg-white/10 text-white' 
-                                : 'text-white/70 hover:bg-white/5 hover:text-white'
-                              }
-                            `}
-                          >
-                            {linkContent}
-                            {active && !isCollapsed && (
-                              <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full" />
-                            )}
-                          </NavLink>
-                        </TooltipTrigger>
-                        {isCollapsed && (
-                          <TooltipContent side="right" className="bg-card text-foreground border-border">
-                            <div className="flex items-center gap-2">
-                              {item.title}
-                              {item.badge && (
-                                <Badge variant="secondary" className="text-xs">
-                                  {item.badge}
-                                </Badge>
-                              )}
-                            </div>
-                          </TooltipContent>
-                        )}
-                      </Tooltip>
-                    )
-                  })}
+                      );
+                      
+                      return (
+                        <Tooltip key={item.title}>
+                          <TooltipTrigger asChild>
+                            <NavLink 
+                              to={item.url} 
+                              end={item.url === "/"} 
+                              className={`
+                                group relative w-full block
+                                ${isCollapsed ? 'p-3.5' : 'px-4 py-3.5'}
+                                rounded-2xl text-base font-medium
+                                transition-all duration-200
+                                ${active 
+                                  ? 'bg-primary text-white shadow-sm' 
+                                  : 'text-white/70 hover:bg-white/5 hover:text-white'
+                                }
+                              `}
+                            >
+                              {linkContent}
+                            </NavLink>
+                          </TooltipTrigger>
+                          {isCollapsed && (
+                            <TooltipContent side="right" className="bg-card text-foreground border-border">
+                              <div className="flex items-center gap-2">
+                                {item.title}
+                                {item.badge && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    {item.badge}
+                                  </Badge>
+                                )}
+                              </div>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
+                      )
+                    })}
                 </div>
               );
               })}
@@ -323,17 +346,22 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
           {(() => {
             const active = isActive('/configuracoes');
             const linkContent = (
-              <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
-                <div className={`flex items-center ${isCollapsed ? '' : 'gap-3'}`}>
-                  <Settings className={`
-                    w-5 h-5 transition-all duration-200
-                    ${active ? 'text-white' : 'text-white/70 group-hover:text-white'}
-                  `} />
-                  {!isCollapsed && (
-                    <span className={`
-                      font-medium transition-all duration-200
+              <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} w-full`}>
+                <div className={`flex items-center ${isCollapsed ? '' : 'gap-4'}`}>
+                  <Settings
+                    className={`
+                      w-7 h-7 transition-all duration-200
                       ${active ? 'text-white' : 'text-white/70 group-hover:text-white'}
-                    `}>
+                      group-hover:scale-105
+                    `}
+                  />
+                  {!isCollapsed && (
+                    <span
+                      className={`
+                        text-lg font-medium transition-colors duration-200
+                        ${active ? 'text-white' : 'text-white/70 group-hover:text-white'}
+                      `}
+                    >
                       Configurações
                     </span>
                   )}
@@ -345,19 +373,19 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <NavLink 
-                    to="/configuracoes" 
+                    to="/configuracoes"
                     className={`
-                      block ${isCollapsed ? 'p-2' : 'p-3'} rounded-lg transition-all duration-200 group relative w-full
+                      group relative w-full block
+                      ${isCollapsed ? 'p-3.5' : 'px-4 py-3.5'}
+                      rounded-2xl text-base font-medium
+                      transition-all duration-200
                       ${active 
-                        ? 'bg-white/10 text-white' 
+                        ? 'bg-primary text-white shadow-sm' 
                         : 'text-white/70 hover:bg-white/5 hover:text-white'
                       }
                     `}
                   >
                     {linkContent}
-                    {active && !isCollapsed && (
-                      <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full" />
-                    )}
                   </NavLink>
                 </TooltipTrigger>
                 {isCollapsed && (
@@ -371,17 +399,17 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
           
           {/* User info and logout */}
           {!isCollapsed && (
-            <div className="mt-4 p-3 bg-white/5 rounded-lg">
-              <div className="text-xs text-white/60 mb-2 truncate">
+            <div className="mt-3 px-3 py-2.5 bg-white/5 rounded-2xl">
+              <div className="text-sm text-white/60 mb-2 truncate">
                 {user?.email}
               </div>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleSignOut}
-                className="w-full justify-start p-2 h-8 hover:bg-white/10 text-white/70 hover:text-white"
+                className="w-full justify-start px-2.5 py-2 h-9 rounded-2xl text-base text-white/70 hover:text-white hover:bg-white/10"
               >
-                <LogOut className="mr-2 h-4 w-4" />
+                <LogOut className="mr-2 h-5 w-5" />
                 Sair
               </Button>
             </div>

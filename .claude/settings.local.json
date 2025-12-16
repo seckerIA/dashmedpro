@@ -12,7 +12,17 @@
       "Bash(npx supabase:*)",
       "Bash(cat:*)",
       "Bash(npm run dev:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(npm run build:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(timeout:*)",
+      "Bash(curl:*)",
+      "Bash(grep:*)",
+      "Bash(node run-migration.mjs:*)",
+      "Bash(DB_PASSWORD=\"Vq79qn7t@96037951aA\" npx supabase db push:*)",
+      "Bash(ping:*)",
+      "Bash(nslookup:*)"
     ]
   }
 }

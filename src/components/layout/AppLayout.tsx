@@ -46,94 +46,114 @@ export function AppLayout({ children }: AppLayoutProps) {
     <TooltipProvider>
         <ResizablePanelGroup 
             direction="horizontal" 
-            className="min-h-screen w-full"
+            className="h-screen w-full overflow-hidden font-sans"
             onLayout={(sizes: number[]) => {
                 document.cookie = `react-resizable-panels:layout=${JSON.stringify(sizes)}`
             }}
         >
         <ResizablePanel
-            ref={sidebarRef}
-            defaultSize={20}
-            collapsedSize={3}
-            collapsible={true}
-            minSize={3}
-            maxSize={20}
-            onCollapse={() => {
-                setIsCollapsed(true)
-                document.cookie = `react-resizable-panels:collapsed=${JSON.stringify(true)}`
-            }}
-            onExpand={() => {
-                setIsCollapsed(false)
-                document.cookie = `react-resizable-panels:collapsed=${JSON.stringify(false)}`
-            }}
-            className="transition-all duration-300 ease-in-out"
+          ref={sidebarRef}
+          defaultSize={20}
+          collapsedSize={3}
+          collapsible={true}
+          minSize={3}
+          maxSize={20}
+          onCollapse={() => {
+            setIsCollapsed(true)
+            document.cookie = `react-resizable-panels:collapsed=${JSON.stringify(true)}`
+          }}
+          onExpand={() => {
+            setIsCollapsed(false)
+            document.cookie = `react-resizable-panels:collapsed=${JSON.stringify(false)}`
+          }}
+          className="transition-all duration-300 ease-in-out"
         >
-            <AppSidebar isCollapsed={isCollapsed} />
+          <AppSidebar isCollapsed={isCollapsed} />
         </ResizablePanel>
         
         <ResizableHandle withHandle />
         
         <ResizablePanel defaultSize={80}>
-            <div className="flex-1 flex flex-col h-full bg-background">
-            {/* Header - Nexus Dark Theme */}
-            <header className="h-16 flex items-center justify-between px-6 bg-card border-b border-border shadow-card">
-                <div className="flex items-center gap-6">
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button
-                                onClick={toggleSidebar}
-                                className="p-2 hover:bg-muted rounded-lg transition-all duration-200"
-                                variant="ghost"
-                                size="icon"
-                            >
-                                <AlignJustify className="w-5 h-5 text-foreground" />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="right">
-                            <p>{isCollapsed ? "Expandir Menu" : "Recolher Menu"}</p>
-                        </TooltipContent>
-                    </Tooltip>
-                    <div className="flex flex-col">
-                        <h1 className="text-lg font-semibold text-foreground">Olá, {displayName}</h1>
-                        <p className="text-sm text-muted-foreground">DashMed Pro</p>
-                    </div>
+          <div className="flex-1 flex flex-col h-full bg-background">
+            {/* Header - estilo Dabang */}
+            <header className="h-20 flex items-center justify-between px-8 bg-card border-b border-border shadow-card">
+              <div className="flex items-center gap-6 flex-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={toggleSidebar}
+                      className="p-2 hover:bg-muted rounded-xl transition-all duration-200"
+                      variant="ghost"
+                      size="icon"
+                    >
+                      <AlignJustify className="w-5 h-5 text-foreground" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <p>{isCollapsed ? "Expandir Menu" : "Recolher Menu"}</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                <div className="flex flex-col">
+                  <h1 className="text-2xl font-semibold text-foreground tracking-tight">
+                    Dashboard
+                  </h1>
+                  <p className="text-sm text-muted-foreground">
+                    Visão geral de vendas e CRM
+                  </p>
                 </div>
-                
-                <div className="flex items-center gap-4">
-                    {/* Navigation Links */}
-                    <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-2 text-sm">
-                            <span className="text-muted-foreground">Cadastro rápido</span>
-                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                            <span className="text-primary font-medium border-b border-primary">Ajuda</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                            <span className="text-muted-foreground">Comunicações</span>
-                            <NotificationBell />
-                        </div>
-                    </div>
-                    
-                    {/* User Profile */}
-                    <div className="flex items-center gap-3 pl-4 border-l border-border">
-                        <Avatar className="h-8 w-8">
-                            <AvatarImage src={profile?.avatar_url || undefined} />
-                            <AvatarFallback className="bg-primary text-primary-foreground text-xs">{initials}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex flex-col">
-                            <span className="text-sm font-medium text-foreground">{displayName}</span>
-                            <span className="text-xs text-muted-foreground">Cargo: {displayRole}</span>
-                        </div>
-                    </div>
+
+                {/* Barra de busca */}
+                <div className="hidden md:flex items-center ml-8 flex-1 max-w-md">
+                  <div className="relative w-full">
+                    <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted-foreground">
+                      <Search className="w-4 h-4" />
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="Buscar contratos, contatos..."
+                      className="w-full pl-9 pr-4 py-2 rounded-full border border-border bg-muted/60 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/60 focus:border-transparent transition-colors"
+                    />
+                  </div>
                 </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <div className="hidden md:flex items-center gap-6 text-sm">
+                  <button className="text-primary font-medium border-b border-primary/60">
+                    Ajuda
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">Comunicações</span>
+                    <NotificationBell />
+                  </div>
+                </div>
+
+                {/* User Profile */}
+                <div className="flex items-center gap-3 pl-4 border-l border-border">
+                  <Avatar className="h-9 w-9">
+                    <AvatarImage src={profile?.avatar_url || undefined} />
+                    <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-foreground leading-tight">
+                      {displayName}
+                    </span>
+                    <span className="text-xs text-muted-foreground leading-tight">
+                      Cargo: {displayRole}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </header>
 
             {/* Main Content */}
             <main className="flex-1 p-8 bg-background overflow-auto">
-                {children}
+              {children}
             </main>
-            </div>
+          </div>
         </ResizablePanel>
         </ResizablePanelGroup>
         
