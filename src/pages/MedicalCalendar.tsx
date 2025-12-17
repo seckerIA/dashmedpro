@@ -1,30 +1,49 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useMedicalAppointments } from '@/hooks/useMedicalAppointments';
-import { FullCalendarView } from '@/components/medical-calendar/FullCalendarView';
-import { CalendarToolbar } from '@/components/medical-calendar/CalendarToolbar';
+import { useGeneralMeetings } from '@/hooks/useGeneralMeetings';
 import { AppointmentForm } from '@/components/medical-calendar/AppointmentForm';
 import { AppointmentDetailsModal } from '@/components/medical-calendar/AppointmentDetailsModal';
+import { MeetingDetailsModal } from '@/components/medical-calendar/MeetingDetailsModal';
+import { MeetingForm } from '@/components/medical-calendar/MeetingForm';
+import { MonthlyCalendarView } from '@/components/medical-calendar/MonthlyCalendarView';
+import { DailyAppointmentsList } from '@/components/medical-calendar/DailyAppointmentsList';
+import { TimeGridView } from '@/components/medical-calendar/TimeGridView';
+import { AppointmentMetrics } from '@/components/medical-calendar/AppointmentMetrics';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { MedicalAppointmentWithRelations, AppointmentType, AppointmentStatus, PaymentStatus } from '@/types/medicalAppointments';
-import { CalendarCheck, DollarSign, Clock } from 'lucide-react';
+import { GeneralMeeting } from '@/types/generalMeetings';
+import { Calendar, Plus, CalendarDays, Clock } from 'lucide-react';
+import { startOfMonth, endOfMonth } from 'date-fns';
+
+type CalendarView = 'monthly' | 'daily-hours';
 
 export default function MedicalCalendar() {
   const { user } = useAuth();
-  const [view, setView] = useState<'timeGridDay' | 'timeGridWeek' | 'dayGridMonth'>('timeGridWeek');
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [view, setView] = useState<CalendarView>('monthly');
   const [typeFilter, setTypeFilter] = useState<AppointmentType | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<AppointmentStatus | 'all'>('all');
   const [paymentFilter, setPaymentFilter] = useState<PaymentStatus | 'all'>('all');
-  const [showForm, setShowForm] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
+  const [showAppointmentForm, setShowAppointmentForm] = useState(false);
+  const [showMeetingForm, setShowMeetingForm] = useState(false);
+  const [showAppointmentDetails, setShowAppointmentDetails] = useState(false);
+  const [showMeetingDetails, setShowMeetingDetails] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<MedicalAppointmentWithRelations | null>(null);
+  const [selectedMeeting, setSelectedMeeting] = useState<GeneralMeeting | null>(null);
   const [prefilledDates, setPrefilledDates] = useState<{ start?: Date; end?: Date }>({});
+
+  // Calcular range do mês para carregar consultas
+  const monthStart = startOfMonth(selectedDate);
+  const monthEnd = endOfMonth(selectedDate);
 
   // Fetch appointments with filters
   const filters = {
+    startDate: monthStart,
+    endDate: monthEnd,
     appointmentType: typeFilter,
     status: statusFilter,
     paymentStatus: paymentFilter,
@@ -32,9 +51,7 @@ export default function MedicalCalendar() {
 
   const {
     appointments,
-    todayAppointments,
-    pendingPaymentsCount,
-    isLoading,
+    isLoading: isLoadingAppointments,
     createAppointment,
     updateAppointment,
     deleteAppointment,
@@ -43,130 +60,288 @@ export default function MedicalCalendar() {
     cancelAppointment,
   } = useMedicalAppointments(filters);
 
-  // Handle navigation
-  const handleNavigate = (action: 'prev' | 'next' | 'today') => {
-    const newDate = new Date(currentDate);
-    switch (action) {
-      case 'prev':
-        if (view === 'timeGridDay') {
-          newDate.setDate(newDate.getDate() - 1);
-        } else if (view === 'timeGridWeek') {
-          newDate.setDate(newDate.getDate() - 7);
-        } else {
-          newDate.setMonth(newDate.getMonth() - 1);
-        }
-        break;
-      case 'next':
-        if (view === 'timeGridDay') {
-          newDate.setDate(newDate.getDate() + 1);
-        } else if (view === 'timeGridWeek') {
-          newDate.setDate(newDate.getDate() + 7);
-        } else {
-          newDate.setMonth(newDate.getMonth() + 1);
-        }
-        break;
-      case 'today':
-        setCurrentDate(new Date());
-        return;
-    }
-    setCurrentDate(newDate);
+  // Buscar reuniões do mesmo período
+  const {
+    meetings,
+    isLoading: isLoadingMeetings,
+    createMeeting,
+    updateMeeting,
+    deleteMeeting,
+    markAsCompleted: markMeetingCompleted,
+    cancelMeeting,
+  } = useGeneralMeetings({
+    startDate: monthStart,
+    endDate: monthEnd,
+  });
+
+  const isLoading = isLoadingAppointments || isLoadingMeetings;
+
+  // Handle date selection from calendar
+  const handleDateSelect = (date: Date) => {
+    setSelectedDate(date);
   };
 
-  // Handle event click
-  const handleEventClick = (appointment: MedicalAppointmentWithRelations) => {
+  // Handle event click (from appointment card)
+  const handleAppointmentClick = (appointment: MedicalAppointmentWithRelations) => {
     setSelectedAppointment(appointment);
-    setShowDetails(true);
+    setShowAppointmentDetails(true);
   };
 
-  // Handle event drop (drag-and-drop)
-  const handleEventDrop = async (appointmentId: string, newStart: Date, newEnd: Date) => {
-    await updateAppointment.mutateAsync({
-      id: appointmentId,
-      updates: {
-        start_time: newStart.toISOString(),
-        end_time: newEnd.toISOString(),
-        duration_minutes: Math.round((newEnd.getTime() - newStart.getTime()) / 60000),
-      },
+  // Handle appointment form submit
+  const handleAppointmentFormSubmit = async (data: any) => {
+    // The AppointmentForm already calculates end_time, but if it's empty, calculate it
+    if (!data.end_time && data.start_time && data.duration_minutes) {
+      const startDateTime = new Date(data.start_time);
+      const endDateTime = new Date(startDateTime.getTime() + data.duration_minutes * 60000);
+      data.end_time = endDateTime.toISOString();
+    }
+
+    if (selectedAppointment) {
+      // Editing existing appointment
+      await updateAppointment.mutateAsync({
+        id: selectedAppointment.id,
+        updates: data,
+      });
+    } else {
+      // Creating new appointment
+      await createAppointment.mutateAsync(data);
+    }
+    setShowAppointmentForm(false);
+    setPrefilledDates({});
+    setSelectedAppointment(null);
+  };
+
+  // Handle meeting form submit
+  const handleMeetingFormSubmit = async (data: any) => {
+    if (selectedMeeting) {
+      // Editing existing meeting
+      await updateMeeting.mutateAsync({
+        id: selectedMeeting.id,
+        updates: data,
+      });
+    } else {
+      // Creating new meeting
+      await createMeeting.mutateAsync(data);
+    }
+    setShowMeetingForm(false);
+    setPrefilledDates({});
+    setSelectedMeeting(null);
+  };
+
+  // Handle actions from appointment card
+  const handleEdit = (appointment: MedicalAppointmentWithRelations) => {
+    setSelectedAppointment(appointment);
+    setShowAppointmentDetails(false);
+    setPrefilledDates({
+      start: new Date(appointment.start_time),
+      end: new Date(appointment.end_time),
     });
+    setShowAppointmentForm(true);
   };
 
-  // Handle date selection (click to create)
-  const handleDateSelect = (start: Date, end: Date) => {
-    setPrefilledDates({ start, end });
-    setShowForm(true);
+  const handleDelete = async (appointment: MedicalAppointmentWithRelations) => {
+    if (confirm('Tem certeza que deseja excluir esta consulta?')) {
+      await deleteAppointment.mutateAsync(appointment.id);
+      setShowAppointmentDetails(false);
+      setSelectedAppointment(null);
+    }
   };
 
-  // Handle form submit
-  const handleFormSubmit = async (data: any) => {
-    await createAppointment.mutateAsync(data);
+  const handleMarkCompleted = async (appointment: MedicalAppointmentWithRelations) => {
+    await markAsCompleted.mutateAsync(appointment.id);
+    setShowAppointmentDetails(false);
+    setSelectedAppointment(null);
   };
 
-  // Handle actions from details modal
-  const handleMarkCompleted = async () => {
+  const handleCancel = async (appointment: MedicalAppointmentWithRelations) => {
+    const reason = prompt('Motivo do cancelamento:');
+    if (reason) {
+      await cancelAppointment.mutateAsync({ id: appointment.id, reason });
+      setShowAppointmentDetails(false);
+      setSelectedAppointment(null);
+    }
+  };
+
+  // Handle meeting actions
+  const handleMeetingClick = (meeting: GeneralMeeting) => {
+    setSelectedMeeting(meeting);
+    setShowMeetingDetails(true);
+  };
+
+  const handleMeetingEdit = (meeting: GeneralMeeting) => {
+    setSelectedMeeting(meeting);
+    setPrefilledDates({
+      start: new Date(meeting.start_time),
+      end: new Date(meeting.end_time),
+    });
+    setShowMeetingDetails(false);
+    setShowMeetingForm(true);
+  };
+
+  const handleMeetingDelete = async (meeting: GeneralMeeting) => {
+    if (confirm('Tem certeza que deseja excluir esta reunião?')) {
+      await deleteMeeting.mutateAsync(meeting.id);
+      setShowMeetingDetails(false);
+      setSelectedMeeting(null);
+    }
+  };
+
+  const handleMeetingCompleted = async (meeting: GeneralMeeting) => {
+    await markMeetingCompleted.mutateAsync(meeting.id);
+    setShowMeetingDetails(false);
+    setSelectedMeeting(null);
+  };
+
+  const handleMeetingCancel = async (meeting: GeneralMeeting) => {
+    const reason = prompt('Motivo do cancelamento (opcional):');
+    if (reason !== null) { // User clicked OK (even if empty)
+      await cancelMeeting.mutateAsync(meeting.id);
+      setShowMeetingDetails(false);
+      setSelectedMeeting(null);
+    }
+  };
+
+  // Handle meeting details modal actions
+  const handleMeetingDetailsEdit = () => {
+    if (selectedMeeting) {
+      handleMeetingEdit(selectedMeeting);
+    }
+  };
+
+  const handleMeetingDetailsDelete = async () => {
+    if (selectedMeeting) {
+      await handleMeetingDelete(selectedMeeting);
+    }
+  };
+
+  const handleMeetingDetailsCompleted = async () => {
+    if (selectedMeeting) {
+      await handleMeetingCompleted(selectedMeeting);
+    }
+  };
+
+  const handleMeetingDetailsCancel = async () => {
+    if (selectedMeeting) {
+      await handleMeetingCancel(selectedMeeting);
+    }
+  };
+
+  const handleTimeSlotClick = (startTime: Date, endTime: Date) => {
+    setPrefilledDates({ start: startTime, end: endTime });
+    // Por padrão, abrir formulário de consulta
+    setShowAppointmentForm(true);
+  };
+
+  // Handle actions from appointment details modal
+  const handleDetailsEdit = () => {
+    if (selectedAppointment) {
+      setShowAppointmentDetails(false);
+      setPrefilledDates({
+        start: new Date(selectedAppointment.start_time),
+        end: new Date(selectedAppointment.end_time),
+      });
+      setShowAppointmentForm(true);
+    }
+  };
+
+  const handleDetailsDelete = async () => {
+    if (selectedAppointment && confirm('Tem certeza que deseja excluir esta consulta?')) {
+      await deleteAppointment.mutateAsync(selectedAppointment.id);
+      setShowAppointmentDetails(false);
+      setSelectedAppointment(null);
+    }
+  };
+
+  const handleDetailsMarkCompleted = async () => {
     if (selectedAppointment) {
       await markAsCompleted.mutateAsync(selectedAppointment.id);
-      setShowDetails(false);
+      setShowAppointmentDetails(false);
+      setSelectedAppointment(null);
     }
   };
 
-  const handleMarkNoShow = async () => {
+  const handleDetailsMarkNoShow = async () => {
     if (selectedAppointment) {
       await markAsNoShow.mutateAsync(selectedAppointment.id);
-      setShowDetails(false);
+      setShowAppointmentDetails(false);
+      setSelectedAppointment(null);
     }
   };
 
-  const handleCancelAppointment = async () => {
+  const handleDetailsCancel = async () => {
     if (selectedAppointment) {
       const reason = prompt('Motivo do cancelamento:');
       if (reason) {
         await cancelAppointment.mutateAsync({ id: selectedAppointment.id, reason });
-        setShowDetails(false);
+        setShowAppointmentDetails(false);
+        setSelectedAppointment(null);
       }
-    }
-  };
-
-  const handleDeleteAppointment = async () => {
-    if (selectedAppointment && confirm('Tem certeza que deseja excluir esta consulta?')) {
-      await deleteAppointment.mutateAsync(selectedAppointment.id);
-      setShowDetails(false);
     }
   };
 
   return (
     <div className="min-h-screen space-y-6 bg-background pb-20">
-      {/* Header Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="p-4 flex items-center gap-4">
-          <div className="p-3 rounded-full bg-primary/10">
-            <CalendarCheck className="h-6 w-6 text-primary" />
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="p-3 rounded-xl bg-primary/10">
+            <Calendar className="h-8 w-8 text-primary" />
           </div>
           <div>
-            <p className="text-sm text-muted-foreground">Total de Consultas</p>
-            <p className="text-2xl font-bold">{appointments.length}</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-card-foreground">Agenda Médica</h1>
+            <p className="text-muted-foreground text-sm sm:text-lg">Sistema de Agendamento</p>
           </div>
-        </Card>
-
-        <Card className="p-4 flex items-center gap-4">
-          <div className="p-3 rounded-full bg-blue-500/10">
-            <Clock className="h-6 w-6 text-blue-500" />
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground">Consultas Hoje</p>
-            <p className="text-2xl font-bold">{todayAppointments.length}</p>
-          </div>
-        </Card>
-
-        <Card className="p-4 flex items-center gap-4">
-          <div className="p-3 rounded-full bg-yellow-500/10">
-            <DollarSign className="h-6 w-6 text-yellow-500" />
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground">Pagamentos Pendentes</p>
-            <p className="text-2xl font-bold">{pendingPaymentsCount}</p>
-          </div>
-        </Card>
+        </div>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <Button 
+            onClick={() => setShowAppointmentForm(true)} 
+            size="lg" 
+            className="flex-1 sm:flex-none bg-primary hover:bg-primary/90"
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            Nova Consulta
+          </Button>
+          <Button 
+            onClick={() => setShowMeetingForm(true)} 
+            size="lg" 
+            variant="outline"
+            className="flex-1 sm:flex-none"
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            Nova Reunião
+          </Button>
+        </div>
       </div>
+
+      {/* Metrics Cards */}
+      <AppointmentMetrics appointments={appointments} meetings={meetings} />
+
+      {/* View Toggle */}
+      <Card className="p-4">
+        <div className="flex items-center justify-between">
+          <Label className="text-base font-semibold">Visualização</Label>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={view === 'monthly' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setView('monthly')}
+              className="gap-2"
+            >
+              <CalendarDays className="h-4 w-4" />
+              Mensal
+            </Button>
+            <Button
+              variant={view === 'daily-hours' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setView('daily-hours')}
+              className="gap-2"
+            >
+              <Clock className="h-4 w-4" />
+              Diário em Horas
+            </Button>
+          </div>
+        </div>
+      </Card>
 
       {/* Filters */}
       <Card className="p-4">
@@ -225,47 +400,102 @@ export default function MedicalCalendar() {
         </div>
       </Card>
 
-      {/* Calendar Toolbar */}
-      <CalendarToolbar
-        currentDate={currentDate}
-        view={view}
-        onViewChange={setView}
-        onNavigate={handleNavigate}
-        onNewAppointment={() => setShowForm(true)}
-      />
+      {/* Main Layout: Calendar + Appointments List */}
+      {view === 'monthly' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Calendar - Left Column */}
+          <div className="lg:col-span-1 order-2 lg:order-1">
+          <MonthlyCalendarView
+            selectedDate={selectedDate}
+            onDateSelect={handleDateSelect}
+            appointments={appointments}
+            meetings={meetings}
+          />
+          </div>
 
-      {/* Calendar */}
-      <FullCalendarView
-        appointments={appointments}
-        view={view}
-        onEventClick={handleEventClick}
-        onEventDrop={handleEventDrop}
-        onDateSelect={handleDateSelect}
-        isLoading={isLoading}
-        currentDate={currentDate}
-      />
+          {/* Appointments List - Right Column */}
+          <div className="lg:col-span-2 order-1 lg:order-2">
+            <DailyAppointmentsList
+              selectedDate={selectedDate}
+              appointments={appointments}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onMarkCompleted={handleMarkCompleted}
+              onCancel={handleCancel}
+            />
+          </div>
+        </div>
+      ) : (
+        /* Time Grid View */
+        <TimeGridView
+          selectedDate={selectedDate}
+          appointments={appointments}
+          meetings={meetings}
+          onDateChange={setSelectedDate}
+          onAppointmentClick={(appt) => {
+            setSelectedAppointment(appt);
+            setShowAppointmentDetails(true);
+          }}
+          onMeetingClick={handleMeetingClick}
+          onMeetingCancel={handleMeetingCancel}
+          onMeetingDelete={handleMeetingDelete}
+          onMeetingCompleted={handleMeetingCompleted}
+          onSlotClick={handleTimeSlotClick}
+          onCreateAppointment={() => setShowAppointmentForm(true)}
+          onCreateMeeting={() => setShowMeetingForm(true)}
+        />
+      )}
 
       {/* Modals */}
       <AppointmentForm
-        open={showForm}
-        onOpenChange={setShowForm}
-        onSubmit={handleFormSubmit}
+        open={showAppointmentForm}
+        onOpenChange={(open) => {
+          setShowAppointmentForm(open);
+          if (!open) {
+            setSelectedAppointment(null);
+            setPrefilledDates({});
+          }
+        }}
+        onSubmit={handleAppointmentFormSubmit}
         prefilledStart={prefilledDates.start}
         prefilledEnd={prefilledDates.end}
+        appointment={selectedAppointment}
+      />
+
+      <MeetingForm
+        open={showMeetingForm}
+        onOpenChange={(open) => {
+          setShowMeetingForm(open);
+          if (!open) {
+            setSelectedMeeting(null);
+            setPrefilledDates({});
+          }
+        }}
+        onSubmit={handleMeetingFormSubmit}
+        prefilledStart={prefilledDates.start}
+        prefilledEnd={prefilledDates.end}
+        meeting={selectedMeeting}
       />
 
       <AppointmentDetailsModal
-        open={showDetails}
-        onOpenChange={setShowDetails}
+        open={showAppointmentDetails}
+        onOpenChange={setShowAppointmentDetails}
         appointment={selectedAppointment}
-        onEdit={() => {
-          setShowDetails(false);
-          setShowForm(true);
-        }}
-        onDelete={handleDeleteAppointment}
-        onMarkCompleted={handleMarkCompleted}
-        onMarkNoShow={handleMarkNoShow}
-        onCancel={handleCancelAppointment}
+        onEdit={handleDetailsEdit}
+        onDelete={handleDetailsDelete}
+        onMarkCompleted={handleDetailsMarkCompleted}
+        onMarkNoShow={handleDetailsMarkNoShow}
+        onCancel={handleDetailsCancel}
+      />
+
+      <MeetingDetailsModal
+        open={showMeetingDetails}
+        onOpenChange={setShowMeetingDetails}
+        meeting={selectedMeeting}
+        onEdit={handleMeetingDetailsEdit}
+        onDelete={handleMeetingDetailsDelete}
+        onMarkCompleted={handleMeetingDetailsCompleted}
+        onCancel={handleMeetingDetailsCancel}
       />
     </div>
   );
