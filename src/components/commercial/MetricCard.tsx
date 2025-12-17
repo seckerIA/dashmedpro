@@ -1,14 +1,18 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUp, Target, DollarSign, BarChart3, UserPlus, Calendar, Loader2 } from "lucide-react";
+import { TrendingUp, Target, DollarSign, BarChart3, UserPlus, Calendar, Loader2, TrendingDown, Percent, Clock, Calculator, UserCheck, Zap } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 
 interface MetricCardProps {
   title: string;
   value: string | number;
-  icon: "trending-up" | "target" | "dollar-sign" | "bar-chart" | "user-plus" | "calendar";
+  icon: "trending-up" | "target" | "dollar-sign" | "bar-chart" | "user-plus" | "calendar" | "percent" | "clock" | "calculator" | "user-check" | "zap";
   format?: "currency" | "number" | "percentage";
   isLoading?: boolean;
+  comparison?: {
+    value: number;
+    label?: string;
+  };
 }
 
 const iconMap = {
@@ -18,9 +22,14 @@ const iconMap = {
   "bar-chart": BarChart3,
   "user-plus": UserPlus,
   "calendar": Calendar,
+  "percent": Percent,
+  "clock": Clock,
+  "calculator": Calculator,
+  "user-check": UserCheck,
+  "zap": Zap,
 };
 
-export function MetricCard({ title, value, icon, format = "number", isLoading }: MetricCardProps) {
+export function MetricCard({ title, value, icon, format = "number", isLoading, comparison }: MetricCardProps) {
   const Icon = iconMap[icon];
 
   const formatValue = (val: string | number): string => {
@@ -31,28 +40,51 @@ export function MetricCard({ title, value, icon, format = "number", isLoading }:
     }
     
     if (format === "percentage") {
-      return `${val}%`;
+      return `${val.toFixed(1)}%`;
     }
     
     return val.toLocaleString("pt-BR");
   };
 
+  const getTrendIcon = () => {
+    if (!comparison || comparison.value === 0) return null;
+    if (comparison.value > 0) {
+      return <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />;
+    }
+    return <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />;
+  };
+
+  const getTrendColor = () => {
+    if (!comparison || comparison.value === 0) return "text-muted-foreground";
+    if (comparison.value > 0) return "text-green-600 dark:text-green-400";
+    return "text-red-600 dark:text-red-400";
+  };
+
   return (
     <Card className="bg-gradient-card shadow-card border-border">
-      <CardContent className="p-4 flex items-center gap-4">
-        <div className="p-3 rounded-full bg-primary/10">
-          {isLoading ? (
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          ) : (
-            <Icon className="h-6 w-6 text-primary" />
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-2">
           <p className="text-sm text-muted-foreground truncate">{title}</p>
-          <p className="text-2xl font-bold text-card-foreground">
-            {isLoading ? "..." : formatValue(value)}
-          </p>
+          <div className="p-2 rounded-full bg-primary/10 flex-shrink-0">
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            ) : (
+              <Icon className="h-4 w-4 text-primary" />
+            )}
+          </div>
         </div>
+        <p className="text-2xl font-bold text-card-foreground mb-2">
+          {isLoading ? "..." : formatValue(value)}
+        </p>
+        {comparison && (
+          <div className={cn("flex items-center gap-1 text-xs", getTrendColor())}>
+            {getTrendIcon()}
+            <span>
+              {comparison.value > 0 ? '+' : ''}{comparison.value.toFixed(1)}%
+              {comparison.label && ` ${comparison.label}`}
+            </span>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

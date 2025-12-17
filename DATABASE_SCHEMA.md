@@ -579,3 +579,4 @@ financial_transactions
 **Última Atualização**: 2025-01-20  
 **Versão do Schema**: 1.0
 
+
