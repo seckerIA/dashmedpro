@@ -25,6 +25,7 @@ import Financial from "./pages/Financial";
 import FinancialTransactions from "./pages/FinancialTransactions";
 import TransactionForm from "./components/financial/TransactionForm";
 import ProspectingGuide from "./pages/ProspectingGuide";
+import Commercial from "./pages/Commercial";
 import { 
   TrendingUp, 
   Target, 
@@ -139,16 +140,7 @@ const AppRoutes = () => {
             />
           } 
         />
-        <Route 
-          path="/comercial" 
-          element={
-            <PlaceholderPage 
-              title="Comercial" 
-              description="Gestão de vendas e relacionamento com clientes"
-              icon={Target}
-            />
-          } 
-        />
+        <Route path="/comercial" element={<Commercial />} />
         <Route 
           path="/financeiro" 
           element={

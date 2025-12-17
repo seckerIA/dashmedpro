@@ -13,6 +13,7 @@ import {
   AppointmentStatus,
   PaymentStatus,
 } from '@/types/medicalAppointments';
+import { FinancialTransactionInsert } from '@/types/financial';
 
 interface UseMedicalAppointmentsFilters {
   startDate?: Date;
@@ -214,18 +215,105 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
   // Helper: Mark as completed
   const markAsCompleted = useMutation({
     mutationFn: async (id: string) => {
+      // Buscar a consulta completa antes de atualizar
+      const { data: appointment, error: fetchError } = await supabase
+        .from('medical_appointments')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) throw new Error(`Erro ao buscar consulta: ${fetchError.message}`);
+      if (!appointment) throw new Error('Consulta não encontrada');
+
+      // Verificar se já existe transação financeira vinculada
+      let financialTransactionId = appointment.financial_transaction_id;
+
+      // Se não existe transação e tem valor estimado, criar uma transação financeira
+      if (!financialTransactionId && appointment.estimated_value && appointment.estimated_value > 0) {
+        // Buscar categoria padrão de entrada (consultas médicas)
+        const { data: categories } = await supabase
+          .from('financial_categories')
+          .select('id')
+          .eq('type', 'entrada')
+          .limit(1);
+
+        // Buscar primeira conta disponível
+        const { data: accounts } = await supabase
+          .from('financial_accounts')
+          .select('id')
+          .limit(1);
+
+        const categoryId = categories && categories.length > 0 ? categories[0].id : null;
+        const accountId = accounts && accounts.length > 0 ? accounts[0].id : null;
+
+        // Criar transação financeira
+        const transactionData: FinancialTransactionInsert = {
+          user_id: appointment.user_id,
+          account_id: accountId,
+          category_id: categoryId,
+          type: 'entrada',
+          amount: Number(appointment.estimated_value),
+          description: `Consulta: ${appointment.title}`,
+          date: new Date(appointment.start_time).toISOString().split('T')[0],
+          transaction_date: new Date(appointment.start_time).toISOString().split('T')[0],
+          contact_id: appointment.contact_id,
+          payment_method: (appointment.payment_status === 'paid' || appointment.payment_status === 'partial') ? 'pix' : null,
+          status: (appointment.payment_status === 'paid' || appointment.payment_status === 'partial') ? 'concluida' : 'pendente',
+          notes: `Consulta médica - ${appointment.appointment_type}`,
+          tags: ['consulta-medica'],
+          has_costs: false,
+          total_costs: 0,
+          metadata: {
+            appointment_id: appointment.id,
+            appointment_type: appointment.appointment_type,
+          },
+        };
+
+        const { data: transaction, error: transactionError } = await supabase
+          .from('financial_transactions')
+          .insert(transactionData)
+          .select()
+          .single();
+
+        if (transactionError) {
+          console.error('Erro ao criar transação financeira:', transactionError);
+          console.error('Dados da transação:', transactionData);
+          toast({
+            title: 'Aviso',
+            description: `Consulta concluída, mas não foi possível criar a transação financeira: ${transactionError.message}`,
+            variant: 'default',
+          });
+          // Não falha a operação principal se não conseguir criar a transação
+        } else {
+          financialTransactionId = transaction.id;
+          console.log('Transação financeira criada com sucesso:', transaction.id);
+        }
+      }
+
+      // Atualizar a consulta com status concluído e vincular transação se criada
       return updateMutation.mutateAsync({
         id,
         updates: {
           status: 'completed',
           completed_at: new Date().toISOString(),
+          ...(financialTransactionId && !appointment.financial_transaction_id
+            ? { financial_transaction_id: financialTransactionId }
+            : {}),
         },
       });
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-accounts'] });
+      
+      // Verificar se uma transação foi criada
+      const hasTransaction = data?.financial_transaction_id;
       toast({
         title: 'Consulta concluída',
-        description: 'A consulta foi marcada como concluída.',
+        description: hasTransaction 
+          ? 'A consulta foi marcada como concluída e a transação financeira foi criada automaticamente.'
+          : 'A consulta foi marcada como concluída.',
       });
     },
   });
