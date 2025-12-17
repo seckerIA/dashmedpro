@@ -243,3 +243,8 @@ export const COMMERCIAL_INTERACTION_TYPE_LABELS: Record<CommercialInteractionTyp
   other: 'Outro',
 };
 
+
+
+
+
+

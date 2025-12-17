@@ -106,12 +106,12 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, forceOp
         contactData.service = undefined;
       }
       
-      // Garantir que o campo 'name' seja preenchido (obrigatório no banco)
-      // Usar full_name como name, pois name é obrigatório na tabela crm_contacts
-      const contactDataWithName = {
-        ...contactData,
-        name: contactData.full_name, // name é obrigatório, usar full_name como valor
-      };
+      // Extrair service_value antes de remover (será usado para criar o deal)
+      const serviceValue = contactData.service_value;
+      
+      // Remover campos que não existem na tabela crm_contacts
+      // (service e service_value não são campos do crm_contacts, apenas do formulário)
+      const { service, service_value, ...contactDataForDB } = contactData;
       
       if (contact) {
         console.log('✏️ Atualizando contato existente:', contact.id);
@@ -119,7 +119,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, forceOp
         await updateContact({
           contactId: contact.id,
           data: {
-            ...contactDataWithName,
+            ...contactDataForDB,
             updated_at: new Date().toISOString(),
           },
         });
@@ -129,8 +129,8 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, forceOp
         });
       } else {
         console.log('➕ Criando novo contato...');
-        // Criar novo contato
-        const newContact = await createContact(contactDataWithName as any);
+        // Criar novo contato (sem service e service_value)
+        const newContact = await createContact(contactDataForDB as any);
         console.log('✅ Contato criado:', newContact);
         
         // Criar contrato automaticamente se solicitado
@@ -142,7 +142,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, forceOp
             title: contactData.full_name,
             description: `Contato adicionado automaticamente ao estágio`,
             stage: dealStage,
-            value: contactData.service_value || null,
+            value: serviceValue || null,
             probability: 0,
           });
           console.log('✅ Deal criado:', newDeal);

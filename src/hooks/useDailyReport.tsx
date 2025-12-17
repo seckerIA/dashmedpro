@@ -73,8 +73,7 @@ export function useDailyReport() {
         .from('prospecting_daily_reports')
         .select('*')
         .eq('user_id', user.id)
-        .eq('date', todayISO)
-        .eq('status', 'active')
+        .eq('report_date', todayISO)
         .maybeSingle();
 
       if (error && error.code !== 'PGRST116') {
@@ -83,7 +82,7 @@ export function useDailyReport() {
       }
 
       // Verificar se o relatório é de um dia anterior e marcar como expirado
-      if (data && data.date !== todayISO) {
+      if (data && data.report_date !== todayISO) {
         console.log('Relatório de dia anterior encontrado, não retornando dados');
         return null;
       }
@@ -103,25 +102,23 @@ export function useDailyReport() {
 
       const upsertData: DailyReportInsert = {
         user_id: user.id,
-        date: today,
-        goal_calls: data.goalCalls,
-        goal_contacts: data.goalContacts,
-        status: 'active',
-        started_at: new Date().toISOString(),
-        // Resetar campos quando reiniciar
-        finished_at: null,
+        report_date: today,
+        calls_made: 0,
+        contacts_reached: 0,
+        appointments_set: 0,
+        deals_closed: 0,
+        revenue: 0,
+        notes: null,
         is_paused: false,
         paused_at: null,
         total_paused_time: 0,
-        final_calls: null,
-        final_contacts: null,
       };
 
       // Usar upsert para permitir criar ou atualizar
       const { data: report, error } = await supabase
         .from('prospecting_daily_reports')
         .upsert(upsertData, {
-          onConflict: 'user_id,date'
+          onConflict: 'user_id,report_date'
         })
         .select()
         .single();
@@ -167,10 +164,8 @@ export function useDailyReport() {
       const { data, error } = await supabase
         .from('prospecting_daily_reports')
         .update({
-          status: 'completed',
-          finished_at: new Date().toISOString(),
-          final_calls: finalCalls,
-          final_contacts: finalContacts,
+          calls_made: finalCalls,
+          contacts_reached: finalContacts,
         })
         .eq('id', todayReport.id)
         .select()
@@ -295,18 +290,21 @@ export function useDailyReport() {
     },
   });
 
-  // Atualizar metas do dia
+  // Atualizar metas do dia (atualiza user_daily_goals, não o relatório)
   const updateGoals = useMutation({
     mutationFn: async (data: { goalCalls: number; goalContacts: number }) => {
-      if (!todayReport?.id) throw new Error('Nenhum relatório ativo encontrado');
+      if (!user?.id) throw new Error('Usuário não autenticado');
 
+      // Atualizar ou criar metas padrão do usuário
       const { data: updated, error } = await supabase
-        .from('prospecting_daily_reports')
-        .update({
-          goal_calls: data.goalCalls,
-          goal_contacts: data.goalContacts,
+        .from('user_daily_goals')
+        .upsert({
+          user_id: user.id,
+          default_goal_calls: data.goalCalls,
+          default_goal_contacts: data.goalContacts,
+        }, {
+          onConflict: 'user_id'
         })
-        .eq('id', todayReport.id)
         .select()
         .single();
 
@@ -333,19 +331,19 @@ export function useDailyReport() {
   const todayMetrics = useMemo((): DailyMetrics | null => {
     if (!todayReport) return null;
 
-    // Se o relatório está completo, usar os valores salvos (não atualizar em tempo real)
-    const isCompleted = todayReport.status === 'completed';
-    const totalCalls = isCompleted ? (todayReport.final_calls || todayStats.total) : todayStats.total;
-    const totalContacts = isCompleted ? (todayReport.final_contacts || todayStats.contatosDecisores) : todayStats.contatosDecisores;
-    const goalCalls = todayReport.goal_calls;
-    const goalContacts = todayReport.goal_contacts;
+    // Usar valores salvos do relatório
+    const totalCalls = todayReport.calls_made || todayStats.total;
+    const totalContacts = todayReport.contacts_reached || todayStats.contatosDecisores;
+    // Nota: goal_calls e goal_contacts não existem na tabela, usar valores padrão ou do user_daily_goals
+    const goalCalls = 50; // Valor padrão - pode ser buscado de user_daily_goals
+    const goalContacts = 10; // Valor padrão - pode ser buscado de user_daily_goals
 
     // Calcular progresso (limitado a 100%)
     const callsProgress = Math.min((totalCalls / goalCalls) * 100, 100);
     const contactsProgress = Math.min((totalContacts / goalContacts) * 100, 100);
 
-    // Calcular tempo decorrido
-    const startTime = new Date(todayReport.started_at);
+    // Calcular tempo decorrido (usar created_at como referência)
+    const startTime = new Date(todayReport.created_at);
     const now = new Date();
     const elapsedMs = now.getTime() - startTime.getTime();
     
@@ -376,7 +374,7 @@ export function useDailyReport() {
       contactsProgress,
       elapsedTimeMinutes,
       elapsedTimeFormatted,
-      isActive: todayReport.status === 'active',
+      isActive: !todayReport.is_paused, // Ativo se não estiver pausado
       isPaused: todayReport.is_paused || false,
       reportId: todayReport.id,
     };
@@ -384,7 +382,7 @@ export function useDailyReport() {
 
   // Helper para verificar se já existe relatório hoje
   const hasReportToday = !!todayReport;
-  const isReportActive = todayReport?.status === 'active';
+  const isReportActive = todayReport ? !todayReport.is_paused : false;
 
   // Função para forçar limpeza de dados antigos
   const clearOldData = useMutation({

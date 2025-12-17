@@ -9,7 +9,6 @@ export interface Notification {
   message: string;
   read: boolean;
   created_at: string;
-  updated_at: string;
   task_id?: string | null;
   user_id: string;
 }
@@ -29,7 +28,7 @@ export function useNotifications() {
     try {
       const { data, error } = await supabase
         .from('notifications')
-        .select('id, type, title, message, read, created_at, updated_at, task_id, user_id')
+        .select('id, type, title, message, read, created_at, task_id, user_id')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(50);

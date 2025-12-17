@@ -12,19 +12,20 @@ import {
 } from '@/types/crm';
 import { useAuth } from './useAuth';
 
-// Fetch contacts
+// Fetch contacts - OTIMIZADO
 const fetchContacts = async (userId: string): Promise<CRMContact[]> => {
   const { data, error } = await supabase
     .from('crm_contacts')
     .select('*')
     .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(1000); // Limite para evitar queries muito grandes
 
   if (error) throw new Error(`Erro ao buscar contatos: ${error.message}`);
   return data || [];
 };
 
-// Fetch deals with contacts
+// Fetch deals with contacts - OTIMIZADO
 const fetchDeals = async (userId: string, viewAsUserIds?: string[]): Promise<CRMDealWithContact[]> => {
   // Se viewAsUserIds é fornecido, buscar deals desses usuários, senão do userId atual
   const targetUserIds = viewAsUserIds && viewAsUserIds.length > 0 ? viewAsUserIds : [userId];
@@ -34,6 +35,7 @@ const fetchDeals = async (userId: string, viewAsUserIds?: string[]): Promise<CRM
     .map(id => `user_id.eq.${id},assigned_to.eq.${id}`)
     .join(',');
   
+  // Buscar deals com contatos em uma única query
   const { data, error } = await supabase
     .from('crm_deals')
     .select(`
@@ -41,33 +43,32 @@ const fetchDeals = async (userId: string, viewAsUserIds?: string[]): Promise<CRM
       contact:crm_contacts(*)
     `)
     .or(orConditions)
-    .order('position', { ascending: true });
+    .order('position', { ascending: true })
+    .limit(1000); // Limite para evitar queries muito grandes
 
   if (error) throw new Error(`Erro ao buscar deals: ${error.message}`);
   
-  // Fetch user profiles for deal owners (para mostrar badge no card)
-  const userIds = [...new Set(data?.map(d => d.user_id).filter(Boolean) || [])];
-  
-  // Fetch assigned profiles separately if needed
-  if (data) {
-    const assignedToIds = data
-      .map(d => d.assigned_to)
-      .filter((id): id is string => id !== null && id !== undefined);
-    
-    // Buscar todos os profiles necessários (owners + assigned)
+  // Buscar profiles em batch (mais eficiente que múltiplas queries)
+  if (data && data.length > 0) {
+    const userIds = [...new Set(data.map(d => d.user_id).filter(Boolean))];
+    const assignedToIds = [...new Set(data.map(d => d.assigned_to).filter((id): id is string => id !== null && id !== undefined))];
     const allProfileIds = [...new Set([...userIds, ...assignedToIds])];
     
     if (allProfileIds.length > 0) {
+      // Buscar todos os profiles de uma vez
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, full_name, email')
         .in('id', allProfileIds);
       
-      // Merge profiles with deals (adicionar owner_profile e assigned_to_profile)
+      // Criar mapa para lookup rápido
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+      
+      // Merge profiles with deals
       return data.map(deal => ({
         ...deal,
-        owner_profile: profiles?.find(p => p.id === deal.user_id) || null,
-        assigned_to_profile: profiles?.find(p => p.id === deal.assigned_to) || null
+        owner_profile: deal.user_id ? (profileMap.get(deal.user_id) || null) : null,
+        assigned_to_profile: deal.assigned_to ? (profileMap.get(deal.assigned_to) || null) : null
       }));
     }
   }
@@ -79,7 +80,7 @@ const fetchDeals = async (userId: string, viewAsUserIds?: string[]): Promise<CRM
   }));
 };
 
-// Fetch activities
+// Fetch activities - OTIMIZADO (carregado apenas quando necessário)
 const fetchActivities = async (userId: string, contactId?: string): Promise<CRMActivity[]> => {
   let query = supabase
     .from('crm_activities')
@@ -90,7 +91,9 @@ const fetchActivities = async (userId: string, contactId?: string): Promise<CRMA
     query = query.eq('contact_id', contactId);
   }
 
-  const { data, error } = await query.order('created_at', { ascending: false });
+  const { data, error } = await query
+    .order('created_at', { ascending: false })
+    .limit(500); // Limite para evitar queries muito grandes
 
   if (error) throw new Error(`Erro ao buscar atividades: ${error.message}`);
   return data || [];
@@ -183,7 +186,7 @@ export function useCRM(viewAsUserIds?: string[]) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Queries
+  // Queries com cache otimizado
   const {
     data: contacts = [],
     isLoading: isLoadingContacts,
@@ -191,6 +194,8 @@ export function useCRM(viewAsUserIds?: string[]) {
     queryKey: ['crm-contacts', user?.id],
     queryFn: () => fetchContacts(user?.id || ''),
     enabled: !!user?.id,
+    staleTime: 2 * 60 * 1000, // Cache por 2 minutos
+    gcTime: 10 * 60 * 1000, // Manter em cache por 10 minutos
   });
 
   const {
@@ -200,15 +205,19 @@ export function useCRM(viewAsUserIds?: string[]) {
     queryKey: ['crm-deals', user?.id, viewAsUserIds?.join(',')],
     queryFn: () => fetchDeals(user?.id || '', viewAsUserIds),
     enabled: !!user?.id,
+    staleTime: 2 * 60 * 1000, // Cache por 2 minutos
+    gcTime: 10 * 60 * 1000, // Manter em cache por 10 minutos
   });
 
+  // Activities são carregadas apenas quando necessário (lazy loading)
   const {
     data: activities = [],
     isLoading: isLoadingActivities,
   } = useQuery({
     queryKey: ['crm-activities', user?.id],
     queryFn: () => fetchActivities(user?.id || ''),
-    enabled: !!user?.id,
+    enabled: false, // Desabilitado por padrão - carregar apenas quando necessário
+    staleTime: 5 * 60 * 1000, // Cache por 5 minutos
   });
 
   // Mutations

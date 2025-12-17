@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client'
 import { toast } from '@/hooks/use-toast'
 
 // URL do Supabase para edge functions
-const SUPABASE_URL = "https://rpcixpbmtpyrnzlsuuus.supabase.co"
+const SUPABASE_URL = "https://adzaqkduxnpckbcuqpmg.supabase.co"
 
 export interface UploadedFile {
   id: string

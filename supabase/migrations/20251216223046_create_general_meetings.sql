@@ -90,3 +90,8 @@ COMMENT ON TABLE public.general_meetings IS 'Reuniões e compromissos gerais do 
 COMMENT ON COLUMN public.general_meetings.is_busy IS 'Se true, marca o período como indisponível para agendamento de consultas médicas';
 COMMENT ON COLUMN public.general_meetings.meeting_type IS 'Tipo de reunião: meeting (reunião), appointment (compromisso), block (bloqueio de tempo), other (outro)';
 
+
+
+
+
+

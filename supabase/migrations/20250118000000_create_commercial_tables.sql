@@ -296,3 +296,8 @@ CREATE POLICY "Users can delete their own interactions"
   ON public.commercial_lead_interactions FOR DELETE
   USING (auth.uid() = user_id);
 
+
+
+
+
+

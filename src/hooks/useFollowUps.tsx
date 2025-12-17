@@ -9,8 +9,7 @@ const fetchFollowUps = async (userId: string): Promise<FollowUp[]> => {
     .from('crm_follow_ups')
     .select('*')
     .eq('user_id', userId)
-    .order('scheduled_date', { ascending: true })
-    .order('scheduled_time', { ascending: true });
+    .order('scheduled_date', { ascending: true });
 
   if (error) throw error;
   return (data || []) as FollowUp[];
