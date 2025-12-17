@@ -30,7 +30,7 @@ export function LeadsManagement() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar leads..."
+              placeholder="Buscar pacientes..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -42,7 +42,7 @@ export function LeadsManagement() {
           className="bg-primary hover:bg-primary/90"
         >
           <Plus className="h-4 w-4 mr-2" />
-          Novo Lead
+          Novo Paciente
         </Button>
       </div>
 

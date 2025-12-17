@@ -33,6 +33,8 @@ export type CRMActivityUpdate = Database['public']['Tables']['crm_activities']['
 // Enums
 export type CRMPipelineStage = Database['public']['Enums']['crm_pipeline_stage'];
 export type CRMActivityType = Database['public']['Enums']['crm_activity_type'];
+export type HealthInsuranceType = 'convenio' | 'particular';
+export type PatientGender = 'masculino' | 'feminino' | 'outro' | 'prefiro_nao_dizer';
 
 // Tipos auxiliares para o frontend
 export interface CRMDealWithContact extends CRMDeal {
@@ -171,11 +173,31 @@ export const ACTIVITY_TYPES: {
     bgColor: 'bg-orange-500/10',
     textColor: 'text-orange-400'
   },
-  { 
-    value: 'ai_interaction', 
-    label: 'Interação IA', 
+  {
+    value: 'ai_interaction',
+    label: 'Interação IA',
     icon: Bot,
     bgColor: 'bg-indigo-500/10',
     textColor: 'text-indigo-400'
   },
+];
+
+// Constantes para tipo de convênio
+export const INSURANCE_TYPES: {
+  value: HealthInsuranceType;
+  label: string;
+}[] = [
+  { value: 'particular', label: 'Particular' },
+  { value: 'convenio', label: 'Convênio' },
+];
+
+// Constantes para gênero
+export const PATIENT_GENDERS: {
+  value: PatientGender;
+  label: string;
+}[] = [
+  { value: 'masculino', label: 'Masculino' },
+  { value: 'feminino', label: 'Feminino' },
+  { value: 'outro', label: 'Outro' },
+  { value: 'prefiro_nao_dizer', label: 'Prefiro não dizer' },
 ];

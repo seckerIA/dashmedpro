@@ -98,7 +98,7 @@ export function LeadDetailsModal({ open, onOpenChange, lead }: LeadDetailsModalP
 
           {lead.estimated_value && (
             <div>
-              <p className="text-sm text-muted-foreground">Valor Estimado</p>
+              <p className="text-sm text-muted-foreground">Valor Estimado da 1ª Consulta</p>
               <p className="font-medium">{formatCurrency(lead.estimated_value)}</p>
             </div>
           )}

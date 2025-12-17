@@ -16,6 +16,7 @@ import { ptBR } from "date-fns/locale";
 import { useCommercialLeads } from "@/hooks/useCommercialLeads";
 import { useState } from "react";
 import { LeadDetailsModal } from "./LeadDetailsModal";
+import { ConversionModal } from "./ConversionModal";
 
 interface LeadCardProps {
   lead: CommercialLead;
@@ -24,6 +25,7 @@ interface LeadCardProps {
 export function LeadCard({ lead }: LeadCardProps) {
   const { deleteLead, convertLead } = useCommercialLeads();
   const [showDetails, setShowDetails] = useState(false);
+  const [showConversion, setShowConversion] = useState(false);
 
   const handleCall = () => {
     if (lead.phone) {
@@ -45,9 +47,7 @@ export function LeadCard({ lead }: LeadCardProps) {
   };
 
   const handleConvert = async () => {
-    // This would typically open a form to create contact
-    // For now, we'll just show a message
-    alert("Funcionalidade de conversão será implementada em breve");
+    setShowConversion(true);
   };
 
   return (
@@ -154,6 +154,16 @@ export function LeadCard({ lead }: LeadCardProps) {
         open={showDetails}
         onOpenChange={setShowDetails}
         lead={lead}
+      />
+
+      <ConversionModal
+        open={showConversion}
+        onOpenChange={setShowConversion}
+        leadId={lead.id}
+        leadName={lead.name}
+        leadEmail={lead.email}
+        leadPhone={lead.phone}
+        estimatedValue={lead.estimated_value}
       />
     </>
   );

@@ -114,7 +114,7 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEditing ? "Editar Lead" : "Novo Lead"}</DialogTitle>
+          <DialogTitle>{isEditing ? "Editar Paciente" : "Novo Paciente"}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -124,7 +124,7 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
               <Input
                 id="name"
                 {...register("name")}
-                placeholder="Nome do lead"
+                placeholder="Nome do paciente"
               />
               {errors.name && (
                 <p className="text-sm text-destructive">{errors.name.message}</p>
@@ -192,7 +192,7 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="estimated_value">Valor Estimado</Label>
+              <Label htmlFor="estimated_value">Valor Estimado da 1ª Consulta</Label>
               <Input
                 id="estimated_value"
                 type="text"
@@ -220,7 +220,7 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
                 Salvando...
               </>
             ) : (
-              isEditing ? "Salvar Alterações" : "Criar Lead"
+              isEditing ? "Salvar Alterações" : "Criar Paciente"
             )}
           </Button>
         </form>

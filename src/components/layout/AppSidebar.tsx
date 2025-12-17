@@ -186,6 +186,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                     '/email-marketing', // E-mail Marketing
                     '/landing-pages', // Landing Pages
                     '/relatorios', // Relatórios
+                    '/crm', // CRM
                   ];
                   if (hiddenUrls.includes(item.url)) {
                     return false;

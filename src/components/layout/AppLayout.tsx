@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
 import { LivePerformanceCard } from "@/components/prospecting/LivePerformanceCard"
+import { useOverdueAppointments } from "@/hooks/useOverdueAppointments"
+import { AlertTriangle } from "lucide-react"
 
 interface AppLayoutProps {
   children: ReactNode
@@ -23,6 +25,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const sidebarRef = useRef<ImperativePanelHandle>(null)
   const { profile } = useUserProfile()
+  const { hasOverdue, overdueCount } = useOverdueAppointments()
   const displayName = profile?.full_name || profile?.email || 'Usuário'
   const displayRole = profile?.role || 'vendedor'
 
@@ -128,9 +131,26 @@ export function AppLayout({ children }: AppLayoutProps) {
                   >
                     Ajuda
                   </a>
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">Comunicações</span>
-                    <NotificationBell />
+                  <div className="flex items-center gap-4">
+                    {hasOverdue && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-100 dark:bg-red-950 border border-red-300 dark:border-red-800 cursor-pointer hover:bg-red-200 dark:hover:bg-red-900 transition-colors">
+                            <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                            <span className="text-xs font-semibold text-red-700 dark:text-red-300">
+                              {overdueCount} Pendente{overdueCount > 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Consultas com mais de 12h aguardando confirmação</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">Comunicações</span>
+                      <NotificationBell />
+                    </div>
                   </div>
                 </div>
 
