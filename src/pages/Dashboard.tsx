@@ -17,6 +17,7 @@ import { PipelineFunnelCard } from "@/components/dashboard/PipelineFunnelCard"
 import { SalesChart } from "@/components/dashboard/SalesChart"
 import { StatsPanel } from "@/components/dashboard/StatsPanel"
 import { CustomerTable } from "@/components/dashboard/CustomerTable"
+import { OverdueAppointmentsAlert } from "@/components/shared/OverdueAppointmentsAlert"
 import { 
   Calculator, 
   TrendingUp, 
@@ -83,6 +84,9 @@ const Dashboard = () => {
   // Dashboard completo para Admin/Dono
   return (
     <div className="min-h-screen space-y-4 sm:space-y-6 lg:space-y-8 bg-background font-sans px-3 sm:px-4 lg:px-6">
+
+      {/* Overdue Appointments Alert */}
+      <OverdueAppointmentsAlert />
 
       {/* Top Metrics - Métricas Financeiras */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6 animate-fade-in">

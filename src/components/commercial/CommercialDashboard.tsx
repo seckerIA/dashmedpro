@@ -29,7 +29,7 @@ export function CommercialDashboard() {
           className="bg-primary hover:bg-primary/90"
         >
           <Plus className="h-4 w-4 mr-2" />
-          Novo Lead
+          Novo Paciente
         </Button>
         <Button
           onClick={handleNewCampaign}

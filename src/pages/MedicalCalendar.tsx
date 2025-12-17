@@ -10,6 +10,7 @@ import { MonthlyCalendarView } from '@/components/medical-calendar/MonthlyCalend
 import { DailyAppointmentsList } from '@/components/medical-calendar/DailyAppointmentsList';
 import { TimeGridView } from '@/components/medical-calendar/TimeGridView';
 import { AppointmentMetrics } from '@/components/medical-calendar/AppointmentMetrics';
+import { AttendanceChecklist } from '@/components/medical-calendar/AttendanceChecklist';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -445,6 +446,9 @@ export default function MedicalCalendar() {
           onCreateMeeting={() => setShowMeetingForm(true)}
         />
       )}
+
+      {/* Attendance Checklist */}
+      <AttendanceChecklist />
 
       {/* Modals */}
       <AppointmentForm
