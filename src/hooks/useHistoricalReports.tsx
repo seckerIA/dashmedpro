@@ -6,15 +6,15 @@ import { useUserProfile } from './useUserProfile';
 interface HistoricalReport {
   id: string;
   user_id: string;
-  date: string;
-  goal_calls: number;
-  goal_contacts: number;
-  final_calls: number | null;
-  final_contacts: number | null;
-  started_at: string;
-  finished_at: string | null;
-  status: string;
+  report_date: string;
+  calls_made: number;
+  contacts_reached: number;
+  appointments_set: number;
+  deals_closed: number;
+  revenue: number;
+  notes: string | null;
   is_paused: boolean | null;
+  paused_at: string | null;
   total_paused_time: number | null;
   created_at: string;
   updated_at: string | null;
@@ -57,7 +57,7 @@ export function useHistoricalReports(filters: HistoricalReportsFilters = {}) {
       let reportsQuery = supabase
         .from('prospecting_daily_reports')
         .select('*')
-        .order('date', { ascending: false });
+        .order('report_date', { ascending: false });
 
       // Se não for admin, só mostra dados do próprio usuário
       if (!isAdmin) {
@@ -69,10 +69,10 @@ export function useHistoricalReports(filters: HistoricalReportsFilters = {}) {
 
       // Aplicar filtros de data
       if (filters.startDate) {
-        reportsQuery = reportsQuery.gte('date', filters.startDate);
+        reportsQuery = reportsQuery.gte('report_date', filters.startDate);
       }
       if (filters.endDate) {
-        reportsQuery = reportsQuery.lte('date', filters.endDate);
+        reportsQuery = reportsQuery.lte('report_date', filters.endDate);
       }
 
       const { data: reportsData, error: reportsError } = await reportsQuery;
@@ -120,25 +120,25 @@ export function useHistoricalReports(filters: HistoricalReportsFilters = {}) {
   // Calcular estatísticas
   const stats: HistoricalStats | null = reports ? {
     totalReports: reports.length,
-    totalCalls: reports.reduce((sum, report) => sum + (report.final_calls || 0), 0),
-    totalContacts: reports.reduce((sum, report) => sum + (report.final_contacts || 0), 0),
-    averageCalls: reports.length > 0 ? reports.reduce((sum, report) => sum + (report.final_calls || 0), 0) / reports.length : 0,
-    averageContacts: reports.length > 0 ? reports.reduce((sum, report) => sum + (report.final_contacts || 0), 0) / reports.length : 0,
+    totalCalls: reports.reduce((sum, report) => sum + (report.calls_made || 0), 0),
+    totalContacts: reports.reduce((sum, report) => sum + (report.contacts_reached || 0), 0),
+    averageCalls: reports.length > 0 ? reports.reduce((sum, report) => sum + (report.calls_made || 0), 0) / reports.length : 0,
+    averageContacts: reports.length > 0 ? reports.reduce((sum, report) => sum + (report.contacts_reached || 0), 0) / reports.length : 0,
     bestDay: reports.length > 0 ? (() => {
       const bestReport = reports.reduce((best, report) => {
-        const currentTotal = (report.final_calls || 0) + (report.final_contacts || 0);
-        const bestTotal = (best.final_calls || 0) + (best.final_contacts || 0);
+        const currentTotal = (report.calls_made || 0) + (report.contacts_reached || 0);
+        const bestTotal = (best.calls_made || 0) + (best.contacts_reached || 0);
         return currentTotal > bestTotal ? report : best;
       });
       return {
-        date: bestReport.date,
-        calls: bestReport.final_calls || 0,
-        contacts: bestReport.final_contacts || 0,
+        date: bestReport.report_date,
+        calls: bestReport.calls_made || 0,
+        contacts: bestReport.contacts_reached || 0,
       };
     })() : null,
     conversionRate: reports.length > 0 ? (() => {
-      const totalCalls = reports.reduce((sum, report) => sum + (report.final_calls || 0), 0);
-      const totalContacts = reports.reduce((sum, report) => sum + (report.final_contacts || 0), 0);
+      const totalCalls = reports.reduce((sum, report) => sum + (report.calls_made || 0), 0);
+      const totalContacts = reports.reduce((sum, report) => sum + (report.contacts_reached || 0), 0);
       return totalCalls > 0 ? (totalContacts / totalCalls) * 100 : 0;
     })() : 0,
   } : null;
@@ -150,32 +150,30 @@ export function useHistoricalReports(filters: HistoricalReportsFilters = {}) {
     const headers = [
       'Data',
       'Usuário',
-      'Meta Atendimentos',
-      'Meta Contatos',
-      'Atendimentos Realizados',
-      'Contatos Realizados',
+      'Ligações Feitas',
+      'Contatos Alcançados',
+      'Consultas Agendadas',
+      'Negócios Fechados',
+      'Receita',
       'Taxa Conversão (%)',
-      'Status',
-      'Iniciado em',
-      'Finalizado em',
-      'Tempo Pausado (min)'
+      'Pausado?',
+      'Tempo Pausado (min)',
     ];
 
     const csvContent = [
       headers.join(','),
       ...reports.map(report => [
-        report.date,
+        report.report_date,
         report.user_profile?.full_name || report.user_profile?.email || 'N/A',
-        report.goal_calls,
-        report.goal_contacts,
-        report.final_calls || 0,
-        report.final_contacts || 0,
-        report.final_calls && report.final_calls > 0 
-          ? ((report.final_contacts || 0) / report.final_calls * 100).toFixed(2)
+        report.calls_made || 0,
+        report.contacts_reached || 0,
+        report.appointments_set || 0,
+        report.deals_closed || 0,
+        report.revenue || 0,
+        report.calls_made && report.calls_made > 0 
+          ? ((report.contacts_reached || 0) / report.calls_made * 100).toFixed(2)
           : '0.00',
-        report.status === 'completed' ? 'Finalizado' : 'Ativo',
-        new Date(report.started_at).toLocaleString('pt-BR'),
-        report.finished_at ? new Date(report.finished_at).toLocaleString('pt-BR') : 'N/A',
+        report.is_paused ? 'Sim' : 'Não',
         report.total_paused_time || 0
       ].join(','))
     ].join('\n');

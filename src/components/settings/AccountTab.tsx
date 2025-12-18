@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,12 +6,12 @@ import { Label } from '@/components/ui/label';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Info, Download, Trash2, Calendar, User, Shield, Activity } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { useQuery } from '@tanstack/react-query';
 
 interface AccountTabProps {
   profile: any;
@@ -20,9 +20,47 @@ interface AccountTabProps {
 
 const AccountTab = ({ profile, user }: AccountTabProps) => {
   const { toast } = useToast();
-  const { signOut } = useAuth();
   const navigate = useNavigate();
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const {
+    data: stats,
+    isLoading: isLoadingStats,
+    isError: isStatsError,
+  } = useQuery({
+    queryKey: ['settings-account-stats', user?.id],
+    enabled: !!user?.id,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    queryFn: async () => {
+      if (!user?.id) {
+        return { contactsCreated: 0, dealsCreated: 0 };
+      }
+
+      const [contactsRes, dealsRes] = await Promise.all([
+        supabase
+          .from('crm_contacts')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id),
+        supabase
+          .from('crm_deals')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id),
+      ]);
+
+      if (contactsRes.error) {
+        throw new Error(`Erro ao buscar total de contatos: ${contactsRes.error.message}`);
+      }
+      if (dealsRes.error) {
+        throw new Error(`Erro ao buscar total de deals: ${dealsRes.error.message}`);
+      }
+
+      return {
+        contactsCreated: contactsRes.count ?? 0,
+        dealsCreated: dealsRes.count ?? 0,
+      };
+    },
+  });
 
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return 'Não disponível';
@@ -32,6 +70,12 @@ const AccountTab = ({ profile, user }: AccountTabProps) => {
       return dateString;
     }
   };
+
+  const lastSignInLabel = useMemo(() => {
+    // `last_sign_in_at` comes from Supabase Auth user object
+    // and does not require querying `auth.users`.
+    return formatDate(user?.last_sign_in_at);
+  }, [user?.last_sign_in_at]);
 
   const handleExportData = async () => {
     toast({
@@ -188,21 +232,29 @@ const AccountTab = ({ profile, user }: AccountTabProps) => {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-4 rounded-lg bg-muted/50">
-              <div className="text-2xl font-bold text-primary">-</div>
+              <div className="text-2xl font-bold text-primary">
+                {isLoadingStats ? '…' : isStatsError ? '—' : (stats?.contactsCreated ?? 0)}
+              </div>
               <div className="text-sm text-muted-foreground">Contatos Criados</div>
             </div>
             <div className="p-4 rounded-lg bg-muted/50">
-              <div className="text-2xl font-bold text-primary">-</div>
+              <div className="text-2xl font-bold text-primary">
+                {isLoadingStats ? '…' : isStatsError ? '—' : (stats?.dealsCreated ?? 0)}
+              </div>
               <div className="text-sm text-muted-foreground">Deals Criados</div>
             </div>
             <div className="p-4 rounded-lg bg-muted/50">
-              <div className="text-2xl font-bold text-primary">-</div>
+              <div className="text-2xl font-bold text-primary">
+                {lastSignInLabel}
+              </div>
               <div className="text-sm text-muted-foreground">Último Login</div>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground mt-4 text-center">
-            Estatísticas detalhadas estarão disponíveis em breve
-          </p>
+          {isStatsError && (
+            <p className="text-xs text-muted-foreground mt-4 text-center">
+              Não foi possível carregar as estatísticas agora. Verifique sua conexão/permissões e tente novamente.
+            </p>
+          )}
         </CardContent>
       </Card>
 

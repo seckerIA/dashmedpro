@@ -295,7 +295,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                               end={item.url === "/"} 
                               className={`
                                 group relative w-full block
-                                ${isCollapsed ? 'p-3.5' : 'px-4 py-3.5'}
+                                ${isCollapsed ? 'p-2.5' : 'px-4 py-3.5'}
                                 rounded-2xl text-base font-medium
                                 transition-all duration-200
                                 ${active 
@@ -368,7 +368,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                     to="/configuracoes"
                     className={`
                       group relative w-full block
-                      ${isCollapsed ? 'p-3.5' : 'px-4 py-3.5'}
+                      ${isCollapsed ? 'p-2.5' : 'px-4 py-3.5'}
                       rounded-2xl text-base font-medium
                       transition-all duration-200
                       ${active 

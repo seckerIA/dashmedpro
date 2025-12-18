@@ -13,7 +13,8 @@ export function CommercialDashboard() {
   
   // Handle navigation with query params
   const handleNewLead = () => {
-    navigate("/comercial?tab=leads&action=new");
+    // Abrir modal "Novo Paciente" sem trocar a aba para Leads automaticamente
+    navigate("/comercial?tab=dashboard&action=new");
   };
   
 

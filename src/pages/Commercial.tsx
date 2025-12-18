@@ -7,17 +7,50 @@ import { LeadsManagement } from "@/components/commercial/LeadsManagement";
 import { SalesManagement } from "@/components/commercial/SalesManagement";
 import { CampaignsManagement } from "@/components/commercial/CampaignsManagement";
 import { CommercialReports } from "@/components/commercial/CommercialReports";
+import { LeadForm } from "@/components/commercial/LeadForm";
 
 export default function Commercial() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get("tab") || "dashboard";
+  const actionFromUrl = searchParams.get("action");
   const [activeTab, setActiveTab] = useState(tabFromUrl);
+  const [isLeadFormOpen, setIsLeadFormOpen] = useState(actionFromUrl === "new");
   
   useEffect(() => {
     if (tabFromUrl) {
       setActiveTab(tabFromUrl);
     }
   }, [tabFromUrl]);
+
+  useEffect(() => {
+    setIsLeadFormOpen(actionFromUrl === "new");
+  }, [actionFromUrl]);
+
+  const handleTabChange = (nextTab: string) => {
+    setActiveTab(nextTab);
+
+    // Importante: ao trocar de aba, limpar `action` para não disparar modais
+    // (ex.: `?tab=leads&action=new` vindo do botão "Novo Paciente" do dashboard)
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev);
+      params.set("tab", nextTab);
+      params.delete("action");
+      return params;
+    });
+  };
+
+  const handleLeadFormOpenChange = (open: boolean) => {
+    setIsLeadFormOpen(open);
+
+    // Ao fechar o modal, limpe o `action` da URL para não reabrir ao recarregar
+    if (!open) {
+      setSearchParams((prev) => {
+        const params = new URLSearchParams(prev);
+        params.delete("action");
+        return params;
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen space-y-6 bg-background pb-20">
@@ -35,7 +68,7 @@ export default function Commercial() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-2 lg:grid-cols-5 gap-2 h-auto p-1 bg-muted/50">
           <TabsTrigger
             value="dashboard"
@@ -94,6 +127,9 @@ export default function Commercial() {
           <CommercialReports />
         </TabsContent>
       </Tabs>
+
+      {/* Modal global: abrir "Novo Paciente" sem obrigar trocar de aba */}
+      <LeadForm open={isLeadFormOpen} onOpenChange={handleLeadFormOpenChange} />
     </div>
   );
 }

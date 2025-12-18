@@ -12,7 +12,7 @@ import { User } from '@supabase/supabase-js';
 import { Eye, EyeOff, Loader2, Lock, KeyRound } from 'lucide-react';
 
 const passwordSchema = z.object({
-  currentPassword: z.string().optional(),
+  currentPassword: z.string().min(1, 'Informe sua senha atual'),
   newPassword: z
     .string()
     .min(8, 'A senha deve ter pelo menos 8 caracteres')
@@ -57,21 +57,28 @@ const SecurityTab = ({ user }: SecurityTabProps) => {
     }
 
     try {
-      // If current password is provided, verify it first
-      if (data.currentPassword) {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: user.email!,
-          password: data.currentPassword,
+      if (!user.email) {
+        toast({
+          variant: 'destructive',
+          title: 'Erro',
+          description: 'Não foi possível identificar o e-mail do usuário para validação da senha atual.',
         });
+        return;
+      }
 
-        if (signInError) {
-          toast({
-            variant: 'destructive',
-            title: 'Senha atual incorreta',
-            description: 'A senha atual informada está incorreta.',
-          });
-          return;
-        }
+      // Always verify current password first
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: data.currentPassword,
+      });
+
+      if (signInError) {
+        toast({
+          variant: 'destructive',
+          title: 'Senha atual incorreta',
+          description: 'A senha atual informada está incorreta.',
+        });
+        return;
       }
 
       // Update password
@@ -139,9 +146,9 @@ const SecurityTab = ({ user }: SecurityTabProps) => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            {/* Current Password (Optional) */}
+            {/* Current Password */}
             <div className="space-y-2">
-              <Label htmlFor="currentPassword">Senha Atual (Opcional)</Label>
+              <Label htmlFor="currentPassword">Senha Atual</Label>
               <div className="relative">
                 <Input
                   id="currentPassword"
@@ -167,9 +174,6 @@ const SecurityTab = ({ user }: SecurityTabProps) => {
               {errors.currentPassword && (
                 <p className="text-sm text-destructive">{errors.currentPassword.message}</p>
               )}
-              <p className="text-xs text-muted-foreground">
-                Recomendamos informar sua senha atual para maior segurança
-              </p>
             </div>
 
             {/* New Password */}

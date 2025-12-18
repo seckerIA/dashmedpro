@@ -103,39 +103,42 @@ export type Database = {
           completed: boolean | null
           completed_at: string | null
           contact_id: string | null
-          created_at: string | null
+          created_at: string
           deal_id: string | null
+          activity_type: Database["public"]["Enums"]["crm_activity_type"]
           description: string | null
           id: string
+          metadata: Json | null
           scheduled_at: string | null
           title: string | null
-          type: Database["public"]["Enums"]["crm_activity_type"]
           user_id: string | null
         }
         Insert: {
           completed?: boolean | null
           completed_at?: string | null
           contact_id?: string | null
-          created_at?: string | null
+          created_at?: string
           deal_id?: string | null
+          activity_type: Database["public"]["Enums"]["crm_activity_type"]
           description?: string | null
           id?: string
+          metadata?: Json | null
           scheduled_at?: string | null
           title?: string | null
-          type: Database["public"]["Enums"]["crm_activity_type"]
           user_id?: string | null
         }
         Update: {
           completed?: boolean | null
           completed_at?: string | null
           contact_id?: string | null
-          created_at?: string | null
+          created_at?: string
           deal_id?: string | null
+          activity_type?: Database["public"]["Enums"]["crm_activity_type"]
           description?: string | null
           id?: string
+          metadata?: Json | null
           scheduled_at?: string | null
           title?: string | null
-          type?: Database["public"]["Enums"]["crm_activity_type"]
           user_id?: string | null
         }
         Relationships: [
@@ -158,57 +161,48 @@ export type Database = {
       crm_contacts: {
         Row: {
           company: string | null
-          created_at: string | null
+          created_at: string
+          custom_fields: Json | null
           email: string | null
-          full_name: string | null
+          full_name: string
           id: string
           last_contact_at: string | null
-          name: string
-          notes: string | null
+          lead_score: number | null
           phone: string | null
           position: string | null
-          service: string | null
-          service_value: number | null
-          source: string | null
           tags: string[] | null
-          updated_at: string | null
-          user_id: string | null
+          updated_at: string
+          user_id: string
         }
         Insert: {
           company?: string | null
-          created_at?: string | null
+          created_at?: string
+          custom_fields?: Json | null
           email?: string | null
-          full_name?: string | null
+          full_name: string
           id?: string
           last_contact_at?: string | null
-          name: string
-          notes?: string | null
+          lead_score?: number | null
           phone?: string | null
           position?: string | null
-          service?: string | null
-          service_value?: number | null
-          source?: string | null
           tags?: string[] | null
-          updated_at?: string | null
-          user_id?: string | null
+          updated_at?: string
+          user_id: string
         }
         Update: {
           company?: string | null
-          created_at?: string | null
+          created_at?: string
+          custom_fields?: Json | null
           email?: string | null
-          full_name?: string | null
+          full_name?: string
           id?: string
           last_contact_at?: string | null
-          name?: string
-          notes?: string | null
+          lead_score?: number | null
           phone?: string | null
           position?: string | null
-          service?: string | null
-          service_value?: number | null
-          source?: string | null
           tags?: string[] | null
-          updated_at?: string | null
-          user_id?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -216,61 +210,55 @@ export type Database = {
         Row: {
           assigned_to: string | null
           contact_id: string | null
-          contact_name: string | null
-          created_at: string | null
+          created_at: string
+          closed_at: string | null
+          custom_fields: Json | null
           description: string | null
           expected_close_date: string | null
           id: string
-          needs_follow_up: boolean | null
-          notes: string | null
           position: number | null
           probability: number | null
-          service: string | null
-          stage: Database["public"]["Enums"]["crm_pipeline_stage"] | null
+          stage: Database["public"]["Enums"]["crm_pipeline_stage"]
           tags: string[] | null
           title: string
-          updated_at: string | null
-          user_id: string | null
+          updated_at: string
+          user_id: string
           value: number | null
         }
         Insert: {
           assigned_to?: string | null
           contact_id?: string | null
-          contact_name?: string | null
-          created_at?: string | null
+          created_at?: string
+          closed_at?: string | null
+          custom_fields?: Json | null
           description?: string | null
           expected_close_date?: string | null
           id?: string
-          needs_follow_up?: boolean | null
-          notes?: string | null
           position?: number | null
           probability?: number | null
-          service?: string | null
-          stage?: Database["public"]["Enums"]["crm_pipeline_stage"] | null
+          stage?: Database["public"]["Enums"]["crm_pipeline_stage"]
           tags?: string[] | null
           title: string
-          updated_at?: string | null
-          user_id?: string | null
+          updated_at?: string
+          user_id: string
           value?: number | null
         }
         Update: {
           assigned_to?: string | null
           contact_id?: string | null
-          contact_name?: string | null
-          created_at?: string | null
+          created_at?: string
+          closed_at?: string | null
+          custom_fields?: Json | null
           description?: string | null
           expected_close_date?: string | null
           id?: string
-          needs_follow_up?: boolean | null
-          notes?: string | null
           position?: number | null
           probability?: number | null
-          service?: string | null
-          stage?: Database["public"]["Enums"]["crm_pipeline_stage"] | null
+          stage?: Database["public"]["Enums"]["crm_pipeline_stage"]
           tags?: string[] | null
           title?: string
-          updated_at?: string | null
-          user_id?: string | null
+          updated_at?: string
+          user_id?: string
           value?: number | null
         }
         Relationships: [

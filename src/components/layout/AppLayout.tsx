@@ -57,9 +57,9 @@ export function AppLayout({ children }: AppLayoutProps) {
         <ResizablePanel
           ref={sidebarRef}
           defaultSize={20}
-          collapsedSize={3}
+          collapsedSize={5}
           collapsible={true}
-          minSize={3}
+          minSize={5}
           maxSize={20}
           onCollapse={() => {
             setIsCollapsed(true)

@@ -1,21 +1,10 @@
-import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import { LeadsList } from "./LeadsList";
-import { LeadForm } from "./LeadForm";
 
 export function LeadsManagement() {
-  const [searchParams] = useSearchParams();
-  const action = searchParams.get("action");
-  const [showLeadForm, setShowLeadForm] = useState(action === "new");
   const [searchTerm, setSearchTerm] = useState("");
-  
-  useEffect(() => {
-    if (action === "new") {
-      setShowLeadForm(true);
-    }
-  }, [action]);
 
   return (
     <div className="space-y-6">
@@ -36,12 +25,6 @@ export function LeadsManagement() {
 
       {/* Leads List */}
       <LeadsList searchTerm={searchTerm} />
-
-      {/* Lead Form Modal */}
-      <LeadForm
-        open={showLeadForm}
-        onOpenChange={setShowLeadForm}
-      />
     </div>
   );
 }
