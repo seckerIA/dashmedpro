@@ -16,9 +16,6 @@ export function CommercialDashboard() {
     navigate("/comercial?tab=leads&action=new");
   };
   
-  const handleNewCampaign = () => {
-    navigate("/comercial?tab=campaigns&action=new");
-  };
 
   return (
     <div className="space-y-6">
@@ -30,13 +27,6 @@ export function CommercialDashboard() {
         >
           <Plus className="h-4 w-4 mr-2" />
           Novo Paciente
-        </Button>
-        <Button
-          onClick={handleNewCampaign}
-          variant="outline"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Campanha
         </Button>
         <Button
           onClick={() => navigate("/calendar")}

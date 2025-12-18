@@ -532,3 +532,7 @@ ORDER BY tablename, policyname;
 - **Ver logs**: Use `mcp_supabase_get_logs` para debug
 - **Ver advisors**: Use `mcp_supabase_get_advisors` para segurança/performance
 
+
+
+
+

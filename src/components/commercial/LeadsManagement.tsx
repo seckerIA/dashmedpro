@@ -1,20 +1,15 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter } from "lucide-react";
+import { Search } from "lucide-react";
 import { LeadsList } from "./LeadsList";
 import { LeadForm } from "./LeadForm";
-import { FunnelBoard } from "./FunnelBoard";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export function LeadsManagement() {
   const [searchParams] = useSearchParams();
   const action = searchParams.get("action");
   const [showLeadForm, setShowLeadForm] = useState(action === "new");
   const [searchTerm, setSearchTerm] = useState("");
-  const [viewMode, setViewMode] = useState<"list" | "funnel">("list");
   
   useEffect(() => {
     if (action === "new") {
@@ -37,30 +32,10 @@ export function LeadsManagement() {
             />
           </div>
         </div>
-        <Button
-          onClick={() => setShowLeadForm(true)}
-          className="bg-primary hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Paciente
-        </Button>
       </div>
 
-      {/* Tabs: List or Funnel */}
-      <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "list" | "funnel")}>
-        <TabsList>
-          <TabsTrigger value="list">Lista</TabsTrigger>
-          <TabsTrigger value="funnel">Funil</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="list" className="mt-6">
-          <LeadsList searchTerm={searchTerm} />
-        </TabsContent>
-
-        <TabsContent value="funnel" className="mt-6">
-          <FunnelBoard />
-        </TabsContent>
-      </Tabs>
+      {/* Leads List */}
+      <LeadsList searchTerm={searchTerm} />
 
       {/* Lead Form Modal */}
       <LeadForm
@@ -70,4 +45,3 @@ export function LeadsManagement() {
     </div>
   );
 }
-

@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useSearchParams } from 'react-router-dom';
 import { useMedicalAppointments } from '@/hooks/useMedicalAppointments';
 import { useGeneralMeetings } from '@/hooks/useGeneralMeetings';
 import { AppointmentForm } from '@/components/medical-calendar/AppointmentForm';
@@ -11,6 +12,7 @@ import { DailyAppointmentsList } from '@/components/medical-calendar/DailyAppoin
 import { TimeGridView } from '@/components/medical-calendar/TimeGridView';
 import { AppointmentMetrics } from '@/components/medical-calendar/AppointmentMetrics';
 import { AttendanceChecklist } from '@/components/medical-calendar/AttendanceChecklist';
+import { DailyAttendanceChecklist } from '@/components/medical-calendar/DailyAttendanceChecklist';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -24,6 +26,7 @@ type CalendarView = 'monthly' | 'daily-hours';
 
 export default function MedicalCalendar() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [view, setView] = useState<CalendarView>('monthly');
   const [typeFilter, setTypeFilter] = useState<AppointmentType | 'all'>('all');
@@ -36,6 +39,11 @@ export default function MedicalCalendar() {
   const [selectedAppointment, setSelectedAppointment] = useState<MedicalAppointmentWithRelations | null>(null);
   const [selectedMeeting, setSelectedMeeting] = useState<GeneralMeeting | null>(null);
   const [prefilledDates, setPrefilledDates] = useState<{ start?: Date; end?: Date }>({});
+  const [conversionData, setConversionData] = useState<{
+    contactId?: string;
+    appointmentValue?: number;
+    paidInAdvance?: boolean;
+  } | null>(null);
 
   // Calcular range do mês para carregar consultas
   const monthStart = startOfMonth(selectedDate);
@@ -76,6 +84,28 @@ export default function MedicalCalendar() {
   });
 
   const isLoading = isLoadingAppointments || isLoadingMeetings;
+
+  // Detectar query params de conversão e abrir formulário
+  useEffect(() => {
+    const convertedFromDeal = searchParams.get('convertedFromDeal');
+    if (convertedFromDeal) {
+      const contactId = searchParams.get('contactId');
+      const appointmentValue = searchParams.get('appointmentValue');
+      const paidInAdvance = searchParams.get('paidInAdvance') === 'true';
+
+      if (contactId && appointmentValue) {
+        setConversionData({
+          contactId,
+          appointmentValue: parseFloat(appointmentValue),
+          paidInAdvance,
+        });
+        setShowAppointmentForm(true);
+        
+        // Limpar query params
+        setSearchParams({});
+      }
+    }
+  }, [searchParams, setSearchParams]);
 
   // Handle date selection from calendar
   const handleDateSelect = (date: Date) => {
@@ -152,6 +182,14 @@ export default function MedicalCalendar() {
     await markAsCompleted.mutateAsync(appointment.id);
     setShowAppointmentDetails(false);
     setSelectedAppointment(null);
+  };
+
+  const handleMarkAttended = async (appointment: MedicalAppointmentWithRelations) => {
+    await markAsCompleted.mutateAsync(appointment.id);
+  };
+
+  const handleMarkNoShow = async (appointment: MedicalAppointmentWithRelations) => {
+    await markAsNoShow.mutateAsync(appointment.id);
   };
 
   const handleCancel = async (appointment: MedicalAppointmentWithRelations) => {
@@ -405,13 +443,16 @@ export default function MedicalCalendar() {
       {view === 'monthly' ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Calendar - Left Column */}
-          <div className="lg:col-span-1 order-2 lg:order-1">
-          <MonthlyCalendarView
-            selectedDate={selectedDate}
-            onDateSelect={handleDateSelect}
-            appointments={appointments}
-            meetings={meetings}
-          />
+          <div className="lg:col-span-1 order-2 lg:order-1 space-y-6">
+            <MonthlyCalendarView
+              selectedDate={selectedDate}
+              onDateSelect={handleDateSelect}
+              appointments={appointments}
+              meetings={meetings}
+            />
+            
+            {/* Daily Attendance Checklist - Below Calendar */}
+            <DailyAttendanceChecklist selectedDate={selectedDate} />
           </div>
 
           {/* Appointments List - Right Column */}
@@ -423,6 +464,8 @@ export default function MedicalCalendar() {
               onDelete={handleDelete}
               onMarkCompleted={handleMarkCompleted}
               onCancel={handleCancel}
+              onMarkAttended={handleMarkAttended}
+              onMarkNoShow={handleMarkNoShow}
             />
           </div>
         </div>
@@ -464,6 +507,7 @@ export default function MedicalCalendar() {
         prefilledStart={prefilledDates.start}
         prefilledEnd={prefilledDates.end}
         appointment={selectedAppointment}
+        conversionData={conversionData}
       />
 
       <MeetingForm

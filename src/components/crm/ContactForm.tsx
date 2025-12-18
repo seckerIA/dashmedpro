@@ -60,11 +60,12 @@ interface ContactFormProps {
   trigger?: React.ReactNode;
   initialStage?: CRMPipelineStage;
   onSuccess?: (dealId?: string) => void;
+  onContactCreated?: (contactId: string) => void;
   forceOpen?: boolean;
   onCancel?: () => void;
 }
 
-export function ContactForm({ contact, trigger, initialStage, onSuccess, forceOpen, onCancel }: ContactFormProps) {
+export function ContactForm({ contact, trigger, initialStage, onSuccess, onContactCreated, forceOpen, onCancel }: ContactFormProps) {
   const [open, setOpen] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const { createContact, updateContact, createDeal, isCreatingContact, isUpdatingContact } = useCRM();
@@ -129,8 +130,14 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, forceOp
         });
       } else {
         console.log('➕ Criando novo contato...');
+        // Garantir que name e full_name estejam preenchidos
+        const contactToCreate = {
+          ...contactDataForDB,
+          name: contactDataForDB.full_name || contactDataForDB.name || '',
+          full_name: contactDataForDB.full_name || contactDataForDB.name || '',
+        };
         // Criar novo contato (sem service e service_value)
-        const newContact = await createContact(contactDataForDB as any);
+        const newContact = await createContact(contactToCreate as any);
         console.log('✅ Contato criado:', newContact);
         
         // Criar contrato automaticamente se solicitado
@@ -155,6 +162,11 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, forceOp
           setOpen(false);
           form.reset();
           console.log('🔔 Chamando onSuccess com dealId:', newDeal.id);
+          // Chamar callback com contactId quando contato for criado (mesmo com deal)
+          if (newContact?.id) {
+            console.log('🔔 Chamando onContactCreated com contactId:', newContact.id);
+            onContactCreated?.(newContact.id);
+          }
           onSuccess?.(newDeal.id);
           return;
         } else {
@@ -163,6 +175,12 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, forceOp
             title: "Contato criado",
             description: "O contato foi criado com sucesso.",
           });
+        }
+        
+        // Chamar callback com contactId quando contato for criado
+        if (newContact?.id) {
+          console.log('🔔 Chamando onContactCreated com contactId:', newContact.id);
+          onContactCreated?.(newContact.id);
         }
       }
       
@@ -203,9 +221,16 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, forceOp
   const handleOpenChange = (newOpen: boolean) => {
     console.log('🔧 handleOpenChange chamado - newOpen:', newOpen, 'forceOpen:', forceOpen);
     
-    // Se forceOpen é true, não permitir fechar
+    // Se forceOpen é true e está tentando fechar, chamar onCancel se disponível
+    // mas ainda permitir fechar se onCancel foi fornecido (para controle externo)
     if (forceOpen && !newOpen) {
-      console.log('⚠️ Tentativa de fechar Dialog com forceOpen=true - bloqueando');
+      console.log('⚠️ Tentativa de fechar Dialog com forceOpen=true');
+      if (onCancel) {
+        console.log('📞 Chamando onCancel para controle externo');
+        onCancel();
+        return; // Deixar o componente pai controlar o estado
+      }
+      console.log('⚠️ Bloqueando fechamento - forceOpen sem onCancel');
       return;
     }
     

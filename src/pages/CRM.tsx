@@ -74,6 +74,7 @@ const CRM = () => {
     contacts, 
     isLoading,
     updateDeal,
+    updateDealsPositions,
     deleteContact,
     deleteDeal,
     isDeletingContact,
@@ -96,7 +97,30 @@ const CRM = () => {
   const [showCallForm, setShowCallForm] = useState(false);
   const [dealForCall, setDealForCall] = useState<CRMDealWithContact | null>(null);
 
-  const handleUpdateDealStage = async (dealId: string, newStage: string) => {
+  const handleReorderDealsInStage = async (stage: string, dealIds: string[]) => {
+    try {
+      // Calcular novas posições baseadas na ordem dos IDs
+      const updates = dealIds.map((dealId, index) => ({
+        id: dealId,
+        position: index,
+      }));
+      
+      await updateDealsPositions(updates);
+      
+      toast({
+        title: "Ordem atualizada",
+        description: "Os contatos foram reordenados com sucesso.",
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Não foi possível reordenar os contatos.",
+      });
+    }
+  };
+
+  const handleUpdateDealStage = async (dealId: string, newStage: string, position?: number) => {
     try {
       // Se o deal foi movido para "fechado_ganho", mostrar modal
       if (newStage === 'fechado_ganho') {
@@ -105,53 +129,69 @@ const CRM = () => {
           setWonDeal(deal);
           setShowDealWonModal(true);
           
-          // Atualizar o stage mesmo assim
-          await updateDeal({ 
-            dealId, 
-            data: { stage: newStage as any }
-          });
+          // Não atualizar o stage ainda - será atualizado após confirmação da conversão
           return;
         }
       }
 
+      // Preparar dados de atualização - sempre atualizar stage
+      const updateData: Partial<CRMDeal> = { stage: newStage as any };
+      
+      // Se position foi fornecida, atualizar também
+      if (position !== undefined && position !== null) {
+        updateData.position = position;
+      }
+
       await updateDeal({ 
         dealId, 
-        data: { stage: newStage as any }
-      });
-      toast({
-        title: "Contato atualizado",
-        description: "O contato foi movido com sucesso.",
+        data: updateData
       });
     } catch (error) {
+      console.error('Erro ao atualizar deal:', error);
       toast({
         variant: "destructive",
         title: "Erro",
         description: "Não foi possível atualizar o contato.",
       });
+      throw error; // Re-throw para que o componente saiba que falhou
     }
   };
 
-  const handleDealWonConfirm = () => {
-    if (wonDeal) {
-      // Criar URL com query params para pré-preencher o formulário
+  const handleDealConversion = async (data: { appointmentValue: number; paymentTiming: 'advance' | 'at_appointment' }) => {
+    if (!wonDeal) return;
+
+    try {
+      // Atualizar o deal para fechado_ganho
+      await updateDeal({ 
+        dealId: wonDeal.id, 
+        data: { stage: 'fechado_ganho' as any }
+      });
+
+      // Navegar para o calendário médico com os dados da conversão
       const params = new URLSearchParams({
-        dealId: wonDeal.id,
-        title: wonDeal.title,
-        value: wonDeal.value?.toString() || '',
         contactId: wonDeal.contact_id || '',
-        contactName: wonDeal.contact?.full_name || '',
+        convertedFromDeal: wonDeal.id,
+        appointmentValue: data.appointmentValue.toString(),
+        paidInAdvance: (data.paymentTiming === 'advance').toString(),
       });
       
-      navigate(`/financeiro/nova-transacao?${params.toString()}`);
+      navigate(`/calendario-medico?${params.toString()}`);
+      
+      setShowDealWonModal(false);
+      setWonDeal(null);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Não foi possível converter o negócio.",
+      });
     }
-    setShowDealWonModal(false);
-    setWonDeal(null);
   };
 
   const handleDealWonCancel = () => {
     toast({
-      title: "Negócio fechado!",
-      description: "Você pode registrar a receita depois na página financeira.",
+      title: "Conversão cancelada",
+      description: "O negócio não foi convertido. Você pode tentar novamente depois.",
     });
     setShowDealWonModal(false);
     setWonDeal(null);
@@ -460,6 +500,7 @@ const CRM = () => {
             deals={deals}
             followUps={followUps}
             onUpdateDeal={handleUpdateDealStage}
+            onReorderDealsInStage={handleReorderDealsInStage}
             onEditDeal={(deal) => setEditingDeal(deal)}
             onDeleteDeal={handleDeleteDeal}
             onScheduleCall={handleScheduleCall}
@@ -631,7 +672,7 @@ const CRM = () => {
       <DealWonModal
         open={showDealWonModal}
         deal={wonDeal}
-        onConfirm={handleDealWonConfirm}
+        onConfirm={handleDealConversion}
         onCancel={handleDealWonCancel}
       />
 

@@ -20,9 +20,12 @@
       "Bash(curl:*)",
       "Bash(grep:*)",
       "Bash(node run-migration.mjs:*)",
-      "Bash(DB_PASSWORD=\"Vq79qn7t@96037951aA\" npx supabase db push:*)",
+      "Bash(DB_PASSWORD=\"Dashmedpro2026@\" npx supabase db push:*)",
       "Bash(ping:*)",
-      "Bash(nslookup:*)"
+      "Bash(nslookup:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
+      "Bash(git fetch:*)"
     ]
   }
 }

@@ -16,13 +16,6 @@ export function SalesManagement() {
       {/* Header Actions */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">Vendas & Procedimentos</h2>
-        <Button
-          onClick={() => setShowSaleForm(true)}
-          className="bg-primary hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Venda
-        </Button>
       </div>
 
       {/* Tabs */}

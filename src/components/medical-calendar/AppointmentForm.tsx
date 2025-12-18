@@ -12,6 +12,9 @@ import * as z from 'zod';
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { useAvailability } from '@/hooks/useAvailability';
+import { ContactForm } from '@/components/crm/ContactForm';
+import { UserPlus } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   AppointmentType,
   AppointmentStatus,
@@ -47,6 +50,7 @@ const appointmentSchema = z.object({
   internal_notes: z.string().optional(),
   estimated_value: z.string().optional().transform((val) => val ? parseCurrencyToNumber(val) : undefined),
   payment_status: z.enum(['pending', 'paid', 'partial', 'cancelled']),
+  paid_in_advance: z.boolean().optional(),
 });
 
 type AppointmentFormData = z.infer<typeof appointmentSchema>;
@@ -58,6 +62,11 @@ interface AppointmentFormProps {
   appointment?: MedicalAppointment | null;
   prefilledStart?: Date;
   prefilledEnd?: Date;
+  conversionData?: {
+    contactId?: string;
+    appointmentValue?: number;
+    paidInAdvance?: boolean;
+  } | null;
 }
 
 export function AppointmentForm({
@@ -67,13 +76,16 @@ export function AppointmentForm({
   appointment,
   prefilledStart,
   prefilledEnd,
+  conversionData,
 }: AppointmentFormProps) {
   const { user } = useAuth();
   const { contacts } = useCRM();
   const { checkAvailability } = useAvailability();
+  const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [estimatedValueDisplay, setEstimatedValueDisplay] = useState<string>('');
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
+  const [showNewContactForm, setShowNewContactForm] = useState(false);
 
   const timeSlots = generateTimeSlots();
 
@@ -143,6 +155,7 @@ export function AppointmentForm({
         internal_notes: data.internal_notes || null,
         estimated_value: data.estimated_value || null,
         payment_status: data.payment_status,
+        paid_in_advance: data.paid_in_advance || false,
       };
 
       await onSubmit(submitData);
@@ -158,7 +171,7 @@ export function AppointmentForm({
     }
   };
 
-  // Populate form when editing
+  // Populate form when editing or when conversion data is provided
   useEffect(() => {
     if (appointment && open) {
       const startDate = parseISO(appointment.start_time);
@@ -178,25 +191,32 @@ export function AppointmentForm({
         internal_notes: appointment.internal_notes || '',
         estimated_value: estimatedValueFormatted,
         payment_status: appointment.payment_status,
+        paid_in_advance: appointment.paid_in_advance || false,
       });
     } else if (!appointment && open) {
       // Reset to defaults for new appointment
-      setEstimatedValueDisplay('');
+      const isConversion = conversionData && conversionData.contactId;
+      const estimatedValueFormatted = isConversion && conversionData.appointmentValue
+        ? formatCurrency(conversionData.appointmentValue)
+        : '';
+      
+      setEstimatedValueDisplay(estimatedValueFormatted);
       reset({
         appointment_type: 'first_visit',
         status: 'scheduled',
         duration_minutes: 30,
-        payment_status: 'pending',
+        payment_status: isConversion && conversionData.paidInAdvance ? 'paid' : 'pending',
         start_date: prefilledStart || new Date(),
         start_time: prefilledStart ? format(prefilledStart, 'HH:mm') : '09:00',
         title: '',
-        contact_id: '',
+        contact_id: isConversion ? conversionData.contactId! : '',
         notes: '',
         internal_notes: '',
-        estimated_value: '',
+        estimated_value: estimatedValueFormatted,
+        paid_in_advance: isConversion ? conversionData.paidInAdvance || false : false,
       });
     }
-  }, [appointment, open, prefilledStart, reset]);
+  }, [appointment, open, prefilledStart, reset, conversionData]);
 
   const selectedContactId = watch('contact_id');
   const selectedType = watch('appointment_type');
@@ -231,21 +251,37 @@ export function AppointmentForm({
                 <SelectValue placeholder="Selecione o paciente" />
               </SelectTrigger>
               <SelectContent>
-                {contacts.map((contact) => (
-                  <SelectItem key={contact.id} value={contact.id}>
-                    <div className="flex flex-col">
-                      <span className="font-medium">{contact.full_name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {contact.phone} {contact.email && `• ${contact.email}`}
-                      </span>
-                    </div>
-                  </SelectItem>
-                ))}
+                {contacts.length === 0 ? (
+                  <div className="p-2 text-sm text-muted-foreground">
+                    Nenhum paciente cadastrado. Clique em "Cadastrar novo paciente" para adicionar.
+                  </div>
+                ) : (
+                  contacts.map((contact) => (
+                    <SelectItem key={contact.id} value={contact.id}>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{contact.full_name || contact.name || 'Sem nome'}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {contact.phone} {contact.email && `• ${contact.email}`}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
             {errors.contact_id && (
               <p className="text-sm text-destructive">{errors.contact_id.message}</p>
             )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowNewContactForm(true)}
+              className="w-full"
+            >
+              <UserPlus className="h-4 w-4 mr-2" />
+              Cadastrar novo paciente
+            </Button>
           </div>
 
           {/* Appointment Type */}
@@ -452,6 +488,27 @@ export function AppointmentForm({
           </div>
         </form>
       </DialogContent>
+
+      {/* Contact Form Modal */}
+      {showNewContactForm && (
+        <ContactForm
+          forceOpen={true}
+          onContactCreated={async (contactId) => {
+            // Invalidar e refetch a lista de contatos para garantir que o novo paciente apareça
+            await queryClient.invalidateQueries({ queryKey: ['crm-contacts', user?.id] });
+            await queryClient.refetchQueries({ queryKey: ['crm-contacts', user?.id] });
+            setValue('contact_id', contactId);
+            setShowNewContactForm(false);
+          }}
+          onCancel={() => setShowNewContactForm(false)}
+          onSuccess={async () => {
+            // Invalidar e refetch a lista de contatos
+            await queryClient.invalidateQueries({ queryKey: ['crm-contacts', user?.id] });
+            await queryClient.refetchQueries({ queryKey: ['crm-contacts', user?.id] });
+            setShowNewContactForm(false);
+          }}
+        />
+      )}
     </Dialog>
   );
 }

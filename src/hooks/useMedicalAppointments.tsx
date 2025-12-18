@@ -75,7 +75,10 @@ const createAppointment = async (
 ): Promise<MedicalAppointmentWithRelations> => {
   const { data, error } = await supabase
     .from('medical_appointments')
-    .insert(appointmentData)
+    .insert({
+      ...appointmentData,
+      paid_in_advance: appointmentData.paid_in_advance || false,
+    })
     .select(`
       *,
       contact:crm_contacts(*),
@@ -95,9 +98,14 @@ const updateAppointment = async ({
   id: string;
   updates: MedicalAppointmentUpdate;
 }): Promise<MedicalAppointmentWithRelations> => {
+  const updateData = {
+    ...updates,
+    paid_in_advance: updates.paid_in_advance !== undefined ? updates.paid_in_advance : undefined,
+  };
+  
   const { data, error } = await supabase
     .from('medical_appointments')
-    .update(updates)
+    .update(updateData)
     .eq('id', id)
     .select(`
       *,

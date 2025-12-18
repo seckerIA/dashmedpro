@@ -2,10 +2,6 @@ import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts';
 import { designTokens } from '@/lib/design-tokens';
 
 interface StatsPanelProps {
-  totalIntake: number;
-  newCustomers: { value: number; change: number };
-  repeatCustomers: number;
-  totalRevenue: string;
   distributionData: Array<{
     name: string;
     value: number;
@@ -15,10 +11,6 @@ interface StatsPanelProps {
 }
 
 export function StatsPanel({
-  totalIntake,
-  newCustomers,
-  repeatCustomers,
-  totalRevenue,
   distributionData,
   className,
 }: StatsPanelProps) {
@@ -96,65 +88,6 @@ export function StatsPanel({
               </div>
             </div>
           ))}
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="bg-card rounded-2xl p-3 sm:p-4 lg:p-6 border border-border space-y-2 sm:space-y-3 lg:space-y-4">
-        <h3 className="text-xs sm:text-sm font-semibold text-foreground mb-2 sm:mb-3 lg:mb-4">
-          Estatísticas Rápidas
-        </h3>
-
-        {/* Total Intake */}
-        <div className="flex items-center justify-between p-3 sm:p-4 bg-muted/20 rounded-xl">
-          <div>
-            <p className="text-[10px] sm:text-xs text-muted-foreground mb-1">Total Intake</p>
-            <p className="text-lg sm:text-xl lg:text-2xl font-bold text-foreground">{totalIntake.toLocaleString()}k</p>
-          </div>
-          <div className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 bg-gradient-purple rounded-xl flex items-center justify-center">
-            <span className="text-sm sm:text-base lg:text-xl">📊</span>
-          </div>
-        </div>
-
-        {/* New Customers */}
-        <div className="flex items-center justify-between p-3 sm:p-4 bg-muted/20 rounded-xl">
-          <div>
-            <p className="text-[10px] sm:text-xs text-muted-foreground mb-1">Novos Clientes</p>
-            <div className="flex items-center gap-1 sm:gap-2">
-              <p className="text-lg sm:text-xl lg:text-2xl font-bold text-foreground">
-                {newCustomers.value.toLocaleString()}k
-              </p>
-              <span className="text-[10px] sm:text-xs font-semibold text-green-500 flex items-center gap-1">
-                <span>▲</span>
-                +{newCustomers.change}k
-              </span>
-            </div>
-          </div>
-          <div className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 bg-gradient-cyan rounded-xl flex items-center justify-center">
-            <span className="text-sm sm:text-base lg:text-xl">👥</span>
-          </div>
-        </div>
-
-        {/* Repeat Customers */}
-        <div className="flex items-center justify-between p-3 sm:p-4 bg-muted/20 rounded-xl">
-          <div>
-            <p className="text-[10px] sm:text-xs text-muted-foreground mb-1">Clientes Recorrentes</p>
-            <p className="text-lg sm:text-xl lg:text-2xl font-bold text-foreground">{repeatCustomers.toLocaleString()}k</p>
-          </div>
-          <div className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 bg-gradient-yellow rounded-xl flex items-center justify-center">
-            <span className="text-sm sm:text-base lg:text-xl">🔄</span>
-          </div>
-        </div>
-
-        {/* Total Revenue */}
-        <div className="flex items-center justify-between p-3 sm:p-4 bg-muted/20 rounded-xl">
-          <div>
-            <p className="text-[10px] sm:text-xs text-muted-foreground mb-1">Receita Total</p>
-            <p className="text-lg sm:text-xl lg:text-2xl font-bold text-foreground">{totalRevenue}</p>
-          </div>
-          <div className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 bg-gradient-green rounded-xl flex items-center justify-center">
-            <span className="text-sm sm:text-base lg:text-xl">💰</span>
-          </div>
         </div>
       </div>
 

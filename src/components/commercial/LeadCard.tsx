@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Phone, Mail, MessageSquare, UserPlus, MoreVertical } from "lucide-react";
+import { Phone, Mail, MessageSquare, MoreVertical, Calendar } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +15,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useCommercialLeads } from "@/hooks/useCommercialLeads";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { LeadDetailsModal } from "./LeadDetailsModal";
 import { ConversionModal } from "./ConversionModal";
 
@@ -24,6 +25,7 @@ interface LeadCardProps {
 
 export function LeadCard({ lead }: LeadCardProps) {
   const { deleteLead, convertLead } = useCommercialLeads();
+  const navigate = useNavigate();
   const [showDetails, setShowDetails] = useState(false);
   const [showConversion, setShowConversion] = useState(false);
 
@@ -50,14 +52,25 @@ export function LeadCard({ lead }: LeadCardProps) {
     setShowConversion(true);
   };
 
+  const handleScheduleAppointment = () => {
+    // Navegar para o calendário com os dados do lead pré-preenchidos
+    const params = new URLSearchParams();
+    if (lead.email) params.set('email', lead.email);
+    if (lead.phone) params.set('phone', lead.phone);
+    if (lead.name) params.set('name', lead.name);
+    if (lead.estimated_value) params.set('estimatedValue', lead.estimated_value.toString());
+    
+    navigate(`/calendar?${params.toString()}`);
+  };
+
   return (
     <>
       <Card className="bg-gradient-card shadow-card border-border hover:shadow-lg transition-shadow">
         <CardContent className="p-4">
           <div className="flex items-start justify-between mb-3">
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-card-foreground truncate">{lead.name}</h3>
-              <div className="flex items-center gap-2 mt-1">
+              <h3 className="font-semibold text-card-foreground truncate mb-1">{lead.name}</h3>
+              <div className="flex items-center gap-2">
                 <Badge variant="secondary" className="text-xs">
                   {COMMERCIAL_LEAD_STATUS_LABELS[lead.status]}
                 </Badge>
@@ -66,27 +79,38 @@ export function LeadCard({ lead }: LeadCardProps) {
                 </Badge>
               </div>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setShowDetails(true)}>
-                  Ver Detalhes
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleConvert} disabled={lead.status === 'converted'}>
-                  Converter em Paciente
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => deleteLead.mutate(lead.id)}
-                  className="text-destructive"
-                >
-                  Excluir
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="default"
+                onClick={handleScheduleAppointment}
+                className="h-8 px-3 text-xs bg-primary hover:bg-primary/90"
+              >
+                <Calendar className="h-4 w-4 mr-1.5" />
+                Agendar Paciente
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setShowDetails(true)}>
+                    Ver Detalhes
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleConvert} disabled={lead.status === 'converted'}>
+                    Converter em Paciente
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => deleteLead.mutate(lead.id)}
+                    className="text-destructive"
+                  >
+                    Excluir
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
 
           <div className="space-y-2 text-sm text-muted-foreground">
@@ -168,9 +192,3 @@ export function LeadCard({ lead }: LeadCardProps) {
     </>
   );
 }
-
-
-
-
-
-

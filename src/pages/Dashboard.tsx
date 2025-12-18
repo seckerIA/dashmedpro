@@ -215,13 +215,6 @@ const Dashboard = () => {
         {/* Coluna Direita (1/3 width) - Novo: StatsPanel */}
         <div>
           <StatsPanel
-            totalIntake={metrics?.totalContacts || 0}
-            newCustomers={{
-              value: metrics?.totalContacts || 0,
-              change: 1
-            }}
-            repeatCustomers={metrics?.wonDeals || 0}
-            totalRevenue={`${((financialMetrics?.monthRevenue || 0) / 1000).toFixed(0)}k`}
             distributionData={
               metrics?.servicesInterest.slice(0, 4).map((s, i) => ({
                 name: s.service,

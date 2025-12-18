@@ -355,6 +355,17 @@ export function TimeGridView({
                             💰 {formatCurrency(appointment.estimated_value)}
                           </div>
                         )}
+                        {/* Badge de pagamento antecipado */}
+                        {appointment.paid_in_advance && (
+                          <>
+                            {appointment.estimated_value && (
+                              <span className="opacity-50">•</span>
+                            )}
+                            <div className="truncate flex-shrink-0 text-green-500 font-semibold">
+                              ✓ Pago
+                            </div>
+                          </>
+                        )}
                       </div>
                     ) : meeting ? (
                       <div className={cn(

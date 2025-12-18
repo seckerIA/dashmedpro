@@ -25,6 +25,7 @@ import {
 import {
   SortableContext,
   verticalListSortingStrategy,
+  arrayMove,
 } from "@dnd-kit/sortable";
 import {
   useSortable,
@@ -104,7 +105,8 @@ export interface PipelineBoardProps {
   followUps?: FollowUp[]; // Follow-ups agendados
   onDealClick?: (deal: CRMDealWithContact) => void;
   onStageClick?: (stage: string) => void;
-  onUpdateDeal?: (dealId: string, stage: string) => void;
+  onUpdateDeal?: (dealId: string, stage: string, position?: number) => void;
+  onReorderDealsInStage?: (stage: string, dealIds: string[]) => Promise<void>;
   onEditDeal?: (deal: CRMDealWithContact) => void;
   onDeleteDeal?: (dealId: string) => void;
   onScheduleCall?: (deal: CRMDealWithContact) => void;
@@ -126,6 +128,7 @@ export function PipelineBoard({
   onDealClick, 
   onStageClick,
   onUpdateDeal,
+  onReorderDealsInStage,
   onEditDeal,
   onDeleteDeal,
   onScheduleCall,
@@ -151,7 +154,7 @@ export function PipelineBoard({
   );
 
   const getDealsByStage = (stage: string) => {
-    return deals.filter(deal => deal.stage === stage);
+    return deals.filter(deal => deal.stage === stage).sort((a, b) => (a.position || 0) - (b.position || 0));
   };
 
   const getTotalValueByStage = (stage: string) => {
@@ -178,59 +181,63 @@ export function PipelineBoard({
     }
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     
     setActiveDeal(null);
     
-    if (!over || !onUpdateDeal) {
-      console.log('⚠️ Drag cancelado: over ou onUpdateDeal não disponível', { over: !!over, onUpdateDeal: !!onUpdateDeal });
+    if (!over || active.id === over.id || !onUpdateDeal) {
       return;
     }
 
     const activeId = active.id as string;
-    const overId = over.id as string;
-    
-    console.log('🎯 Drag End:', { activeId, overId, overData: over.data.current });
-    
-    // Se foi solto no mesmo lugar, não faz nada
-    if (activeId === overId) {
-      console.log('ℹ️ Solto no mesmo lugar, ignorando');
-      return;
-    }
-    
     const activeDeal = deals.find(d => d.id === activeId);
     if (!activeDeal) {
-      console.error('❌ Deal ativo não encontrado:', activeId);
       return;
     }
     
-    // Determinar o estágio de destino
-    // Pode ser o ID de uma coluna (stage) ou de outro card
-    const overIsStage = PIPELINE_STAGES.some(s => s.value === overId);
+    // Verificar se foi solto em uma coluna (stage)
+    const overIsStage = PIPELINE_STAGES.some(s => s.value === over.id);
+    
     let targetStage: string;
-
+    
     if (overIsStage) {
-      // Solto diretamente em uma coluna
-      targetStage = overId;
-      console.log('✅ Solto em coluna:', targetStage);
+      // Solto diretamente em uma coluna: usar o stage da coluna
+      targetStage = over.id as string;
     } else {
-      // Solto em outro card - usar o estágio desse card
-      const overDeal = deals.find(d => d.id === overId);
+      // Solto em um card: usar o stage do card destino
+      const overDeal = deals.find(d => d.id === over.id);
       if (!overDeal) {
-        console.error('❌ Deal de destino não encontrado:', overId);
         return;
       }
       targetStage = overDeal.stage;
-      console.log('✅ Solto em card, usando stage do card:', targetStage);
     }
     
-    // Só atualiza se o estágio for diferente
-    if (activeDeal.stage !== targetStage) {
-      console.log(`🚀 Movendo deal ${activeId} de ${activeDeal.stage} para ${targetStage}`);
-      onUpdateDeal(activeId, targetStage);
-    } else {
-      console.log('ℹ️ Stage já é o mesmo, ignorando atualização');
+    // Se não mudou de stage, reordenar dentro do mesmo stage
+    if (activeDeal.stage === targetStage) {
+      const stageDeals = getDealsByStage(targetStage);
+      const oldIndex = stageDeals.findIndex(d => d.id === activeId);
+      const newIndex = stageDeals.findIndex(d => d.id === over.id);
+      
+      if (oldIndex !== newIndex && oldIndex >= 0 && newIndex >= 0) {
+        // Reordenar usando arrayMove
+        const reordered = arrayMove(stageDeals, oldIndex, newIndex);
+        
+        // Atualizar todas as posições
+        if (onReorderDealsInStage) {
+          const reorderedIds = reordered.map(d => d.id);
+          await onReorderDealsInStage(targetStage, reorderedIds);
+        }
+      }
+      return;
+    }
+    
+    // Mudou de stage: atualizar apenas o stage (como FunnelBoard faz)
+    // A posição será gerenciada automaticamente pela query
+    try {
+      await onUpdateDeal(activeId, targetStage);
+    } catch (error) {
+      console.error('Erro ao atualizar deal:', error);
     }
   };
 

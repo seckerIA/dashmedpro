@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Clock, User, Phone, Stethoscope, MoreVertical, Edit, Trash2, CheckCircle2, XCircle } from 'lucide-react';
+import { Clock, User, Phone, Stethoscope, MoreVertical, Edit, Trash2, CheckCircle2, XCircle, DollarSign, UserCheck, UserX } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { MedicalAppointmentWithRelations, APPOINTMENT_TYPE_LABELS, APPOINTMENT_STATUS_LABELS } from '@/types/medicalAppointments';
@@ -20,6 +20,8 @@ interface AppointmentCardProps {
   onDelete?: () => void;
   onMarkCompleted?: () => void;
   onCancel?: () => void;
+  onMarkAttended?: () => void;
+  onMarkNoShow?: () => void;
 }
 
 export function AppointmentCard({
@@ -28,6 +30,8 @@ export function AppointmentCard({
   onDelete,
   onMarkCompleted,
   onCancel,
+  onMarkAttended,
+  onMarkNoShow,
 }: AppointmentCardProps) {
   const startTime = format(parseISO(appointment.start_time), 'HH:mm', { locale: ptBR });
   const patientName = appointment.contact?.full_name || 'Sem paciente';
@@ -74,6 +78,47 @@ export function AppointmentCard({
                   </div>
                 </div>
               )}
+
+              {/* Badge de pagamento antecipado */}
+              {appointment.paid_in_advance && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
+                    <DollarSign className="h-3 w-3 mr-1" />
+                    Pago Antecipado
+                  </Badge>
+                </div>
+              )}
+
+              {/* Botões de presença/ausência - visíveis apenas se não estiver concluído/cancelado */}
+              {appointment.status !== 'completed' && 
+               appointment.status !== 'no_show' && 
+               appointment.status !== 'cancelled' && 
+               (onMarkAttended || onMarkNoShow) && (
+                <div className="flex items-center gap-2 pt-2">
+                  {onMarkAttended && (
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={onMarkAttended}
+                      className="h-7 text-xs bg-green-600 hover:bg-green-700"
+                    >
+                      <UserCheck className="h-3.5 w-3.5 mr-1.5" />
+                      Compareceu
+                    </Button>
+                  )}
+                  {onMarkNoShow && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={onMarkNoShow}
+                      className="h-7 text-xs border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950"
+                    >
+                      <UserX className="h-3.5 w-3.5 mr-1.5" />
+                      Falta
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -90,6 +135,24 @@ export function AppointmentCard({
                   <Edit className="h-4 w-4 mr-2" />
                   Editar
                 </DropdownMenuItem>
+              )}
+              {appointment.status !== 'completed' && 
+               appointment.status !== 'no_show' && 
+               appointment.status !== 'cancelled' && (
+                <>
+                  {onMarkAttended && (
+                    <DropdownMenuItem onClick={onMarkAttended} className="text-green-600 focus:text-green-600">
+                      <UserCheck className="h-4 w-4 mr-2" />
+                  Compareceu
+                    </DropdownMenuItem>
+                  )}
+                  {onMarkNoShow && (
+                    <DropdownMenuItem onClick={onMarkNoShow} className="text-red-600 focus:text-red-600">
+                      <UserX className="h-4 w-4 mr-2" />
+                  Não Compareceu
+                    </DropdownMenuItem>
+                  )}
+                </>
               )}
               {appointment.status !== 'completed' && onMarkCompleted && (
                 <DropdownMenuItem onClick={onMarkCompleted}>

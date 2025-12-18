@@ -148,6 +148,25 @@ const updateDeal = async ({ dealId, data }: { dealId: string; data: Partial<CRMD
   return updatedDeal;
 };
 
+// Update multiple deals positions (for reordering within same stage)
+const updateDealsPositions = async (updates: Array<{ id: string; position: number }>): Promise<void> => {
+  // Atualizar cada deal individualmente (Supabase não suporta update múltiplo com diferentes valores facilmente)
+  const promises = updates.map(({ id, position }) =>
+    supabase
+      .from('crm_deals')
+      .update({ position })
+      .eq('id', id)
+  );
+
+  const results = await Promise.all(promises);
+  
+  // Verificar se algum teve erro
+  const errors = results.filter(r => r.error);
+  if (errors.length > 0) {
+    throw new Error(`Erro ao atualizar posições: ${errors[0].error?.message}`);
+  }
+};
+
 // Update contact
 const updateContact = async ({ contactId, data }: { contactId: string; data: Partial<CRMContact> }): Promise<CRMContact> => {
   const { data: updatedContact, error } = await supabase
@@ -249,6 +268,16 @@ export function useCRM(viewAsUserIds?: string[]) {
     mutationFn: updateDeal,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['crm-deals', user?.id] });
+      // Forçar refetch imediato dos deals para atualizar os cards
+      queryClient.refetchQueries({ queryKey: ['crm-deals', user?.id] });
+    },
+  });
+
+  const updateDealsPositionsMutation = useMutation({
+    mutationFn: updateDealsPositions,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm-deals', user?.id] });
+      queryClient.refetchQueries({ queryKey: ['crm-deals', user?.id] });
     },
   });
 
@@ -295,6 +324,7 @@ export function useCRM(viewAsUserIds?: string[]) {
     createDeal: createDealMutation.mutateAsync,
     createActivity: createActivityMutation.mutateAsync,
     updateDeal: updateDealMutation.mutateAsync,
+    updateDealsPositions: updateDealsPositionsMutation.mutateAsync,
     updateContact: updateContactMutation.mutateAsync,
     deleteContact: deleteContactMutation.mutateAsync,
     deleteDeal: deleteDealMutation.mutateAsync,

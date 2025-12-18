@@ -58,6 +58,7 @@ export interface MedicalAppointment {
   estimated_value?: number | null;
   payment_status: PaymentStatus;
   financial_transaction_id?: string | null;
+  paid_in_advance?: boolean;
 
   completed_at?: string | null;
   cancelled_at?: string | null;
@@ -69,7 +70,7 @@ export interface MedicalAppointment {
 
 // With relations for display
 export interface MedicalAppointmentWithRelations extends MedicalAppointment {
-  contact: CRMContact;
+  contact: CRMContact | null;
   financial_transaction?: {
     id: string;
     description: string;
@@ -93,6 +94,7 @@ export interface MedicalAppointmentInsert {
   estimated_value?: number | null;
   payment_status?: PaymentStatus;
   financial_transaction_id?: string | null;
+  paid_in_advance?: boolean;
 }
 
 // Update type
@@ -108,6 +110,7 @@ export interface MedicalAppointmentUpdate {
   estimated_value?: number | null;
   payment_status?: PaymentStatus;
   financial_transaction_id?: string | null;
+  paid_in_advance?: boolean;
   completed_at?: string | null;
   cancelled_at?: string | null;
   cancellation_reason?: string | null;

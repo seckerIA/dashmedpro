@@ -309,3 +309,7 @@ Antes de aplicar uma migration, verifique:
 - [ ] Migration não quebra funcionalidades existentes
 - [ ] Dados existentes são preservados ou migrados corretamente
 
+
+
+
+

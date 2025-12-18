@@ -13,6 +13,8 @@ interface DailyAppointmentsListProps {
   onDelete?: (appointment: MedicalAppointmentWithRelations) => void;
   onMarkCompleted?: (appointment: MedicalAppointmentWithRelations) => void;
   onCancel?: (appointment: MedicalAppointmentWithRelations) => void;
+  onMarkAttended?: (appointment: MedicalAppointmentWithRelations) => void;
+  onMarkNoShow?: (appointment: MedicalAppointmentWithRelations) => void;
 }
 
 export function DailyAppointmentsList({
@@ -22,6 +24,8 @@ export function DailyAppointmentsList({
   onDelete,
   onMarkCompleted,
   onCancel,
+  onMarkAttended,
+  onMarkNoShow,
 }: DailyAppointmentsListProps) {
   // Filtrar consultas do dia selecionado
   const dailyAppointments = appointments.filter(appt => {
@@ -77,6 +81,8 @@ export function DailyAppointmentsList({
                 onDelete={() => onDelete?.(appointment)}
                 onMarkCompleted={() => onMarkCompleted?.(appointment)}
                 onCancel={() => onCancel?.(appointment)}
+                onMarkAttended={() => onMarkAttended?.(appointment)}
+                onMarkNoShow={() => onMarkNoShow?.(appointment)}
               />
             ))}
           </div>

@@ -51,9 +51,15 @@ export function AppointmentDetailsModal({
           <div>
             <h4 className="font-semibold mb-2">Paciente</h4>
             <div className="text-sm">
-              <p className="font-medium">{appointment.contact.full_name}</p>
-              {appointment.contact.phone && <p className="text-muted-foreground">{appointment.contact.phone}</p>}
-              {appointment.contact.email && <p className="text-muted-foreground">{appointment.contact.email}</p>}
+              {appointment.contact ? (
+                <>
+                  <p className="font-medium">{appointment.contact.full_name}</p>
+                  {appointment.contact.phone && <p className="text-muted-foreground">{appointment.contact.phone}</p>}
+                  {appointment.contact.email && <p className="text-muted-foreground">{appointment.contact.email}</p>}
+                </>
+              ) : (
+                <p className="text-muted-foreground italic">Contato não encontrado ou removido</p>
+              )}
             </div>
           </div>
 
@@ -88,9 +94,18 @@ export function AppointmentDetailsModal({
           {appointment.estimated_value && (
             <div>
               <h4 className="font-semibold mb-2">Informações Financeiras</h4>
-              <p className="text-sm">
-                Valor Estimado: <span className="font-medium">{formatCurrency(appointment.estimated_value)}</span>
-              </p>
+              <div className="space-y-2 text-sm">
+                <p>
+                  Valor Estimado: <span className="font-medium">{formatCurrency(appointment.estimated_value)}</span>
+                </p>
+                {appointment.paid_in_advance !== undefined && (
+                  <p>
+                    Pagamento: <span className="font-medium">
+                      {appointment.paid_in_advance ? 'Antecipado' : 'Na consulta'}
+                    </span>
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
