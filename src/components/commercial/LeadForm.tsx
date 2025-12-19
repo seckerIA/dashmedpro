@@ -203,15 +203,66 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="estimated_value">Valor Estimado da 1ª Consulta</Label>
-              <Input
-                id="estimated_value"
-                type="text"
-                value={watch("estimated_value") || ""}
-                onChange={handleEstimatedValueChange}
-                placeholder="R$ 0,00"
-              />
+              <Label htmlFor="procedure_id">Procedimento de Interesse</Label>
+              <Select
+                value={watch("procedure_id") || "none"}
+                onValueChange={(value) => {
+                  setValue("procedure_id", value);
+                  // Preencher valor estimado automaticamente se procedimento foi selecionado
+                  const selectedProcedure = procedures?.find(p => p.id === value);
+                  if (selectedProcedure && selectedProcedure.price && !watch("estimated_value")) {
+                    const priceInCents = (Number(selectedProcedure.price) * 100).toString();
+                    setValue("estimated_value", priceInCents);
+                  }
+                }}
+                disabled={isLoadingProcedures}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={isLoadingProcedures ? "Carregando..." : "Selecione o procedimento"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum procedimento específico</SelectItem>
+                  {isLoadingProcedures ? (
+                    <div className="p-2 text-sm text-muted-foreground">
+                      Carregando procedimentos...
+                    </div>
+                  ) : procedures && procedures.filter(p => p.is_active).length > 0 ? (
+                    procedures.filter(p => p.is_active).map((procedure) => (
+                      <SelectItem key={procedure.id} value={procedure.id}>
+                        <div className="flex items-center justify-between w-full">
+                          <span>{procedure.name}</span>
+                          {procedure.price && (
+                            <span className="text-xs text-muted-foreground ml-2">
+                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(procedure.price))}
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="p-2 text-sm text-muted-foreground">
+                      Nenhum procedimento cadastrado
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="estimated_value">Valor Estimado da 1ª Consulta</Label>
+            <Input
+              id="estimated_value"
+              type="text"
+              value={watch("estimated_value") || ""}
+              onChange={handleEstimatedValueChange}
+              placeholder="R$ 0,00"
+            />
+            {watch("procedure_id") && watch("procedure_id") !== "none" && procedures?.find(p => p.id === watch("procedure_id"))?.price && (
+              <p className="text-xs text-muted-foreground">
+                Valor sugerido: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(procedures.find(p => p.id === watch("procedure_id"))?.price))}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
