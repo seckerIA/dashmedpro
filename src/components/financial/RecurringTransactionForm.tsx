@@ -143,9 +143,7 @@ export const RecurringTransactionForm = ({ onSuccess }: RecurringTransactionForm
         frequency: data.frequency,
         start_date: startDate.toISOString().split('T')[0],
         end_date: endDate?.toISOString().split('T')[0] || null,
-        next_execution_date: nextExecutionDate.toISOString().split('T')[0],
-        last_execution_date: null,
-        auto_create: autoCreate,
+        next_occurrence: nextExecutionDate.toISOString().split('T')[0],
         is_active: true,
         execution_count: 0
       } as any)

@@ -108,9 +108,9 @@ export function ProcedureForm({ open, onOpenChange, procedure }: ProcedureFormPr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800">
         <DialogHeader>
-          <DialogTitle>{isEditing ? "Editar Procedimento" : "Novo Procedimento"}</DialogTitle>
+          <DialogTitle className="text-blue-900 dark:text-blue-100">{isEditing ? "Editar Procedimento" : "Novo Procedimento"}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -207,6 +207,8 @@ export function ProcedureForm({ open, onOpenChange, procedure }: ProcedureFormPr
     </Dialog>
   );
 }
+
+
 
 
 

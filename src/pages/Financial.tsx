@@ -45,14 +45,7 @@ import { RecurringTransactionsManager } from "@/components/financial/RecurringTr
 import { RecurringTransactionsWidget } from "@/components/financial/RecurringTransactionsWidget"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    minimumFractionDigits: 2,
-  }).format(value);
-};
+import { formatCurrency } from "@/lib/currency"
 
 const Financial = () => {
   const navigate = useNavigate();

@@ -20,6 +20,7 @@ import {
   Plus,
   Trash2,
   DollarSign,
+  RefreshCw,
 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
@@ -29,6 +30,7 @@ import { useCreateFinancialTransaction, useUpdateFinancialTransaction } from '@/
 import { useFileUpload } from '@/hooks/useFileUpload'
 import { useCreateMultipleCosts, useTransactionCosts, useDeleteTransactionCost } from '@/hooks/useTransactionCosts'
 import { FinancialTransaction, TransactionCostFormData, CostType } from '@/types/financial'
+import { useQueryClient } from '@tanstack/react-query'
 
 interface TransactionFormData {
   type: 'entrada' | 'saida'
@@ -53,9 +55,29 @@ const TransactionForm = () => {
   const { id } = useParams()
   const location = useLocation()
   const existingTransaction = location.state?.transaction as FinancialTransaction | undefined
+  const queryClient = useQueryClient()
   
-  const { data: categories = [] } = useFinancialCategories()
+  const { data: categories = [], isLoading: isLoadingCategories, refetch: refetchCategories } = useFinancialCategories()
   const { accountsSummary = [] } = useFinancialAccounts()
+  
+  // Invalidar cache ao montar para garantir que categorias e contas sejam carregadas
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ['financial-categories'] })
+    queryClient.invalidateQueries({ queryKey: ['financial-accounts'] })
+  }, [queryClient])
+  
+  const handleRefreshCategories = async () => {
+    console.log('🔄 Atualizando categorias...')
+    queryClient.removeQueries({ queryKey: ['financial-categories'] })
+    queryClient.invalidateQueries({ queryKey: ['financial-categories'] })
+    const result = await refetchCategories()
+    console.log('✅ Categorias atualizadas:', result.data?.length || 0)
+  }
+  
+  const handleRefreshAccounts = () => {
+    queryClient.invalidateQueries({ queryKey: ['financial-accounts'] })
+    queryClient.refetchQueries({ queryKey: ['financial-accounts'] })
+  }
   const createTransaction = useCreateFinancialTransaction()
   const updateTransaction = useUpdateFinancialTransaction()
   const createMultipleCosts = useCreateMultipleCosts()
@@ -108,6 +130,22 @@ const TransactionForm = () => {
       }));
     }
   }, [location.search, isEditMode]);
+
+  // Invalidar cache ao montar para garantir que categorias e contas sejam carregadas
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ['financial-categories'] })
+    queryClient.invalidateQueries({ queryKey: ['financial-accounts'] })
+  }, [queryClient])
+
+  // Debug: Log das categorias (após formData ser inicializado)
+  useEffect(() => {
+    console.log('📊 TransactionForm - Categorias carregadas:', {
+      total: categories.length,
+      categorias: categories.map(c => ({ id: c.id, name: c.name, type: c.type })),
+      tipoSelecionado: formData.type,
+      categoriasFiltradas: categories.filter(c => c.type === formData.type).length
+    })
+  }, [categories, formData.type])
 
   // Preencher formulário quando em modo de edição
   useEffect(() => {
@@ -502,36 +540,107 @@ const TransactionForm = () => {
 
               {/* Categoria */}
               <div className="space-y-2">
-                <Label htmlFor="category" className="text-sm font-medium text-foreground">Categoria *</Label>
-                <Select value={formData.category_id} onValueChange={(value) => handleInputChange('category_id', value)}>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="category" className="text-sm font-medium text-foreground">Categoria *</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRefreshCategories}
+                    className="h-7 px-2"
+                  >
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                    Atualizar
+                  </Button>
+                </div>
+                <Select 
+                  value={formData.category_id} 
+                  onValueChange={(value) => handleInputChange('category_id', value)}
+                  disabled={isLoadingCategories}
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione uma categoria" />
+                    <SelectValue placeholder={isLoadingCategories ? "Carregando categorias..." : "Selecione uma categoria"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories?.filter(category => category.id && category.name).map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.name}
-                      </SelectItem>
-                    )) || []}
+                    {isLoadingCategories ? (
+                      <div className="p-2 text-sm text-muted-foreground flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Carregando categorias...
+                      </div>
+                    ) : categories && categories.length > 0 ? (
+                      (() => {
+                        const filteredCategories = categories.filter(category => 
+                          category.id && 
+                          category.name && 
+                          category.type === formData.type
+                        )
+                        console.log('📋 Categorias filtradas para', formData.type, ':', filteredCategories.length)
+                        
+                        return filteredCategories.length > 0 ? (
+                          filteredCategories.map((category) => (
+                            <SelectItem key={category.id} value={category.id}>
+                              {category.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="p-2 text-sm text-muted-foreground">
+                            Nenhuma categoria de {formData.type === 'entrada' ? 'entrada' : 'saída'} disponível.
+                          </div>
+                        )
+                      })()
+                    ) : (
+                      <div className="p-2 text-sm text-muted-foreground">
+                        Nenhuma categoria disponível. Clique em "Atualizar" para carregar as categorias padrão.
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
+                {!isLoadingCategories && categories && categories.filter(category => category.type === formData.type).length === 0 && (
+                  <p className="text-xs text-amber-500">
+                    ⚠️ Nenhuma categoria disponível para {formData.type === 'entrada' ? 'entrada' : 'saída'}. 
+                    Total de categorias carregadas: {categories.length}
+                  </p>
+                )}
               </div>
 
               {/* Conta */}
               <div className="space-y-2">
-                <Label htmlFor="account" className="text-sm font-medium text-foreground">Conta Bancária *</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="account" className="text-sm font-medium text-foreground">Conta Bancária *</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRefreshAccounts}
+                    className="h-7 px-2"
+                  >
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                    Atualizar
+                  </Button>
+                </div>
                 <Select value={formData.account_id} onValueChange={(value) => handleInputChange('account_id', value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione uma conta" />
                   </SelectTrigger>
                   <SelectContent>
-                    {accountsSummary?.filter(account => account.id && account.name).map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.name}
-                      </SelectItem>
-                    )) || []}
+                    {accountsSummary && accountsSummary.filter(account => account.id && account.name).length > 0 ? (
+                      accountsSummary.filter(account => account.id && account.name).map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="p-2 text-sm text-muted-foreground">
+                        Nenhuma conta disponível. Clique em "Atualizar" para carregar as contas padrão.
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
+                {accountsSummary && accountsSummary.filter(account => account.id && account.name).length === 0 && (
+                  <p className="text-xs text-amber-500">
+                    ⚠️ Nenhuma conta disponível. Clique em "Atualizar" acima para carregar as contas padrão.
+                  </p>
+                )}
               </div>
 
               {/* Método de Pagamento */}

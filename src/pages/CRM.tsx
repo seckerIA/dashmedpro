@@ -12,6 +12,7 @@ import { DealWonModal } from "@/components/crm/DealWonModal";
 import { FollowUpScheduleModal } from "@/components/crm/FollowUpScheduleModal";
 import { TeamMemberSelector } from "@/components/crm/TeamMemberSelector";
 import { SalesCallForm } from "@/components/calendar/SalesCallForm";
+import { WhatsAppLeadsTab } from "@/components/crm/WhatsAppLeadsTab";
 import { useCRM } from "@/hooks/useCRM";
 import { useFollowUps } from "@/hooks/useFollowUps";
 import { useAuth } from "@/hooks/useAuth";
@@ -468,7 +469,7 @@ const CRM = () => {
 
       {/* Tabs - iOS Inspired */}
       <Tabs defaultValue="pipeline" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 bg-muted/30 backdrop-blur-sm border border-border/50 rounded-2xl p-1 h-12">
+        <TabsList className="grid w-full grid-cols-4 bg-muted/30 backdrop-blur-sm border border-border/50 rounded-2xl p-1 h-12">
           <TabsTrigger 
             value="pipeline" 
             className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-border/50 transition-all duration-200 font-medium"
@@ -485,6 +486,13 @@ const CRM = () => {
             <Badge variant="secondary" className="ml-2 bg-primary/10 text-primary border-primary/20 text-xs">
               {contacts.length}
             </Badge>
+          </TabsTrigger>
+          <TabsTrigger 
+            value="whatsapp"
+            className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-border/50 transition-all duration-200 font-medium"
+          >
+            <MessageSquare className="w-4 h-4 mr-2" />
+            WhatsApp
           </TabsTrigger>
           <TabsTrigger 
             value="activities"
@@ -637,6 +645,10 @@ const CRM = () => {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="whatsapp" className="mt-6">
+          <WhatsAppLeadsTab />
         </TabsContent>
 
         <TabsContent value="activities" className="mt-6">

@@ -15,6 +15,7 @@ export interface CommercialLead {
   phone?: string | null;
   origin: CommercialLeadOrigin;
   status: CommercialLeadStatus;
+  procedure_id?: string | null;
   estimated_value?: number | null;
   converted_at?: string | null;
   contact_id?: string | null;
@@ -30,6 +31,7 @@ export interface CommercialLeadInsert {
   phone?: string | null;
   origin?: CommercialLeadOrigin;
   status?: CommercialLeadStatus;
+  procedure_id?: string | null;
   estimated_value?: number | null;
   notes?: string | null;
 }
@@ -242,6 +244,9 @@ export const COMMERCIAL_INTERACTION_TYPE_LABELS: Record<CommercialInteractionTyp
   meeting: 'Reunião',
   other: 'Outro',
 };
+
+
+
 
 
 

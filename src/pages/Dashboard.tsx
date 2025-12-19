@@ -43,20 +43,13 @@ import {
   Coins
 } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
+import { formatCurrency } from "@/lib/currency"
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { isVendedor } = useUserProfile();
   const { data: metrics, isLoading, error } = useDashboardMetrics();
   const { metrics: financialMetrics } = useFinancialMetrics();
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 0,
-    }).format(value);
-  };
 
   if (isLoading) {
     return (

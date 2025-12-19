@@ -849,6 +849,7 @@ CREATE TABLE IF NOT EXISTS public.medical_appointments (
     estimated_value DECIMAL(10,2),
     payment_status payment_status DEFAULT 'pending',
     financial_transaction_id UUID REFERENCES public.financial_transactions(id) ON DELETE SET NULL,
+    paid_in_advance BOOLEAN DEFAULT false,
     completed_at TIMESTAMP WITH TIME ZONE,
     cancelled_at TIMESTAMP WITH TIME ZONE,
     cancellation_reason TEXT,

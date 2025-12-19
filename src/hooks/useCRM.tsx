@@ -1,5 +1,6 @@
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL } from '@/integrations/supabase/client';
 import { 
   CRMContact, 
   CRMDeal, 
@@ -14,6 +15,20 @@ import { useAuth } from './useAuth';
 
 // Fetch contacts - OTIMIZADO
 const fetchContacts = async (userId: string): Promise<CRMContact[]> => {
+  console.log('🔍 useCRM.fetchContacts - Iniciando busca de contatos...');
+  console.log('   User ID:', userId);
+  console.log('   Supabase URL:', SUPABASE_URL);
+  
+  if (!userId) {
+    console.warn('⚠️ useCRM.fetchContacts - User ID não fornecido!');
+    return [];
+  }
+  
+  // Verificar sessão atual
+  const { data: { session } } = await supabase.auth.getSession();
+  console.log('   Session exists:', !!session);
+  console.log('   Session user ID:', session?.user?.id);
+  
   const { data, error } = await supabase
     .from('crm_contacts')
     .select('*')
@@ -21,7 +36,30 @@ const fetchContacts = async (userId: string): Promise<CRMContact[]> => {
     .order('created_at', { ascending: false })
     .limit(1000); // Limite para evitar queries muito grandes
 
-  if (error) throw new Error(`Erro ao buscar contatos: ${error.message}`);
+  if (error) {
+    console.error('❌ useCRM.fetchContacts - Erro ao buscar contatos:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+    });
+    throw new Error(`Erro ao buscar contatos: ${error.message}`);
+  }
+  
+  console.log('✅ useCRM.fetchContacts - Contatos encontrados:', data?.length || 0);
+  if (data && data.length > 0) {
+    console.log('   TODOS os contatos retornados:', data.map(c => ({ 
+      id: c.id, 
+      name: c.full_name || c.name,
+      email: c.email,
+      phone: c.phone,
+      user_id: c.user_id,
+      created_at: c.created_at
+    })));
+  } else {
+    console.warn('⚠️ useCRM.fetchContacts - Nenhum contato encontrado para user_id:', userId);
+  }
+  
   return data || [];
 };
 
@@ -209,13 +247,34 @@ export function useCRM(viewAsUserIds?: string[]) {
   const {
     data: contacts = [],
     isLoading: isLoadingContacts,
+    refetch: refetchContacts,
+    error: contactsError,
   } = useQuery({
     queryKey: ['crm-contacts', user?.id],
-    queryFn: () => fetchContacts(user?.id || ''),
+    queryFn: () => {
+      if (!user?.id) {
+        console.warn('⚠️ useCRM - Tentando buscar contatos sem user.id');
+        return Promise.resolve([]);
+      }
+      return fetchContacts(user.id);
+    },
     enabled: !!user?.id,
-    staleTime: 2 * 60 * 1000, // Cache por 2 minutos
-    gcTime: 10 * 60 * 1000, // Manter em cache por 10 minutos
+    staleTime: 0, // Sempre considerar dados como stale para forçar busca fresca
+    gcTime: 5 * 60 * 1000, // Manter em cache por 5 minutos
+    refetchOnMount: true, // Sempre refazer busca ao montar
+    refetchOnWindowFocus: true, // Refazer busca ao focar na janela
   });
+
+  // Log de debug quando os contatos mudarem
+  useEffect(() => {
+    console.log('📊 useCRM - Estado dos contatos:', {
+      contactsLength: contacts.length,
+      isLoadingContacts,
+      userId: user?.id,
+      hasError: !!contactsError,
+      error: contactsError,
+    });
+  }, [contacts, isLoadingContacts, user?.id, contactsError]);
 
   const {
     data: deals = [],
@@ -318,6 +377,9 @@ export function useCRM(viewAsUserIds?: string[]) {
     isLoadingDeals,
     isLoadingActivities,
     isLoading: isLoadingContacts || isLoadingDeals || isLoadingActivities,
+    
+    // Refetch functions
+    refetchContacts,
 
     // Mutations
     createContact: createContactMutation.mutateAsync,

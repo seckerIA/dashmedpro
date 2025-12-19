@@ -15,7 +15,8 @@ import {
   CheckSquare2,
   Sparkles,
   Compass,
-  Calendar
+  Calendar,
+  RotateCcw
 } from "lucide-react"
 import { NavLink, useLocation, useNavigate } from "react-router-dom"
 import {
@@ -62,6 +63,7 @@ const navigationGroups: Array<{
       { title: "Calculadora", url: "/calculadora", icon: Calculator, badge: "Novo", variant: "new" as const },
       { title: "CRM", url: "/crm", icon: Users },
       { title: "Calendário", url: "/calendar", icon: Calendar, badge: "Novo", variant: "new" as const },
+      // { title: "Follow-ups", url: "/follow-ups", icon: RotateCcw }, // Ocultado
       { title: "Funil de Vendas", url: "/funil-vendas", icon: BarChart3 },
     ]
   },

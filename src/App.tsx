@@ -7,6 +7,7 @@ import { ThemeProvider } from "next-themes";
 import { AppLayout } from "./components/layout/AppLayout";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { useUserProfile } from "./hooks/useUserProfile";
+import { SupabaseProjectValidator } from "./components/SupabaseProjectValidator";
 import Dashboard from "./pages/Dashboard";
 import Calculadora from "./pages/Calculadora";
 import CalculadoraSelection from "./pages/CalculadoraSelection";
@@ -26,6 +27,7 @@ import FinancialTransactions from "./pages/FinancialTransactions";
 import TransactionForm from "./components/financial/TransactionForm";
 import ProspectingGuide from "./pages/ProspectingGuide";
 import Commercial from "./pages/Commercial";
+import FollowUps from "./pages/FollowUps";
 import { 
   TrendingUp, 
   Target, 
@@ -175,6 +177,7 @@ const AppRoutes = () => {
         />
         <Route path="/crm" element={<CRM />} />
         <Route path="/calendar" element={<MedicalCalendar />} />
+        <Route path="/follow-ups" element={<FollowUps />} />
         <Route path="/comercial/guia-prospeccao" element={<ProspectingGuide />} />
         <Route 
           path="/email-marketing" 
@@ -232,15 +235,17 @@ const AppRoutes = () => {
 const App = () => (
   <ThemeProvider attribute="class" defaultTheme="dark" storageKey="dashmed-theme">
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
-        </TooltipProvider>
-      </AuthProvider>
+      <SupabaseProjectValidator>
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <AppRoutes />
+            </BrowserRouter>
+          </TooltipProvider>
+        </AuthProvider>
+      </SupabaseProjectValidator>
     </QueryClientProvider>
   </ThemeProvider>
 );

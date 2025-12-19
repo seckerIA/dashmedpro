@@ -25,14 +25,7 @@ import { useUserProfile } from "@/hooks/useUserProfile"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { FinancialTransactionWithDetails } from "@/types/financial"
-
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    minimumFractionDigits: 2,
-  }).format(value)
-}
+import { formatCurrency } from "@/lib/currency"
 
 const FinancialTransactions = () => {
   const navigate = useNavigate()

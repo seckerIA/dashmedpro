@@ -2,8 +2,46 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = "https://adzaqkduxnpckbcuqpmg.supabase.co";
+export const SUPABASE_URL = "https://adzaqkduxnpckbcuqpmg.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkemFxa2R1eG5wY2tiY3VxcG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5ODgyMDksImV4cCI6MjA4MTU2NDIwOX0.WO9-vzv_Vuh86TQWgNWuQ45cXa-L4GoGQfpSbvQiVMc";
+export const CURRENT_PROJECT_REF = "adzaqkduxnpckbcuqpmg";
+
+// Limpar TODAS as sessões antigas do Supabase ao inicializar
+if (typeof window !== 'undefined') {
+  // DEBUG: Log das chaves antes de limpar
+  const allKeys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i)).filter(Boolean) as string[];
+  const supabaseKeys = allKeys.filter(key => key.startsWith('sb-') || key.includes('supabase'));
+  
+  if (supabaseKeys.length > 0) {
+    console.log('🧹 Limpando sessões antigas do Supabase:', supabaseKeys);
+  }
+  
+  // Limpar todas as chaves do Supabase do localStorage
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key) {
+      // Remover TODAS as chaves do Supabase (vamos forçar nova autenticação)
+      if (key.startsWith('sb-') || key.includes('supabase')) {
+        keysToRemove.push(key);
+      }
+    }
+  }
+  keysToRemove.forEach(key => localStorage.removeItem(key));
+  
+  // Também limpar sessionStorage
+  const sessionKeysToRemove: string[] = [];
+  for (let i = 0; i < sessionStorage.length; i++) {
+    const key = sessionStorage.key(i);
+    if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
+      sessionKeysToRemove.push(key);
+    }
+  }
+  sessionKeysToRemove.forEach(key => sessionStorage.removeItem(key));
+  
+  console.log('✅ Cliente Supabase inicializado para projeto: adzaqkduxnpckbcuqpmg');
+  console.log('✅ URL:', SUPABASE_URL);
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
@@ -13,5 +51,60 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+    storageKey: `sb-${CURRENT_PROJECT_REF}-auth-token`, // Forçar chave específica do projeto
+    detectSessionInUrl: false, // Não detectar sessão na URL
+    flowType: 'pkce', // Usar PKCE flow para segurança
+  },
+  global: {
+    headers: {
+      'apikey': SUPABASE_PUBLISHABLE_KEY,
+    }
   }
 });
+
+// Exportar URL e Project Ref para uso em outros lugares
+export const SUPABASE_PROJECT_URL = SUPABASE_URL;
+export const SUPABASE_PROJECT_REF = CURRENT_PROJECT_REF;
+
+// VALIDAÇÃO RIGOROSA: Garantir que estamos usando o projeto correto
+if (CURRENT_PROJECT_REF !== 'adzaqkduxnpckbcuqpmg') {
+  throw new Error(
+    `❌ ERRO CRÍTICO: Project Ref incorreto! Esperado: adzaqkduxnpckbcuqpmg, Atual: ${CURRENT_PROJECT_REF}`
+  );
+}
+
+if (SUPABASE_URL !== 'https://adzaqkduxnpckbcuqpmg.supabase.co') {
+  throw new Error(
+    `❌ ERRO CRÍTICO: URL do Supabase incorreta! Esperado: https://adzaqkduxnpckbcuqpmg.supabase.co, Atual: ${SUPABASE_URL}`
+  );
+}
+
+// DEBUG: Verificar configuração ao inicializar
+if (typeof window !== 'undefined') {
+  console.log('✅ Supabase Client Configurado:');
+  console.log('   URL:', SUPABASE_URL);
+  console.log('   Project Ref:', CURRENT_PROJECT_REF);
+  console.log('   Storage Key:', `sb-${CURRENT_PROJECT_REF}-auth-token`);
+  
+  // Verificar se há sessão armazenada
+  const storedSession = localStorage.getItem(`sb-${CURRENT_PROJECT_REF}-auth-token`);
+  if (storedSession) {
+    console.log('⚠️ Sessão encontrada no localStorage. Verificando validade...');
+    try {
+      const sessionData = JSON.parse(storedSession);
+      if (sessionData?.access_token) {
+        // Decodificar JWT para verificar o projeto
+        const payload = JSON.parse(atob(sessionData.access_token.split('.')[1]));
+        console.log('   JWT Payload:', payload);
+        console.log('   JWT Issuer:', payload.iss);
+        if (payload.iss && !payload.iss.includes(CURRENT_PROJECT_REF)) {
+          console.error('❌ ERRO: JWT token é de outro projeto!', payload.iss);
+          console.error('   Limpando sessão inválida...');
+          localStorage.removeItem(`sb-${CURRENT_PROJECT_REF}-auth-token`);
+        }
+      }
+    } catch (e) {
+      console.warn('   Não foi possível decodificar JWT:', e);
+    }
+  }
+}

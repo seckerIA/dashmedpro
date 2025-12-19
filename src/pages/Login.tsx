@@ -90,18 +90,67 @@ const Login = () => {
     setLoading(true);
 
     try {
+      // Verificar se o projeto está correto antes de fazer login
+      const { data: { session: existingSession } } = await supabase.auth.getSession();
+      if (existingSession) {
+        // Se há sessão existente, verificar se é do projeto correto
+        const sessionProjectRef = existingSession.user?.app_metadata?.project_ref;
+        const currentProjectRef = 'adzaqkduxnpckbcuqpmg';
+        
+        if (sessionProjectRef && sessionProjectRef !== currentProjectRef) {
+          // Sessão de projeto antigo, limpar e continuar
+          await supabase.auth.signOut();
+          clearSupabaseCache();
+        }
+      }
+
+      // DEBUG: Verificar URL e chave antes do login
+      console.log('🔍 DEBUG Login - Email tentando login:', email);
+      console.log('🔍 DEBUG Login - Project Ref esperado: adzaqkduxnpckbcuqpmg');
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
+      // DEBUG: Verificar resultado
+      if (data?.user) {
+        console.log('🔍 DEBUG Login - Usuário autenticado:', data.user.email);
+        console.log('🔍 DEBUG Login - User ID:', data.user.id);
+        
+        // Verificar se o usuário existe no perfil do banco atual
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, email, full_name, role')
+          .eq('id', data.user.id)
+          .single();
+        
+        console.log('🔍 DEBUG Login - Perfil encontrado:', profile);
+        console.log('🔍 DEBUG Login - Erro ao buscar perfil:', profileError);
+        
+        if (profileError || !profile) {
+          console.error('❌ ERRO: Usuário autenticado mas não existe no banco atual!');
+          console.error('❌ Isso significa que o Auth está validando contra outro projeto!');
+          
+          await supabase.auth.signOut();
+          clearSupabaseCache();
+          
+          toast({
+            variant: 'destructive',
+            title: 'Erro de configuração',
+            description: 'O usuário foi autenticado em outro projeto. Limpe o cache e tente novamente. Se o problema persistir, verifique a configuração do Supabase Auth.',
+          });
+          return;
+        }
+      }
+
       if (error) {
-        // Se erro de credenciais inválidas, pode ser cache antigo
+        // Se erro de credenciais inválidas, pode ser cache antigo ou usuário não existe no banco novo
         if (error.message === 'Invalid login credentials' || error.status === 400) {
           toast({
             variant: 'destructive',
             title: 'Credenciais inválidas',
-            description: 'Se você baixou uma nova versão do projeto, clique em "Limpar Cache" e tente novamente.',
+            description: 'Este usuário não existe no banco de dados atual. Se você migrou de um banco antigo, o usuário precisa ser recriado no novo banco.',
           });
         } else {
           toast({
@@ -111,6 +160,25 @@ const Login = () => {
           });
         }
         return;
+      }
+
+      // Verificar se o usuário existe no perfil após login bem-sucedido
+      if (data.user) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, email')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profileError || !profile) {
+          toast({
+            variant: 'destructive',
+            title: 'Erro no perfil',
+            description: 'Usuário autenticado mas perfil não encontrado. Entre em contato com o administrador.',
+          });
+          await supabase.auth.signOut();
+          return;
+        }
       }
 
       toast({

@@ -40,14 +40,7 @@ import { useFinancialAccounts } from "@/hooks/useFinancialAccounts"
 import { useFinancialTransactions } from "@/hooks/useFinancialTransactions"
 import { useNavigate } from "react-router-dom"
 import { format } from "date-fns"
-
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    minimumFractionDigits: 2,
-  }).format(value);
-};
+import { formatCurrency } from "@/lib/currency"
 
 const FinancialMockup = () => {
   const navigate = useNavigate();

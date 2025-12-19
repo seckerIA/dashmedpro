@@ -162,7 +162,7 @@ export const RecurringTransactionsManager = () => {
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <Calendar className="w-4 h-4" />
-                        {format(new Date(transaction.next_execution_date), 'dd/MM/yyyy', { locale: ptBR })}
+                        {format(new Date(transaction.next_occurrence), 'dd/MM/yyyy', { locale: ptBR })}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -173,7 +173,7 @@ export const RecurringTransactionsManager = () => {
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <Clock className="w-4 h-4" />
-                        {transaction.execution_count || 0}
+                        {0}
                       </div>
                     </TableCell>
                     <TableCell className="text-right">

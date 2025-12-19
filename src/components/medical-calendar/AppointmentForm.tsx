@@ -79,13 +79,43 @@ export function AppointmentForm({
   conversionData,
 }: AppointmentFormProps) {
   const { user } = useAuth();
-  const { contacts } = useCRM();
+  const { contacts, isLoadingContacts, refetchContacts } = useCRM();
   const { checkAvailability } = useAvailability();
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [estimatedValueDisplay, setEstimatedValueDisplay] = useState<string>('');
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
   const [showNewContactForm, setShowNewContactForm] = useState(false);
+
+  // Forçar refetch dos contatos quando o formulário abrir (SEM CACHE)
+  useEffect(() => {
+    if (open && user?.id) {
+      console.log('🔄 AppointmentForm - Forçando busca de contatos do banco de dados...');
+      console.log('   User ID:', user.id);
+      console.log('   Contacts array length:', contacts.length);
+      console.log('   isLoadingContacts:', isLoadingContacts);
+      
+      // REMOVER TODO o cache de contatos primeiro (mais agressivo)
+      queryClient.removeQueries({ queryKey: ['crm-contacts'] });
+      
+      // Invalidar cache também
+      queryClient.invalidateQueries({ queryKey: ['crm-contacts', user.id] });
+      
+      // Depois forçar refetch direto do banco (sem usar cache)
+      if (refetchContacts) {
+        refetchContacts().then((result) => {
+          console.log('✅ AppointmentForm - Refetch concluído:', {
+            data: result.data,
+            dataLength: result.data?.length || 0,
+            contatos: result.data?.map(c => ({ id: c.id, name: c.full_name })) || [],
+            error: result.error,
+          });
+        }).catch((error) => {
+          console.error('❌ AppointmentForm - Erro ao refetch contatos:', error);
+        });
+      }
+    }
+  }, [open, user?.id, queryClient, refetchContacts]);
 
   const timeSlots = generateTimeSlots();
 
@@ -142,8 +172,14 @@ export function AppointmentForm({
         return;
       }
 
+      if (!user?.id) {
+        setAvailabilityError('Usuário não autenticado. Por favor, faça login novamente.');
+        setIsSubmitting(false);
+        return;
+      }
+
       const submitData = {
-        user_id: user?.id,
+        user_id: user.id,
         contact_id: data.contact_id,
         title: data.title,
         appointment_type: data.appointment_type,
@@ -246,26 +282,35 @@ export function AppointmentForm({
             <Select 
               value={watch('contact_id') || ''} 
               onValueChange={(value) => setValue('contact_id', value)}
+              disabled={isLoadingContacts}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Selecione o paciente" />
+                <SelectValue placeholder={isLoadingContacts ? "Carregando pacientes..." : "Selecione o paciente"} />
               </SelectTrigger>
               <SelectContent>
-                {contacts.length === 0 ? (
+                {isLoadingContacts ? (
+                  <div className="p-2 text-sm text-muted-foreground flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Carregando pacientes...
+                  </div>
+                ) : contacts.length === 0 ? (
                   <div className="p-2 text-sm text-muted-foreground">
                     Nenhum paciente cadastrado. Clique em "Cadastrar novo paciente" para adicionar.
                   </div>
                 ) : (
-                  contacts.map((contact) => (
-                    <SelectItem key={contact.id} value={contact.id}>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{contact.full_name || contact.name || 'Sem nome'}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {contact.phone} {contact.email && `• ${contact.email}`}
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))
+                  contacts.map((contact) => {
+                    console.log('📋 Rendering contact:', { id: contact.id, name: contact.full_name || contact.name });
+                    return (
+                      <SelectItem key={contact.id} value={contact.id}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{contact.full_name || contact.name || 'Sem nome'}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {contact.phone || ''} {contact.email && `• ${contact.email}`}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })
                 )}
               </SelectContent>
             </Select>

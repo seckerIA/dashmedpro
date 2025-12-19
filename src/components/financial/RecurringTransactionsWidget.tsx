@@ -37,7 +37,7 @@ export const RecurringTransactionsWidget = () => {
   const fallbackRecurring = (financialTransactions || []).filter(t => t.is_recurring).slice(0, 3)
   const today = new Date()
   const pendingToday = activeTransactions.filter(t => 
-    new Date(t.next_execution_date) <= today
+    new Date(t.next_occurrence) <= today
   ).length
 
   const getFrequencyLabel = (frequency: string) => {
@@ -92,11 +92,11 @@ export const RecurringTransactionsWidget = () => {
                 <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <Calendar className="w-3 h-3" />
-                    {format(new Date(transaction.next_execution_date), 'dd/MM', { locale: ptBR })}
+                    {format(new Date(transaction.next_occurrence), 'dd/MM', { locale: ptBR })}
                   </div>
                   <div className="flex items-center gap-1">
                     <Clock className="w-3 h-3" />
-                    {transaction.execution_count || 0} execuções
+                    {0} execuções
                   </div>
                 </div>
               </div>
@@ -132,8 +132,6 @@ export const RecurringTransactionsWidget = () => {
                   category_id: t.category_id || null,
                   next_date: format(nextDate, 'yyyy-MM-dd'),
                   is_active: true,
-                  execution_count: 0,
-                  auto_create: true,
                 })
               }
 

@@ -27,7 +27,7 @@ import { X, Plus, UserPlus, Phone } from "lucide-react";
 import { useCRM } from "@/hooks/useCRM";
 import { useToast } from "@/hooks/use-toast";
 import { CRMContact, CRMPipelineStage } from "@/types/crm";
-import { AVAILABLE_SERVICES } from "@/constants/services";
+import { useCommercialProcedures } from "@/hooks/useCommercialProcedures";
 import {
   formatCurrencyInput,
   parseCurrencyToNumber,
@@ -63,13 +63,35 @@ interface ContactFormProps {
   onContactCreated?: (contactId: string) => void;
   forceOpen?: boolean;
   onCancel?: () => void;
+  initialData?: {
+    full_name?: string;
+    email?: string;
+    phone?: string;
+    notes?: string;
+  };
 }
 
-export function ContactForm({ contact, trigger, initialStage, onSuccess, onContactCreated, forceOpen, onCancel }: ContactFormProps) {
+export function ContactForm({ contact, trigger, initialStage, onSuccess, onContactCreated, forceOpen, onCancel, initialData }: ContactFormProps) {
   const [open, setOpen] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const { createContact, updateContact, createDeal, isCreatingContact, isUpdatingContact } = useCRM();
+  const { procedures, isLoading: isLoadingProcedures } = useCommercialProcedures();
   const { toast } = useToast();
+
+  const form = useForm<ContactFormData>({
+    resolver: zodResolver(contactSchema),
+    defaultValues: {
+      full_name: contact?.full_name || initialData?.full_name || "",
+      email: contact?.email || initialData?.email || "",
+      phone: contact?.phone || initialData?.phone || "",
+      company: contact?.company || "",
+      position: contact?.position || "",
+      service: contact?.service || (contact?.custom_fields as any)?.procedure_id || "none",
+      service_value: (contact?.service_value?.toString() || "") as any,
+      tags: contact?.tags || [],
+      create_deal: !!initialStage,
+    },
+  });
 
   // Abrir automaticamente quando forceOpen é true
   useEffect(() => {
@@ -80,39 +102,64 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
     }
   }, [forceOpen]);
 
-  const form = useForm<ContactFormData>({
-    resolver: zodResolver(contactSchema),
-    defaultValues: {
-      full_name: contact?.full_name || "",
-      email: contact?.email || "",
-      phone: contact?.phone || "",
-      company: contact?.company || "",
-      position: contact?.position || "",
-      service: contact?.service || "none",
-      service_value: (contact?.service_value?.toString() || "") as any,
-      tags: contact?.tags || [],
-      create_deal: !!initialStage,
-    },
-  });
+  // Atualizar form quando initialData mudar
+  useEffect(() => {
+    if (initialData && open && !contact) {
+      form.reset({
+        full_name: initialData.full_name || "",
+        email: initialData.email || "",
+        phone: initialData.phone || "",
+        company: "",
+        position: "",
+        service: "none",
+        service_value: "" as any,
+        tags: [],
+        create_deal: !!initialStage,
+      });
+    }
+  }, [initialData, open, contact, initialStage, form]);
 
   const watchedTags = form.watch("tags");
+  const watchedService = form.watch("service");
+  
+  // Atualizar valor automaticamente quando um procedimento for selecionado
+  useEffect(() => {
+    if (watchedService && watchedService !== "none") {
+      const selectedProcedure = procedures?.find(p => p.id === watchedService);
+      if (selectedProcedure && selectedProcedure.price) {
+        const priceInCents = (Number(selectedProcedure.price) * 100).toString();
+        const currentValue = form.getValues("service_value");
+        // Só atualizar se o campo estiver vazio
+        if (!currentValue || currentValue === "") {
+          form.setValue("service_value", priceInCents);
+        }
+      }
+    }
+  }, [watchedService, procedures, form]);
 
   const onSubmit = async (data: ContactFormData) => {
     console.log('📝 ContactForm onSubmit chamado com data:', data);
     try {
       const { create_deal, ...contactData } = data;
       
-      // Converter "none" para null para o banco de dados
-      if (contactData.service === "none") {
-        contactData.service = undefined;
-      }
+      // Buscar o procedimento selecionado para obter o valor
+      const selectedProcedure = procedures?.find(p => p.id === contactData.service);
+      const serviceValue = contactData.service_value || (selectedProcedure ? Number(selectedProcedure.price) : null);
       
-      // Extrair service_value antes de remover (será usado para criar o deal)
-      const serviceValue = contactData.service_value;
+      // Preparar custom_fields com procedure_id se houver procedimento selecionado
+      const customFields: any = { ...(contact?.custom_fields as any || {}) };
+      if (contactData.service && contactData.service !== "none") {
+        customFields.procedure_id = contactData.service;
+      } else {
+        delete customFields.procedure_id;
+      }
       
       // Remover campos que não existem na tabela crm_contacts
       // (service e service_value não são campos do crm_contacts, apenas do formulário)
       const { service, service_value, ...contactDataForDB } = contactData;
+      
+      // Adicionar custom_fields com procedure_id
+      contactDataForDB.custom_fields = customFields;
       
       if (contact) {
         console.log('✏️ Atualizando contato existente:', contact.id);
@@ -366,23 +413,41 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
               name="service"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Serviço de Interesse</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormLabel>Procedimento de Interesse</FormLabel>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    value={field.value}
+                    disabled={isLoadingProcedures}
+                  >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecione o serviço de interesse" />
+                        <SelectValue placeholder={isLoadingProcedures ? "Carregando procedimentos..." : "Selecione o procedimento de interesse"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="none">Nenhum serviço específico</SelectItem>
-                      {AVAILABLE_SERVICES.map((service) => (
-                        <SelectItem key={service.value} value={service.value}>
-                          <div className="flex items-center gap-2">
-                            <div className={`w-3 h-3 rounded-full ${service.color}`} />
-                            {service.label}
-                          </div>
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="none">Nenhum procedimento específico</SelectItem>
+                      {isLoadingProcedures ? (
+                        <div className="p-2 text-sm text-muted-foreground">
+                          Carregando procedimentos...
+                        </div>
+                      ) : procedures && procedures.filter(p => p.is_active).length > 0 ? (
+                        procedures.filter(p => p.is_active).map((procedure) => (
+                          <SelectItem key={procedure.id} value={procedure.id}>
+                            <div className="flex items-center justify-between w-full">
+                              <span>{procedure.name}</span>
+                              {procedure.price && (
+                                <span className="text-xs text-muted-foreground ml-2">
+                                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(procedure.price))}
+                                </span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="p-2 text-sm text-muted-foreground">
+                          Nenhum procedimento cadastrado. Cadastre procedimentos na aba Comercial.
+                        </div>
+                      )}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -393,22 +458,31 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
             <FormField
               control={form.control}
               name="service_value"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Valor do Serviço</FormLabel>
-                  <FormControl>
-                    <Input 
-                      placeholder="R$ 0,00"
-                      {...field}
-                      onChange={(e) => {
-                        const formattedValue = formatCurrencyInput(e.target.value);
-                        field.onChange(formattedValue);
-                      }}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+              render={({ field }) => {
+                const selectedProcedure = procedures?.find(p => p.id === watchedService);
+                return (
+                  <FormItem>
+                    <FormLabel>Valor do Procedimento</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="R$ 0,00"
+                        {...field}
+                        value={field.value || ""}
+                        onChange={(e) => {
+                          const formattedValue = formatCurrencyInput(e.target.value);
+                          field.onChange(formattedValue);
+                        }}
+                      />
+                    </FormControl>
+                    {selectedProcedure && selectedProcedure.price && (
+                      <p className="text-xs text-muted-foreground">
+                        Valor sugerido: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(selectedProcedure.price))}
+                      </p>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
 
             <FormField

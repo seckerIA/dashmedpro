@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useCommercialLeads } from "@/hooks/useCommercialLeads";
+import { useCommercialProcedures } from "@/hooks/useCommercialProcedures";
 import { CommercialLead, CommercialLeadInsert } from "@/types/commercial";
 import { COMMERCIAL_LEAD_STATUS_LABELS, COMMERCIAL_LEAD_ORIGIN_LABELS } from "@/types/commercial";
 import { formatCurrencyInput, parseCurrencyToNumber } from "@/lib/currency";
@@ -20,6 +21,7 @@ const leadSchema = z.object({
   phone: z.string().optional(),
   origin: z.enum(['google', 'instagram', 'facebook', 'indication', 'website', 'other']),
   status: z.enum(['new', 'contacted', 'qualified', 'converted', 'lost']),
+  procedure_id: z.string().optional(),
   estimated_value: z.string().optional().transform((val) => val ? parseCurrencyToNumber(val) : undefined),
   notes: z.string().optional(),
 });
@@ -34,6 +36,7 @@ interface LeadFormProps {
 
 export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
   const { createLead, updateLead } = useCommercialLeads();
+  const { procedures, isLoading: isLoadingProcedures } = useCommercialProcedures();
   const isEditing = !!lead;
 
   const {
@@ -51,6 +54,7 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
       phone: "",
       origin: "other",
       status: "new",
+      procedure_id: "",
       estimated_value: "",
       notes: "",
     },
@@ -64,6 +68,7 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
         phone: lead.phone || "",
         origin: lead.origin,
         status: lead.status,
+        procedure_id: lead.procedure_id || "",
         estimated_value: lead.estimated_value ? lead.estimated_value.toString() : "",
         notes: lead.notes || "",
       });
@@ -74,6 +79,7 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
         phone: "",
         origin: "other",
         status: "new",
+        procedure_id: "",
         estimated_value: "",
         notes: "",
       });
@@ -82,13 +88,18 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
 
   const onSubmit = async (data: LeadFormData) => {
     try {
+      // Buscar o procedimento selecionado para obter o valor estimado se não foi preenchido
+      const selectedProcedure = procedures?.find(p => p.id === data.procedure_id);
+      const estimatedValue = data.estimated_value || (selectedProcedure ? Number(selectedProcedure.price) : null);
+      
       const leadData: CommercialLeadInsert = {
         name: data.name,
         email: data.email || null,
         phone: data.phone || null,
         origin: data.origin,
         status: data.status,
-        estimated_value: data.estimated_value || null,
+        procedure_id: data.procedure_id && data.procedure_id !== "none" ? data.procedure_id : null,
+        estimated_value: estimatedValue,
         notes: data.notes || null,
       };
 
@@ -228,6 +239,9 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
     </Dialog>
   );
 }
+
+
+
 
 
 

@@ -13,7 +13,7 @@ import { useCommercialProcedures } from "@/hooks/useCommercialProcedures";
 import { useCRM } from "@/hooks/useCRM";
 import { CommercialSale, CommercialSaleInsert } from "@/types/commercial";
 import { COMMERCIAL_SALE_STATUS_LABELS, COMMERCIAL_PAYMENT_METHOD_LABELS } from "@/types/commercial";
-import { formatCurrencyInput, parseCurrencyToNumber } from "@/lib/currency";
+import { formatCurrencyInput, parseCurrencyToNumber, formatCurrency } from "@/lib/currency";
 import { Loader2 } from "lucide-react";
 
 const saleSchema = z.object({
@@ -270,6 +270,9 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
     </Dialog>
   );
 }
+
+
+
 
 
 

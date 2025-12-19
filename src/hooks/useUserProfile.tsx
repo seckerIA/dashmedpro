@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_PROJECT_URL, SUPABASE_PROJECT_REF } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 
 export function useUserProfile() {
@@ -11,12 +11,21 @@ export function useUserProfile() {
       if (!user?.id) return null;
 
       try {
+        // DEBUG: Verificar URL do Supabase antes de buscar perfil
+        console.log('🔍 useUserProfile - Buscando perfil para user.id:', user.id);
+        console.log('🔍 useUserProfile - Supabase URL:', SUPABASE_PROJECT_URL);
+        console.log('🔍 useUserProfile - Project Ref:', SUPABASE_PROJECT_REF);
+        console.log('🔍 useUserProfile - Esperado: https://adzaqkduxnpckbcuqpmg.supabase.co');
+        
         // Primeiro, tentar buscar do profiles com colunas específicas para evitar erro 406
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by')
           .eq('id', user.id)
           .single();
+        
+        // DEBUG: Log do resultado
+        console.log('🔍 useUserProfile - Resultado da query:', { profileData, profileError });
 
         if (profileError && profileError.code !== 'PGRST116') {
           console.error('useUserProfile - erro ao buscar profile:', {

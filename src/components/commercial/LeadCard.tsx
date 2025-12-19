@@ -18,6 +18,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LeadDetailsModal } from "./LeadDetailsModal";
 import { ConversionModal } from "./ConversionModal";
+import { useCRM } from "@/hooks/useCRM";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 interface LeadCardProps {
   lead: CommercialLead;
@@ -25,9 +28,13 @@ interface LeadCardProps {
 
 export function LeadCard({ lead }: LeadCardProps) {
   const { deleteLead, convertLead } = useCommercialLeads();
+  const { createContact } = useCRM();
+  const { user } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
   const [showDetails, setShowDetails] = useState(false);
   const [showConversion, setShowConversion] = useState(false);
+  const [isScheduling, setIsScheduling] = useState(false);
 
   const handleCall = () => {
     if (lead.phone) {
@@ -52,15 +59,50 @@ export function LeadCard({ lead }: LeadCardProps) {
     setShowConversion(true);
   };
 
-  const handleScheduleAppointment = () => {
-    // Navegar para o calendário com os dados do lead pré-preenchidos
-    const params = new URLSearchParams();
-    if (lead.email) params.set('email', lead.email);
-    if (lead.phone) params.set('phone', lead.phone);
-    if (lead.name) params.set('name', lead.name);
-    if (lead.estimated_value) params.set('estimatedValue', lead.estimated_value.toString());
-    
-    navigate(`/calendar?${params.toString()}`);
+  const handleScheduleAppointment = async () => {
+    setIsScheduling(true);
+    try {
+      let contactId = lead.contact_id;
+
+      // Se o lead ainda não foi convertido, criar contato automaticamente
+      if (!contactId) {
+        const contactData = {
+          full_name: lead.name,
+          email: lead.email || undefined,
+          phone: lead.phone || undefined,
+          insurance_type: 'particular' as const,
+        };
+
+        const newContact = await createContact.mutateAsync(contactData);
+        contactId = newContact.id;
+
+        // Converter o lead
+        await convertLead.mutateAsync({
+          leadId: lead.id,
+          contactId: newContact.id,
+        });
+      }
+
+      // Navegar para o calendário com o contactId e abrir formulário de consulta
+      const params = new URLSearchParams();
+      params.set('convertedFromDeal', 'true');
+      params.set('contactId', contactId);
+      if (lead.estimated_value) {
+        params.set('appointmentValue', lead.estimated_value.toString());
+      }
+      params.set('paidInAdvance', 'false');
+      
+      navigate(`/calendar?${params.toString()}`);
+    } catch (error) {
+      console.error('Erro ao agendar consulta:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao agendar consulta',
+        description: error instanceof Error ? error.message : 'Não foi possível criar o contato e agendar a consulta.',
+      });
+    } finally {
+      setIsScheduling(false);
+    }
   };
 
   return (
@@ -84,10 +126,11 @@ export function LeadCard({ lead }: LeadCardProps) {
                 size="sm"
                 variant="default"
                 onClick={handleScheduleAppointment}
+                disabled={isScheduling}
                 className="h-8 px-3 text-xs bg-primary hover:bg-primary/90"
               >
                 <Calendar className="h-4 w-4 mr-1.5" />
-                Agendar Paciente
+                {isScheduling ? 'Abrindo...' : 'Agendar Paciente'}
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -192,3 +235,5 @@ export function LeadCard({ lead }: LeadCardProps) {
     </>
   );
 }
+
+

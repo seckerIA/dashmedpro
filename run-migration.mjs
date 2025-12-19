@@ -10,7 +10,7 @@ const { Client } = pg;
 
 // Database connection (password URL-encoded: @ becomes %40)
 // Using port 6543 (pooler) instead of 5432 (direct)
-const connectionString = 'postgresql://postgres:Vq79qn7t%4096037951aA@db.rpcixpbmtpyrnzlsuuus.supabase.co:6543/postgres';
+const connectionString = 'postgresql://postgres:Vq79qn7t%4096037951aA@db.adzaqkduxnpckbcuqpmg.supabase.co:6543/postgres';
 
 async function runMigration() {
   const client = new Client({

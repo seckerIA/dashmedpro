@@ -73,11 +73,31 @@ const fetchAppointments = async (
 const createAppointment = async (
   appointmentData: MedicalAppointmentInsert
 ): Promise<MedicalAppointmentWithRelations> => {
+  // Validate required fields
+  if (!appointmentData.user_id) {
+    throw new Error('user_id é obrigatório');
+  }
+  if (!appointmentData.contact_id) {
+    throw new Error('contact_id é obrigatório');
+  }
+  if (!appointmentData.title) {
+    throw new Error('title é obrigatório');
+  }
+  if (!appointmentData.start_time) {
+    throw new Error('start_time é obrigatório');
+  }
+  if (!appointmentData.end_time) {
+    throw new Error('end_time é obrigatório');
+  }
+  if (!appointmentData.duration_minutes) {
+    throw new Error('duration_minutes é obrigatório');
+  }
+
   const { data, error } = await supabase
     .from('medical_appointments')
     .insert({
       ...appointmentData,
-      paid_in_advance: appointmentData.paid_in_advance || false,
+      paid_in_advance: appointmentData.paid_in_advance ?? false,
     })
     .select(`
       *,
@@ -86,7 +106,11 @@ const createAppointment = async (
     `)
     .single();
 
-  if (error) throw new Error(`Erro ao criar consulta: ${error.message}`);
+  if (error) {
+    console.error('Erro ao criar consulta:', error);
+    console.error('Dados enviados:', appointmentData);
+    throw new Error(`Erro ao criar consulta: ${error.message}`);
+  }
   return data as MedicalAppointmentWithRelations;
 };
 
@@ -245,37 +269,79 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
           .eq('type', 'entrada')
           .limit(1);
 
-        // Buscar primeira conta disponível
+        // Buscar primeira conta disponível (sempre precisa ter uma conta)
         const { data: accounts } = await supabase
           .from('financial_accounts')
           .select('id')
+          .eq('is_active', true)
           .limit(1);
 
         const categoryId = categories && categories.length > 0 ? categories[0].id : null;
         const accountId = accounts && accounts.length > 0 ? accounts[0].id : null;
+        
+        // Se não houver conta, não criar transação (mas avisar)
+        if (!accountId) {
+          console.warn('Nenhuma conta financeira ativa encontrada. Transação não será criada.');
+          toast({
+            title: 'Aviso',
+            description: 'Consulta concluída, mas não foi possível criar a transação financeira: nenhuma conta ativa encontrada.',
+            variant: 'default',
+          });
+        }
 
-        // Criar transação financeira
-        const transactionData: FinancialTransactionInsert = {
-          user_id: appointment.user_id,
-          account_id: accountId,
-          category_id: categoryId,
-          type: 'entrada',
-          amount: Number(appointment.estimated_value),
-          description: `Consulta: ${appointment.title}`,
-          date: new Date(appointment.start_time).toISOString().split('T')[0],
-          transaction_date: new Date(appointment.start_time).toISOString().split('T')[0],
-          contact_id: appointment.contact_id,
-          payment_method: (appointment.payment_status === 'paid' || appointment.payment_status === 'partial') ? 'pix' : null,
-          status: (appointment.payment_status === 'paid' || appointment.payment_status === 'partial') ? 'concluida' : 'pendente',
-          notes: `Consulta médica - ${appointment.appointment_type}`,
-          tags: ['consulta-medica'],
-          has_costs: false,
-          total_costs: 0,
-          metadata: {
-            appointment_id: appointment.id,
-            appointment_type: appointment.appointment_type,
-          },
-        };
+        // Só criar transação se tiver conta e categoria
+        if (!accountId || !categoryId) {
+          console.warn('Conta ou categoria não encontrada. Transação não será criada.');
+          toast({
+            title: 'Aviso',
+            description: 'Consulta concluída, mas não foi possível criar a transação financeira: conta ou categoria não encontrada.',
+            variant: 'default',
+          });
+        } else {
+          // Criar transação financeira
+          const transactionData: FinancialTransactionInsert = {
+            user_id: appointment.user_id,
+            account_id: accountId,
+            category_id: categoryId,
+            type: 'entrada',
+            amount: Number(appointment.estimated_value),
+            description: `Consulta: ${appointment.title}`,
+            date: new Date(appointment.start_time).toISOString().split('T')[0],
+            transaction_date: new Date(appointment.start_time).toISOString().split('T')[0],
+            contact_id: appointment.contact_id,
+            payment_method: (appointment.payment_status === 'paid' || appointment.payment_status === 'partial') ? 'pix' : null,
+            // Sempre criar como concluída se a consulta foi finalizada (marcada como compareceu)
+            status: 'concluida',
+            notes: `Consulta médica - ${appointment.appointment_type}`,
+            tags: ['consulta-medica'],
+            has_costs: false,
+            total_costs: 0,
+            metadata: {
+              appointment_id: appointment.id,
+              appointment_type: appointment.appointment_type,
+            },
+          };
+
+          const { data: transaction, error: transactionError } = await supabase
+            .from('financial_transactions')
+            .insert(transactionData)
+            .select()
+            .single();
+
+          if (transactionError) {
+            console.error('Erro ao criar transação financeira:', transactionError);
+            console.error('Dados da transação:', transactionData);
+            toast({
+              title: 'Aviso',
+              description: `Consulta concluída, mas não foi possível criar a transação financeira: ${transactionError.message}`,
+              variant: 'default',
+            });
+            // Não falha a operação principal se não conseguir criar a transação
+          } else {
+            financialTransactionId = transaction.id;
+            console.log('Transação financeira criada com sucesso:', transaction.id);
+          }
+        }
 
         const { data: transaction, error: transactionError } = await supabase
           .from('financial_transactions')
