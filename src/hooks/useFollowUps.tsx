@@ -64,14 +64,28 @@ const deleteFollowUp = async (id: string): Promise<void> => {
 };
 
 export function useFollowUps() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
 
   // Query para buscar follow-ups
   const { data: followUps = [], isLoading, error } = useQuery({
     queryKey: ['followUps', user?.id],
-    queryFn: () => fetchFollowUps(user!.id),
-    enabled: !!user,
+    queryFn: async () => {
+      if (!user?.id) {
+        return [];
+      }
+      try {
+        return await fetchFollowUps(user.id);
+      } catch (error) {
+        console.error('❌ useFollowUps - Erro ao buscar follow-ups:', error);
+        return [];
+      }
+    },
+    enabled: !!user?.id && !authLoading, // Aguardar auth terminar de carregar
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 2,
   });
 
   // Mutation para criar follow-up

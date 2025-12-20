@@ -9,12 +9,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Calendar, Clock, User, AlertCircle, Save, X, Sparkles, Star, Zap, Users, Target, Briefcase, ImagePlus } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, User, AlertCircle, Save, X, Zap, Users, Target, Briefcase, ImagePlus } from 'lucide-react';
 import { TaskWithProfile, TaskWithCRM, CreateTaskData, UpdateTaskData, TASK_PRIORITIES, TASK_CATEGORIES } from '@/types/tasks';
 import { useCRM } from '@/hooks/useCRM';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { generateTimeSlots } from '@/types/medicalAppointments';
+import { Label } from '@/components/ui/label';
 
 // Schema de validação
 const taskSchema = z.object({
@@ -49,9 +55,15 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(task?.image_url || null);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
+    task?.due_date ? new Date(task.due_date) : undefined
+  );
   const { deals, contacts } = useCRM();
   const { uploadTaskImage, isUploading } = useFileUpload();
   const { user } = useAuth();
+  
+  const timeSlots = generateTimeSlots();
   
   const {
     register,
@@ -85,9 +97,11 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
   useEffect(() => {
     if (task) {
       const assignedUsers = task.assignments?.map(a => a.user_id) || [];
+      const dueDate = task.due_date ? new Date(task.due_date) : undefined;
       setSelectedUsers(assignedUsers);
       setImagePreview(task.image_url || null);
       setImageFile(null);
+      setSelectedDate(dueDate);
       reset({
         title: task.title,
         description: task.description || '',
@@ -104,6 +118,7 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
       setSelectedUsers([]);
       setImagePreview(null);
       setImageFile(null);
+      setSelectedDate(undefined);
       reset({
         title: '',
         description: '',
@@ -158,6 +173,7 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
         setSelectedUsers([]);
         setImageFile(null);
         setImagePreview(null);
+        setSelectedDate(undefined);
       }
     } catch (error) {
       console.error('[TaskForm] Erro ao salvar tarefa:', error);
@@ -202,33 +218,55 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
     return TASK_PRIORITIES.find(p => p.value === priority);
   };
 
-  const formatDateTime = (dateTimeString: string) => {
-    if (!dateTimeString) return '';
-    const date = new Date(dateTimeString);
-    return date.toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  // Get current time from due_date or default to current time
+  const getCurrentTime = (): string => {
+    if (watchedDueDate) {
+      const date = new Date(watchedDueDate);
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      return `${hours}:${minutes}`;
+    }
+    return '09:00';
+  };
+
+  // Handle date selection
+  const handleDateSelect = (date: Date | undefined) => {
+    setSelectedDate(date);
+    if (date) {
+      const currentTime = getCurrentTime();
+      const [hours, minutes] = currentTime.split(':');
+      date.setHours(parseInt(hours), parseInt(minutes));
+      setValue('due_date', date.toISOString().slice(0, 16));
+    } else {
+      setValue('due_date', '');
+    }
+    setIsDatePickerOpen(false);
+  };
+
+  // Handle time change
+  const handleTimeChange = (time: string) => {
+    if (selectedDate) {
+      const [hours, minutes] = time.split(':');
+      const newDate = new Date(selectedDate);
+      newDate.setHours(parseInt(hours || '0'), parseInt(minutes || '0'));
+      setValue('due_date', newDate.toISOString().slice(0, 16));
+    } else {
+      // If no date selected, create a date for today with the selected time
+      const today = new Date();
+      const [hours, minutes] = time.split(':');
+      today.setHours(parseInt(hours || '0'), parseInt(minutes || '0'));
+      setSelectedDate(today);
+      setValue('due_date', today.toISOString().slice(0, 16));
+    }
   };
 
   return (
-    <Card className="relative bg-gradient-to-br from-card/80 via-card/50 to-card/80 backdrop-blur-xl border border-border shadow-2xl rounded-3xl overflow-hidden group hover:shadow-3xl transition-all duration-500">
-      {/* Magic UI Background Effects */}
-      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary/60 via-primary to-primary/60" />
-      <div className="absolute inset-0 bg-gradient-to-br from-transparent via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
-      
-      <CardHeader className="pb-4 pt-8 px-8 relative z-10">
+    <Card className="border border-border shadow-sm rounded-2xl">
+      <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-3">
-            <div className="relative">
-              <Calendar className="h-8 w-8 text-primary" />
-              <Sparkles className="h-5 w-5 text-yellow-500 absolute -top-1 -right-1 animate-bounce" />
-              <Star className="h-3 w-3 text-amber-500 absolute -bottom-1 -left-1 animate-pulse" />
-            </div>
-            <span className="font-bold">
+          <CardTitle className="text-xl font-bold text-foreground tracking-tight flex items-center gap-3">
+            <CalendarIcon className="h-5 w-5 text-primary" />
+            <span>
               {isEditing ? 'Editar Tarefa' : 'Nova Tarefa'}
             </span>
           </CardTitle>
@@ -236,14 +274,14 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
             variant="ghost"
             size="sm"
             onClick={onCancel}
-            className="h-10 w-10 p-0 hover:bg-accent rounded-xl transition-all hover:scale-110"
+            className="h-8 w-8 p-0"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </Button>
         </div>
       </CardHeader>
       
-      <CardContent className="px-8 pb-8 relative z-10">
+      <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {/* Título */}
           <div className="space-y-3">
@@ -287,19 +325,62 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
           {/* Data e Hora */}
           <div className="space-y-3">
             <label className="text-base font-bold text-foreground flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-primary" />
+              <CalendarIcon className="h-5 w-5 text-primary" />
               Data e Hora de Vencimento
             </label>
-            <Input
-              type="datetime-local"
-              {...register('due_date')}
-              className="bg-background text-foreground border-input text-base font-medium h-12 rounded-xl transition-all"
-            />
-            {watchedDueDate && (
-              <p className="text-sm text-foreground font-medium">
-                {formatDateTime(watchedDueDate)}
-              </p>
-            )}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Date Picker */}
+              <div className="space-y-2">
+                <Label>Data</Label>
+                <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal h-12 rounded-xl bg-background text-foreground border-input",
+                        !selectedDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {selectedDate ? (
+                        format(selectedDate, "dd/MM/yyyy", { locale: ptBR })
+                      ) : (
+                        <span>Selecione a data</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={handleDateSelect}
+                      initialFocus
+                      locale={ptBR}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Time Select */}
+              <div className="space-y-2">
+                <Label>Horário</Label>
+                <Select
+                  value={getCurrentTime()}
+                  onValueChange={(value) => handleTimeChange(value)}
+                >
+                  <SelectTrigger className="bg-background text-foreground border-input text-base font-medium h-12 rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[200px]">
+                    {timeSlots.map((time) => (
+                      <SelectItem key={time} value={time}>
+                        {time}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
 
           {/* Prioridade */}
@@ -344,7 +425,7 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
           {/* Categoria */}
           <div className="space-y-3">
             <label className="text-base font-bold text-foreground flex items-center gap-2">
-              <Star className="h-5 w-5 text-primary" />
+              <Target className="h-5 w-5 text-primary" />
               Categoria
             </label>
             <Select

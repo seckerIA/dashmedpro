@@ -190,7 +190,7 @@ const Dashboard = () => {
 
         <MetricCard
           title="Taxa de Conversão"
-          value={`${metrics?.conversionRate.toFixed(2) || '0.00'}%`}
+          value={`${(metrics?.conversionRate ?? 0).toFixed(2)}%`}
           variant="cyan"
           icon={TrendingUp}
           trend={{
@@ -330,7 +330,7 @@ const VendedorDashboard = () => {
         />
         <MetricCard
           title="Taxa de Conversão"
-          value={`${metrics?.conversionRate.toFixed(2) || '0.00'}%`}
+          value={`${(metrics?.conversionRate ?? 0).toFixed(2)}%`}
           variant="cyan"
           icon={BarChart3}
           trend={{ value: 0, label: "desempenho" }}

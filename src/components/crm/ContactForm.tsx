@@ -227,17 +227,12 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
         });
       } else {
         console.log('➕ Criando novo contato...');
-        // Garantir que name e full_name estejam preenchidos
-        const contactToCreate = {
-          ...contactDataForDB,
-          name: contactDataForDB.full_name || contactDataForDB.name || '',
-          full_name: contactDataForDB.full_name || contactDataForDB.name || '',
-        };
         // Criar novo contato (sem service e service_value)
         // IMPORTANTE: Garantir que custom_fields seja incluído explicitamente
+        // A tabela crm_contacts usa 'full_name', não 'name'
         const createData = {
-          ...contactToCreate,
-          custom_fields: contactToCreate.custom_fields, // Garantir que custom_fields está presente
+          ...contactDataForDB,
+          custom_fields: contactDataForDB.custom_fields, // Garantir que custom_fields está presente
         };
         console.log('💾 ContactForm - Dados que serão enviados para createContact:', {
           createData,

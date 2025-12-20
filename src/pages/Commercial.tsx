@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Target, TrendingUp, ShoppingCart, Megaphone, BarChart3 } from "lucide-react";
+import { Target, TrendingUp, ShoppingCart, Megaphone, BarChart3, Workflow } from "lucide-react";
 import { CommercialDashboard } from "@/components/commercial/CommercialDashboard";
 import { LeadsManagement } from "@/components/commercial/LeadsManagement";
 import { SalesManagement } from "@/components/commercial/SalesManagement";
 import { CampaignsManagement } from "@/components/commercial/CampaignsManagement";
 import { CommercialReports } from "@/components/commercial/CommercialReports";
+import { PipelineManagement } from "@/components/commercial/PipelineManagement";
 import { LeadForm } from "@/components/commercial/LeadForm";
 
 export default function Commercial() {
@@ -69,13 +70,20 @@ export default function Commercial() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-5 gap-2 h-auto p-1 bg-muted/50">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-6 gap-2 h-auto p-1 bg-muted/50">
           <TabsTrigger
             value="dashboard"
             className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-border/50 transition-all duration-200 font-medium py-3"
           >
             <BarChart3 className="w-4 h-4 mr-2" />
             Dashboard
+          </TabsTrigger>
+          <TabsTrigger
+            value="pipeline"
+            className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-border/50 transition-all duration-200 font-medium py-3"
+          >
+            <Workflow className="w-4 h-4 mr-2" />
+            Pipeline
           </TabsTrigger>
           <TabsTrigger
             value="leads"
@@ -109,6 +117,10 @@ export default function Commercial() {
 
         <TabsContent value="dashboard" className="mt-6">
           <CommercialDashboard />
+        </TabsContent>
+
+        <TabsContent value="pipeline" className="mt-6">
+          <PipelineManagement />
         </TabsContent>
 
         <TabsContent value="leads" className="mt-6">

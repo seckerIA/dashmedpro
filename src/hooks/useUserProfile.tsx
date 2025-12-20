@@ -3,7 +3,7 @@ import { supabase, SUPABASE_PROJECT_URL, SUPABASE_PROJECT_REF } from '@/integrat
 import { useAuth } from './useAuth';
 
 export function useUserProfile() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const { data: profile, isLoading, error, refetch } = useQuery({
     queryKey: ['user-profile', user?.id],
@@ -84,9 +84,12 @@ export function useUserProfile() {
         throw err;
       }
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !authLoading, // Aguardar auth terminar de carregar
     retry: 2,
     retryDelay: 1000,
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000, // Cache por 5 minutos
+    gcTime: 10 * 60 * 1000,
   });
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'dono';

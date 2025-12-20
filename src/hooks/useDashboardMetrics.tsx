@@ -79,8 +79,10 @@ const fetchDashboardMetrics = async (userId: string, isAdminOrDono: boolean): Pr
       return sum + (value || 0);
     }, 0);
 
+  // Taxa de conversão: deals ganhos / total de deals (incluindo ativos, ganhos e perdidos)
+  // Garantir que não haja divisão por zero e que o resultado seja um número válido
   const conversionRate = dealsData.length > 0 
-    ? (wonDeals / dealsData.length) * 100
+    ? Math.round((wonDeals / dealsData.length) * 100 * 100) / 100 // Arredondar para 2 casas decimais
     : 0;
 
   // Calcular deals por estágio
@@ -195,14 +197,26 @@ const fetchDashboardMetrics = async (userId: string, isAdminOrDono: boolean): Pr
 };
 
 export function useDashboardMetrics() {
-  const { user } = useAuth();
-  const { profile } = useUserProfile();
+  const { user, loading: authLoading } = useAuth();
+  const { profile, isLoading: isLoadingProfile } = useUserProfile();
   const isAdminOrDono = profile?.role === 'admin' || profile?.role === 'dono';
 
   return useQuery({
     queryKey: ['dashboard-metrics', user?.id, profile?.role],
-    queryFn: () => fetchDashboardMetrics(user?.id || '', isAdminOrDono),
-    enabled: !!user?.id && !!profile,
-    refetchInterval: 30000, // Refetch a cada 30 segundos
+    queryFn: async () => {
+      if (!user?.id) {
+        throw new Error('Usuário não autenticado');
+      }
+      try {
+        return await fetchDashboardMetrics(user.id, isAdminOrDono);
+      } catch (error) {
+        console.error('❌ useDashboardMetrics - Erro ao buscar métricas:', error);
+        throw error;
+      }
+    },
+    enabled: !!user?.id && !!profile && !authLoading && !isLoadingProfile,
+    refetchInterval: 30000,
+    refetchOnWindowFocus: false,
+    retry: 2,
   });
 }

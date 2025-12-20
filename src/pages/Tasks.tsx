@@ -4,6 +4,7 @@ import { CreateTaskData, UpdateTaskData } from '@/types/tasks';
 import { useTasks } from '@/hooks/useTasks';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { CheckSquare } from 'lucide-react';
 
 const Tasks = () => {
   const { toast } = useToast();
@@ -148,7 +149,24 @@ const Tasks = () => {
   }
 
   return (
-    <div className="min-h-screen space-y-8 p-6">
+    <div className="min-h-screen space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/30 backdrop-blur-sm border border-primary/20">
+              <CheckSquare className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-foreground tracking-tight">Tarefas</h1>
+              <p className="text-muted-foreground text-sm font-medium">
+                Gerencie suas tarefas e atividades
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <TaskList
         tasks={tasks}
         onTaskCreate={handleTaskCreate}

@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { addDays, isAfter, isBefore } from 'date-fns';
 import {
   MedicalAppointment,
@@ -35,8 +35,14 @@ const fetchAppointments = async (
       *,
       contact:crm_contacts(*),
       financial_transaction:financial_transactions(id, description, amount, type)
-    `)
-    .order('start_time', { ascending: true });
+    `);
+
+  // CRITICAL: Filter by user_id FIRST - this was missing!
+  if (userId) {
+    query = query.eq('user_id', userId);
+  }
+
+  query = query.order('start_time', { ascending: true });
 
   // Apply filters
   if (filters?.startDate) {
@@ -154,11 +160,22 @@ const deleteAppointment = async (id: string): Promise<void> => {
 
 // Hook principal
 export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const queryKey = ['medical-appointments', user?.id, filters];
+
+  // Invalidar cache quando o usuário mudar para evitar dados de outros usuários
+  useEffect(() => {
+    if (user?.id) {
+      // Invalidar todas as queries de medical-appointments para garantir dados corretos
+      queryClient.invalidateQueries({ 
+        queryKey: ['medical-appointments'],
+        exact: false 
+      });
+    }
+  }, [user?.id, queryClient]);
 
   // Query: List appointments with relations
   const {
@@ -169,7 +186,10 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
   } = useQuery({
     queryKey,
     queryFn: () => fetchAppointments(user?.id || '', filters),
-    enabled: !!user?.id,
+    enabled: !!user?.id && !authLoading,
+    staleTime: 0, // Sempre considerar stale para garantir dados atualizados
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   // Mutation: Create appointment

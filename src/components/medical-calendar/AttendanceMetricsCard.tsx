@@ -38,20 +38,23 @@ export function AttendanceMetricsCard() {
     const prevCompleted = prevMonthAppointments.filter(a => a.status === "completed").length;
     const prevNoShow = prevMonthAppointments.filter(a => a.status === "no_show").length;
 
+    // Taxa de comparecimento: (total - faltas) / total * 100
     const currentAttendanceRate = currentTotal > 0 
-      ? ((currentTotal - currentNoShow) / currentTotal) * 100 
+      ? Math.round(((currentTotal - currentNoShow) / currentTotal) * 100 * 10) / 10
       : 0;
     
     const prevAttendanceRate = prevTotal > 0 
-      ? ((prevTotal - prevNoShow) / prevTotal) * 100 
+      ? Math.round(((prevTotal - prevNoShow) / prevTotal) * 100 * 10) / 10
       : 0;
 
+    // Mudança percentual: (atual - anterior) / anterior * 100
     const attendanceChange = prevAttendanceRate > 0
-      ? ((currentAttendanceRate - prevAttendanceRate) / prevAttendanceRate) * 100
+      ? Math.round(((currentAttendanceRate - prevAttendanceRate) / prevAttendanceRate) * 100 * 10) / 10
       : 0;
 
+    // Taxa de faltas: faltas / total * 100
     const noShowRate = currentTotal > 0 
-      ? (currentNoShow / currentTotal) * 100 
+      ? Math.round((currentNoShow / currentTotal) * 100 * 10) / 10
       : 0;
 
     return {
@@ -208,4 +211,5 @@ export function AttendanceMetricsCard() {
     </Card>
   );
 }
+
 

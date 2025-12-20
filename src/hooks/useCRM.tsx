@@ -325,7 +325,7 @@ const deleteDeal = async (dealId: string): Promise<void> => {
 
 // Hook principal
 export function useCRM(viewAsUserIds?: string[]) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const queryClient = useQueryClient();
 
   // Queries com cache otimizado
@@ -336,20 +336,26 @@ export function useCRM(viewAsUserIds?: string[]) {
     error: contactsError,
   } = useQuery({
     queryKey: ['crm-contacts', user?.id],
-    queryFn: () => {
+    queryFn: async () => {
       if (!user?.id) {
         console.warn('⚠️ useCRM - Tentando buscar contatos sem user.id');
-        return Promise.resolve([]);
+        return [];
       }
-      return fetchContacts(user.id);
+      try {
+        return await fetchContacts(user.id);
+      } catch (error) {
+        console.error('❌ useCRM - Erro ao buscar contatos:', error);
+        // Retornar array vazio em caso de erro para não travar a UI
+        return [];
+      }
     },
-    enabled: !!user?.id,
-    staleTime: 30 * 1000, // Considerar dados como stale após 30 segundos (não 0, para evitar requisições excessivas)
-    gcTime: 5 * 60 * 1000, // Manter em cache por 5 minutos
-    refetchOnMount: 'always', // Sempre refazer busca ao montar
-    refetchOnWindowFocus: true, // Refazer busca ao focar na janela
-    retry: 2, // Tentar novamente 2 vezes em caso de erro
-    retryDelay: 1000, // Esperar 1 segundo entre tentativas
+    enabled: !!user?.id && !loading, // Aguardar auth terminar de carregar
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false, // Desabilitado para evitar loops
+    retry: 2,
+    retryDelay: 1000,
   });
 
   // Log de debug quando os contatos mudarem
@@ -368,10 +374,21 @@ export function useCRM(viewAsUserIds?: string[]) {
     isLoading: isLoadingDeals,
   } = useQuery({
     queryKey: ['crm-deals', user?.id, viewAsUserIds?.join(',')],
-    queryFn: () => fetchDeals(user?.id || '', viewAsUserIds),
-    enabled: !!user?.id,
-    staleTime: 2 * 60 * 1000, // Cache por 2 minutos
-    gcTime: 10 * 60 * 1000, // Manter em cache por 10 minutos
+    queryFn: async () => {
+      if (!user?.id) {
+        return [];
+      }
+      try {
+        return await fetchDeals(user.id, viewAsUserIds);
+      } catch (error) {
+        console.error('❌ useCRM - Erro ao buscar deals:', error);
+        return [];
+      }
+    },
+    enabled: !!user?.id && !loading, // Aguardar auth terminar de carregar
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   // Activities são carregadas apenas quando necessário (lazy loading)

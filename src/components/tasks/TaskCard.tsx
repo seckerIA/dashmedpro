@@ -111,8 +111,8 @@ export function TaskCard({ task, onEdit, onDelete, onToggleComplete, onToggleAss
       ref={setNodeRef}
       style={style}
       className={cn(
-        "bg-card/80 backdrop-blur-sm border-[3px] border-double border-border shadow-lg rounded-2xl transition-all duration-200 hover:shadow-xl hover:border-primary/50 cursor-pointer group",
-        isDragging && "opacity-50 shadow-2xl scale-105 border-primary",
+        "border border-border shadow-sm rounded-2xl transition-all duration-200 hover:shadow-md cursor-pointer group",
+        isDragging && "opacity-50 scale-105 border-primary",
         isCompleted && "opacity-60"
       )}
     >
@@ -138,7 +138,7 @@ export function TaskCard({ task, onEdit, onDelete, onToggleComplete, onToggleAss
           <div className="flex-1 min-w-0">
             {/* Categoria Badge */}
             {categoryConfig && (
-              <Badge variant="outline" className={cn("mb-2 text-xs", categoryConfig.color, "bg-background/50 border-current/20")}>
+              <Badge variant="outline" className="mb-2 text-xs">
                 {categoryConfig.label}
               </Badge>
             )}
@@ -180,18 +180,18 @@ export function TaskCard({ task, onEdit, onDelete, onToggleComplete, onToggleAss
               <div className="mb-3 space-y-2">
                 {/* Deal Information */}
                 {task.deal && (
-                  <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
-                    <Target className="h-4 w-4 text-blue-600" />
+                  <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
+                    <Target className="h-4 w-4 text-primary" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-blue-900 truncate">
+                      <p className="text-sm font-medium text-foreground truncate">
                         {task.deal.title}
                       </p>
-                      <div className="flex items-center gap-2 text-xs text-blue-700">
-                        <Badge variant="outline" className="text-xs px-1 py-0">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant="outline" className="text-xs">
                           {task.deal.stage}
                         </Badge>
                         {task.deal.value && (
-                          <span className="font-medium">
+                          <span>
                             R$ {task.deal.value.toLocaleString('pt-BR')}
                           </span>
                         )}
@@ -202,14 +202,14 @@ export function TaskCard({ task, onEdit, onDelete, onToggleComplete, onToggleAss
 
                 {/* Contact Information */}
                 {task.contact && (
-                  <div className="flex items-center gap-2 p-2 bg-green-50 rounded-lg border border-green-200">
-                    <Building2 className="h-4 w-4 text-green-600" />
+                  <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
+                    <Building2 className="h-4 w-4 text-primary" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-green-900 truncate">
+                      <p className="text-sm font-medium text-foreground truncate">
                         {task.contact?.full_name || task.contact?.email || 'Sem contato'}
                       </p>
                       {task.contact.company && (
-                        <p className="text-xs text-green-700 truncate">
+                        <p className="text-xs text-muted-foreground truncate">
                           {task.contact.company}
                         </p>
                       )}

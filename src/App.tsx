@@ -39,7 +39,25 @@ import {
   Settings as SettingsIcon
 } from "lucide-react";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 2,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      staleTime: 30 * 1000, // 30 segundos
+      gcTime: 5 * 60 * 1000, // 5 minutos (anteriormente cacheTime)
+      refetchOnWindowFocus: false, // Evitar refetch automático ao focar na janela
+      refetchOnMount: true,
+      refetchOnReconnect: true,
+      // Timeout de 30 segundos para evitar queries infinitas
+      networkMode: 'online',
+    },
+    mutations: {
+      retry: 1,
+      retryDelay: 1000,
+    },
+  },
+});
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {

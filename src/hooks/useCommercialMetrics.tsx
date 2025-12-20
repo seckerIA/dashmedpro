@@ -74,7 +74,7 @@ function getPreviousPeriod(current: PeriodRange): PeriodRange {
 }
 
 export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange?: PeriodRange) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const period = getPeriodRange(filter, customRange);
   const previousPeriod = getPreviousPeriod(period);
 
@@ -762,9 +762,11 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         throw error;
       }
     },
-    enabled: !!user,
-    staleTime: 2 * 60 * 1000, // Cache por 2 minutos
-    gcTime: 10 * 60 * 1000, // Manter em cache por 10 minutos
+    enabled: !!user?.id && !loading, // Aguardar auth terminar de carregar
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 2,
   });
 
   return {

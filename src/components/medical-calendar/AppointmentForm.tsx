@@ -13,6 +13,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { useAvailability } from '@/hooks/useAvailability';
 import { useCommercialProcedures } from '@/hooks/useCommercialProcedures';
+import { supabase } from '@/integrations/supabase/client';
 import { ContactForm } from '@/components/crm/ContactForm';
 import { UserPlus } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -280,8 +281,11 @@ export function AppointmentForm({
       return;
     }
 
-    // Pequeno delay para garantir que o reset já foi executado
-    const timeoutId = setTimeout(() => {
+    // Função async para buscar e preencher procedimento
+    const fetchAndFillProcedure = async () => {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppointmentForm.tsx:285',message:'Iniciando busca de procedimento',data:{selectedContactId,contactsLength:contacts.length,proceduresLength:procedures?.length||0},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       console.log('🔍 AppointmentForm - Iniciando busca de procedimento vinculado...');
       console.log('   Contato selecionado:', selectedContactId);
       console.log('   Total de contatos:', contacts.length);
@@ -325,6 +329,9 @@ export function AppointmentForm({
         customFields = {};
       }
       
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppointmentForm.tsx:328',message:'custom_fields processado',data:{customFields,keys:Object.keys(customFields),procedureId:customFields?.procedure_id,procedureIdType:typeof customFields?.procedure_id},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       console.log('🔍 AppointmentForm - custom_fields processado:', {
         customFields,
         keys: Object.keys(customFields),
@@ -332,12 +339,110 @@ export function AppointmentForm({
         procedure_id_type: typeof customFields?.procedure_id,
       });
 
-      const procedureId = customFields?.procedure_id;
+      let procedureId = customFields?.procedure_id;
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppointmentForm.tsx:338',message:'Procedure ID extraído',data:{procedureId,hasProcedureId:!!procedureId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+
+      // Se não encontrou no custom_fields, buscar no lead comercial convertido
+      if (!procedureId) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppointmentForm.tsx:347',message:'procedure_id não encontrado em custom_fields, buscando no lead',data:{contactId:selectedContactId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
+        console.log('ℹ️ AppointmentForm - procedure_id não encontrado em custom_fields, buscando no lead comercial...');
+        
+        try {
+          console.log('🔍 AppointmentForm - Buscando lead comercial com:', {
+            contactId: selectedContactId,
+            status: 'converted'
+          });
+
+          // Buscar TODOS os leads vinculados ao contato para encontrar algum com procedure_id
+          const { data: allLeads, error: leadsError } = await supabase
+            .from('commercial_leads' as any)
+            .select('procedure_id, status, contact_id, name')
+            .eq('contact_id', selectedContactId)
+            .order('created_at', { ascending: false })
+            .limit(10);
+
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppointmentForm.tsx:365',message:'Todos os leads comerciais buscados',data:{allLeadsCount:allLeads?.length||0,leadsError,hasLeads:!!allLeads},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+          // #endregion
+
+          console.log('📊 AppointmentForm - Todos os leads encontrados:', {
+            count: allLeads?.length || 0,
+            leads: allLeads?.map((l: any) => ({ 
+              id: l.id,
+              procedure_id: l.procedure_id, 
+              status: l.status,
+              name: l.name,
+              estimated_value: l.estimated_value,
+              notes: l.notes
+            })),
+            error: leadsError
+          });
+          
+          // Log detalhado de cada lead
+          if (allLeads && allLeads.length > 0) {
+            allLeads.forEach((lead: any, index: number) => {
+              console.log(`📋 Lead ${index + 1}:`, {
+                id: lead.id,
+                name: lead.name,
+                procedure_id: lead.procedure_id,
+                status: lead.status,
+                estimated_value: lead.estimated_value,
+                fullLead: lead
+              });
+            });
+          }
+
+          if (!leadsError && allLeads && allLeads.length > 0) {
+            // Procurar o primeiro lead com procedure_id não nulo
+            const leadWithProcedure = allLeads.find((lead: any) => lead.procedure_id && lead.procedure_id !== null);
+            
+            console.log('🔍 AppointmentForm - Lead com procedure_id encontrado:', leadWithProcedure);
+            
+            if (leadWithProcedure) {
+              procedureId = (leadWithProcedure as any).procedure_id;
+              console.log('✅ AppointmentForm - procedure_id encontrado no lead comercial:', procedureId);
+              
+              // Atualizar o custom_fields do contato para futuras buscas
+              const updatedCustomFields = { ...customFields, procedure_id: procedureId };
+              const updateResult = await supabase
+                .from('crm_contacts')
+                .update({ custom_fields: updatedCustomFields })
+                .eq('id', selectedContactId);
+              
+              if (updateResult.error) {
+                console.error('❌ AppointmentForm - Erro ao atualizar custom_fields:', updateResult.error);
+              } else {
+                console.log('💾 AppointmentForm - custom_fields atualizado no contato');
+              }
+            } else {
+              console.log('⚠️ AppointmentForm - Nenhum lead encontrado com procedure_id');
+              console.log('   Leads encontrados:', allLeads.length);
+              console.log('   Todos os leads têm procedure_id null ou vazio');
+              console.log('   Isso significa que os leads foram criados/convertidos sem procedimento associado');
+              console.log('   Para novos leads, certifique-se de selecionar um procedimento ao criar o lead');
+              return;
+            }
+          } else {
+            console.log('ℹ️ AppointmentForm - Nenhum lead comercial encontrado');
+            console.log('   Erro:', leadsError);
+            console.log('   contactId usado:', selectedContactId);
+            return;
+          }
+        } catch (error) {
+          console.error('❌ AppointmentForm - Erro ao buscar lead comercial:', error);
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppointmentForm.tsx:410',message:'Erro ao buscar lead comercial',data:{error:error instanceof Error ? error.message : String(error)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+          // #endregion
+          return;
+        }
+      }
 
       if (!procedureId) {
-        console.log('ℹ️ AppointmentForm - Contato selecionado não tem procedimento vinculado');
-        console.log('   custom_fields completo:', customFields);
-        console.log('   Todas as chaves em custom_fields:', Object.keys(customFields));
         return;
       }
 
@@ -352,6 +457,9 @@ export function AppointmentForm({
         return;
       }
 
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppointmentForm.tsx:355',message:'Procedimento encontrado',data:{id:linkedProcedure.id,name:linkedProcedure.name,duration:linkedProcedure.duration_minutes,price:linkedProcedure.price},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
       console.log('✅ AppointmentForm - Procedimento encontrado:', {
         id: linkedProcedure.id,
         name: linkedProcedure.name,
@@ -396,11 +504,19 @@ export function AppointmentForm({
       setEstimatedValueDisplay(formattedPrice);
       setValue('estimated_value', formattedPrice as any);
 
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppointmentForm.tsx:399',message:'Preenchimento automático concluído',data:{title:linkedProcedure.name,duration:linkedProcedure.duration_minutes,price:linkedProcedure.price},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
       console.log('✅ AppointmentForm - Preenchimento automático concluído!');
-    }, 100); // Pequeno delay para garantir que o reset foi executado
+    };
+
+    // Pequeno delay para garantir que o reset já foi executado
+    const timeoutId = setTimeout(() => {
+      fetchAndFillProcedure();
+    }, 100);
 
     return () => clearTimeout(timeoutId);
-  }, [selectedContactId, contacts, procedures, appointment, open, watch, setValue, estimatedValueDisplay, isLoadingProcedures, isLoadingContacts]);
+  }, [selectedContactId, contacts, procedures, appointment, open, watch, setValue, estimatedValueDisplay, isLoadingProcedures, isLoadingContacts, setEstimatedValueDisplay]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -465,11 +581,11 @@ export function AppointmentForm({
                   </div>
                 ) : (
                   contacts.map((contact) => {
-                    console.log('📋 Rendering contact:', { id: contact.id, name: contact.full_name || contact.name });
+                    console.log('📋 Rendering contact:', { id: contact.id, name: contact.full_name });
                     return (
                       <SelectItem key={contact.id} value={contact.id}>
                         <div className="flex flex-col">
-                          <span className="font-medium">{contact.full_name || contact.name || 'Sem nome'}</span>
+                          <span className="font-medium">{contact.full_name || 'Sem nome'}</span>
                           <span className="text-xs text-muted-foreground">
                             {contact.phone || ''} {contact.email && `• ${contact.email}`}
                           </span>
