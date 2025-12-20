@@ -93,3 +93,29 @@ export const formatInitialCurrencyValue = (value: number | string | null | undef
   
   return formatCurrency(numericValue);
 };
+
+/**
+ * Formata valores para exibição em gráficos usando abreviações (k, M)
+ */
+export function formatCurrencyShort(value: number): string {
+  if (value >= 1000000) {
+    return `R$ ${(value / 1000000).toFixed(1)}M`;
+  }
+  if (value >= 1000) {
+    return `R$ ${(value / 1000).toFixed(1)}k`;
+  }
+  return formatCurrency(value);
+}
+
+/**
+ * Formata valores numéricos para eixos de gráficos (sem R$)
+ */
+export function formatNumberShort(value: number): string {
+  if (value >= 1000000) {
+    return `${(value / 1000000).toFixed(1)}M`;
+  }
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(1)}k`;
+  }
+  return value.toLocaleString('pt-BR');
+}

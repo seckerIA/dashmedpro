@@ -190,7 +190,7 @@ export function HistoricalReportsPanel({ isOpen, onClose }: HistoricalReportsPan
                     <TrendingUp className="h-4 w-4 text-orange-500" />
                     <span className="text-sm font-medium">Taxa Conversão</span>
                   </div>
-                  <p className="text-2xl font-bold mt-1">{stats.conversionRate.toFixed(1)}%</p>
+                  <p className="text-2xl font-bold mt-1">{stats.conversionRate.toFixed(2)}%</p>
                 </CardContent>
               </Card>
             </div>

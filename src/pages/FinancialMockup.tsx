@@ -148,7 +148,7 @@ const FinancialMockup = () => {
             <p className="text-3xl font-bold text-blue-500 mb-1">{formatCurrency(metrics?.monthProfit || 0)}</p>
             <div className="flex items-center gap-1">
               <TrendingUp className="w-3 h-3 text-blue-500" />
-              <span className="text-xs text-muted-foreground">{metrics?.profitMargin.toFixed(1)}% margem</span>
+              <span className="text-xs text-muted-foreground">{metrics?.profitMargin.toFixed(2)}% margem</span>
             </div>
           </CardContent>
         </Card>
@@ -243,7 +243,7 @@ const FinancialMockup = () => {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(2)}%`}
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"

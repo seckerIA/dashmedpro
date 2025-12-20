@@ -206,6 +206,18 @@ export interface CommercialMetrics {
   period: PeriodRange;
   previousPeriod?: PeriodRange;
   
+  // Propriedades simplificadas para o dashboard
+  totalLeads?: number;
+  conversionRate?: number;
+  totalRevenue?: number;
+  averageRevenue?: number;
+  newPatients?: number;
+  scheduledProcedures?: number;
+  funnelData?: Array<{ stage: string; count: number; percentage: number }>;
+  revenueByProcedure?: Array<{ name: string; value: number }>;
+  leadsTrend?: Array<{ name: string; value: number }>;
+  monthlyComparison?: Array<{ name: string; value: number }>;
+  
   // Métricas principais
   financial: FinancialMetrics;
   customer: CustomerMetrics;

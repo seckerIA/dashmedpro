@@ -379,7 +379,7 @@ const CalculadoraROI = () => {
                       <div className="text-center space-y-2">
                         <p className="text-sm font-medium text-muted-foreground">Retorno Sobre Investimento</p>
                         <p className={`text-4xl font-extrabold ${scenario.roi >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {scenario.roi.toFixed(1)}%
+                          {scenario.roi.toFixed(2)}%
                         </p>
                       </div>
 

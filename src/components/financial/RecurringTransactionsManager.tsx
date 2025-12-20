@@ -29,6 +29,15 @@ export const RecurringTransactionsManager = () => {
 
   const getFrequencyLabel = (frequency: string) => {
     const labels: Record<string, string> = {
+      'diaria': 'Diário',
+      'semanal': 'Semanal',
+      'quinzenal': 'Quinzenal',
+      'mensal': 'Mensal',
+      'bimestral': 'Bimestral',
+      'trimestral': 'Trimestral',
+      'semestral': 'Semestral',
+      'anual': 'Anual',
+      // Compatibilidade com valores antigos em inglês
       'daily': 'Diário',
       'weekly': 'Semanal',
       'monthly': 'Mensal',
@@ -40,6 +49,15 @@ export const RecurringTransactionsManager = () => {
 
   const getFrequencyColor = (frequency: string) => {
     const colors: Record<string, string> = {
+      'diaria': 'bg-red-100 text-red-800',
+      'semanal': 'bg-orange-100 text-orange-800',
+      'quinzenal': 'bg-yellow-100 text-yellow-800',
+      'mensal': 'bg-blue-100 text-blue-800',
+      'bimestral': 'bg-indigo-100 text-indigo-800',
+      'trimestral': 'bg-purple-100 text-purple-800',
+      'semestral': 'bg-pink-100 text-pink-800',
+      'anual': 'bg-green-100 text-green-800',
+      // Compatibilidade com valores antigos em inglês
       'daily': 'bg-red-100 text-red-800',
       'weekly': 'bg-orange-100 text-orange-800',
       'monthly': 'bg-blue-100 text-blue-800',

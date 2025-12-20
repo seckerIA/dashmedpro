@@ -83,7 +83,7 @@ export function StatsPanel({
                   {item.name}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {item.value}%
+                  {typeof item.value === 'number' ? item.value.toFixed(2) : item.value}%
                 </p>
               </div>
             </div>

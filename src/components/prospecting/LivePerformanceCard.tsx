@@ -240,7 +240,7 @@ export function LivePerformanceCard() {
                             <div>
                               <p className="text-sm text-foreground/80">Taxa de Conversão</p>
                               <p className="text-2xl font-bold text-white">
-                                {conversionRate.toFixed(1)}%
+                                {conversionRate.toFixed(2)}%
                               </p>
                       </div>
                     </div>

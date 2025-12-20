@@ -54,7 +54,10 @@ const fetchContacts = async (userId: string): Promise<CRMContact[]> => {
       email: c.email,
       phone: c.phone,
       user_id: c.user_id,
-      created_at: c.created_at
+      created_at: c.created_at,
+      custom_fields: c.custom_fields,
+      custom_fields_type: typeof c.custom_fields,
+      custom_fields_keys: c.custom_fields ? Object.keys(c.custom_fields as any) : []
     })));
   } else {
     console.warn('⚠️ useCRM.fetchContacts - Nenhum contato encontrado para user_id:', userId);
@@ -139,13 +142,49 @@ const fetchActivities = async (userId: string, contactId?: string): Promise<CRMA
 
 // Create contact
 const createContact = async (contactData: CRMContactInsert): Promise<CRMContact> => {
+  console.log('💾 useCRM.createContact - Criando contato:', {
+    contactData,
+    custom_fields: contactData.custom_fields,
+    custom_fields_type: typeof contactData.custom_fields,
+    custom_fields_stringified: JSON.stringify(contactData.custom_fields),
+  });
+  
+  // Garantir que custom_fields seja um objeto válido
+  const insertData = { ...contactData };
+  if (insertData.custom_fields !== undefined) {
+    if (insertData.custom_fields && typeof insertData.custom_fields === 'object') {
+      if (Array.isArray(insertData.custom_fields)) {
+        console.warn('⚠️ useCRM.createContact - custom_fields é um array, convertendo para objeto');
+        insertData.custom_fields = {} as any;
+      }
+    }
+  }
+  
+  console.log('💾 useCRM.createContact - Dados que serão enviados para Supabase:', {
+    ...insertData,
+    custom_fields: insertData.custom_fields,
+    custom_fields_stringified: JSON.stringify(insertData.custom_fields),
+  });
+  
   const { data, error } = await supabase
     .from('crm_contacts')
-    .insert(contactData)
+    .insert(insertData)
     .select()
     .single();
 
-  if (error) throw new Error(`Erro ao criar contato: ${error.message}`);
+  if (error) {
+    console.error('❌ useCRM.createContact - Erro ao criar:', error);
+    console.error('   Erro completo:', JSON.stringify(error, null, 2));
+    throw new Error(`Erro ao criar contato: ${error.message}`);
+  }
+  
+  console.log('✅ useCRM.createContact - Contato criado:', {
+    id: data.id,
+    custom_fields: data.custom_fields,
+    custom_fields_type: typeof data.custom_fields,
+    custom_fields_keys: data.custom_fields ? Object.keys(data.custom_fields as any) : [],
+  });
+  
   return data;
 };
 
@@ -207,14 +246,60 @@ const updateDealsPositions = async (updates: Array<{ id: string; position: numbe
 
 // Update contact
 const updateContact = async ({ contactId, data }: { contactId: string; data: Partial<CRMContact> }): Promise<CRMContact> => {
+  console.log('💾 useCRM.updateContact - Atualizando contato:', {
+    contactId,
+    data,
+    custom_fields: data.custom_fields,
+    custom_fields_type: typeof data.custom_fields,
+    custom_fields_is_object: typeof data.custom_fields === 'object',
+    custom_fields_is_null: data.custom_fields === null,
+    custom_fields_stringified: JSON.stringify(data.custom_fields),
+  });
+  
+  // Garantir que custom_fields seja um objeto válido ou null
+  const updateData = { ...data };
+  if (updateData.custom_fields !== undefined) {
+    // Se custom_fields for um objeto vazio {}, manter como objeto
+    // Se for null, manter como null
+    // Se for um objeto com propriedades, manter como objeto
+    if (updateData.custom_fields && typeof updateData.custom_fields === 'object') {
+      // Garantir que é um objeto JavaScript válido (não array, não Date, etc)
+      if (Array.isArray(updateData.custom_fields)) {
+        console.warn('⚠️ useCRM.updateContact - custom_fields é um array, convertendo para objeto');
+        updateData.custom_fields = {} as any;
+      } else {
+        // É um objeto válido, manter como está
+        console.log('✅ useCRM.updateContact - custom_fields é um objeto válido:', updateData.custom_fields);
+      }
+    }
+  }
+  
+  console.log('💾 useCRM.updateContact - Dados que serão enviados para Supabase:', {
+    ...updateData,
+    custom_fields: updateData.custom_fields,
+    custom_fields_stringified: JSON.stringify(updateData.custom_fields),
+  });
+  
   const { data: updatedContact, error } = await supabase
     .from('crm_contacts')
-    .update(data)
+    .update(updateData)
     .eq('id', contactId)
     .select()
     .single();
 
-  if (error) throw new Error(`Erro ao atualizar contato: ${error.message}`);
+  if (error) {
+    console.error('❌ useCRM.updateContact - Erro ao atualizar:', error);
+    console.error('   Erro completo:', JSON.stringify(error, null, 2));
+    throw new Error(`Erro ao atualizar contato: ${error.message}`);
+  }
+  
+  console.log('✅ useCRM.updateContact - Contato atualizado:', {
+    id: updatedContact.id,
+    custom_fields: updatedContact.custom_fields,
+    custom_fields_type: typeof updatedContact.custom_fields,
+    custom_fields_keys: updatedContact.custom_fields ? Object.keys(updatedContact.custom_fields as any) : [],
+  });
+  
   return updatedContact;
 };
 
@@ -259,10 +344,12 @@ export function useCRM(viewAsUserIds?: string[]) {
       return fetchContacts(user.id);
     },
     enabled: !!user?.id,
-    staleTime: 0, // Sempre considerar dados como stale para forçar busca fresca
+    staleTime: 30 * 1000, // Considerar dados como stale após 30 segundos (não 0, para evitar requisições excessivas)
     gcTime: 5 * 60 * 1000, // Manter em cache por 5 minutos
-    refetchOnMount: true, // Sempre refazer busca ao montar
+    refetchOnMount: 'always', // Sempre refazer busca ao montar
     refetchOnWindowFocus: true, // Refazer busca ao focar na janela
+    retry: 2, // Tentar novamente 2 vezes em caso de erro
+    retryDelay: 1000, // Esperar 1 segundo entre tentativas
   });
 
   // Log de debug quando os contatos mudarem

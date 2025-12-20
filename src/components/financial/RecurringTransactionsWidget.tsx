@@ -42,6 +42,15 @@ export const RecurringTransactionsWidget = () => {
 
   const getFrequencyLabel = (frequency: string) => {
     const labels: Record<string, string> = {
+      'diaria': 'Diário',
+      'semanal': 'Semanal',
+      'quinzenal': 'Quinzenal',
+      'mensal': 'Mensal',
+      'bimestral': 'Bimestral',
+      'trimestral': 'Trimestral',
+      'semestral': 'Semestral',
+      'anual': 'Anual',
+      // Compatibilidade com valores antigos em inglês
       'daily': 'Diário',
       'weekly': 'Semanal',
       'monthly': 'Mensal',
@@ -124,7 +133,7 @@ export const RecurringTransactionsWidget = () => {
                 await createRecurring.mutateAsync({
                   user_id: user.id,
                   template_transaction_id: t.id,
-                  frequency: 'monthly',
+                  frequency: 'mensal', // Corrigido de 'monthly' para 'mensal'
                   amount: t.amount,
                   type: t.type,
                   description: t.description || '',

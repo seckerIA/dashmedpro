@@ -32,7 +32,13 @@ import {
   formatCurrencyInput,
   parseCurrencyToNumber,
   formatInitialCurrencyValue,
+  formatCurrency,
 } from "@/lib/currency";
+import {
+  formatPhoneInput,
+  parsePhoneToNumber,
+  formatPhone,
+} from "@/lib/phone";
 import {
   Select,
   SelectContent,
@@ -83,7 +89,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
     defaultValues: {
       full_name: contact?.full_name || initialData?.full_name || "",
       email: contact?.email || initialData?.email || "",
-      phone: contact?.phone || initialData?.phone || "",
+      phone: formatPhone(contact?.phone || initialData?.phone || ""),
       company: contact?.company || "",
       position: contact?.position || "",
       service: contact?.service || (contact?.custom_fields as any)?.procedure_id || "none",
@@ -108,7 +114,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
       form.reset({
         full_name: initialData.full_name || "",
         email: initialData.email || "",
-        phone: initialData.phone || "",
+        phone: initialData.phone ? formatPhone(initialData.phone) : "",
         company: "",
         position: "",
         service: "none",
@@ -127,11 +133,12 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
     if (watchedService && watchedService !== "none") {
       const selectedProcedure = procedures?.find(p => p.id === watchedService);
       if (selectedProcedure && selectedProcedure.price) {
-        const priceInCents = (Number(selectedProcedure.price) * 100).toString();
         const currentValue = form.getValues("service_value");
         // Só atualizar se o campo estiver vazio
         if (!currentValue || currentValue === "") {
-          form.setValue("service_value", priceInCents);
+          // Formatar o preço como moeda usando formatCurrency
+          const formattedPrice = formatCurrency(selectedProcedure.price);
+          form.setValue("service_value", formattedPrice);
         }
       }
     }
@@ -147,29 +154,72 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
       const serviceValue = contactData.service_value || (selectedProcedure ? Number(selectedProcedure.price) : null);
       
       // Preparar custom_fields com procedure_id se houver procedimento selecionado
-      const customFields: any = { ...(contact?.custom_fields as any || {}) };
+      console.log('🔍 ContactForm - Preparando custom_fields:', {
+        contactData_service: contactData.service,
+        contactData_service_type: typeof contactData.service,
+        contact_custom_fields: contact?.custom_fields,
+        contact_custom_fields_type: typeof contact?.custom_fields,
+      });
+      
+      // Inicializar customFields a partir do contato existente ou objeto vazio
+      const existingCustomFields = contact?.custom_fields as any;
+      const customFields: any = existingCustomFields && typeof existingCustomFields === 'object' 
+        ? { ...existingCustomFields } 
+        : {};
+      
+      console.log('🔍 ContactForm - customFields inicial:', customFields);
+      
+      // Adicionar ou remover procedure_id baseado na seleção
       if (contactData.service && contactData.service !== "none") {
         customFields.procedure_id = contactData.service;
+        console.log('✅ ContactForm - Adicionando procedure_id:', contactData.service);
       } else {
         delete customFields.procedure_id;
+        console.log('🗑️ ContactForm - Removendo procedure_id (service é "none" ou vazio)');
       }
+      
+      console.log('🔍 ContactForm - customFields final:', customFields);
+      console.log('🔍 ContactForm - customFields keys:', Object.keys(customFields));
       
       // Remover campos que não existem na tabela crm_contacts
       // (service e service_value não são campos do crm_contacts, apenas do formulário)
       const { service, service_value, ...contactDataForDB } = contactData;
       
+      // Remover formatação do telefone antes de salvar (manter apenas números)
+      if (contactDataForDB.phone) {
+        contactDataForDB.phone = parsePhoneToNumber(contactDataForDB.phone);
+      }
+      
       // Adicionar custom_fields com procedure_id
       contactDataForDB.custom_fields = customFields;
+      
+      console.log('💾 ContactForm - Salvando contato com custom_fields:', {
+        customFields,
+        procedure_id: customFields.procedure_id,
+        custom_fields_to_save: contactDataForDB.custom_fields,
+        custom_fields_to_save_type: typeof contactDataForDB.custom_fields,
+        custom_fields_to_save_keys: Object.keys(contactDataForDB.custom_fields || {}),
+        full_contactDataForDB: contactDataForDB,
+      });
       
       if (contact) {
         console.log('✏️ Atualizando contato existente:', contact.id);
         // Atualizar contato existente
+        // IMPORTANTE: Garantir que custom_fields seja incluído explicitamente
+        const updateData = {
+          ...contactDataForDB,
+          custom_fields: contactDataForDB.custom_fields, // Garantir que custom_fields está presente
+          updated_at: new Date().toISOString(),
+        };
+        console.log('📤 ContactForm - Enviando dados para updateContact:', {
+          updateData,
+          custom_fields: updateData.custom_fields,
+          custom_fields_type: typeof updateData.custom_fields,
+          custom_fields_keys: updateData.custom_fields ? Object.keys(updateData.custom_fields) : [],
+        });
         await updateContact({
           contactId: contact.id,
-          data: {
-            ...contactDataForDB,
-            updated_at: new Date().toISOString(),
-          },
+          data: updateData,
         });
         toast({
           title: "Contato atualizado",
@@ -184,8 +234,23 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
           full_name: contactDataForDB.full_name || contactDataForDB.name || '',
         };
         // Criar novo contato (sem service e service_value)
-        const newContact = await createContact(contactToCreate as any);
-        console.log('✅ Contato criado:', newContact);
+        // IMPORTANTE: Garantir que custom_fields seja incluído explicitamente
+        const createData = {
+          ...contactToCreate,
+          custom_fields: contactToCreate.custom_fields, // Garantir que custom_fields está presente
+        };
+        console.log('💾 ContactForm - Dados que serão enviados para createContact:', {
+          createData,
+          custom_fields: createData.custom_fields,
+          custom_fields_type: typeof createData.custom_fields,
+          custom_fields_keys: createData.custom_fields ? Object.keys(createData.custom_fields) : [],
+        });
+        const newContact = await createContact(createData as any);
+        console.log('✅ Contato criado:', {
+          id: newContact.id,
+          custom_fields: newContact.custom_fields,
+          custom_fields_type: typeof newContact.custom_fields,
+        });
         
         // Criar contrato automaticamente se solicitado
         if (create_deal && newContact) {
@@ -367,8 +432,13 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
                     </FormLabel>
                     <FormControl>
                       <Input 
-                        placeholder="(11) 99999-9999" 
+                        placeholder="(21) 99940-9021" 
                         {...field}
+                        value={field.value || ""}
+                        onChange={(e) => {
+                          const formatted = formatPhoneInput(e.target.value);
+                          field.onChange(formatted);
+                        }}
                         className="border-blue-200 focus:border-blue-500"
                       />
                     </FormControl>

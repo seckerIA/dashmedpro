@@ -2,6 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { TrendingUp, Target, DollarSign, BarChart3, UserPlus, Calendar, Loader2 } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 
 interface MetricCardProps {
   title: string;
@@ -31,35 +32,45 @@ export function MetricCard({ title, value, icon, format = "number", isLoading }:
     }
     
     if (format === "percentage") {
-      return `${val}%`;
+      return `${typeof val === 'number' ? val.toFixed(2) : val}%`;
     }
     
     return val.toLocaleString("pt-BR");
   };
 
   return (
-    <Card className="bg-gradient-card shadow-card border-border">
-      <CardContent className="p-4 flex items-center gap-4">
-        <div className="p-3 rounded-full bg-primary/10">
-          {isLoading ? (
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          ) : (
-            <Icon className="h-6 w-6 text-primary" />
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm text-muted-foreground truncate">{title}</p>
-          <p className="text-2xl font-bold text-card-foreground">
-            {isLoading ? "..." : formatValue(value)}
-          </p>
-        </div>
-      </CardContent>
-    </Card>
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.3 }}
+      whileHover={{ scale: 1.02 }}
+    >
+      <Card className="bg-gradient-card shadow-card border-border transition-all duration-300 hover:shadow-lg">
+        <CardContent className="p-4 flex items-center gap-4">
+          <motion.div 
+            className="p-3 rounded-full bg-primary/10"
+            whileHover={{ rotate: 360 }}
+            transition={{ duration: 0.6 }}
+          >
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            ) : (
+              <Icon className="h-6 w-6 text-primary" />
+            )}
+          </motion.div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-muted-foreground truncate">{title}</p>
+            <motion.p 
+              className="text-2xl font-bold text-card-foreground"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+            >
+              {isLoading ? "..." : formatValue(value)}
+            </motion.p>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 }
-
-
-
-
-
-

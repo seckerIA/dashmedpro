@@ -311,7 +311,7 @@ export function DailyReportSummaryModal({
                   </div>
                   <p className="text-sm font-medium text-muted-foreground">Taxa de Conversão</p>
                   <p className="text-2xl font-bold text-purple-600">
-                     {metrics.conversionRate.toFixed(1)}%
+                     {metrics.conversionRate.toFixed(2)}%
                   </p>
                 </div>
 

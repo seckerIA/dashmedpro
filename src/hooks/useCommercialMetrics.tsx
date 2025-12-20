@@ -18,6 +18,7 @@ import {
   parseISO,
   differenceInDays
 } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { CommercialMetrics, PeriodFilter, PeriodRange } from "@/types/metrics";
 
 // Função para calcular o período baseado no filtro
@@ -77,7 +78,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
   const period = getPeriodRange(filter, customRange);
   const previousPeriod = getPreviousPeriod(period);
 
-  return useQuery({
+  const queryResult = useQuery({
     queryKey: ["commercial-metrics", user?.id, filter, period.start.toISOString(), period.end.toISOString()],
     queryFn: async (): Promise<CommercialMetrics> => {
       if (!user) throw new Error("User not authenticated");
@@ -110,11 +111,12 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
 
       if (appointmentsError) throw appointmentsError;
 
-      // 2. Buscar transações financeiras do período
+      // Preparar IDs de transações para busca paralela
       const transactionIds = appointments
         ?.map(a => a.financial_transaction_id)
         .filter((id): id is string => id !== null && id !== undefined) || [];
 
+      // 2. Buscar transações financeiras do período
       const { data: transactions, error: transactionsError } = await supabase
         .from("financial_transactions")
         .select(`
@@ -136,76 +138,104 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
 
       if (transactionsError) throw transactionsError;
 
-      // 3. Buscar custos detalhados das transações
-      const { data: costs, error: costsError } = await supabase
-        .from("transaction_costs")
-        .select("*")
-        .in("transaction_id", transactions?.map(t => t.id) || []);
+      // Atualizar transactionIds com as transações encontradas
+      const allTransactionIds = transactions?.map(t => t.id) || [];
+      
+      // 3-5. Executar queries em paralelo (que não dependem de transactionIds)
+      const [
+        { data: costs, error: costsError },
+        { data: leads, error: leadsError },
+        { data: campaigns, error: campaignsError },
+      ] = await Promise.all([
+        // 3. Buscar custos detalhados das transações
+        allTransactionIds.length > 0
+          ? supabase
+              .from("transaction_costs")
+              .select("*")
+              .in("transaction_id", allTransactionIds)
+          : Promise.resolve({ data: [], error: null }),
+        
+        // 4. Buscar leads comerciais
+        supabase
+          .from("commercial_leads")
+          .select("*")
+          .eq("user_id", user.id)
+          .gte("created_at", periodStartISO)
+          .lte("created_at", periodEndISO),
+        
+        // 5. Buscar campanhas
+        supabase
+          .from("commercial_campaigns")
+          .select("*")
+          .eq("user_id", user.id),
+      ]);
 
       if (costsError) throw costsError;
-
-      // 4. Buscar leads comerciais
-      const { data: leads, error: leadsError } = await supabase
-        .from("commercial_leads")
-        .select("*")
-        .eq("user_id", user.id)
-        .gte("created_at", periodStartISO)
-        .lte("created_at", periodEndISO);
-
-      if (leadsError) throw leadsError;
-
-      // 5. Buscar campanhas
-      const { data: campaigns, error: campaignsError } = await supabase
-        .from("commercial_campaigns")
-        .select("*")
-        .eq("user_id", user.id);
-
+      if (leadsError) {
+        console.error('❌ Erro ao buscar leads comerciais:', leadsError);
+        throw leadsError;
+      }
       if (campaignsError) throw campaignsError;
 
-      // 6. Buscar vendas comerciais
-      const { data: sales, error: salesError } = await supabase
-        .from("commercial_sales")
-        .select("*")
-        .eq("user_id", user.id)
-        .gte("sale_date", format(period.start, "yyyy-MM-dd"))
-        .lte("sale_date", format(period.end, "yyyy-MM-dd"));
+      console.log('📊 useCommercialMetrics - Leads encontrados:', {
+        total: leads?.length || 0,
+        periodStart: periodStartISO,
+        periodEnd: periodEndISO,
+        leads: leads?.slice(0, 3).map(l => ({ id: l.id, name: l.name, created_at: l.created_at })),
+      });
+
+      // 6-8. Executar queries restantes em paralelo
+      const [
+        { data: sales, error: salesError },
+        { data: deals, error: dealsError },
+        { data: prevTransactions },
+        { data: prevAppointments },
+      ] = await Promise.all([
+        // 6. Buscar vendas comerciais
+        supabase
+          .from("commercial_sales")
+          .select("*")
+          .eq("user_id", user.id)
+          .gte("sale_date", format(period.start, "yyyy-MM-dd"))
+          .lte("sale_date", format(period.end, "yyyy-MM-dd")),
+        
+        // 7. Buscar deals do CRM
+        supabase
+          .from("crm_deals")
+          .select(`
+            id,
+            title,
+            stage,
+            value,
+            created_at,
+            closed_at,
+            contact_id
+          `)
+          .eq("user_id", user.id)
+          .gte("created_at", periodStartISO)
+          .lte("created_at", periodEndISO),
+        
+        // 8a. Buscar transações do período anterior
+        supabase
+          .from("financial_transactions")
+          .select("amount, type, total_costs")
+          .eq("user_id", user.id)
+          .eq("type", "entrada")
+          .eq("status", "concluida")
+          .gte("transaction_date", format(previousPeriod.start, "yyyy-MM-dd"))
+          .lte("transaction_date", format(previousPeriod.end, "yyyy-MM-dd")),
+        
+        // 8b. Buscar appointments do período anterior
+        supabase
+          .from("medical_appointments")
+          .select("id")
+          .eq("user_id", user.id)
+          .gte("start_time", prevStartISO)
+          .lte("start_time", prevEndISO),
+      ]);
 
       if (salesError) throw salesError;
-
-      // 7. Buscar deals do CRM
-      const { data: deals, error: dealsError } = await supabase
-        .from("crm_deals")
-        .select(`
-          id,
-          title,
-          stage,
-          value,
-          created_at,
-          closed_at,
-          contact_id
-        `)
-        .eq("user_id", user.id)
-        .gte("created_at", periodStartISO)
-        .lte("created_at", periodEndISO);
-
       if (dealsError) throw dealsError;
-
-      // 8. Buscar dados do período anterior para comparação
-      const { data: prevTransactions } = await supabase
-        .from("financial_transactions")
-        .select("amount, type, total_costs")
-        .eq("user_id", user.id)
-        .eq("type", "entrada")
-        .eq("status", "concluida")
-        .gte("transaction_date", format(previousPeriod.start, "yyyy-MM-dd"))
-        .lte("transaction_date", format(previousPeriod.end, "yyyy-MM-dd"));
-
-      const { data: prevAppointments } = await supabase
-        .from("medical_appointments")
-        .select("id")
-        .eq("user_id", user.id)
-        .gte("start_time", prevStartISO)
-        .lte("start_time", prevEndISO);
 
       // ========== CÁLCULOS DE MÉTRICAS ==========
 
@@ -220,15 +250,16 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         costsMap.set(cost.transaction_id, current + Number(cost.amount));
       });
 
-      // Custo por consulta
+      // Custo por consulta - incluir TODAS as consultas completadas (com ou sem transação financeira)
       const completedAppointments = appointments?.filter(a => 
-        a.status === 'completed' && a.financial_transaction_id
+        a.status === 'completed'
       ) || [];
 
       const appointmentCosts = completedAppointments.map(apt => {
-        const transaction = transactionMap.get(apt.financial_transaction_id!);
+        const transaction = apt.financial_transaction_id ? transactionMap.get(apt.financial_transaction_id) : null;
+        // Usar valor da transação financeira se existir, senão usar estimated_value da consulta
         const revenue = transaction?.amount || apt.estimated_value || 0;
-        const costs = transaction?.total_costs || costsMap.get(apt.financial_transaction_id!) || 0;
+        const costs = transaction ? (transaction.total_costs || costsMap.get(apt.financial_transaction_id!) || 0) : 0;
         const netProfit = revenue - costs;
         const margin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
 
@@ -244,7 +275,21 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       });
 
       const totalCosts = appointmentCosts.reduce((sum, a) => sum + a.costs, 0);
-      const totalRevenue = appointmentCosts.reduce((sum, a) => sum + a.revenue, 0);
+      
+      // Receita de consultas completadas - usar estimated_value se não houver transação
+      const appointmentsRevenue = appointmentCosts.reduce((sum, a) => sum + a.revenue, 0);
+      
+      // Também incluir consultas agendadas/confirmadas que ainda não foram completadas mas têm valor estimado
+      const pendingAppointments = appointments?.filter(a => 
+        (a.status === 'scheduled' || a.status === 'confirmed') && a.estimated_value
+      ) || [];
+      const pendingRevenue = pendingAppointments.reduce((sum, apt) => sum + Number(apt.estimated_value || 0), 0);
+      
+      // Receita de vendas comerciais
+      const salesRevenue = sales?.reduce((sum, s) => sum + Number(s.value || 0), 0) || 0;
+      
+      // Receita total (consultas completadas + consultas agendadas com valor estimado + vendas)
+      const totalRevenue = appointmentsRevenue + pendingRevenue + salesRevenue;
       const avgCostPerAppointment = completedAppointments.length > 0 
         ? totalCosts / completedAppointments.length 
         : 0;
@@ -319,9 +364,10 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         };
       });
 
-      // Ticket médio
-      const avgTicketPerAppointment = completedAppointments.length > 0
-        ? totalRevenue / completedAppointments.length
+      // Ticket médio - usar total de appointments (completadas + agendadas) se houver receita
+      const totalAppointmentsForAverage = completedAppointments.length + pendingAppointments.length;
+      const avgTicketPerAppointment = totalAppointmentsForAverage > 0
+        ? totalRevenue / totalAppointmentsForAverage
         : 0;
 
       // LTV por paciente
@@ -376,6 +422,36 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       const overallConversion = totalLeads > 0
         ? ((sales?.length || 0) / totalLeads) * 100
         : 0;
+
+      // Buscar procedimentos do catálogo (total de procedimentos ativos cadastrados) - MOVER PARA ANTES DO LOG
+      const { data: procedures, error: proceduresError } = await supabase
+        .from("commercial_procedures")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("is_active", true);
+
+      if (proceduresError) {
+        console.error('❌ Erro ao buscar procedimentos:', proceduresError);
+      }
+
+      // Contar procedimentos ativos no catálogo
+      const scheduledProcedures = procedures?.length || 0;
+
+      console.log('📊 useCommercialMetrics - Métricas calculadas:', {
+        totalLeads,
+        leadsData: leads?.slice(0, 3).map(l => ({ id: l.id, name: l.name, created_at: l.created_at })),
+        completedAppointments: completedAppointments.length,
+        appointmentsData: completedAppointments.slice(0, 3).map(a => ({ id: a.id, title: a.title, estimated_value: a.estimated_value, status: a.status })),
+        sales: sales?.length || 0,
+        overallConversion: overallConversion.toFixed(2),
+        totalRevenue,
+        appointmentsRevenue,
+        pendingRevenue,
+        salesRevenue,
+        avgTicketPerAppointment: avgTicketPerAppointment.toFixed(2),
+        scheduledProcedures,
+        proceduresCount: procedures?.length || 0,
+      });
 
       // Taxa de ocupação
       const workDays = differenceInDays(period.end, period.start) + 1;
@@ -438,9 +514,74 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         ? ((completedAppointments.length - prevAppointmentsCount) / prevAppointmentsCount) * 100
         : 0;
 
-      return {
+      // Calcular pacientes novos (contatos criados no período)
+      const { data: newContacts } = await supabase
+        .from("crm_contacts")
+        .select("id")
+        .eq("user_id", user.id)
+        .gte("created_at", periodStartISO)
+        .lte("created_at", periodEndISO);
+
+      const newPatients = newContacts?.length || 0;
+
+      // Preparar dados do funil
+      const funnelData = [
+        { stage: 'Leads', count: totalLeads, percentage: 100 },
+        { stage: 'Consultas', count: completedAppointments.length, percentage: leadsToAppointments },
+        { stage: 'Vendas', count: sales?.length || 0, percentage: overallConversion },
+      ];
+
+      // Preparar receita por procedimento
+      const revenueByProcedure = procedureEfficiency.map(p => ({
+        name: p.procedureType,
+        value: p.averageRevenue * p.count,
+      }));
+
+      // Preparar tendência de leads (últimos 6 meses)
+      const leadsTrend = [];
+      for (let i = 5; i >= 0; i--) {
+        const monthDate = new Date(period.end);
+        monthDate.setMonth(monthDate.getMonth() - i);
+        const monthStart = startOfMonth(monthDate);
+        const monthEnd = endOfMonth(monthDate);
+        
+        const monthLeads = leads?.filter(l => {
+          const leadDate = parseISO(l.created_at);
+          return leadDate >= monthStart && leadDate <= monthEnd;
+        }).length || 0;
+        
+        leadsTrend.push({
+          name: format(monthStart, 'MMM', { locale: ptBR }),
+          value: monthLeads,
+        });
+      }
+
+      // Preparar comparação mensal
+      const monthlyComparison = [
+        {
+          name: 'Atual',
+          value: totalRevenue,
+        },
+        {
+          name: 'Anterior',
+          value: prevRevenue,
+        },
+      ];
+
+      const result = {
         period,
         previousPeriod,
+        // Propriedades simplificadas para o dashboard
+        totalLeads,
+        conversionRate: overallConversion,
+        totalRevenue,
+        averageRevenue: avgTicketPerAppointment,
+        newPatients,
+        scheduledProcedures,
+        funnelData,
+        revenueByProcedure,
+        leadsTrend,
+        monthlyComparison,
         financial: {
           costPerAppointment: {
             average: avgCostPerAppointment,
@@ -592,9 +733,43 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
           },
         },
       };
+      
+      console.log('✅ useCommercialMetrics - Retornando resultado:', {
+        totalLeads: result.totalLeads,
+        totalRevenue: result.totalRevenue,
+        scheduledProcedures: result.scheduledProcedures,
+        newPatients: result.newPatients,
+        conversionRate: result.conversionRate,
+        averageRevenue: result.averageRevenue,
+      });
+      
+      try {
+        // Verificar se todas as propriedades obrigatórias estão presentes
+        if (!result.financial || !result.customer || !result.operational || !result.marketing || !result.comparisons) {
+          console.error('❌ useCommercialMetrics - Propriedades obrigatórias faltando:', {
+            hasFinancial: !!result.financial,
+            hasCustomer: !!result.customer,
+            hasOperational: !!result.operational,
+            hasMarketing: !!result.marketing,
+            hasComparisons: !!result.comparisons,
+          });
+          throw new Error('Propriedades obrigatórias faltando no resultado');
+        }
+        
+        return result;
+      } catch (error) {
+        console.error('❌ useCommercialMetrics - Erro ao retornar resultado:', error);
+        throw error;
+      }
     },
     enabled: !!user,
     staleTime: 2 * 60 * 1000, // Cache por 2 minutos
     gcTime: 10 * 60 * 1000, // Manter em cache por 10 minutos
   });
+
+  return {
+    metrics: queryResult.data,
+    isLoading: queryResult.isLoading,
+    error: queryResult.error,
+  };
 }

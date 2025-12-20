@@ -92,7 +92,7 @@ export function MetricCard({
                 'font-medium',
                 isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
               )}>
-                {isPositive ? '↑' : '↓'} {Math.abs(trend.value)}%
+                {isPositive ? '↑' : '↓'} {Math.abs(trend.value).toFixed(2)}%
               </span>
               <span className="text-muted-foreground/80">{trend.label}</span>
             </div>

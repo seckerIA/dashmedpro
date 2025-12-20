@@ -133,9 +133,9 @@ export function AnimatedDealCard({
               )}
             </div>
             <div className="flex items-center gap-3">
-              <h4 className="font-semibold text-sm text-foreground line-clamp-1 transition-colors duration-150 group-hover:text-primary">
-                {deal.title}
-              </h4>
+            <h4 className="font-semibold text-sm text-foreground line-clamp-1 transition-colors duration-150 group-hover:text-primary">
+              {deal.title}
+            </h4>
               <span className="text-sm font-bold text-green-700 tabular-nums whitespace-nowrap">
                 {formatCurrency(deal.value ?? 0)}
               </span>
@@ -155,12 +155,12 @@ export function AnimatedDealCard({
                       if (!serviceConfig) return null;
                       return (
                         <>
-                          <Badge 
-                            variant="secondary" 
+                        <Badge 
+                          variant="secondary" 
                             className={`text-xs px-2 py-0.5 ${serviceConfig.bgColor} ${serviceConfig.textColor} border-0 font-medium flex-shrink-0`}
-                          >
-                            {serviceConfig.label}
-                          </Badge>
+                        >
+                          {serviceConfig.label}
+                        </Badge>
                           {deal.contact.service_value !== null && deal.contact.service_value !== undefined && (
                             <span className="text-xs font-semibold text-green-600 tabular-nums whitespace-nowrap">
                               {formatCurrency(deal.contact.service_value)}
@@ -257,8 +257,8 @@ export function AnimatedDealCard({
             <div className="flex items-center justify-between w-full">
               <span className="text-xs font-medium text-green-600 uppercase tracking-wide whitespace-nowrap">Valor do Serviço</span>
               <span className="text-xl font-bold text-green-700 tabular-nums whitespace-nowrap flex-shrink-0">
-                {formatCurrency(displayedServiceValue)}
-              </span>
+                  {formatCurrency(displayedServiceValue)}
+                </span>
             </div>
           </div>
         )}

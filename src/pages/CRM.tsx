@@ -312,8 +312,8 @@ const CRM = () => {
   ).length;
 
   const conversionRate = deals.length > 0 
-    ? ((wonDeals / deals.length) * 100).toFixed(1)
-    : '0';
+    ? ((wonDeals / deals.length) * 100).toFixed(2)
+    : '0.00';
 
   const handleScheduleCall = (deal: CRMDealWithContact) => {
     setDealForCall(deal);

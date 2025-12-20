@@ -12,7 +12,7 @@ import { useCommercialLeads } from "@/hooks/useCommercialLeads";
 import { useCommercialProcedures } from "@/hooks/useCommercialProcedures";
 import { CommercialLead, CommercialLeadInsert } from "@/types/commercial";
 import { COMMERCIAL_LEAD_STATUS_LABELS, COMMERCIAL_LEAD_ORIGIN_LABELS } from "@/types/commercial";
-import { formatCurrencyInput, parseCurrencyToNumber } from "@/lib/currency";
+import { formatCurrencyInput, parseCurrencyToNumber, formatCurrency } from "@/lib/currency";
 import { Loader2 } from "lucide-react";
 
 const leadSchema = z.object({
@@ -69,7 +69,7 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
         origin: lead.origin,
         status: lead.status,
         procedure_id: lead.procedure_id || "",
-        estimated_value: lead.estimated_value ? lead.estimated_value.toString() : "",
+        estimated_value: lead.estimated_value ? formatCurrency(lead.estimated_value) : "",
         notes: lead.notes || "",
       });
     } else if (!lead && open) {
@@ -210,9 +210,14 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
                   setValue("procedure_id", value);
                   // Preencher valor estimado automaticamente se procedimento foi selecionado
                   const selectedProcedure = procedures?.find(p => p.id === value);
-                  if (selectedProcedure && selectedProcedure.price && !watch("estimated_value")) {
-                    const priceInCents = (Number(selectedProcedure.price) * 100).toString();
-                    setValue("estimated_value", priceInCents);
+                  if (selectedProcedure && selectedProcedure.price) {
+                    const currentValue = watch("estimated_value");
+                    // Só preencher se o campo estiver vazio
+                    if (!currentValue || currentValue.trim() === "") {
+                      // Formatar o preço como moeda usando formatCurrency
+                      const formattedPrice = formatCurrency(selectedProcedure.price);
+                      setValue("estimated_value", formattedPrice);
+                    }
                   }
                 }}
                 disabled={isLoadingProcedures}

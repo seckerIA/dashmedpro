@@ -2,14 +2,31 @@ import { Card, CardContent } from "@/components/ui/card";
 import { MetricCard } from "./MetricCard";
 import { ConversionFunnel } from "./ConversionFunnel";
 import { RevenueChart } from "./RevenueChart";
+import { ConversionBottleneckCard } from "./ConversionBottleneckCard";
+import { RevenueDistributionCard } from "./RevenueDistributionCard";
 import { Button } from "@/components/ui/button";
-import { Plus, Calendar } from "lucide-react";
+import { Plus, Calendar, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useCommercialMetrics } from "@/hooks/useCommercialMetrics";
+import { useBottleneckMetrics } from "@/hooks/useBottleneckMetrics";
+import { AnimatedWrapper } from "@/components/shared/AnimatedWrapper";
+import { BottleneckCard } from "@/components/dashboard/BottleneckCard";
+import { motion } from "framer-motion";
 
 export function CommercialDashboard() {
   const navigate = useNavigate();
-  const { metrics, isLoading } = useCommercialMetrics();
+  const { metrics, isLoading, error } = useCommercialMetrics();
+  const { data: bottlenecks, isLoading: isLoadingBottlenecks } = useBottleneckMetrics();
+  
+  // Debug log
+  console.log('🔍 CommercialDashboard - Dados recebidos:', {
+    metrics,
+    isLoading,
+    error,
+    totalLeads: metrics?.totalLeads,
+    totalRevenue: metrics?.totalRevenue,
+    scheduledProcedures: metrics?.scheduledProcedures,
+  });
   
   // Handle navigation with query params
   const handleNewLead = () => {
@@ -21,97 +38,131 @@ export function CommercialDashboard() {
   return (
     <div className="space-y-6">
       {/* Quick Actions */}
-      <div className="flex flex-wrap gap-3">
-        <Button
-          onClick={handleNewLead}
-          className="bg-primary hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Paciente
-        </Button>
-        <Button
-          onClick={() => navigate("/calendar")}
-          variant="outline"
-        >
-          <Calendar className="h-4 w-4 mr-2" />
-          Agendar Consulta
-        </Button>
-      </div>
+      <AnimatedWrapper animationType="slideDown" delay={0.1}>
+        <div className="flex flex-wrap gap-3">
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Button
+              onClick={handleNewLead}
+              className="bg-primary hover:bg-primary/90 transition-all"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Paciente
+            </Button>
+          </motion.div>
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Button
+              onClick={() => navigate("/calendar")}
+              variant="outline"
+              className="transition-all"
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Agendar Consulta
+            </Button>
+          </motion.div>
+        </div>
+      </AnimatedWrapper>
+
+      {/* Alertas de Gargalo */}
+      {!isLoadingBottlenecks && bottlenecks && bottlenecks.length > 0 && (
+        <AnimatedWrapper animationType="slideDown" delay={0.15}>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-lg font-semibold text-foreground">
+              <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+              Gargalos Identificados
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {bottlenecks.slice(0, 4).map((bottleneck, index) => (
+                <AnimatedWrapper key={bottleneck.id} animationType="slideUp" delay={0.2 + index * 0.05}>
+                  <BottleneckCard bottleneck={bottleneck} />
+                </AnimatedWrapper>
+              ))}
+            </div>
+          </div>
+        </AnimatedWrapper>
+      )}
 
       {/* Metrics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <MetricCard
-          title="Leads do Mês"
-          value={metrics?.totalLeads || 0}
-          icon="trending-up"
-          isLoading={isLoading}
-        />
-        <MetricCard
-          title="Taxa de Conversão"
-          value={`${metrics?.conversionRate || 0}%`}
-          icon="target"
-          isLoading={isLoading}
-        />
-        <MetricCard
-          title="Receita Total"
-          value={metrics?.totalRevenue || 0}
-          icon="dollar-sign"
-          format="currency"
-          isLoading={isLoading}
-        />
-        <MetricCard
-          title="Receita Média"
-          value={metrics?.averageRevenue || 0}
-          icon="bar-chart"
-          format="currency"
-          isLoading={isLoading}
-        />
-        <MetricCard
-          title="Pacientes Novos"
-          value={metrics?.newPatients || 0}
-          icon="user-plus"
-          isLoading={isLoading}
-        />
-        <MetricCard
-          title="Procedimentos"
-          value={metrics?.scheduledProcedures || 0}
-          icon="calendar"
-          isLoading={isLoading}
-        />
+        {[
+          { title: "Leads do Mês", value: metrics?.totalLeads || 0, icon: "trending-up" as const },
+          { title: "Taxa de Conversão", value: metrics?.conversionRate || 0, icon: "target" as const, format: "percentage" as const },
+          { title: "Receita Total", value: metrics?.totalRevenue || 0, icon: "dollar-sign" as const, format: "currency" as const },
+          { title: "Receita Média", value: metrics?.averageRevenue || 0, icon: "bar-chart" as const, format: "currency" as const },
+          { title: "Pacientes Novos", value: metrics?.newPatients || 0, icon: "user-plus" as const },
+          { title: "Procedimentos", value: metrics?.scheduledProcedures || 0, icon: "calendar" as const },
+        ].map((metric, index) => (
+          <AnimatedWrapper key={metric.title} animationType="scale" delay={0.3 + index * 0.05}>
+            <motion.div whileHover={{ y: -4 }} transition={{ duration: 0.2 }}>
+              <MetricCard
+                title={metric.title}
+                value={metric.value}
+                icon={metric.icon}
+                format={metric.format}
+                isLoading={isLoading}
+              />
+            </motion.div>
+          </AnimatedWrapper>
+        ))}
+      </div>
+
+      {/* Cards de Gargalo Específicos */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <AnimatedWrapper animationType="slideUp" delay={0.6}>
+          <ConversionBottleneckCard />
+        </AnimatedWrapper>
+        <AnimatedWrapper animationType="slideUp" delay={0.65}>
+          <RevenueDistributionCard />
+        </AnimatedWrapper>
       </div>
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="bg-gradient-card shadow-card border-border">
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Funil de Conversão</h3>
-            <ConversionFunnel data={metrics?.funnelData || []} />
-          </CardContent>
-        </Card>
+        <AnimatedWrapper animationType="slideUp" delay={0.7}>
+          <motion.div whileHover={{ scale: 1.01 }} transition={{ duration: 0.2 }}>
+            <Card className="bg-gradient-card shadow-card border-border transition-all">
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold mb-4">Funil de Conversão</h3>
+                <ConversionFunnel data={metrics?.funnelData || []} />
+              </CardContent>
+            </Card>
+          </motion.div>
+        </AnimatedWrapper>
 
-        <Card className="bg-gradient-card shadow-card border-border">
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Receita por Procedimento</h3>
-            <RevenueChart data={metrics?.revenueByProcedure || []} />
-          </CardContent>
-        </Card>
+        <AnimatedWrapper animationType="slideUp" delay={0.75}>
+          <motion.div whileHover={{ scale: 1.01 }} transition={{ duration: 0.2 }}>
+            <Card className="bg-gradient-card shadow-card border-border transition-all">
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold mb-4">Receita por Procedimento</h3>
+                <RevenueChart data={metrics?.revenueByProcedure || []} />
+              </CardContent>
+            </Card>
+          </motion.div>
+        </AnimatedWrapper>
       </div>
 
       {/* Additional Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="bg-gradient-card shadow-card border-border">
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Tendência de Leads</h3>
-            <RevenueChart data={metrics?.leadsTrend || []} type="line" />
-          </CardContent>
-        </Card>
+        <AnimatedWrapper animationType="slideUp" delay={0.8}>
+          <motion.div whileHover={{ scale: 1.01 }} transition={{ duration: 0.2 }}>
+            <Card className="bg-gradient-card shadow-card border-border transition-all">
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold mb-4">Tendência de Leads</h3>
+                <RevenueChart data={metrics?.leadsTrend || []} type="line" />
+              </CardContent>
+            </Card>
+          </motion.div>
+        </AnimatedWrapper>
 
-        <Card className="bg-gradient-card shadow-card border-border">
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Comparativo Mensal</h3>
-            <RevenueChart data={metrics?.monthlyComparison || []} type="bar" />
-          </CardContent>
-        </Card>
+        <AnimatedWrapper animationType="slideUp" delay={0.85}>
+          <motion.div whileHover={{ scale: 1.01 }} transition={{ duration: 0.2 }}>
+            <Card className="bg-gradient-card shadow-card border-border transition-all">
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold mb-4">Comparativo Mensal</h3>
+                <RevenueChart data={metrics?.monthlyComparison || []} type="bar" />
+              </CardContent>
+            </Card>
+          </motion.div>
+        </AnimatedWrapper>
       </div>
     </div>
   );

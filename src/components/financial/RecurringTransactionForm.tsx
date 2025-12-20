@@ -29,7 +29,7 @@ interface FormData {
   type: 'income' | 'expense'
   category_id: string
   account_id: string
-  frequency: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'
+  frequency: 'diaria' | 'semanal' | 'quinzenal' | 'mensal' | 'bimestral' | 'trimestral' | 'semestral' | 'anual'
   start_date: Date
   end_date?: Date
   auto_create: boolean
@@ -85,20 +85,37 @@ export const RecurringTransactionForm = ({ onSuccess }: RecurringTransactionForm
     const nextDate = new Date(startDate)
     
     switch (frequency) {
-      case 'daily':
+      case 'diaria':
         nextDate.setDate(nextDate.getDate() + 1)
         break
-      case 'weekly':
+      case 'semanal':
         nextDate.setDate(nextDate.getDate() + 7)
         break
-      case 'monthly':
+      case 'quinzenal':
+        nextDate.setDate(nextDate.getDate() + 15)
+        break
+      case 'mensal':
         nextDate.setMonth(nextDate.getMonth() + 1)
         break
-      case 'quarterly':
+      case 'bimestral':
+        nextDate.setMonth(nextDate.getMonth() + 2)
+        break
+      case 'trimestral':
         nextDate.setMonth(nextDate.getMonth() + 3)
         break
-      case 'yearly':
+      case 'semestral':
+        nextDate.setMonth(nextDate.getMonth() + 6)
+        break
+      case 'anual':
         nextDate.setFullYear(nextDate.getFullYear() + 1)
+        break
+      default:
+        // Fallback para valores antigos em inglês (compatibilidade)
+        if (frequency === 'daily') nextDate.setDate(nextDate.getDate() + 1)
+        else if (frequency === 'weekly') nextDate.setDate(nextDate.getDate() + 7)
+        else if (frequency === 'monthly') nextDate.setMonth(nextDate.getMonth() + 1)
+        else if (frequency === 'quarterly') nextDate.setMonth(nextDate.getMonth() + 3)
+        else if (frequency === 'yearly') nextDate.setFullYear(nextDate.getFullYear() + 1)
         break
     }
     
@@ -111,12 +128,15 @@ export const RecurringTransactionForm = ({ onSuccess }: RecurringTransactionForm
         throw new Error('Data de início é obrigatória')
       }
 
+      // Converter tipo de transação de inglês para português
+      const transactionType = data.type === 'income' ? 'entrada' : 'saida'
+
       // Primeiro, criar a transação template
       const templateTransaction = await createTransaction.mutateAsync({
         user_id: (await supabase.auth.getUser()).data.user?.id!,
         description: data.description,
         amount: parseFloat(data.amount) / 100,
-        type: data.type,
+        type: transactionType, // Convertido para 'entrada' ou 'saida'
         category_id: data.category_id,
         account_id: data.account_id,
         date: startDate.toISOString().split('T')[0],
@@ -140,7 +160,7 @@ export const RecurringTransactionForm = ({ onSuccess }: RecurringTransactionForm
       await createRecurringTransaction.mutateAsync({
         user_id: (await supabase.auth.getUser()).data.user?.id!,
         template_transaction_id: templateTransaction.id,
-        frequency: data.frequency,
+        frequency: data.frequency, // Já está em português (mensal, trimestral, etc)
         start_date: startDate.toISOString().split('T')[0],
         end_date: endDate?.toISOString().split('T')[0] || null,
         next_occurrence: nextExecutionDate.toISOString().split('T')[0],
@@ -250,11 +270,14 @@ export const RecurringTransactionForm = ({ onSuccess }: RecurringTransactionForm
                   <SelectValue placeholder="Selecione a frequência" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="daily">Diário</SelectItem>
-                  <SelectItem value="weekly">Semanal</SelectItem>
-                  <SelectItem value="monthly">Mensal</SelectItem>
-                  <SelectItem value="quarterly">Trimestral</SelectItem>
-                  <SelectItem value="yearly">Anual</SelectItem>
+                  <SelectItem value="diaria">Diário</SelectItem>
+                  <SelectItem value="semanal">Semanal</SelectItem>
+                  <SelectItem value="quinzenal">Quinzenal</SelectItem>
+                  <SelectItem value="mensal">Mensal</SelectItem>
+                  <SelectItem value="bimestral">Bimestral</SelectItem>
+                  <SelectItem value="trimestral">Trimestral</SelectItem>
+                  <SelectItem value="semestral">Semestral</SelectItem>
+                  <SelectItem value="anual">Anual</SelectItem>
                 </SelectContent>
               </Select>
             </div>

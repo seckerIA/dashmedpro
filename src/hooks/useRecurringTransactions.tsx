@@ -165,8 +165,38 @@ export const useExecuteRecurringTransaction = () => {
 
       // Update next occurrence date (calculate next based on frequency)
       const nextOccurrence = new Date(recurring.next_occurrence)
-      // Simple increment by 1 month for now (can be improved based on frequency)
-      nextOccurrence.setMonth(nextOccurrence.getMonth() + 1)
+      
+      // Calcular próxima data baseado na frequência (valores em português)
+      switch (recurring.frequency) {
+        case 'diaria':
+          nextOccurrence.setDate(nextOccurrence.getDate() + 1)
+          break
+        case 'semanal':
+          nextOccurrence.setDate(nextOccurrence.getDate() + 7)
+          break
+        case 'quinzenal':
+          nextOccurrence.setDate(nextOccurrence.getDate() + 15)
+          break
+        case 'mensal':
+          nextOccurrence.setMonth(nextOccurrence.getMonth() + 1)
+          break
+        case 'bimestral':
+          nextOccurrence.setMonth(nextOccurrence.getMonth() + 2)
+          break
+        case 'trimestral':
+          nextOccurrence.setMonth(nextOccurrence.getMonth() + 3)
+          break
+        case 'semestral':
+          nextOccurrence.setMonth(nextOccurrence.getMonth() + 6)
+          break
+        case 'anual':
+          nextOccurrence.setFullYear(nextOccurrence.getFullYear() + 1)
+          break
+        default:
+          // Fallback: adicionar 1 mês se frequência desconhecida
+          nextOccurrence.setMonth(nextOccurrence.getMonth() + 1)
+          break
+      }
       
       const { error: updateError } = await supabase
         .from('financial_recurring_transactions')

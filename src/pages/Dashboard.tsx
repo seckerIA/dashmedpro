@@ -12,12 +12,16 @@ import { ConversionChart } from "@/components/charts/ConversionChart"
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics"
 import { useFinancialMetrics } from "@/hooks/useFinancialMetrics"
 import { useUserProfile } from "@/hooks/useUserProfile"
+import { useBottleneckMetrics } from "@/hooks/useBottleneckMetrics"
 import { MetricCard, QuickActionCard } from "@/components/dashboard/MetricCard"
 import { PipelineFunnelCard } from "@/components/dashboard/PipelineFunnelCard"
 import { SalesChart } from "@/components/dashboard/SalesChart"
 import { StatsPanel } from "@/components/dashboard/StatsPanel"
 import { CustomerTable } from "@/components/dashboard/CustomerTable"
 import { OverdueAppointmentsAlert } from "@/components/shared/OverdueAppointmentsAlert"
+import { BottleneckCard } from "@/components/dashboard/BottleneckCard"
+import { AttendanceMetricsCard } from "@/components/medical-calendar/AttendanceMetricsCard"
+import { AnimatedWrapper } from "@/components/shared/AnimatedWrapper"
 import { 
   Calculator, 
   TrendingUp, 
@@ -40,7 +44,8 @@ import {
   RefreshCw,
   Filter,
   Eye,
-  Coins
+  Coins,
+  AlertTriangle
 } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
 import { formatCurrency } from "@/lib/currency"
@@ -50,6 +55,7 @@ const Dashboard = () => {
   const { isVendedor } = useUserProfile();
   const { data: metrics, isLoading, error } = useDashboardMetrics();
   const { metrics: financialMetrics } = useFinancialMetrics();
+  const { data: bottlenecks, isLoading: isLoadingBottlenecks } = useBottleneckMetrics();
 
   if (isLoading) {
     return (
@@ -80,6 +86,25 @@ const Dashboard = () => {
 
       {/* Overdue Appointments Alert */}
       <OverdueAppointmentsAlert />
+
+      {/* Gargalos Identificados */}
+      {!isLoadingBottlenecks && bottlenecks && bottlenecks.length > 0 && (
+        <AnimatedWrapper animationType="slideDown" delay={0.1}>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-lg font-semibold text-foreground">
+              <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+              Gargalos Identificados
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {bottlenecks.slice(0, 6).map((bottleneck, index) => (
+                <AnimatedWrapper key={bottleneck.id} animationType="slideUp" delay={0.15 + index * 0.05}>
+                  <BottleneckCard bottleneck={bottleneck} />
+                </AnimatedWrapper>
+              ))}
+            </div>
+          </div>
+        </AnimatedWrapper>
+      )}
 
       {/* Top Metrics - Métricas Financeiras */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6 animate-fade-in">
@@ -165,7 +190,7 @@ const Dashboard = () => {
 
         <MetricCard
           title="Taxa de Conversão"
-          value={`${metrics?.conversionRate.toFixed(1) || '0.0'}%`}
+          value={`${metrics?.conversionRate.toFixed(2) || '0.00'}%`}
           variant="cyan"
           icon={TrendingUp}
           trend={{
@@ -262,6 +287,11 @@ const Dashboard = () => {
         <TodayTasksWidget />
         <UpcomingCallsWidget />
       </div>
+
+      {/* Métricas de Comparecimento */}
+      <AnimatedWrapper animationType="slideUp" delay={0.3}>
+        <AttendanceMetricsCard />
+      </AnimatedWrapper>
     </div>
   )
 }
@@ -300,7 +330,7 @@ const VendedorDashboard = () => {
         />
         <MetricCard
           title="Taxa de Conversão"
-          value={`${metrics?.conversionRate.toFixed(1)}%`}
+          value={`${metrics?.conversionRate.toFixed(2) || '0.00'}%`}
           variant="cyan"
           icon={BarChart3}
           trend={{ value: 0, label: "desempenho" }}

@@ -263,38 +263,40 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
       // Se não existe transação e tem valor estimado, criar uma transação financeira
       if (!financialTransactionId && appointment.estimated_value && appointment.estimated_value > 0) {
         // Buscar categoria padrão de entrada (consultas médicas)
-        const { data: categories } = await supabase
+        const { data: categories, error: categoriesError } = await supabase
           .from('financial_categories')
           .select('id')
           .eq('type', 'entrada')
           .limit(1);
 
+        if (categoriesError) {
+          console.error('Erro ao buscar categorias:', categoriesError);
+        }
+
         // Buscar primeira conta disponível (sempre precisa ter uma conta)
-        const { data: accounts } = await supabase
+        const { data: accounts, error: accountsError } = await supabase
           .from('financial_accounts')
           .select('id')
           .eq('is_active', true)
           .limit(1);
 
+        if (accountsError) {
+          console.error('Erro ao buscar contas:', accountsError);
+        }
+
         const categoryId = categories && categories.length > 0 ? categories[0].id : null;
         const accountId = accounts && accounts.length > 0 ? accounts[0].id : null;
         
-        // Se não houver conta, não criar transação (mas avisar)
-        if (!accountId) {
-          console.warn('Nenhuma conta financeira ativa encontrada. Transação não será criada.');
-          toast({
-            title: 'Aviso',
-            description: 'Consulta concluída, mas não foi possível criar a transação financeira: nenhuma conta ativa encontrada.',
-            variant: 'default',
-          });
-        }
-
         // Só criar transação se tiver conta e categoria
         if (!accountId || !categoryId) {
-          console.warn('Conta ou categoria não encontrada. Transação não será criada.');
+          const missingItems = [];
+          if (!accountId) missingItems.push('conta financeira');
+          if (!categoryId) missingItems.push('categoria de entrada');
+          
+          console.warn(`Não foi possível criar transação: ${missingItems.join(' e ')} não encontrada(s).`);
           toast({
             title: 'Aviso',
-            description: 'Consulta concluída, mas não foi possível criar a transação financeira: conta ou categoria não encontrada.',
+            description: `Consulta concluída, mas não foi possível criar a transação financeira: ${missingItems.join(' e ')} não encontrada(s). Verifique se há contas e categorias cadastradas.`,
             variant: 'default',
           });
         } else {
@@ -342,26 +344,6 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
             console.log('Transação financeira criada com sucesso:', transaction.id);
           }
         }
-
-        const { data: transaction, error: transactionError } = await supabase
-          .from('financial_transactions')
-          .insert(transactionData)
-          .select()
-          .single();
-
-        if (transactionError) {
-          console.error('Erro ao criar transação financeira:', transactionError);
-          console.error('Dados da transação:', transactionData);
-          toast({
-            title: 'Aviso',
-            description: `Consulta concluída, mas não foi possível criar a transação financeira: ${transactionError.message}`,
-            variant: 'default',
-          });
-          // Não falha a operação principal se não conseguir criar a transação
-        } else {
-          financialTransactionId = transaction.id;
-          console.log('Transação financeira criada com sucesso:', transaction.id);
-        }
       }
 
       // Atualizar a consulta com status concluído e vincular transação se criada
@@ -377,6 +359,8 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
       });
     },
     onSuccess: (data, variables) => {
+      // Invalidar todas as queries relacionadas
+      queryClient.invalidateQueries({ queryKey: ['medical-appointments'] });
       queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['financial-metrics'] });
       queryClient.invalidateQueries({ queryKey: ['financial-accounts'] });
@@ -390,6 +374,13 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
           : 'A consulta foi marcada como concluída.',
       });
     },
+    onError: (error: Error) => {
+      toast({
+        title: 'Erro ao concluir consulta',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
   });
 
   // Helper: Mark as no-show
@@ -397,13 +388,24 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
     mutationFn: async (id: string) => {
       return updateMutation.mutateAsync({
         id,
-        updates: { status: 'no_show' },
+        updates: { 
+          status: 'no_show',
+          completed_at: new Date().toISOString(),
+        },
       });
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['medical-appointments'] });
       toast({
         title: 'Falta registrada',
         description: 'O paciente foi marcado como não compareceu.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Erro ao atualizar consulta',
+        description: error.message,
+        variant: 'destructive',
       });
     },
   });

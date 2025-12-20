@@ -35,7 +35,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart as RechartsPieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart as RechartsPieChart, ResponsiveContainer, XAxis, YAxis } from "recharts"
 import { useFinancialMetrics } from "@/hooks/useFinancialMetrics"
 import { useFinancialAccounts } from "@/hooks/useFinancialAccounts"
 import { useFinancialTransactions } from "@/hooks/useFinancialTransactions"
@@ -45,7 +45,9 @@ import { RecurringTransactionsManager } from "@/components/financial/RecurringTr
 import { RecurringTransactionsWidget } from "@/components/financial/RecurringTransactionsWidget"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { formatCurrency } from "@/lib/currency"
+import { formatCurrency, formatCurrencyShort, formatNumberShort } from "@/lib/currency"
+import { EnhancedTooltip } from "@/components/charts/EnhancedTooltip"
+import { getGradient, CHART_COLORS } from "@/lib/chart-colors"
 
 const Financial = () => {
   const navigate = useNavigate();
@@ -206,7 +208,7 @@ const Financial = () => {
             <p className="text-3xl font-bold text-blue-500 mb-1">{formatCurrency(metrics?.monthNetProfit || 0)}</p>
             <div className="flex items-center gap-1">
               <TrendingUp className="w-3 h-3 text-blue-500" />
-              <span className="text-xs text-muted-foreground">{metrics?.netProfitMargin.toFixed(1)}% margem</span>
+              <span className="text-xs text-muted-foreground">{metrics?.netProfitMargin.toFixed(2)}% margem</span>
             </div>
           </CardContent>
         </Card>
@@ -276,13 +278,10 @@ const Financial = () => {
                     <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.1} />
-                <XAxis dataKey="month" stroke="#888" />
-                <YAxis stroke="#888" />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px' }}
-                  formatter={(value: number) => formatCurrency(value)}
-                />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
+                <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} tickLine={false} axisLine={false} />
+                <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} tickLine={false} axisLine={false} tickFormatter={(value: number) => formatCurrencyShort(value)} />
+                <EnhancedTooltip valueFormatter={(value: number) => formatCurrency(value)} />
                 <Area type="monotone" dataKey="receitas" stroke="#10b981" fillOpacity={1} fill="url(#colorReceitas)" strokeWidth={2} />
                 <Area type="monotone" dataKey="despesas" stroke="#ef4444" fillOpacity={1} fill="url(#colorDespesas)" strokeWidth={2} />
               </AreaChart>
@@ -297,25 +296,56 @@ const Financial = () => {
             <CardDescription>Distribuição dos custos de serviços</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <RechartsPieChart>
-                <Pie
-                  data={costsBreakdown || []}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {(costsBreakdown || []).map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value: number) => formatCurrency(value)} />
-              </RechartsPieChart>
-            </ResponsiveContainer>
+            {!costsBreakdown || costsBreakdown.length === 0 ? (
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                <div className="text-center">
+                  <p className="text-lg mb-2">📊</p>
+                  <p className="text-sm">Nenhum custo registrado no período</p>
+                </div>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <RechartsPieChart>
+                  <defs>
+                    {(costsBreakdown || []).map((entry, index) => {
+                      const gradient = getGradient(index);
+                      return (
+                        <linearGradient key={index} id={`costGradient-${index}`} x1="0" y1="0" x2="1" y2="1">
+                          <stop offset="0%" stopColor={gradient.start} stopOpacity={0.9} />
+                          <stop offset="100%" stopColor={gradient.end} stopOpacity={0.7} />
+                        </linearGradient>
+                      );
+                    })}
+                  </defs>
+                  <Pie
+                    data={costsBreakdown || []}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => {
+                      if (percent < 0.05) return '';
+                      return `${name}: ${(percent * 100).toFixed(1)}%`;
+                    }}
+                    outerRadius={100}
+                    innerRadius={60}
+                    fill="#8884d8"
+                    dataKey="value"
+                    stroke="hsl(var(--background))"
+                    strokeWidth={2}
+                  >
+                    {(costsBreakdown || []).map((entry, index) => {
+                      return (
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={`url(#costGradient-${index})`}
+                        />
+                      );
+                    })}
+                  </Pie>
+                  <EnhancedTooltip valueFormatter={(value: number) => formatCurrency(value)} />
+                </RechartsPieChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
@@ -326,19 +356,39 @@ const Financial = () => {
             <CardDescription>Distribuição do mês atual</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={expensesByCategory || []} layout="vertical" margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.1} />
-                <XAxis type="number" stroke="#888" tickFormatter={(value: number) => formatCurrency(value)} />
-                <YAxis type="category" dataKey="name" width={100} stroke="#888" />
-                <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                <Bar dataKey="value" radius={[4, 4, 4, 4]}>
-                  {(expensesByCategory || []).map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            {!expensesByCategory || expensesByCategory.length === 0 ? (
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                <div className="text-center">
+                  <p className="text-lg mb-2">📊</p>
+                  <p className="text-sm">Nenhuma despesa registrada no mês atual</p>
+                </div>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={expensesByCategory || []} layout="vertical" margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+                  <defs>
+                    {(expensesByCategory || []).map((entry, index) => {
+                      const gradient = getGradient(index);
+                      return (
+                        <linearGradient key={index} id={`expenseGradient-${index}`} x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor={gradient.start} stopOpacity={0.9} />
+                          <stop offset="100%" stopColor={gradient.end} stopOpacity={0.7} />
+                        </linearGradient>
+                      );
+                    })}
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
+                  <XAxis type="number" stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} tickLine={false} axisLine={false} tickFormatter={(value: number) => formatCurrencyShort(value)} />
+                  <YAxis type="category" dataKey="name" width={100} stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} tickLine={false} axisLine={false} />
+                  <EnhancedTooltip valueFormatter={(value: number) => formatCurrency(value)} />
+                  <Bar dataKey="value" radius={[8, 8, 8, 8]}>
+                    {(expensesByCategory || []).map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={`url(#expenseGradient-${index})`} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -352,19 +402,23 @@ const Financial = () => {
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={cashFlowProjection || []}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.1} />
-              <XAxis dataKey="month" stroke="#888" />
-              <YAxis stroke="#888" />
-              <Tooltip 
-                contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px' }}
-                formatter={(value: number) => formatCurrency(value)}
-              />
+              <defs>
+                <linearGradient id="cashFlowGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.05}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
+              <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} tickLine={false} axisLine={false} />
+              <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} tickLine={false} axisLine={false} tickFormatter={(value: number) => formatCurrencyShort(value)} />
+              <EnhancedTooltip valueFormatter={(value: number) => formatCurrency(value)} />
               <Line 
                 type="monotone" 
                 dataKey="saldo" 
                 stroke="#3b82f6" 
                 strokeWidth={3}
-                dot={{ fill: '#3b82f6', r: 4 }}
+                dot={{ fill: '#3b82f6', r: 5 }}
+                activeDot={{ r: 7 }}
               />
             </LineChart>
           </ResponsiveContainer>
