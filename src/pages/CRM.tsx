@@ -11,13 +11,14 @@ import { Users } from "lucide-react";
 
 const CRM = () => {
   const { user } = useAuth();
-  const { isAdmin } = useUserProfile();
+  const { isAdmin } = useUserProfile(); // isAdmin já inclui isDono
+  const isAdminOrDono = isAdmin;
   const [viewAllMode, setViewAllMode] = useState(false);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
 
   // Carregar estado do localStorage ao montar (apenas para admin/dono)
   useEffect(() => {
-    if (!isAdmin) {
+    if (!isAdminOrDono) {
       // Médicos não devem ter viewAllMode ou selectedUserIds
       setViewAllMode(false);
       setSelectedUserIds([]);
@@ -37,13 +38,21 @@ const CRM = () => {
         setSelectedUserIds([]);
       }
     }
-  }, [isAdmin]);
+  }, [isAdminOrDono]);
 
+  // Admin/Dono: se viewAllMode está ativo e tem usuários selecionados, usar esses usuários
+  // Se não tem seleção específica mas é admin/dono, o hook buscará TODOS os usuários automaticamente
   // Médicos sempre veem apenas seus próprios dados (undefined = apenas próprio usuário)
-  // Admin/Dono podem selecionar equipes
-  const { metrics, isLoading } = useTeamMetrics(
-    isAdmin && viewAllMode && selectedUserIds.length > 0 ? selectedUserIds : undefined
-  );
+  const selectedIdsForHook = isAdminOrDono && viewAllMode && selectedUserIds.length > 0 ? selectedUserIds : undefined;
+  
+  console.log('[CRM] Props para useTeamMetrics:', {
+    isAdminOrDono,
+    viewAllMode,
+    selectedUserIds,
+    selectedIdsForHook
+  });
+  
+  const { metrics, isLoading } = useTeamMetrics(selectedIdsForHook);
 
   return (
     <div className="min-h-screen space-y-6">
@@ -57,7 +66,7 @@ const CRM = () => {
             <div>
               <h1 className="text-3xl font-bold text-foreground tracking-tight">CRM</h1>
               <p className="text-muted-foreground text-sm font-medium">
-                {isAdmin ? "Visão Geral de Equipes" : "Meu CRM"}
+                {isAdminOrDono ? "Visão Geral de Equipes" : "Meu CRM"}
               </p>
             </div>
           </div>
@@ -87,12 +96,12 @@ const CRM = () => {
       <TeamOverviewDashboard metrics={metrics} isLoading={isLoading} />
 
       {/* Tabela Comparativa - Apenas para Admin/Dono com múltiplas equipes */}
-      {isAdmin && metrics.teamMetrics.length > 1 && (
+      {isAdminOrDono && metrics.teamMetrics.length > 1 && (
         <TeamComparisonTable teamMetrics={metrics.teamMetrics} isLoading={isLoading} />
       )}
 
       {/* Gráficos Comparativos - Apenas para Admin/Dono com múltiplas equipes */}
-      {isAdmin && metrics.teamMetrics.length > 1 && (
+      {isAdminOrDono && metrics.teamMetrics.length > 1 && (
         <TeamMetricsChart teamMetrics={metrics.teamMetrics} isLoading={isLoading} />
       )}
     </div>
