@@ -86,7 +86,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
           />
           
           {/* Panel */}
-          <Card className="absolute right-0 top-12 w-80 max-h-96 z-50 shadow-2xl border border-gray-200 bg-white/95 backdrop-blur-xl">
+          <Card className="fixed right-8 top-20 w-80 max-h-96 z-50 shadow-2xl border border-gray-200 bg-white/95 backdrop-blur-xl dark:bg-gray-900/95 dark:border-gray-700">
             <CardHeader className="pb-3 pt-4 px-4">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">

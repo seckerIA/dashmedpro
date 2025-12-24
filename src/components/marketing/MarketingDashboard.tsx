@@ -1,0 +1,493 @@
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { 
+  DollarSign, 
+  TrendingUp, 
+  Target, 
+  Users, 
+  RefreshCw, 
+  Link2, 
+  BarChart3, 
+  Settings,
+  AlertTriangle,
+  ArrowUpRight,
+  ArrowDownRight,
+  CheckCircle2,
+  ExternalLink
+} from "lucide-react";
+import { useMarketingDashboard } from "@/hooks/useMarketingDashboard";
+import { useSyncAdCampaigns } from "@/hooks/useAdCampaignsSync";
+import { useAdPlatformConnections } from "@/hooks/useAdPlatformConnections";
+import { useNavigate } from "react-router-dom";
+import { formatCurrency } from "@/lib/currency";
+import { Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+
+export function MarketingDashboard() {
+  const { data: dashboardData, isLoading } = useMarketingDashboard();
+  const { data: connections } = useAdPlatformConnections();
+  const syncCampaigns = useSyncAdCampaigns();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MarketingDashboard.tsx:31',message:'componente renderizado',data:{isLoading,hasDashboardData:!!dashboardData,hasConnections:!!connections,connectionsCount:connections?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
+
+  const handleSyncAll = async () => {
+    if (!connections || connections.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Nenhuma conexão',
+        description: 'Configure pelo menos uma conexão antes de sincronizar.',
+      });
+      return;
+    }
+
+    try {
+      const activeConnections = connections.filter(c => c.is_active);
+      for (const connection of activeConnections) {
+        await syncCampaigns.mutateAsync(connection.id);
+      }
+      toast({
+        title: 'Sincronização iniciada',
+        description: `Sincronizando ${activeConnections.length} conexão(ões)...`,
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: error.message || 'Erro ao sincronizar campanhas.',
+      });
+    }
+  };
+
+  if (isLoading) {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MarketingDashboard.tsx:39',message:'loading state',data:{isLoading},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!dashboardData) {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MarketingDashboard.tsx:48',message:'sem dados do dashboard',data:{isLoading,hasDashboardData:!!dashboardData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+    return (
+      <Card>
+        <CardContent className="p-8 text-center">
+          <p className="text-muted-foreground">Carregando dados do dashboard...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MarketingDashboard.tsx:57',message:'renderizando dashboard',data:{totalSpend:dashboardData.totalSpend,totalRevenue:dashboardData.totalRevenue,averageROAS:dashboardData.averageROAS,totalLeads:dashboardData.totalLeads,alertsCount:dashboardData.alerts.length,hasConnections:dashboardData.hasConnections},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
+
+  // Dados para gráfico de performance (últimos 30 dias - mockado por enquanto)
+  const performanceData = [
+    { date: '01/01', gasto: 500, receita: 1200 },
+    { date: '05/01', gasto: 750, receita: 1800 },
+    { date: '10/01', gasto: 600, receita: 1500 },
+    { date: '15/01', gasto: 900, receita: 2200 },
+    { date: '20/01', gasto: 800, receita: 1900 },
+    { date: '25/01', gasto: 1100, receita: 2800 },
+    { date: '30/01', gasto: dashboardData.totalSpend, receita: dashboardData.totalRevenue },
+  ];
+
+  // Dados para comparativo de plataformas
+  const platformComparisonData = [
+    { name: 'Google Ads', gasto: dashboardData.googleAdsSpend, receita: dashboardData.googleAdsRevenue },
+    { name: 'Meta Ads', gasto: dashboardData.metaAdsSpend, receita: dashboardData.metaAdsRevenue },
+  ];
+
+  const getAlertIcon = (type: string) => {
+    switch (type) {
+      case 'low_roas':
+        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+      case 'no_conversions':
+        return <AlertTriangle className="h-4 w-4 text-orange-500" />;
+      case 'budget_limit':
+        return <AlertTriangle className="h-4 w-4 text-red-500" />;
+      case 'optimization':
+        return <TrendingUp className="h-4 w-4 text-blue-500" />;
+      default:
+        return <AlertTriangle className="h-4 w-4" />;
+    }
+  };
+
+  const getAlertVariant = (type: string): "default" | "destructive" => {
+    return type === 'low_roas' || type === 'no_conversions' ? 'destructive' : 'default';
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Cards de Métricas Principais */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/10 border-blue-500/20">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Gasto Total do Mês</CardTitle>
+            <DollarSign className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(dashboardData.totalSpend)}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {dashboardData.googleAdsSpend + dashboardData.metaAdsSpend > 0 
+                ? `${((dashboardData.googleAdsSpend / (dashboardData.googleAdsSpend + dashboardData.metaAdsSpend)) * 100).toFixed(0)}% Google, ${((dashboardData.metaAdsSpend / (dashboardData.googleAdsSpend + dashboardData.metaAdsSpend)) * 100).toFixed(0)}% Meta`
+                : 'Nenhum gasto registrado'}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-green-500/10 to-green-600/10 border-green-500/20">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Receita Gerada</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(dashboardData.totalRevenue)}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {dashboardData.totalSpend > 0 
+                ? `ROI: ${(((dashboardData.totalRevenue - dashboardData.totalSpend) / dashboardData.totalSpend) * 100).toFixed(1)}%`
+                : 'Sem dados'}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/10 border-purple-500/20">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">ROAS Médio</CardTitle>
+            <Target className="h-4 w-4 text-purple-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {dashboardData.averageROAS > 0 ? `${dashboardData.averageROAS.toFixed(2)}x` : '-'}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {dashboardData.averageROAS >= 3 ? (
+                <span className="text-green-500 flex items-center gap-1">
+                  <ArrowUpRight className="h-3 w-3" />
+                  Excelente
+                </span>
+              ) : dashboardData.averageROAS >= 2 ? (
+                <span className="text-yellow-500 flex items-center gap-1">
+                  <ArrowUpRight className="h-3 w-3" />
+                  Bom
+                </span>
+              ) : dashboardData.averageROAS > 0 ? (
+                <span className="text-orange-500 flex items-center gap-1">
+                  <ArrowDownRight className="h-3 w-3" />
+                  Atenção
+                </span>
+              ) : (
+                'Sem dados'
+              )}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-orange-500/10 to-orange-600/10 border-orange-500/20">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Leads Gerados</CardTitle>
+            <Users className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{dashboardData.totalLeads}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {dashboardData.totalSpend > 0 && dashboardData.totalLeads > 0
+                ? `CPA: ${formatCurrency(dashboardData.totalSpend / dashboardData.totalLeads)}`
+                : 'Sem dados'}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Status de Integrações e Ações Rápidas */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Status de Integrações</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Conexões Ativas</span>
+              <Badge variant={dashboardData.activeConnections > 0 ? 'default' : 'secondary'}>
+                {dashboardData.activeConnections}
+              </Badge>
+            </div>
+            {dashboardData.lastSyncTime && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Última Sincronização</span>
+                <span className="text-sm">
+                  {format(new Date(dashboardData.lastSyncTime), "dd/MM HH:mm", { locale: ptBR })}
+                </span>
+              </div>
+            )}
+            {!dashboardData.hasConnections && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full mt-2"
+                onClick={() => navigate('/marketing?tab=integrations')}
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Configurar Integrações
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Ações Rápidas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                onClick={handleSyncAll}
+                disabled={syncCampaigns.isPending || !dashboardData.hasConnections}
+              >
+                {syncCampaigns.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Sincronizando...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Sincronizar Todas as Campanhas
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => navigate('/marketing?tab=utms')}
+              >
+                <Link2 className="h-4 w-4 mr-2" />
+                Gerar Novo Link UTM
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => navigate('/marketing?tab=reports')}
+              >
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Ver Relatórios
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Gráficos de Performance */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Gasto vs Receita (Últimos 30 dias)</CardTitle>
+            <CardDescription>Evolução do investimento e retorno</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={performanceData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis />
+                <Tooltip 
+                  formatter={(value: number) => formatCurrency(value)}
+                  labelStyle={{ color: '#000' }}
+                />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="gasto" 
+                  stroke="#ef4444" 
+                  strokeWidth={2}
+                  name="Gasto"
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="receita" 
+                  stroke="#10b981" 
+                  strokeWidth={2}
+                  name="Receita"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Comparativo Google Ads vs Meta Ads</CardTitle>
+            <CardDescription>Gasto e receita por plataforma</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={platformComparisonData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip 
+                  formatter={(value: number) => formatCurrency(value)}
+                  labelStyle={{ color: '#000' }}
+                />
+                <Legend />
+                <Bar dataKey="gasto" fill="#ef4444" name="Gasto" />
+                <Bar dataKey="receita" fill="#10b981" name="Receita" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Top Campanhas */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Top 5 Campanhas por ROAS</CardTitle>
+            <CardDescription>Melhores campanhas em retorno sobre investimento</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {dashboardData.topCampaignsByROAS.length > 0 ? (
+              <div className="space-y-3">
+                {dashboardData.topCampaignsByROAS.map((campaign, index) => (
+                  <div
+                    key={campaign.id}
+                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                    onClick={() => navigate(`/marketing?tab=campaigns&campaign=${campaign.id}`)}
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold">
+                        {index + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{campaign.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Gasto: {formatCurrency(campaign.spend)} • Receita: {formatCurrency(campaign.revenue)}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant="default" className="ml-2">
+                      {campaign.roas.toFixed(2)}x
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Nenhuma campanha com ROAS disponível
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Top 5 Campanhas por Conversões</CardTitle>
+            <CardDescription>Campanhas com maior número de conversões</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {dashboardData.topCampaignsByConversions.length > 0 ? (
+              <div className="space-y-3">
+                {dashboardData.topCampaignsByConversions.map((campaign, index) => (
+                  <div
+                    key={campaign.id}
+                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                    onClick={() => navigate(`/marketing?tab=campaigns&campaign=${campaign.id}`)}
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold">
+                        {index + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{campaign.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {campaign.conversions} conversões • Receita: {formatCurrency(campaign.revenue)}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant="secondary" className="ml-2">
+                      {campaign.conversions}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Nenhuma campanha com conversões
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Alertas e Recomendações */}
+      {dashboardData.alerts.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-yellow-500" />
+              Alertas e Recomendações
+            </CardTitle>
+            <CardDescription>Ações que podem melhorar o desempenho das suas campanhas</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {dashboardData.alerts.map((alert, index) => (
+                <Alert key={index} variant={getAlertVariant(alert.type)}>
+                  <div className="flex items-start gap-2">
+                    {getAlertIcon(alert.type)}
+                    <div className="flex-1">
+                      <AlertTitle className="text-sm">{alert.message}</AlertTitle>
+                      {alert.campaignId && (
+                        <AlertDescription className="mt-1">
+                          <Button
+                            variant="link"
+                            size="sm"
+                            className="h-auto p-0 text-xs"
+                            onClick={() => navigate(`/marketing?tab=campaigns&campaign=${alert.campaignId}`)}
+                          >
+                            Ver campanha <ExternalLink className="h-3 w-3 ml-1" />
+                          </Button>
+                        </AlertDescription>
+                      )}
+                    </div>
+                  </div>
+                </Alert>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Mensagem quando não há conexões */}
+      {!dashboardData.hasConnections && (
+        <Card className="border-dashed">
+          <CardContent className="p-8 text-center">
+            <Settings className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Configure suas integrações</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Conecte suas contas do Google Ads e Meta Ads para começar a acompanhar suas campanhas
+            </p>
+            <Button onClick={() => navigate('/marketing?tab=integrations')}>
+              <Settings className="h-4 w-4 mr-2" />
+              Configurar Primeira Integração
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+

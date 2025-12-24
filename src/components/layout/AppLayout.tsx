@@ -16,6 +16,7 @@ import { NotificationBell } from "@/components/notifications/NotificationBell"
 import { LivePerformanceCard } from "@/components/prospecting/LivePerformanceCard"
 import { useOverdueAppointments } from "@/hooks/useOverdueAppointments"
 import { AlertTriangle } from "lucide-react"
+import { GlobalSearch } from "@/components/crm/GlobalSearch"
 
 interface AppLayoutProps {
   children: ReactNode
@@ -108,16 +109,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
                 {/* Barra de busca */}
                 <div className="hidden md:flex items-center ml-8 flex-1 max-w-md">
-                  <div className="relative w-full">
-                    <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted-foreground">
-                      <Search className="w-4 h-4" />
-                    </span>
-                    <input
-                      type="text"
-                      placeholder="Buscar contratos, contatos..."
-                      className="w-full pl-9 pr-4 py-2 rounded-full border border-border bg-muted/60 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/60 focus:border-transparent transition-colors"
-                    />
-                  </div>
+                  <GlobalSearch />
                 </div>
               </div>
 

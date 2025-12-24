@@ -29,6 +29,7 @@ import TransactionForm from "./components/financial/TransactionForm";
 import ProspectingGuide from "./pages/ProspectingGuide";
 import Commercial from "./pages/Commercial";
 import FollowUps from "./pages/FollowUps";
+import Marketing from "./pages/Marketing";
 import { 
   TrendingUp, 
   Target, 
@@ -274,16 +275,7 @@ const AppRoutes = () => {
         />
         <Route path="/tarefas" element={<Tasks />} />
         <Route path="/tarefas-debug" element={<TasksDebug />} />
-        <Route 
-          path="/marketing" 
-          element={
-            <PlaceholderPage 
-              title="Marketing" 
-              description="Gestão de campanhas e estratégias de marketing digital"
-              icon={TrendingUp}
-            />
-          } 
-        />
+        <Route path="/marketing" element={<Marketing />} />
         <Route path="/comercial" element={<Commercial />} />
         <Route 
           path="/financeiro" 
