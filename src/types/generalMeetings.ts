@@ -1,6 +1,14 @@
+/**
+ * Tipos e constantes para reuniões gerais (general_meetings)
+ */
+
+// Tipos de reunião
 export type MeetingType = 'meeting' | 'appointment' | 'block' | 'other';
+
+// Status de reunião
 export type MeetingStatus = 'scheduled' | 'completed' | 'cancelled';
 
+// Interface principal para reunião
 export interface GeneralMeeting {
   id: string;
   user_id: string;
@@ -19,92 +27,83 @@ export interface GeneralMeeting {
   updated_at: string;
 }
 
-export interface GeneralMeetingInsert {
-  user_id: string;
-  title: string;
-  description?: string | null;
-  start_time: string;
-  end_time: string;
-  duration_minutes: number;
-  location?: string | null;
-  meeting_type?: MeetingType;
-  is_busy?: boolean;
-  attendees?: string[] | null;
-  notes?: string | null;
-  status?: MeetingStatus;
-}
+// Tipo para inserção (campos opcionais exceto os obrigatórios)
+export type GeneralMeetingInsert = Omit<GeneralMeeting, 'id' | 'created_at' | 'updated_at'> & {
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+};
 
-export interface GeneralMeetingUpdate {
-  title?: string;
-  description?: string | null;
-  start_time?: string;
-  end_time?: string;
-  duration_minutes?: number;
-  location?: string | null;
-  meeting_type?: MeetingType;
-  is_busy?: boolean;
-  attendees?: string[] | null;
-  notes?: string | null;
-  status?: MeetingStatus;
-}
+// Tipo para atualização (todos os campos opcionais exceto id)
+export type GeneralMeetingUpdate = Partial<Omit<GeneralMeeting, 'id' | 'created_at'>> & {
+  id: string;
+};
 
-// Labels para UI
+// Labels para tipos de reunião
 export const MEETING_TYPE_LABELS: Record<MeetingType, string> = {
   meeting: 'Reunião',
   appointment: 'Compromisso',
-  block: 'Bloqueio de Tempo',
+  block: 'Bloqueio',
   other: 'Outro',
 };
 
+// Labels para status de reunião
 export const MEETING_STATUS_LABELS: Record<MeetingStatus, string> = {
-  scheduled: 'Agendado',
-  completed: 'Concluído',
-  cancelled: 'Cancelado',
+  scheduled: 'Agendada',
+  completed: 'Concluída',
+  cancelled: 'Cancelada',
 };
 
-// Cores para diferentes tipos de reunião
-export const MEETING_TYPE_COLORS: Record<MeetingType, { bg: string; text: string; border: string }> = {
+// Cores para tipos de reunião
+export const MEETING_TYPE_COLORS: Record<
+  MeetingType,
+  { bg: string; text: string; border: string }
+> = {
   meeting: {
-    bg: 'bg-orange-500/10',
-    text: 'text-orange-600 dark:text-orange-400',
-    border: 'border-orange-500/20',
+    bg: 'bg-blue-50 dark:bg-blue-900/30',
+    text: 'text-blue-900 dark:text-blue-100',
+    border: 'border-blue-200 dark:border-blue-700',
   },
   appointment: {
-    bg: 'bg-purple-500/10',
-    text: 'text-purple-600 dark:text-purple-400',
-    border: 'border-purple-500/20',
+    bg: 'bg-purple-50 dark:bg-purple-900/30',
+    text: 'text-purple-900 dark:text-purple-100',
+    border: 'border-purple-200 dark:border-purple-700',
   },
   block: {
-    bg: 'bg-gray-500/10',
-    text: 'text-gray-600 dark:text-gray-400',
-    border: 'border-gray-500/20',
+    bg: 'bg-orange-50 dark:bg-orange-900/30',
+    text: 'text-orange-900 dark:text-orange-100',
+    border: 'border-orange-200 dark:border-orange-700',
   },
   other: {
-    bg: 'bg-cyan-500/10',
-    text: 'text-cyan-600 dark:text-cyan-400',
-    border: 'border-cyan-500/20',
+    bg: 'bg-gray-50 dark:bg-gray-800/30',
+    text: 'text-gray-900 dark:text-gray-100',
+    border: 'border-gray-200 dark:border-gray-700',
   },
 };
 
-export const MEETING_STATUS_COLORS: Record<MeetingStatus, { bg: string; text: string; border: string }> = {
+// Cores para status de reunião
+export const MEETING_STATUS_COLORS: Record<
+  MeetingStatus,
+  { bg: string; text: string; border: string }
+> = {
   scheduled: {
-    bg: 'bg-blue-500/10',
-    text: 'text-blue-600 dark:text-blue-400',
-    border: 'border-blue-500/20',
+    bg: 'bg-blue-50 dark:bg-blue-900/30',
+    text: 'text-blue-900 dark:text-blue-100',
+    border: 'border-blue-200 dark:border-blue-700',
   },
   completed: {
-    bg: 'bg-green-500/10',
-    text: 'text-green-600 dark:text-green-400',
-    border: 'border-green-500/20',
+    bg: 'bg-green-50 dark:bg-green-900/30',
+    text: 'text-green-900 dark:text-green-100',
+    border: 'border-green-200 dark:border-green-700',
   },
   cancelled: {
-    bg: 'bg-gray-500/10',
-    text: 'text-gray-600 dark:text-gray-400',
-    border: 'border-gray-500/20',
+    bg: 'bg-red-50 dark:bg-red-900/30',
+    text: 'text-red-900 dark:text-red-100',
+    border: 'border-red-200 dark:border-red-700',
   },
 };
 
-// Duration options (in minutes) - same as medical appointments
+// Opções de duração (em minutos)
 export const DURATION_OPTIONS = [
   { value: 15, label: '15 minutos' },
   { value: 30, label: '30 minutos' },
@@ -112,5 +111,6 @@ export const DURATION_OPTIONS = [
   { value: 60, label: '1 hora' },
   { value: 90, label: '1 hora e 30 minutos' },
   { value: 120, label: '2 horas' },
+  { value: 180, label: '3 horas' },
+  { value: 240, label: '4 horas' },
 ] as const;
-

@@ -147,6 +147,10 @@ const StuckQueryDetector = () => {
               const stuckSeconds = Math.round(timeSinceStart / 1000);
               console.warn(`⚠️ Query travada detectada: ${queryKey} (${stuckSeconds}s) - Cancelando e invalidando...`);
               
+              // #region agent log
+              fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:StuckQueryDetector',message:'query travada detectada',data:{queryKey,stuckSeconds,timeSinceStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+              // #endregion
+              
               // Cancelar a query travada mais agressivamente
               queryClient.cancelQueries({ queryKey: query.queryKey });
               

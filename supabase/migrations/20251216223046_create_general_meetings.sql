@@ -102,3 +102,5 @@ COMMENT ON COLUMN public.general_meetings.meeting_type IS 'Tipo de reunião: mee
 
 
 
+
+
