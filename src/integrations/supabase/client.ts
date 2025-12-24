@@ -6,39 +6,55 @@ export const SUPABASE_URL = "https://adzaqkduxnpckbcuqpmg.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkemFxa2R1eG5wY2tiY3VxcG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5ODgyMDksImV4cCI6MjA4MTU2NDIwOX0.WO9-vzv_Vuh86TQWgNWuQ45cXa-L4GoGQfpSbvQiVMc";
 export const CURRENT_PROJECT_REF = "adzaqkduxnpckbcuqpmg";
 
-// Limpar TODAS as sessões antigas do Supabase ao inicializar
+// Limpar apenas sessões de OUTROS projetos do Supabase ao inicializar
+// NÃO limpar a sessão do projeto atual para permitir persistência
 if (typeof window !== 'undefined') {
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:init',message:'inicializando cliente Supabase',data:{projectRef:CURRENT_PROJECT_REF,storageKey:`sb-${CURRENT_PROJECT_REF}-auth-token`},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
+
   // DEBUG: Log das chaves antes de limpar
   const allKeys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i)).filter(Boolean) as string[];
   const supabaseKeys = allKeys.filter(key => key.startsWith('sb-') || key.includes('supabase'));
   
-  if (supabaseKeys.length > 0) {
-    console.log('🧹 Limpando sessões antigas do Supabase:', supabaseKeys);
-  }
-  
-  // Limpar todas as chaves do Supabase do localStorage
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:init',message:'chaves Supabase encontradas',data:{totalKeys:supabaseKeys.length,keys:supabaseKeys,currentStorageKey:`sb-${CURRENT_PROJECT_REF}-auth-token`},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
+
+  // Limpar apenas chaves de OUTROS projetos, não a do projeto atual
+  const currentStorageKey = `sb-${CURRENT_PROJECT_REF}-auth-token`;
   const keysToRemove: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
     if (key) {
-      // Remover TODAS as chaves do Supabase (vamos forçar nova autenticação)
-      if (key.startsWith('sb-') || key.includes('supabase')) {
+      // Remover apenas chaves do Supabase que NÃO são do projeto atual
+      if ((key.startsWith('sb-') || key.includes('supabase')) && key !== currentStorageKey) {
         keysToRemove.push(key);
       }
     }
   }
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:init',message:'limpando chaves de outros projetos',data:{keysToRemove:keysToRemove.length,keys:keysToRemove,preservingKey:currentStorageKey},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
+
   keysToRemove.forEach(key => localStorage.removeItem(key));
   
-  // Também limpar sessionStorage
+  // Também limpar sessionStorage de outros projetos
   const sessionKeysToRemove: string[] = [];
   for (let i = 0; i < sessionStorage.length; i++) {
     const key = sessionStorage.key(i);
-    if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
+    if (key && (key.startsWith('sb-') || key.includes('supabase')) && key !== currentStorageKey) {
       sessionKeysToRemove.push(key);
     }
   }
   sessionKeysToRemove.forEach(key => sessionStorage.removeItem(key));
   
+  // #region agent log
+  const storedSession = localStorage.getItem(currentStorageKey);
+  fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:init',message:'cliente inicializado',data:{hasStoredSession:!!storedSession,storageKey:currentStorageKey},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
+
   console.log('✅ Cliente Supabase inicializado para projeto: adzaqkduxnpckbcuqpmg');
   console.log('✅ URL:', SUPABASE_URL);
 }
@@ -58,9 +74,99 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   global: {
     headers: {
       'apikey': SUPABASE_PUBLISHABLE_KEY,
+    },
+    fetch: (url, options = {}) => {
+      // #region agent log
+      const fetchStartTime = Date.now();
+      const requestId = Math.random().toString(36).substring(7);
+      const urlStr = typeof url === 'string' ? url : url.toString();
+      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:59',message:'fetch iniciado',data:{requestId,url:urlStr,method:options.method || 'GET',hasHeaders:!!options.headers,hasAuth:!!(options.headers as any)?.Authorization},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
+
+      // Usar fetch nativo com timeout no nível HTTP
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:66',message:'fetch timeout no controller',data:{requestId,elapsed:Date.now()-fetchStartTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
+        controller.abort();
+      }, 30000);
+
+      // Combinar signals se ambos existirem
+      const combinedSignal = options.signal || controller.signal;
+      if (options.signal && controller.signal) {
+        options.signal.addEventListener('abort', () => controller.abort());
+      }
+
+      return fetch(url, {
+        ...options,
+        signal: combinedSignal,
+      })
+        .then((response) => {
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:80',message:'fetch response recebida',data:{requestId,status:response.status,statusText:response.statusText,ok:response.ok,elapsed:Date.now()-fetchStartTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'E'})}).catch(()=>{});
+          // #endregion
+          clearTimeout(timeoutId);
+          return response;
+        })
+        .catch((error) => {
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:87',message:'fetch erro',data:{requestId,errorMessage:error?.message,errorName:error?.name,isAbort:error?.name === 'AbortError',elapsed:Date.now()-fetchStartTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'E'})}).catch(()=>{});
+          // #endregion
+          clearTimeout(timeoutId);
+          throw error;
+        });
+    },
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10
     }
   }
 });
+
+// Monitorar eventos de refresh de token
+if (typeof window !== 'undefined') {
+  supabase.auth.onAuthStateChange((event, session) => {
+    // #region agent log
+    const now = Math.floor(Date.now() / 1000);
+    const tokenExpiry = session?.expires_at ? parseInt(session.expires_at.toString()) : null;
+    const timeUntilExpiry = tokenExpiry ? tokenExpiry - now : null;
+    fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:60',message:'onAuthStateChange no client',data:{event,hasSession:!!session,userId:session?.user?.id,tokenExpiry,timeUntilExpiry,isExpired:timeUntilExpiry !== null && timeUntilExpiry < 0},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+  });
+  
+  // Monitorar refresh de token periodicamente
+  setInterval(async () => {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      const now = Math.floor(Date.now() / 1000);
+      const tokenExpiry = session?.expires_at ? parseInt(session.expires_at.toString()) : null;
+      const timeUntilExpiry = tokenExpiry ? tokenExpiry - now : null;
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:72',message:'monitoramento token periódico',data:{hasSession:!!session,hasError:!!error,errorMessage:error?.message,tokenExpiry,timeUntilExpiry,isExpired:timeUntilExpiry !== null && timeUntilExpiry < 0,minutesUntilExpiry:timeUntilExpiry ? Math.floor(timeUntilExpiry / 60) : null},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      
+      // Se o token está próximo de expirar (menos de 5 minutos), tentar refresh
+      if (session && timeUntilExpiry !== null && timeUntilExpiry > 0 && timeUntilExpiry < 300) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:79',message:'tentando refresh token',data:{timeUntilExpiry},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:85',message:'refresh token resultado',data:{hasSession:!!refreshData?.session,hasError:!!refreshError,errorMessage:refreshError?.message,newTokenExpiry:refreshData?.session?.expires_at},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+      }
+    } catch (err: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:91',message:'erro monitoramento token',data:{errorMessage:err?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+    }
+  }, 60000); // Verificar a cada minuto
+}
 
 // Exportar URL e Project Ref para uso em outros lugares
 export const SUPABASE_PROJECT_URL = SUPABASE_URL;

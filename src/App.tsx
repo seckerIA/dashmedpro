@@ -1,7 +1,8 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AppLayout } from "./components/layout/AppLayout";
@@ -42,22 +43,141 @@ import {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 2,
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-      staleTime: 30 * 1000, // 30 segundos
+      retry: (failureCount, error: any) => {
+        // Limitar número máximo de retries para evitar loops infinitos
+        if (failureCount >= 3) {
+          return false;
+        }
+        
+        // Retry mais agressivo para erros de timeout (retry imediato)
+        if (error?.message?.includes('timeout') || error?.message?.includes('Query timeout')) {
+          return failureCount < 2; // Retry até 2 vezes para timeouts
+        }
+        
+        // Para outros erros, retry padrão
+        return failureCount < 2;
+      },
+      retryDelay: (attemptIndex, error: any) => {
+        // Retry imediato para timeouts (não esperar delay exponencial)
+        if (error?.message?.includes('timeout') || error?.message?.includes('Query timeout')) {
+          return 500; // 500ms para timeouts (retry rápido)
+        }
+        
+        // Delay padrão para outros erros
+        return Math.min(1000 * 2 ** attemptIndex, 5000); // 1s, 2s, max 5s
+      },
+      staleTime: 2 * 60 * 1000, // 2 minutos
       gcTime: 5 * 60 * 1000, // 5 minutos (anteriormente cacheTime)
       refetchOnWindowFocus: false, // Evitar refetch automático ao focar na janela
-      refetchOnMount: true,
-      refetchOnReconnect: true,
-      // Timeout de 30 segundos para evitar queries infinitas
+      refetchOnMount: false, // Evitar refetch automático ao montar
+      refetchOnReconnect: true, // Refetch ao reconectar
       networkMode: 'online',
+      // Invalidar cache de queries que falharam múltiplas vezes
+      onError: (error: any, query) => {
+        if (error?.message?.includes('timeout')) {
+          console.error(`❌ Query timeout: ${query.queryKey.join('/')}`);
+          
+          // Se a query falhou múltiplas vezes, remover do cache
+          const state = query.state;
+          if (state.failureCount >= 3) {
+            queryClient.removeQueries({ queryKey: query.queryKey });
+          }
+        }
+      },
     },
     mutations: {
       retry: 1,
       retryDelay: 1000,
+      onError: (error: any) => {
+        // Log global de erros de mutação
+        if (error?.message?.includes('timeout')) {
+          console.error('❌ Mutation timeout:', error);
+        }
+      },
     },
   },
 });
+
+// Componente para detectar e cancelar queries travadas
+const StuckQueryDetector = () => {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    // Rastrear quando queries começam a fazer fetch
+    const fetchStartTimes = new Map<string, number>();
+    
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      if (event?.type === 'updated') {
+        const query = event.query;
+        const state = query.state;
+        
+        // Quando uma query começa a fazer fetch, registrar o tempo
+        if (state.fetchStatus === 'fetching') {
+          const queryKey = query.queryKey.join('/');
+          if (!fetchStartTimes.has(queryKey)) {
+            fetchStartTimes.set(queryKey, Date.now());
+          }
+        }
+        
+        // Quando uma query termina (sucesso ou erro), remover do rastreamento
+        if (state.fetchStatus === 'idle' || state.fetchStatus === 'paused') {
+          const queryKey = query.queryKey.join('/');
+          fetchStartTimes.delete(queryKey);
+        }
+      }
+    });
+
+    const checkInterval = setInterval(() => {
+      const queryCache = queryClient.getQueryCache();
+      const allQueries = queryCache.getAll();
+
+      allQueries.forEach((query) => {
+        const state = query.state;
+        const queryKey = query.queryKey.join('/');
+        
+        // Verificar se a query está em fetching há mais de 25 segundos (antes do timeout de 30s)
+        if (state.fetchStatus === 'fetching') {
+          const fetchStartTime = fetchStartTimes.get(queryKey);
+          
+          if (fetchStartTime) {
+            const timeSinceStart = Date.now() - fetchStartTime;
+            const stuckThreshold = 25000; // 25 segundos (antes do timeout de 30s)
+
+            if (timeSinceStart > stuckThreshold) {
+              const stuckSeconds = Math.round(timeSinceStart / 1000);
+              console.warn(`⚠️ Query travada detectada: ${queryKey} (${stuckSeconds}s) - Cancelando e invalidando...`);
+              
+              // Cancelar a query travada mais agressivamente
+              queryClient.cancelQueries({ queryKey: query.queryKey });
+              
+              // Limpar do rastreamento
+              fetchStartTimes.delete(queryKey);
+              
+              // Invalidar para forçar refetch na próxima vez
+              queryClient.invalidateQueries({ queryKey: query.queryKey });
+              
+              // Remover do cache para evitar reutilização de dados antigos
+              queryClient.removeQueries({ queryKey: query.queryKey });
+            }
+          } else {
+            // Se não temos o tempo de início, registrar agora
+            fetchStartTimes.set(queryKey, Date.now());
+          }
+        } else {
+          // Se não está mais em fetching, remover do rastreamento
+          fetchStartTimes.delete(queryKey);
+        }
+      });
+    }, 5000); // Verificar a cada 5 segundos (mais frequente)
+
+    return () => {
+      clearInterval(checkInterval);
+      unsubscribe();
+    };
+  }, [queryClient]);
+
+  return null;
+};
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -256,6 +376,7 @@ const App = () => (
       <SupabaseProjectValidator>
         <AuthProvider>
           <TooltipProvider>
+            <StuckQueryDetector />
             <Toaster />
             <Sonner />
             <BrowserRouter>

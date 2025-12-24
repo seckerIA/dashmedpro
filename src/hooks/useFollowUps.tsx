@@ -1,15 +1,22 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
+import { ensureValidSession } from '@/utils/supabaseHelpers';
 import { FollowUp, CreateFollowUpData, UpdateFollowUpData } from '@/types/followUp';
 import { useAuth } from './useAuth';
 
 // Buscar follow-ups do usuário
-const fetchFollowUps = async (userId: string): Promise<FollowUp[]> => {
-  const { data, error } = await supabase
+const fetchFollowUps = async (userId: string, signal?: AbortSignal): Promise<FollowUp[]> => {
+  // Verificar e garantir sessão válida
+  await ensureValidSession();
+
+  const queryPromise = supabase
     .from('crm_follow_ups')
     .select('*')
     .eq('user_id', userId)
     .order('scheduled_date', { ascending: true });
+
+  const { data, error } = await supabaseQueryWithTimeout(queryPromise, 30000, signal);
 
   if (error) throw error;
   return (data || []) as FollowUp[];
@@ -70,22 +77,25 @@ export function useFollowUps() {
   // Query para buscar follow-ups
   const { data: followUps = [], isLoading, error } = useQuery({
     queryKey: ['followUps', user?.id],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!user?.id) {
         return [];
       }
       try {
-        return await fetchFollowUps(user.id);
+        return await fetchFollowUps(user.id, signal);
       } catch (error) {
         console.error('❌ useFollowUps - Erro ao buscar follow-ups:', error);
         return [];
       }
     },
     enabled: !!user?.id && !authLoading, // Aguardar auth terminar de carregar
-    staleTime: 30 * 1000,
+    staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
+    refetchOnMount: false,
     refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
     retry: 2,
+    retryDelay: 1000,
   });
 
   // Mutation para criar follow-up

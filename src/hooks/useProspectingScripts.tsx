@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
+import { ensureValidSession } from '@/utils/supabaseHelpers';
 import { useAuth } from './useAuth';
 import { 
   ProspectingScriptInsert, 
@@ -17,27 +19,36 @@ export function useProspectingScripts() {
   // Buscar scripts do usuário e scripts públicos de outros usuários
   const { data: scripts = [], isLoading } = useQuery<ProspectingScriptWithCreator[]>({
     queryKey: ['prospecting-scripts', user?.id],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!user?.id) return [];
       
+      // Verificar e garantir sessão válida
+      await ensureValidSession();
+      
       // Buscar scripts do próprio usuário
-      const { data: myScripts, error: myError } = await supabase
+      const myScriptsQuery = supabase
         .from('prospecting_scripts')
         .select('*')
         .eq('user_id', user.id)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
+      const myScriptsResult = await supabaseQueryWithTimeout(myScriptsQuery, 30000, signal);
+      const { data: myScripts, error: myError } = myScriptsResult;
+
       if (myError) throw myError;
 
       // Buscar scripts públicos de outros usuários (sem join por enquanto)
-      const { data: publicScripts, error: publicError } = await supabase
+      const publicScriptsQuery = supabase
         .from('prospecting_scripts')
         .select('*')
         .eq('is_public', true)
         .neq('user_id', user.id)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
+
+      const publicScriptsResult = await supabaseQueryWithTimeout(publicScriptsQuery, 30000, signal);
+      const { data: publicScripts, error: publicError } = publicScriptsResult;
 
       if (publicError) throw publicError;
 
@@ -47,10 +58,13 @@ export function useProspectingScripts() {
       if (publicScripts && publicScripts.length > 0) {
         const creatorIds = [...new Set(publicScripts.map(s => s.user_id))];
         
-        const { data: creators, error: creatorsError } = await supabase
+        const creatorsQuery = supabase
           .from('profiles')
           .select('id, full_name, email')
           .in('id', creatorIds);
+        
+        const creatorsResult = await supabaseQueryWithTimeout(creatorsQuery, 30000, signal);
+        const { data: creators, error: creatorsError } = creatorsResult;
         
         if (!creatorsError && creators) {
           const creatorsMap = new Map(creators.map(c => [c.id, c]));
@@ -70,6 +84,13 @@ export function useProspectingScripts() {
       return scriptResults;
     },
     enabled: !!user?.id,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    retry: 2,
+    retryDelay: 1000,
   });
 
   // Criar novo script

@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
+import { ensureValidSession } from '@/utils/supabaseHelpers';
 import { 
   SalesCall, 
   SalesCallWithRelations, 
@@ -13,11 +15,18 @@ import { format, isBefore, addMinutes } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 // Fetch sales calls with relations
-const fetchSalesCalls = async (userId: string, filters?: {
-  startDate?: Date;
-  endDate?: Date;
-  status?: SalesCallStatus;
-}): Promise<SalesCallWithRelations[]> => {
+const fetchSalesCalls = async (
+  userId: string, 
+  filters?: {
+    startDate?: Date;
+    endDate?: Date;
+    status?: SalesCallStatus;
+  },
+  signal?: AbortSignal
+): Promise<SalesCallWithRelations[]> => {
+  // Verificar e garantir sessão válida
+  await ensureValidSession();
+
   let query = supabase
     .from('sales_calls')
     .select(`
@@ -40,7 +49,7 @@ const fetchSalesCalls = async (userId: string, filters?: {
     query = query.eq('status', filters.status);
   }
 
-  const { data, error } = await query;
+  const { data, error } = await supabaseQueryWithTimeout(query, 30000, signal);
 
   if (error) throw new Error(`Erro ao buscar calls: ${error.message}`);
   return (data || []) as SalesCallWithRelations[];
@@ -75,8 +84,15 @@ export function useSalesCalls(filters?: {
   // Query para listar calls
   const { data: calls, isLoading, error, refetch } = useQuery({
     queryKey: ['sales-calls', user?.id, filters],
-    queryFn: () => fetchSalesCalls(user!.id, filters),
+    queryFn: ({ signal }) => fetchSalesCalls(user!.id, filters, signal),
     enabled: !!user?.id,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    retry: 2,
+    retryDelay: 1000,
   });
 
   // Mutation para criar call

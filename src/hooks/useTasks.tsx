@@ -1,15 +1,22 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
+import { ensureValidSession } from '@/utils/supabaseHelpers';
 import { TaskWithProfile, TaskWithCRM, CreateTaskData, UpdateTaskData, TaskAssignment, UpdateAssignmentData } from '@/types/tasks';
 import { useAuth } from './useAuth';
 import { useTeamMembers } from './useTeamMembers';
 
 // Função para buscar tarefas do usuário
-const fetchTasks = async (userId: string): Promise<TaskWithCRM[]> => {
-  const { data, error } = await supabase
+const fetchTasks = async (userId: string, signal?: AbortSignal): Promise<TaskWithCRM[]> => {
+  // Verificar e garantir sessão válida
+  await ensureValidSession();
+
+  const queryPromise = supabase
     .from('tasks')
     .select('*')
     .order('created_at', { ascending: false });
+
+  const { data, error } = await supabaseQueryWithTimeout(queryPromise, 30000, signal);
 
   if (error) {
     console.error('Erro ao buscar tarefas:', error);
@@ -58,8 +65,15 @@ export function useTasks() {
     error
   } = useQuery({
     queryKey: ['tasks', user?.id],
-    queryFn: () => fetchTasks(user?.id || ''),
+    queryFn: ({ signal }) => fetchTasks(user?.id || '', signal),
     enabled: !!user?.id,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    retry: 2,
+    retryDelay: 1000,
   });
 
   // Mutation para criar tarefa

@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
+import { ensureValidSession } from '@/utils/supabaseHelpers';
 import { ProspectingSessionInsert, SessionResult } from '@/types/prospecting';
 import { useToast } from './use-toast';
 
@@ -12,25 +14,36 @@ export function useProspectingSessions() {
   // Buscar sessões do dia atual
   const { data: todaySessions = [], isLoading } = useQuery({
     queryKey: ['prospecting-sessions-today', user?.id],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!user?.id) return [];
+
+      // Verificar e garantir sessão válida
+      await ensureValidSession();
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const todayISO = today.toISOString();
 
-      const { data, error } = await supabase
+      const queryPromise = supabase
         .from('prospecting_sessions')
         .select('*')
         .eq('user_id', user.id)
         .gte('ended_at', todayISO)
         .order('ended_at', { ascending: false });
 
+      const { data, error } = await supabaseQueryWithTimeout(queryPromise, 30000, signal);
+
       if (error) throw error;
       return data;
     },
     enabled: !!user?.id,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
     refetchInterval: 60000, // Refetch a cada 1 minuto
+    retry: 2,
+    retryDelay: 1000,
   });
 
   // Registrar nova sessão

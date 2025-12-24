@@ -1,13 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
+import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery'
+import { ensureValidSession } from '@/utils/supabaseHelpers'
 import { toast } from '@/hooks/use-toast'
 import { FinancialRecurringTransaction, FinancialRecurringTransactionWithTemplate } from '@/types/financial'
 
 export const useRecurringTransactions = () => {
   return useQuery<FinancialRecurringTransactionWithTemplate[], Error>({
     queryKey: ['recurringTransactions'],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    queryFn: async ({ signal }) => {
+      // Verificar e garantir sessão válida
+      await ensureValidSession();
+
+      const queryPromise = supabase
         .from('financial_recurring_transactions')
         .select(`
           *,
@@ -15,11 +20,20 @@ export const useRecurringTransactions = () => {
         `)
         .order('next_occurrence', { ascending: true })
 
+      const { data, error } = await supabaseQueryWithTimeout(queryPromise, 30000, signal)
+
       if (error) {
         throw new Error(error.message)
       }
       return data
     },
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    retry: 2,
+    retryDelay: 1000,
   })
 }
 

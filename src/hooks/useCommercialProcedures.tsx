@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "./useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { supabaseQueryWithTimeout } from "@/utils/supabaseQuery";
+import { ensureValidSession } from "@/utils/supabaseHelpers";
 import { CommercialProcedure, CommercialProcedureInsert, CommercialProcedureUpdate } from "@/types/commercial";
 
 export function useCommercialProcedures() {
@@ -11,19 +13,32 @@ export function useCommercialProcedures() {
 
   const { data: procedures, isLoading, error } = useQuery({
     queryKey: ["commercial-procedures", user?.id],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!user) throw new Error("User not authenticated");
 
-      const { data, error } = await supabase
+      // Verificar e garantir sessão válida
+      await ensureValidSession();
+
+      // Executar query com timeout
+      const queryPromise = supabase
         .from("commercial_procedures")
         .select("*")
         .eq("user_id", user.id)
         .order("name", { ascending: true });
 
+      const { data, error } = await supabaseQueryWithTimeout(queryPromise, 30000, signal);
+
       if (error) throw error;
       return data as CommercialProcedure[];
     },
     enabled: !!user,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    retry: 2,
+    retryDelay: 1000,
   });
 
   const createProcedure = useMutation({
@@ -117,6 +132,8 @@ export function useCommercialProcedures() {
     deleteProcedure,
   };
 }
+
+
 
 
 

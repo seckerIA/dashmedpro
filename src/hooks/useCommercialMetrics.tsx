@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "./useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { supabaseQueryWithTimeout } from "@/utils/supabaseQuery";
 import { 
   startOfDay, 
   endOfDay, 
@@ -89,7 +90,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       const prevEndISO = previousPeriod.end.toISOString();
 
       // 1. Buscar consultas médicas com transações financeiras
-      const { data: appointments, error: appointmentsError } = await supabase
+      const appointmentsQuery = supabase
         .from("medical_appointments")
         .select(`
           id,
@@ -109,6 +110,9 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .gte("start_time", periodStartISO)
         .lte("start_time", periodEndISO);
 
+      const appointmentsResult = await supabaseQueryWithTimeout(appointmentsQuery, 30000);
+      const { data: appointments, error: appointmentsError } = appointmentsResult;
+
       if (appointmentsError) throw appointmentsError;
 
       // Preparar IDs de transações para busca paralela
@@ -117,7 +121,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .filter((id): id is string => id !== null && id !== undefined) || [];
 
       // 2. Buscar transações financeiras do período
-      const { data: transactions, error: transactionsError } = await supabase
+      const transactionsQuery = supabase
         .from("financial_transactions")
         .select(`
           id,
@@ -136,6 +140,9 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .gte("transaction_date", format(period.start, "yyyy-MM-dd"))
         .lte("transaction_date", format(period.end, "yyyy-MM-dd"));
 
+      const transactionsResult = await supabaseQueryWithTimeout(transactionsQuery, 30000);
+      const { data: transactions, error: transactionsError } = transactionsResult;
+
       if (transactionsError) throw transactionsError;
 
       // Atualizar transactionIds com as transações encontradas
@@ -143,32 +150,45 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       
       // 3-5. Executar queries em paralelo (que não dependem de transactionIds)
       const [
-        { data: costs, error: costsError },
-        { data: leads, error: leadsError },
-        { data: campaigns, error: campaignsError },
+        costsResult,
+        leadsResult,
+        campaignsResult,
       ] = await Promise.all([
         // 3. Buscar custos detalhados das transações
         allTransactionIds.length > 0
-          ? supabase
-              .from("transaction_costs")
-              .select("*")
-              .in("transaction_id", allTransactionIds)
+          ? supabaseQueryWithTimeout(
+              supabase
+                .from("transaction_costs")
+                .select("*")
+                .in("transaction_id", allTransactionIds),
+              30000
+            )
           : Promise.resolve({ data: [], error: null }),
         
         // 4. Buscar leads comerciais
-        supabase
-          .from("commercial_leads")
-          .select("*")
-          .eq("user_id", user.id)
-          .gte("created_at", periodStartISO)
-          .lte("created_at", periodEndISO),
+        supabaseQueryWithTimeout(
+          supabase
+            .from("commercial_leads")
+            .select("*")
+            .eq("user_id", user.id)
+            .gte("created_at", periodStartISO)
+            .lte("created_at", periodEndISO),
+          30000
+        ),
         
         // 5. Buscar campanhas
-        supabase
-          .from("commercial_campaigns")
-          .select("*")
-          .eq("user_id", user.id),
+        supabaseQueryWithTimeout(
+          supabase
+            .from("commercial_campaigns")
+            .select("*")
+            .eq("user_id", user.id),
+          30000
+        ),
       ]);
+
+      const { data: costs, error: costsError } = costsResult;
+      const { data: leads, error: leadsError } = leadsResult;
+      const { data: campaigns, error: campaignsError } = campaignsResult;
 
       if (costsError) throw costsError;
       if (leadsError) {
@@ -186,53 +206,70 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
 
       // 6-8. Executar queries restantes em paralelo
       const [
-        { data: sales, error: salesError },
-        { data: deals, error: dealsError },
-        { data: prevTransactions },
-        { data: prevAppointments },
+        salesResult,
+        dealsResult,
+        prevTransactionsResult,
+        prevAppointmentsResult,
       ] = await Promise.all([
         // 6. Buscar vendas comerciais
-        supabase
-          .from("commercial_sales")
-          .select("*")
-          .eq("user_id", user.id)
-          .gte("sale_date", format(period.start, "yyyy-MM-dd"))
-          .lte("sale_date", format(period.end, "yyyy-MM-dd")),
+        supabaseQueryWithTimeout(
+          supabase
+            .from("commercial_sales")
+            .select("*")
+            .eq("user_id", user.id)
+            .gte("sale_date", format(period.start, "yyyy-MM-dd"))
+            .lte("sale_date", format(period.end, "yyyy-MM-dd")),
+          30000
+        ),
         
         // 7. Buscar deals do CRM
-        supabase
-          .from("crm_deals")
-          .select(`
-            id,
-            title,
-            stage,
-            value,
-            created_at,
-            closed_at,
-            contact_id
-          `)
-          .eq("user_id", user.id)
-          .gte("created_at", periodStartISO)
-          .lte("created_at", periodEndISO),
+        supabaseQueryWithTimeout(
+          supabase
+            .from("crm_deals")
+            .select(`
+              id,
+              title,
+              stage,
+              value,
+              created_at,
+              closed_at,
+              contact_id
+            `)
+            .eq("user_id", user.id)
+            .gte("created_at", periodStartISO)
+            .lte("created_at", periodEndISO),
+          30000
+        ),
         
         // 8a. Buscar transações do período anterior
-        supabase
-          .from("financial_transactions")
-          .select("amount, type, total_costs")
-          .eq("user_id", user.id)
-          .eq("type", "entrada")
-          .eq("status", "concluida")
-          .gte("transaction_date", format(previousPeriod.start, "yyyy-MM-dd"))
-          .lte("transaction_date", format(previousPeriod.end, "yyyy-MM-dd")),
+        supabaseQueryWithTimeout(
+          supabase
+            .from("financial_transactions")
+            .select("amount, type, total_costs")
+            .eq("user_id", user.id)
+            .eq("type", "entrada")
+            .eq("status", "concluida")
+            .gte("transaction_date", format(previousPeriod.start, "yyyy-MM-dd"))
+            .lte("transaction_date", format(previousPeriod.end, "yyyy-MM-dd")),
+          30000
+        ),
         
         // 8b. Buscar appointments do período anterior
-        supabase
-          .from("medical_appointments")
-          .select("id")
-          .eq("user_id", user.id)
-          .gte("start_time", prevStartISO)
-          .lte("start_time", prevEndISO),
+        supabaseQueryWithTimeout(
+          supabase
+            .from("medical_appointments")
+            .select("id")
+            .eq("user_id", user.id)
+            .gte("start_time", prevStartISO)
+            .lte("start_time", prevEndISO),
+          30000
+        ),
       ]);
+
+      const { data: sales, error: salesError } = salesResult;
+      const { data: deals, error: dealsError } = dealsResult;
+      const { data: prevTransactions } = prevTransactionsResult;
+      const { data: prevAppointments } = prevAppointmentsResult;
 
       if (salesError) throw salesError;
       if (dealsError) throw dealsError;
@@ -326,7 +363,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         : 0;
 
       // Calcular despesas gerais (saídas) do período
-      const { data: expenses } = await supabase
+      const expensesQuery = supabase
         .from("financial_transactions")
         .select("amount")
         .eq("user_id", user.id)
@@ -334,6 +371,9 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .eq("status", "concluida")
         .gte("transaction_date", format(period.start, "yyyy-MM-dd"))
         .lte("transaction_date", format(period.end, "yyyy-MM-dd"));
+      
+      const expensesResult = await supabaseQueryWithTimeout(expensesQuery, 30000);
+      const { data: expenses } = expensesResult;
 
       const totalExpenses = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
       const netMargin = totalRevenue > 0 
@@ -424,11 +464,14 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         : 0;
 
       // Buscar procedimentos do catálogo (total de procedimentos ativos cadastrados) - MOVER PARA ANTES DO LOG
-      const { data: procedures, error: proceduresError } = await supabase
+      const proceduresQuery = supabase
         .from("commercial_procedures")
         .select("id")
         .eq("user_id", user.id)
         .eq("is_active", true);
+      
+      const proceduresResult = await supabaseQueryWithTimeout(proceduresQuery, 30000);
+      const { data: procedures, error: proceduresError } = proceduresResult;
 
       if (proceduresError) {
         console.error('❌ Erro ao buscar procedimentos:', proceduresError);
@@ -515,12 +558,15 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         : 0;
 
       // Calcular pacientes novos (contatos criados no período)
-      const { data: newContacts } = await supabase
+      const newContactsQuery = supabase
         .from("crm_contacts")
         .select("id")
         .eq("user_id", user.id)
         .gte("created_at", periodStartISO)
         .lte("created_at", periodEndISO);
+      
+      const newContactsResult = await supabaseQueryWithTimeout(newContactsQuery, 30000);
+      const { data: newContacts } = newContactsResult;
 
       const newPatients = newContacts?.length || 0;
 

@@ -124,17 +124,37 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
   }, [profile, isAdmin, isVendedor, isGestorTrafego, isLoadingProfile, user?.id]);
   
   const handleSignOut = async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppSidebar.tsx:handleSignOut',message:'handleSignOut chamado',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+
     try {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppSidebar.tsx:handleSignOut',message:'chamando signOut',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+
       await signOut();
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppSidebar.tsx:handleSignOut',message:'signOut completou, mostrando toast',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+
       toast({
         title: "Logout realizado",
         description: "Você foi desconectado com sucesso.",
       });
       // Pequeno delay para garantir que o estado seja atualizado antes do redirecionamento
       setTimeout(() => {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppSidebar.tsx:handleSignOut',message:'navegando para login',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
         navigate('/login', { replace: true });
       }, 100);
     } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppSidebar.tsx:handleSignOut',message:'erro em handleSignOut',data:{errorMessage:error instanceof Error ? error.message : String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+
       console.error('Erro ao fazer logout:', error);
       toast({
         variant: "destructive",

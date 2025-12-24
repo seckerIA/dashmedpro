@@ -22,8 +22,22 @@ interface UseGeneralMeetingsFilters {
 // Fetch meetings
 const fetchMeetings = async (
   userId: string,
-  filters?: UseGeneralMeetingsFilters
+  filters?: UseGeneralMeetingsFilters,
+  signal?: AbortSignal
 ): Promise<GeneralMeeting[]> => {
+  // #region agent log
+  const queryStartTime = Date.now();
+  fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useGeneralMeetings.tsx:fetchMeetings',message:'fetchMeetings iniciado',data:{userId,hasFilters:!!filters,hasSignal:!!signal},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+
+  // Verificar e garantir sessão válida
+  const { ensureValidSession } = await import('@/utils/supabaseHelpers');
+  await ensureValidSession();
+
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useGeneralMeetings.tsx:fetchMeetings',message:'sessão validada, criando query',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'D'})}).catch(()=>{});
+  // #endregion
+
   let query = supabase
     .from('general_meetings')
     .select('*')
@@ -51,7 +65,17 @@ const fetchMeetings = async (
     query = query.eq('is_busy', filters.isBusy);
   }
 
-  const { data, error } = await query;
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useGeneralMeetings.tsx:fetchMeetings',message:'antes executar query com wrapper',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+
+  // Usar wrapper com timeout
+  const { supabaseQueryWithTimeout } = await import('@/utils/supabaseQuery');
+  const { data, error } = await supabaseQueryWithTimeout(query, 30000, signal);
+
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useGeneralMeetings.tsx:fetchMeetings',message:'query resultado',data:{hasData:!!data,dataLength:data?.length,hasError:!!error,errorMessage:error?.message,elapsed:Date.now()-queryStartTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
 
   if (error) throw new Error(`Erro ao buscar reuniões: ${error.message}`);
   return (data as GeneralMeeting[]) || [];
@@ -111,8 +135,15 @@ export function useGeneralMeetings(filters?: UseGeneralMeetingsFilters) {
     refetch,
   } = useQuery({
     queryKey,
-    queryFn: () => fetchMeetings(user?.id || '', filters),
+    queryFn: ({ signal }) => fetchMeetings(user?.id || '', filters, signal),
     enabled: !!user?.id,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    retry: 2,
+    retryDelay: 1000,
   });
 
   // Mutation: Create meeting
@@ -240,6 +271,8 @@ export function useGeneralMeetings(filters?: UseGeneralMeetingsFilters) {
     cancelMeeting,
   };
 }
+
+
 
 
 

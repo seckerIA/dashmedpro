@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { DailyReportInsert, DailyMetrics } from '@/types/prospecting';
 import { useToast } from './use-toast';
+import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
 import { useProspectingSessions } from './useProspectingSessions';
 import { useMemo, useEffect } from 'react';
 
@@ -69,12 +70,15 @@ export function useDailyReport() {
       today.setHours(0, 0, 0, 0);
       const todayISO = today.toISOString().split('T')[0];
 
-      const { data, error } = await supabase
+      const reportQuery = supabase
         .from('prospecting_daily_reports')
         .select('*')
         .eq('user_id', user.id)
         .eq('report_date', todayISO)
         .maybeSingle();
+      
+      const reportResult = await supabaseQueryWithTimeout(reportQuery, 30000);
+      const { data, error } = reportResult;
 
       if (error && error.code !== 'PGRST116') {
         console.error('useDailyReport - erro ao buscar:', error);

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase, SUPABASE_PROJECT_URL, SUPABASE_PROJECT_REF } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
 
 export function useUserProfile() {
   const { user, loading: authLoading } = useAuth();
@@ -11,18 +12,47 @@ export function useUserProfile() {
       if (!user?.id) return null;
 
       try {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useUserProfile.tsx:14',message:'queryFn iniciado',data:{userId:user.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+
+        // Verificar sessão antes da query
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useUserProfile.tsx:17',message:'verificando sessão antes query',data:{userId:user.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        
+        const sessionCheck = await supabase.auth.getSession();
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useUserProfile.tsx:20',message:'sessão verificada',data:{hasSession:!!sessionCheck.data?.session,hasError:!!sessionCheck.error,errorMessage:sessionCheck.error?.message,userId:sessionCheck.data?.session?.user?.id,tokenExpiry:sessionCheck.data?.session?.expires_at},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+
         // DEBUG: Verificar URL do Supabase antes de buscar perfil
         console.log('🔍 useUserProfile - Buscando perfil para user.id:', user.id);
         console.log('🔍 useUserProfile - Supabase URL:', SUPABASE_PROJECT_URL);
         console.log('🔍 useUserProfile - Project Ref:', SUPABASE_PROJECT_REF);
         console.log('🔍 useUserProfile - Esperado: https://adzaqkduxnpckbcuqpmg.supabase.co');
         
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useUserProfile.tsx:28',message:'antes criar profileQuery',data:{userId:user.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
+
         // Primeiro, tentar buscar do profiles com colunas específicas para evitar erro 406
-        const { data: profileData, error: profileError } = await supabase
+        const profileQuery = supabase
           .from('profiles')
           .select('id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by')
           .eq('id', user.id)
           .single();
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useUserProfile.tsx:27',message:'antes supabaseQueryWithTimeout',data:{userId:user.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
+
+        const profileResult = await supabaseQueryWithTimeout(profileQuery, 30000);
+        const { data: profileData, error: profileError } = profileResult;
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useUserProfile.tsx:32',message:'após supabaseQueryWithTimeout',data:{hasData:!!profileData,hasError:!!profileError,errorMessage:profileError?.message,errorCode:profileError?.code},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         
         // DEBUG: Log do resultado
         console.log('🔍 useUserProfile - Resultado da query:', { profileData, profileError });
@@ -37,7 +67,7 @@ export function useUserProfile() {
           
           // Se erro 406, tentar buscar apenas colunas básicas
           if (profileError.code === 'PGRST116' || profileError.message?.includes('406') || profileError.code === '406') {
-            const { data: basicData, error: basicError } = await supabase
+            const basicQuery = supabase
               .from('profiles')
               .select('id, email, full_name, role')
               .eq('id', user.id)

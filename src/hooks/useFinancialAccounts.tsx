@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useToast } from "./use-toast";
 import { useUserProfile } from "./useUserProfile";
+import { supabaseQueryWithTimeout } from "@/utils/supabaseQuery";
 import type {
   FinancialAccount,
   FinancialAccountInsert,
@@ -36,7 +37,8 @@ export const useFinancialAccounts = () => {
         query = query.eq("user_id", user.id);
       }
 
-      const { data, error } = await query;
+      const result = await supabaseQueryWithTimeout(query, 30000);
+      const { data, error } = result;
 
       if (error) throw error;
       return data as FinancialAccount[];

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useUserProfile } from './useUserProfile';
+import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
 
 interface DashboardMetrics {
   totalPipelineValue: number;
@@ -33,7 +34,8 @@ const fetchDashboardMetrics = async (userId: string, isAdminOrDono: boolean): Pr
     dealsQuery = dealsQuery.or(`user_id.eq.${userId},assigned_to.eq.${userId}`);
   }
 
-  const { data: deals, error: dealsError } = await dealsQuery;
+  const dealsResult = await supabaseQueryWithTimeout(dealsQuery, 30000);
+  const { data: deals, error: dealsError } = dealsResult;
 
   if (dealsError) throw new Error(`Erro ao buscar deals: ${dealsError.message}`);
 
@@ -47,7 +49,8 @@ const fetchDashboardMetrics = async (userId: string, isAdminOrDono: boolean): Pr
     contactsQuery = contactsQuery.eq('user_id', userId);
   }
 
-  const { data: contacts, error: contactsError } = await contactsQuery;
+  const contactsResult = await supabaseQueryWithTimeout(contactsQuery, 30000);
+  const { data: contacts, error: contactsError } = contactsResult;
 
   if (contactsError) throw new Error(`Erro ao buscar contatos: ${contactsError.message}`);
 
