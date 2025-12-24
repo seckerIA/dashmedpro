@@ -164,15 +164,22 @@ const fetchTeamMetrics = async (
   
   if (selectedUserIds && selectedUserIds.length > 0) {
     targetUserIds = selectedUserIds;
+    console.log('[fetchTeamMetrics] Usando usuários selecionados:', targetUserIds);
   } else {
-    // Buscar todos os membros ativos da equipe
-    const { data: profiles } = await supabase
+    // Buscar todos os membros ativos da equipe (quando admin/dono não tem filtro específico)
+    console.log('[fetchTeamMetrics] Buscando todos os profiles ativos...');
+    const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('id')
+      .select('id, full_name, role')
       .eq('is_active', true);
     
-    if (profiles) {
-      targetUserIds = profiles.map(p => p.id);
+    if (profilesError) {
+      console.error('[fetchTeamMetrics] Erro ao buscar profiles:', profilesError);
+    } else {
+      console.log('[fetchTeamMetrics] Profiles encontrados:', profiles?.length, profiles?.map(p => ({ id: p.id, name: p.full_name, role: p.role })));
+      if (profiles && profiles.length > 0) {
+        targetUserIds = profiles.map(p => p.id);
+      }
     }
   }
 
@@ -190,11 +197,17 @@ const fetchTeamMetrics = async (
     };
   }
 
+  console.log('[fetchTeamMetrics] ===== INÍCIO DA BUSCA =====');
+  console.log('[fetchTeamMetrics] Parâmetros recebidos:', { userId, isAdminOrDono, selectedUserIds });
+  console.log('[fetchTeamMetrics] targetUserIds final:', targetUserIds);
+  
   // Buscar deals de todos os usuários selecionados
   const orConditions = targetUserIds
     .map(id => `user_id.eq.${id},assigned_to.eq.${id}`)
     .join(',');
 
+  console.log('[fetchTeamMetrics] Condições OR para deals:', orConditions);
+  
   const { data: deals, error: dealsError } = await supabase
     .from('crm_deals')
     .select(`
@@ -204,8 +217,11 @@ const fetchTeamMetrics = async (
     .or(orConditions);
 
   if (dealsError) {
+    console.error('[fetchTeamMetrics] Erro ao buscar deals:', dealsError);
     throw new Error(`Erro ao buscar deals: ${dealsError.message}`);
   }
+  
+  console.log('[fetchTeamMetrics] Deals encontrados:', deals?.length || 0, deals?.slice(0, 3).map(d => ({ id: d.id, user_id: d.user_id, title: d.title, value: d.value })));
 
   // Buscar contatos
   const { data: contacts, error: contactsError } = await supabase
@@ -214,8 +230,11 @@ const fetchTeamMetrics = async (
     .in('user_id', targetUserIds);
 
   if (contactsError) {
+    console.error('[fetchTeamMetrics] Erro ao buscar contatos:', contactsError);
     throw new Error(`Erro ao buscar contatos: ${contactsError.message}`);
   }
+  
+  console.log('[fetchTeamMetrics] Contatos encontrados:', contacts?.length || 0, contacts?.slice(0, 3).map(c => ({ id: c.id, user_id: c.user_id, full_name: c.full_name })));
 
   // Buscar leads comerciais
   const { data: leads, error: leadsError } = await supabase
@@ -235,6 +254,11 @@ const fetchTeamMetrics = async (
 
   const profilesMap = new Map(profiles?.map(p => [p.id, p]) || []);
 
+  console.log('[fetchTeamMetrics] ===== CALCULANDO MÉTRICAS POR USUÁRIO =====');
+  console.log('[fetchTeamMetrics] Total deals encontrados:', deals?.length || 0);
+  console.log('[fetchTeamMetrics] Total contacts encontrados:', contacts?.length || 0);
+  console.log('[fetchTeamMetrics] Total leads encontrados:', leads?.length || 0);
+  
   // Calcular métricas por usuário
   const teamMetrics: TeamMetrics[] = targetUserIds.map(targetUserId => {
     const userDeals = (deals || []).filter(
@@ -242,6 +266,13 @@ const fetchTeamMetrics = async (
     );
     const userContacts = (contacts || []).filter(c => c.user_id === targetUserId);
     const userLeads = (leads || []).filter(l => l.user_id === targetUserId);
+    
+    console.log(`[fetchTeamMetrics] Métricas para usuário ${targetUserId}:`, {
+      userDeals: userDeals.length,
+      userContacts: userContacts.length,
+      userLeads: userLeads.length,
+      dealsSample: userDeals.slice(0, 2).map(d => ({ id: d.id, user_id: d.user_id, title: d.title, value: d.value }))
+    });
 
     const totalPipeline = userDeals.reduce((sum, deal) => {
       const value = typeof deal.value === 'string' ? parseFloat(deal.value) : deal.value;
@@ -316,7 +347,7 @@ const fetchTeamMetrics = async (
     ? teamMetrics.reduce((sum, tm) => sum + tm.conversionRate, 0) / teamMetrics.length
     : 0;
 
-  return {
+  const result = {
     totalPipeline,
     totalRevenue,
     totalActiveDeals,
@@ -327,6 +358,18 @@ const fetchTeamMetrics = async (
     totalLeads,
     teamMetrics,
   };
+  
+  console.log('[fetchTeamMetrics] ===== RESULTADO FINAL =====');
+  console.log('[fetchTeamMetrics] Métricas consolidadas:', {
+    totalPipeline,
+    totalRevenue,
+    totalContacts,
+    totalLeads,
+    teamMetricsCount: teamMetrics.length,
+    teamMetrics: teamMetrics.map(tm => ({ userId: tm.userId, userName: tm.userName, totalPipeline: tm.totalPipeline, totalContacts: tm.totalContacts }))
+  });
+  
+  return result;
 };
 
 export function useTeamMetrics(selectedUserIds?: string[]) {

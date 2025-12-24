@@ -19,7 +19,7 @@ import {
   useSensor,
   useSensors,
   DragOverlay,
-  closestCorners,
+  closestCenter,
   useDroppable,
 } from "@dnd-kit/core";
 import {
@@ -73,15 +73,25 @@ function SortableDealCard({
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition: isDragging ? 'none' : transition,
-    opacity: isDragging ? 0.5 : 1,
+    transition: isDragging ? 'none' : (transition || 'transform 150ms cubic-bezier(0.4, 0, 0.2, 1)'),
+    opacity: isDragging ? 0.4 : 1,
     cursor: isDragging ? 'grabbing' : 'grab',
+    zIndex: isDragging ? 1 : 'auto',
   };
 
   return (
     <div 
       ref={setNodeRef} 
-      style={style} 
+      style={{
+        ...style,
+        width: '100%',
+        maxWidth: '100%',
+        boxSizing: 'border-box',
+        overflow: 'hidden',
+        touchAction: 'none', // Melhor suporte mobile para drag
+        margin: 0,
+        position: 'relative',
+      }} 
       {...attributes}
       {...listeners}
     >
@@ -148,7 +158,7 @@ export function PipelineBoard({
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8, // Distância menor para melhor responsividade
+        distance: 5, // Reduzido para melhor responsividade
       },
     })
   );
@@ -179,6 +189,11 @@ export function PipelineBoard({
     if (deal) {
       setActiveDeal(deal);
     }
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    // Melhora o feedback visual durante o arrasto
+    // O estado visual das colunas é gerenciado pelo isOver do useDroppable
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -250,7 +265,6 @@ export function PipelineBoard({
         stage: stage.value,
       }
     });
-
     return (
       <Card 
         ref={setNodeRef}
@@ -259,6 +273,13 @@ export function PipelineBoard({
             ? 'border-primary shadow-glow ring-2 ring-primary/20 scale-[1.02]' 
             : 'border-border hover:shadow-lg'
         }`}
+        style={{ 
+          width: '320px',
+          maxWidth: '320px',
+          minWidth: '320px',
+          boxSizing: 'border-box',
+          overflow: 'hidden',
+        }}
       >
         {children}
       </Card>
@@ -268,8 +289,9 @@ export function PipelineBoard({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCorners}
+      collisionDetection={closestCenter}
       onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
       <div className="flex gap-4 overflow-x-auto pb-4">
@@ -307,10 +329,10 @@ export function PipelineBoard({
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className="p-3 pt-0">
-              <ScrollArea className="h-[calc(100vh-300px)]">
+            <CardContent className="p-2 pt-0" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
+              <ScrollArea className="h-[calc(100vh-300px)] w-full" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
                 <SortableContext items={stageDeals.map(deal => deal.id)} strategy={verticalListSortingStrategy}>
-                  <div className="space-y-2 pr-2">
+                  <div className="space-y-2 w-full" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
                     {stageDeals.map((deal) => (
                       <SortableDealCard
                         key={`${deal.id}-${deal.contact?.service_value || 0}-${deal.contact?.updated_at || ''}`}
@@ -365,17 +387,22 @@ export function PipelineBoard({
       
       <DragOverlay 
         dropAnimation={{
-          duration: 150,
+          duration: 200,
           easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
+        style={{
+          zIndex: 9999,
         }}
       >
         {activeDeal ? (
           <div 
-            className="rotate-2 opacity-95 transition-all duration-150"
+            className="rotate-2 opacity-100"
             style={{
-              transform: 'scale(1.05) translateZ(0)',
-              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
+              transform: 'scale(1.08) translateZ(0)',
+              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.4)',
               cursor: 'grabbing',
+              transition: 'none',
+              willChange: 'transform',
             }}
           >
             <AnimatedDealCard 
