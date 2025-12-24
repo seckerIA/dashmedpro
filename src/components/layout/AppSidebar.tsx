@@ -93,7 +93,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
   const navigate = useNavigate()
   const { signOut, user } = useAuth()
   const { toast } = useToast()
-  const { isAdmin, isVendedor, isGestorTrafego, profile, isLoading: isLoadingProfile } = useUserProfile()
+  const { isAdmin, isVendedor, isGestorTrafego, isSecretaria, profile, isLoading: isLoadingProfile } = useUserProfile()
   
   const currentPath = location.pathname
 
@@ -243,6 +243,14 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                     if (item.url === '/financeiro') return false;
                     // - CRM
                     if (item.url === '/crm') return false;
+                  }
+                  
+                  // Secretaria NÃO pode ver:
+                  if (isSecretaria) {
+                    // - Marketing
+                    if (item.url === '/marketing') return false;
+                    // - Página Financeiro
+                    if (item.url === '/financeiro') return false;
                   }
                   
                   return true;

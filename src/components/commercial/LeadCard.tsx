@@ -21,6 +21,8 @@ import { ConversionModal } from "./ConversionModal";
 import { useCRM } from "@/hooks/useCRM";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { LeadScoreBadge } from "./LeadScoreBadge";
+import { getScoreLevel } from "@/types/leadScoring";
 
 interface LeadCardProps {
   lead: CommercialLead;
@@ -112,16 +114,36 @@ export function LeadCard({ lead }: LeadCardProps) {
           <div className="flex items-start justify-between mb-3">
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-card-foreground truncate mb-1">{lead.name}</h3>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant="secondary" className="text-xs">
                   {COMMERCIAL_LEAD_STATUS_LABELS[lead.status]}
                 </Badge>
                 <Badge variant="outline" className="text-xs">
                   {COMMERCIAL_LEAD_ORIGIN_LABELS[lead.origin]}
                 </Badge>
+                {(lead as any).conversion_score !== undefined && (lead as any).conversion_score !== null && (
+                  <LeadScoreBadge 
+                    score={(lead as any).conversion_score} 
+                    size="sm"
+                  />
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {(lead as any).conversion_score !== undefined && 
+               (lead as any).conversion_score !== null && 
+               getScoreLevel((lead as any).conversion_score) === 'high' && (
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={handleScheduleAppointment}
+                  disabled={isScheduling}
+                  className="h-8 px-3 text-xs bg-green-600 hover:bg-green-700 text-white"
+                >
+                  <Calendar className="h-4 w-4 mr-1.5" />
+                  {isScheduling ? 'Abrindo...' : 'Responder Agora'}
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="default"

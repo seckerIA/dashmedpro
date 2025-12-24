@@ -275,12 +275,19 @@ const AppRoutes = () => {
         />
         <Route path="/tarefas" element={<Tasks />} />
         <Route path="/tarefas-debug" element={<TasksDebug />} />
-        <Route path="/marketing" element={<Marketing />} />
+        <Route 
+          path="/marketing" 
+          element={
+            <RoleProtectedRoute allowedRoles={['admin', 'dono', 'vendedor', 'gestor_trafego', 'medico']}>
+              <Marketing />
+            </RoleProtectedRoute>
+          } 
+        />
         <Route path="/comercial" element={<Commercial />} />
         <Route 
           path="/financeiro" 
           element={
-            <RoleProtectedRoute allowedRoles={['admin', 'dono']}>
+            <RoleProtectedRoute allowedRoles={['admin', 'dono', 'vendedor', 'gestor_trafego', 'medico']}>
               <Financial />
             </RoleProtectedRoute>
           } 
@@ -288,7 +295,7 @@ const AppRoutes = () => {
         <Route 
           path="/financeiro/transacoes" 
           element={
-            <RoleProtectedRoute allowedRoles={['admin', 'dono']}>
+            <RoleProtectedRoute allowedRoles={['admin', 'dono', 'vendedor', 'gestor_trafego', 'medico']}>
               <FinancialTransactions />
             </RoleProtectedRoute>
           } 
@@ -296,7 +303,7 @@ const AppRoutes = () => {
         <Route 
           path="/financeiro/nova-transacao" 
           element={
-            <RoleProtectedRoute allowedRoles={['admin', 'dono']}>
+            <RoleProtectedRoute allowedRoles={['admin', 'dono', 'vendedor', 'gestor_trafego', 'medico']}>
               <TransactionForm />
             </RoleProtectedRoute>
           } 
@@ -304,7 +311,7 @@ const AppRoutes = () => {
         <Route 
           path="/financeiro/editar-transacao/:id" 
           element={
-            <RoleProtectedRoute allowedRoles={['admin', 'dono']}>
+            <RoleProtectedRoute allowedRoles={['admin', 'dono', 'vendedor', 'gestor_trafego', 'medico']}>
               <TransactionForm />
             </RoleProtectedRoute>
           } 

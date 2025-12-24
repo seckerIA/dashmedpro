@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Target, TrendingUp, ShoppingCart, Megaphone, BarChart3, Workflow } from "lucide-react";
+import { Target, TrendingUp, ShoppingCart, Megaphone, BarChart3, Workflow, Brain, MessageSquare } from "lucide-react";
 import { CommercialDashboard } from "@/components/commercial/CommercialDashboard";
 import { LeadsManagement } from "@/components/commercial/LeadsManagement";
 import { SalesManagement } from "@/components/commercial/SalesManagement";
@@ -9,6 +9,8 @@ import { CampaignsManagement } from "@/components/commercial/CampaignsManagement
 import { CommercialReports } from "@/components/commercial/CommercialReports";
 import { PipelineManagement } from "@/components/commercial/PipelineManagement";
 import { LeadForm } from "@/components/commercial/LeadForm";
+import { LeadScoringPanel } from "@/components/commercial/LeadScoringPanel";
+import { ReactivationCampaignManager } from "@/components/commercial/ReactivationCampaignManager";
 
 export default function Commercial() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -70,7 +72,7 @@ export default function Commercial() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-6 gap-2 h-auto p-1 bg-muted/50">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-7 gap-2 h-auto p-1 bg-muted/50">
           <TabsTrigger
             value="dashboard"
             className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-border/50 transition-all duration-200 font-medium py-3"
@@ -91,6 +93,13 @@ export default function Commercial() {
           >
             <TrendingUp className="w-4 h-4 mr-2" />
             Leads & Conversões
+          </TabsTrigger>
+          <TabsTrigger
+            value="intelligence"
+            className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-border/50 transition-all duration-200 font-medium py-3"
+          >
+            <Brain className="w-4 h-4 mr-2" />
+            Inteligência
           </TabsTrigger>
           <TabsTrigger
             value="sales"
@@ -125,6 +134,35 @@ export default function Commercial() {
 
         <TabsContent value="leads" className="mt-6">
           <LeadsManagement />
+        </TabsContent>
+
+        <TabsContent value="intelligence" className="mt-6">
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold mb-2">Inteligência de Leads</h2>
+              <p className="text-muted-foreground">
+                Configure o sistema de scoring e automação de reativação
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Brain className="w-5 h-5" />
+                  Scoring de Leads
+                </h3>
+                <LeadScoringPanel />
+              </div>
+              
+              <div>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5" />
+                  Reativação Automática
+                </h3>
+                <ReactivationCampaignManager />
+              </div>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="sales" className="mt-6">

@@ -22,6 +22,12 @@ export interface CommercialLead {
   notes?: string | null;
   created_at: string;
   updated_at: string;
+  // Lead Scoring fields
+  conversion_score?: number | null;
+  score_updated_at?: string | null;
+  first_response_time_minutes?: number | null;
+  optimal_contact_hour?: number | null;
+  urgency_keywords?: string[] | null;
 }
 
 export interface CommercialLeadInsert {

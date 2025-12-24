@@ -1,22 +1,35 @@
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricCard } from "./MetricCard";
 import { ConversionFunnel } from "./ConversionFunnel";
 import { RevenueChart } from "./RevenueChart";
 import { ConversionBottleneckCard } from "./ConversionBottleneckCard";
 import { RevenueDistributionCard } from "./RevenueDistributionCard";
 import { Button } from "@/components/ui/button";
-import { Plus, Calendar, AlertTriangle } from "lucide-react";
+import { Plus, Calendar, AlertTriangle, TrendingUp, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useCommercialMetrics } from "@/hooks/useCommercialMetrics";
 import { useBottleneckMetrics } from "@/hooks/useBottleneckMetrics";
 import { AnimatedWrapper } from "@/components/shared/AnimatedWrapper";
 import { BottleneckCard } from "@/components/dashboard/BottleneckCard";
 import { motion } from "framer-motion";
+import { useCommercialLeads } from "@/hooks/useCommercialLeads";
+import { LeadScoreBadge } from "./LeadScoreBadge";
+import { getScoreLevel } from "@/types/leadScoring";
 
 export function CommercialDashboard() {
   const navigate = useNavigate();
   const { metrics, isLoading, error } = useCommercialMetrics();
   const { data: bottlenecks, isLoading: isLoadingBottlenecks } = useBottleneckMetrics();
+  const { leads } = useCommercialLeads();
+  
+  // Filtrar leads prioritários (score alto)
+  const priorityLeads = leads
+    .filter((lead: any) => {
+      const score = lead.conversion_score;
+      return score !== null && score !== undefined && getScoreLevel(score) === 'high';
+    })
+    .sort((a: any, b: any) => (b.conversion_score || 0) - (a.conversion_score || 0))
+    .slice(0, 5);
   
   // Debug log
   console.log('🔍 CommercialDashboard - Dados recebidos:', {
@@ -61,6 +74,62 @@ export function CommercialDashboard() {
           </motion.div>
         </div>
       </AnimatedWrapper>
+
+      {/* Leads Prioritários */}
+      {priorityLeads.length > 0 && (
+        <AnimatedWrapper animationType="slideDown" delay={0.12}>
+          <Card className="bg-gradient-card shadow-card border-border">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  <CardTitle className="text-lg">Leads para Responder Agora</CardTitle>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate("/comercial?tab=leads")}
+                >
+                  Ver Todos
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {priorityLeads.map((lead: any) => (
+                  <div
+                    key={lead.id}
+                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() => navigate(`/comercial?tab=leads&leadId=${lead.id}`)}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{lead.name}</div>
+                      <div className="text-sm text-muted-foreground truncate">
+                        {lead.phone || lead.email || 'Sem contato'}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <LeadScoreBadge score={lead.conversion_score} size="sm" />
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="bg-green-600 hover:bg-green-700"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/comercial?tab=leads&leadId=${lead.id}&action=respond`);
+                        }}
+                      >
+                        Responder
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </AnimatedWrapper>
+      )}
 
       {/* Alertas de Gargalo */}
       {!isLoadingBottlenecks && bottlenecks && bottlenecks.length > 0 && (
