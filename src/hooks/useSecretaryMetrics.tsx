@@ -84,7 +84,7 @@ export function useSecretaryMetrics() {
           status,
           user_id,
           doctor_id,
-          contact:crm_contacts(id, full_name, name, phone, email)
+          contact:crm_contacts(id, full_name, phone, email)
         `)
         .gte('start_time', todayStart)
         .order('start_time', { ascending: true });
@@ -131,12 +131,12 @@ export function useSecretaryMetrics() {
         totalContactsResult,
         myAppointmentsResult,
       ] = await Promise.all([
-        supabaseQueryWithTimeout(appointmentsQuery, 30000, signal),
-        supabaseQueryWithTimeout(doctorsQuery, 30000, signal),
-        supabaseQueryWithTimeout(contactsTodayQuery, 30000, signal),
-        supabaseQueryWithTimeout(contactsWeekQuery, 30000, signal),
-        supabaseQueryWithTimeout(totalContactsQuery, 30000, signal),
-        supabaseQueryWithTimeout(myAppointmentsQuery, 30000, signal),
+        supabaseQueryWithTimeout(appointmentsQuery as any, 30000, signal),
+        supabaseQueryWithTimeout(doctorsQuery as any, 30000, signal),
+        supabaseQueryWithTimeout(contactsTodayQuery as any, 30000, signal),
+        supabaseQueryWithTimeout(contactsWeekQuery as any, 30000, signal),
+        supabaseQueryWithTimeout(totalContactsQuery as any, 30000, signal),
+        supabaseQueryWithTimeout(myAppointmentsQuery as any, 30000, signal),
       ]);
 
       const appointments = appointmentsResult.data || [];
@@ -179,7 +179,7 @@ export function useSecretaryMetrics() {
           return {
             id: a.id,
             title: a.title,
-            patientName: a.contact?.full_name || a.contact?.name || 'Paciente não informado',
+            patientName: a.contact?.full_name || 'Paciente não informado',
             doctorName: doctor?.full_name || 'Médico não definido',
             startTime: a.start_time,
             status: a.status,
