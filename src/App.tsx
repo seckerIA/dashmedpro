@@ -30,6 +30,7 @@ import ProspectingGuide from "./pages/ProspectingGuide";
 import Commercial from "./pages/Commercial";
 import FollowUps from "./pages/FollowUps";
 import Marketing from "./pages/Marketing";
+import MedicalRecords from "./pages/MedicalRecords";
 import { 
   TrendingUp, 
   Target, 
@@ -339,6 +340,14 @@ const AppRoutes = () => {
         <Route path="/crm" element={<CRM />} />
         <Route path="/calendar" element={<MedicalCalendar />} />
         <Route path="/follow-ups" element={<FollowUps />} />
+        <Route
+          path="/prontuarios"
+          element={
+            <RoleProtectedRoute allowedRoles={['admin', 'dono', 'medico']}>
+              <MedicalRecords />
+            </RoleProtectedRoute>
+          }
+        />
         <Route path="/comercial/guia-prospeccao" element={<ProspectingGuide />} />
         <Route 
           path="/email-marketing" 

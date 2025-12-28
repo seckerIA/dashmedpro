@@ -8,9 +8,11 @@ const __dirname = path.dirname(__filename);
 
 const { Client } = pg;
 
-// Database connection (password URL-encoded: @ becomes %40)
-// Using port 6543 (pooler) instead of 5432 (direct)
-const connectionString = 'postgresql://postgres:Vq79qn7t%4096037951aA@db.adzaqkduxnpckbcuqpmg.supabase.co:6543/postgres';
+// Database connection - use the database password from Supabase dashboard
+// Project: adzaqkduxnpckbcuqpmg
+// Direct connection (port 5432) instead of pooler (6543)
+const DB_PASSWORD = process.env.SUPABASE_DB_PASSWORD || 'Dashmedpro2026@';
+const connectionString = `postgresql://postgres:${encodeURIComponent(DB_PASSWORD)}@db.adzaqkduxnpckbcuqpmg.supabase.co:5432/postgres`;
 
 async function runMigration() {
   const client = new Client({
@@ -23,14 +25,14 @@ async function runMigration() {
     await client.connect();
     console.log('✅ Conectado com sucesso!');
 
-    // Read migration file
-    const migrationPath = path.join(__dirname, 'supabase', 'migrations', '20250115000000_create_medical_appointments.sql');
+    // Read fix migration file (handles existing partial tables)
+    const migrationPath = path.join(__dirname, 'supabase', 'migrations', '20251228100000_fix_medical_records.sql');
     const sql = fs.readFileSync(migrationPath, 'utf8');
 
-    console.log('📝 Executando migração...');
+    console.log('📝 Executando migração de correção...');
     await client.query(sql);
     console.log('✅ Migração executada com sucesso!');
-    console.log('📋 Tabela medical_appointments criada com ENUMs, índices, RLS e triggers.');
+    console.log('📋 Tabelas medical_records e prescriptions atualizadas com todos os campos.');
 
   } catch (error) {
     console.error('❌ Erro ao executar migração:', error.message);

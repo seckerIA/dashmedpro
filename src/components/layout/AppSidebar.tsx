@@ -1,12 +1,12 @@
 import React from "react"
-import { 
-  BarChart3, 
-  Calculator, 
-  TrendingUp, 
-  Users, 
-  Mail, 
-  FileText, 
-  Target, 
+import {
+  BarChart3,
+  Calculator,
+  TrendingUp,
+  Users,
+  Mail,
+  FileText,
+  Target,
   PieChart,
   Home,
   Settings,
@@ -16,7 +16,8 @@ import {
   Sparkles,
   Compass,
   Calendar,
-  RotateCcw
+  RotateCcw,
+  ClipboardList
 } from "lucide-react"
 import { NavLink, useLocation, useNavigate } from "react-router-dom"
 import {
@@ -41,6 +42,7 @@ type NavigationItem = {
   badge?: string;
   variant?: 'new';
   adminOnly?: boolean;
+  medicoOnly?: boolean;
 };
 
 const navigationGroups: Array<{
@@ -65,6 +67,12 @@ const navigationGroups: Array<{
       { title: "Calendário", url: "/calendar", icon: Calendar, badge: "Novo", variant: "new" as const },
       // { title: "Follow-ups", url: "/follow-ups", icon: RotateCcw }, // Ocultado
       { title: "Funil de Vendas", url: "/funil-vendas", icon: BarChart3 },
+    ]
+  },
+  {
+    label: "Atendimento",
+    items: [
+      { title: "Prontuários", url: "/prontuarios", icon: ClipboardList, medicoOnly: true },
     ]
   },
   {
@@ -93,7 +101,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
   const navigate = useNavigate()
   const { signOut, user } = useAuth()
   const { toast } = useToast()
-  const { isAdmin, isVendedor, isGestorTrafego, isSecretaria, profile, isLoading: isLoadingProfile } = useUserProfile()
+  const { isAdmin, isVendedor, isGestorTrafego, isSecretaria, isMedico, profile, isLoading: isLoadingProfile } = useUserProfile()
   
   const currentPath = location.pathname
 
@@ -124,20 +132,8 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
   }, [profile, isAdmin, isVendedor, isGestorTrafego, isLoadingProfile, user?.id]);
   
   const handleSignOut = async () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppSidebar.tsx:handleSignOut',message:'handleSignOut chamado',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
-
     try {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppSidebar.tsx:handleSignOut',message:'chamando signOut',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
-
       await signOut();
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppSidebar.tsx:handleSignOut',message:'signOut completou, mostrando toast',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
 
       toast({
         title: "Logout realizado",
@@ -145,16 +141,9 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
       });
       // Pequeno delay para garantir que o estado seja atualizado antes do redirecionamento
       setTimeout(() => {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppSidebar.tsx:handleSignOut',message:'navegando para login',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
         navigate('/login', { replace: true });
       }, 100);
     } catch (error) {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppSidebar.tsx:handleSignOut',message:'erro em handleSignOut',data:{errorMessage:error instanceof Error ? error.message : String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
-
       console.error('Erro ao fazer logout:', error);
       toast({
         variant: "destructive",
@@ -226,7 +215,19 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                       return false;
                     }
                   }
-                  
+
+                  // Se o item tem medicoOnly, só mostrar para médico e admin/dono
+                  if (item.medicoOnly === true) {
+                    if (isLoadingProfile || !profile) {
+                      return false;
+                    }
+                    const userRole = profile.role;
+                    const canSee = userRole === 'medico' || userRole === 'admin' || userRole === 'dono';
+                    if (!canSee) {
+                      return false;
+                    }
+                  }
+
                   // Vendedores NÃO podem ver:
                   if (isVendedor) {
                     // - Página Financeiro
