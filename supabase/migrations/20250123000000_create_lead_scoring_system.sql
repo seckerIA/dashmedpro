@@ -232,3 +232,4 @@ CREATE POLICY "Service role can manage reactivation messages"
   ON public.reactivation_messages FOR ALL
   WITH CHECK (true);
 
+

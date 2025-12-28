@@ -232,3 +232,4 @@ export const AD_CAMPAIGN_STATUS_LABELS: Record<AdCampaignStatus, string> = {
   removed: 'Removida',
 };
 
+

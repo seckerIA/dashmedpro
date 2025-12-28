@@ -22,6 +22,7 @@ import { OverdueAppointmentsAlert } from "@/components/shared/OverdueAppointment
 import { BottleneckCard } from "@/components/dashboard/BottleneckCard"
 import { AttendanceMetricsCard } from "@/components/medical-calendar/AttendanceMetricsCard"
 import { AnimatedWrapper } from "@/components/shared/AnimatedWrapper"
+import SecretaryDashboard from "@/components/dashboard/SecretaryDashboard"
 import { 
   Calculator, 
   TrendingUp, 
@@ -52,10 +53,15 @@ import { formatCurrency } from "@/lib/currency"
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { isVendedor } = useUserProfile();
+  const { isVendedor, isSecretaria } = useUserProfile();
   const { data: metrics, isLoading, error } = useDashboardMetrics();
   const { metrics: financialMetrics } = useFinancialMetrics();
   const { data: bottlenecks, isLoading: isLoadingBottlenecks } = useBottleneckMetrics();
+
+  // Se for secretária, mostrar dashboard específico da secretária
+  if (isSecretaria) {
+    return <SecretaryDashboard />;
+  }
 
   if (isLoading) {
     return (

@@ -19,3 +19,4 @@ CREATE INDEX IF NOT EXISTS idx_commercial_leads_ad_campaign_sync_id ON public.co
 -- RLS já está habilitado na tabela commercial_leads
 -- Os campos adicionados herdam as mesmas políticas RLS
 
+

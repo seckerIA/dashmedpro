@@ -80,3 +80,4 @@ export const DEFAULT_REACTIVATION_TEMPLATE_B: ReactivationTemplate = {
   variables: ['{{nome}}', '{{link_agendamento}}'],
 };
 
+

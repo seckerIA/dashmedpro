@@ -1,9 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import type { 
-  AdPlatformConnection, 
-  AdPlatformConnectionInsert, 
-  AdPlatformConnectionUpdate 
+import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
+import type {
+  AdPlatformConnection,
+  AdPlatformConnectionInsert,
+  AdPlatformConnectionUpdate
 } from '@/types/adPlatforms';
 
 // =====================================================
@@ -13,32 +14,44 @@ import type {
 export function useAdPlatformConnections() {
   return useQuery({
     queryKey: ['ad-platform-connections'],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    queryFn: async ({ signal }) => {
+      const query = supabase
         .from('ad_platform_connections')
         .select('*')
         .order('created_at', { ascending: false });
 
+      const { data, error } = await supabaseQueryWithTimeout(query, 30000, signal);
+
       if (error) throw error;
       return data as AdPlatformConnection[];
     },
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    retry: 2,
+    retryDelay: 1000,
   });
 }
 
 export function useAdPlatformConnection(id: string) {
   return useQuery({
     queryKey: ['ad-platform-connection', id],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    queryFn: async ({ signal }) => {
+      const query = supabase
         .from('ad_platform_connections')
         .select('*')
         .eq('id', id)
         .single();
 
+      const { data, error } = await supabaseQueryWithTimeout(query, 30000, signal);
+
       if (error) throw error;
       return data as AdPlatformConnection;
     },
     enabled: !!id,
+    staleTime: 2 * 60 * 1000,
+    retry: 2,
   });
 }
 
@@ -70,12 +83,12 @@ export function useUpdateAdPlatformConnection() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ 
-      id, 
-      updates 
-    }: { 
-      id: string; 
-      updates: AdPlatformConnectionUpdate 
+    mutationFn: async ({
+      id,
+      updates
+    }: {
+      id: string;
+      updates: AdPlatformConnectionUpdate
     }) => {
       const { data, error } = await supabase
         .from('ad_platform_connections')
@@ -119,16 +132,15 @@ export function useDeleteAdPlatformConnection() {
 
 export function useTestAdPlatformConnection() {
   return useMutation({
-    mutationFn: async ({ 
-      platform, 
-      api_key, 
-      account_id 
-    }: { 
+    mutationFn: async ({
+      platform,
+      api_key,
+      account_id
+    }: {
       platform: 'google_ads' | 'meta_ads';
       api_key: string;
       account_id: string;
     }) => {
-      // Chamar Edge Function para testar conexão
       const { data, error } = await supabase.functions.invoke('test-ad-connection', {
         body: {
           platform,
@@ -142,4 +154,3 @@ export function useTestAdPlatformConnection() {
     },
   });
 }
-

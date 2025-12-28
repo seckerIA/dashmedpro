@@ -42,6 +42,7 @@ export type PaymentStatus =
 export interface MedicalAppointment {
   id: string;
   user_id: string;
+  doctor_id?: string | null;
   contact_id: string;
 
   title: string;
@@ -68,9 +69,18 @@ export interface MedicalAppointment {
   updated_at: string;
 }
 
+// Doctor info for display
+export interface DoctorInfo {
+  id: string;
+  email: string;
+  full_name: string | null;
+  role: string;
+}
+
 // With relations for display
 export interface MedicalAppointmentWithRelations extends MedicalAppointment {
   contact: CRMContact | null;
+  doctor?: DoctorInfo | null;
   financial_transaction?: {
     id: string;
     description: string;
@@ -82,6 +92,7 @@ export interface MedicalAppointmentWithRelations extends MedicalAppointment {
 // Insert type
 export interface MedicalAppointmentInsert {
   user_id: string;
+  doctor_id?: string | null;
   contact_id: string;
   title: string;
   appointment_type: AppointmentType;
@@ -99,6 +110,7 @@ export interface MedicalAppointmentInsert {
 
 // Update type
 export interface MedicalAppointmentUpdate {
+  doctor_id?: string | null;
   title?: string;
   appointment_type?: AppointmentType;
   status?: AppointmentStatus;

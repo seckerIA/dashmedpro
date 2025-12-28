@@ -90,6 +90,8 @@ export function useUserProfile() {
   const isVendedor = profile?.role === 'vendedor';
   const isGestorTrafego = profile?.role === 'gestor_trafego';
   const isSecretaria = profile?.role === 'secretaria';
+  const isMedico = profile?.role === 'medico';
+  const canScheduleForOthers = isAdmin || isSecretaria;
 
   return {
     profile,
@@ -99,6 +101,8 @@ export function useUserProfile() {
     isVendedor,
     isGestorTrafego,
     isSecretaria,
+    isMedico,
+    canScheduleForOthers,
     role: profile?.role,
     refetch,
   };

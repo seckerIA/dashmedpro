@@ -1,9 +1,9 @@
 /**
  * Wrapper para queries do Supabase com timeout real
- * 
+ *
  * Este wrapper resolve o problema de queries do Supabase que podem travar indefinidamente.
  * Força rejeição da Promise após o timeout, mesmo que a query original não tenha resolvido.
- * 
+ *
  * CRÍTICO: O Supabase usa lazy evaluation - a Promise só executa quando await é chamado diretamente.
  * Este wrapper força a execução imediata da query antes de entrar no Promise.race.
  */
@@ -15,15 +15,15 @@ export interface SupabaseQueryResult<T> {
 
 /**
  * Executa uma query do Supabase com timeout real
- * 
+ *
  * O problema: queries do Supabase podem travar e nunca resolver nem rejeitar.
  * Solução: usar Promise.race com uma promise que SEMPRE rejeita após o timeout,
  * garantindo que a função retorne dentro do tempo especificado.
- * 
+ *
  * IMPORTANTE: A query é executada IMEDIATAMENTE ao chamar esta função, não quando
  * a Promise é passada para Promise.race. Isso garante que o fetch HTTP seja iniciado
  * imediatamente.
- * 
+ *
  * @param queryPromise - Promise retornada pela query do Supabase (será executada imediatamente)
  * @param timeoutMs - Timeout em milissegundos (padrão: 30000 = 30 segundos)
  * @param signal - AbortSignal opcional para cancelamento externo
@@ -34,18 +34,8 @@ export async function supabaseQueryWithTimeout<T>(
   timeoutMs: number = 30000,
   signal?: AbortSignal
 ): Promise<SupabaseQueryResult<T>> {
-  const queryId = Math.random().toString(36).substring(7);
-  const startTime = Date.now();
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabaseQuery.ts:supabaseQueryWithTimeout',message:'wrapper iniciado',data:{queryId,timeoutMs,hasSignal:!!signal,signalAborted:signal?.aborted},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
-  
   // Verificar se já foi cancelado externamente
   if (signal?.aborted) {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabaseQuery.ts:supabaseQueryWithTimeout',message:'query já cancelada',data:{queryId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     throw new Error('Query cancelada');
   }
 
@@ -53,44 +43,23 @@ export async function supabaseQueryWithTimeout<T>(
   let timeoutId: NodeJS.Timeout;
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabaseQuery.ts:supabaseQueryWithTimeout',message:'timeout disparado',data:{queryId,elapsed:Date.now()-startTime,timeoutMs},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       reject(new Error(`Query timeout após ${timeoutMs}ms`));
     }, timeoutMs);
   });
 
   // CRÍTICO: Forçar execução imediata da query usando IIFE
   // O Supabase usa lazy evaluation, então precisamos iniciar a execução ANTES do Promise.race
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabaseQuery.ts:supabaseQueryWithTimeout',message:'forçando execução imediata com IIFE',data:{queryId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
-  
-  // Usar IIFE para forçar execução imediata
   const executedQueryPromise = (async () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabaseQuery.ts:supabaseQueryWithTimeout',message:'IIFE iniciado, await na queryPromise',data:{queryId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     return await queryPromise;
   })().then((result) => {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabaseQuery.ts:supabaseQueryWithTimeout',message:'query resolvida com sucesso',data:{queryId,hasData:!!result.data,hasError:!!result.error,elapsed:Date.now()-startTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     clearTimeout(timeoutId);
     return result;
   }).catch((err) => {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabaseQuery.ts:supabaseQueryWithTimeout',message:'query rejeitada',data:{queryId,errorMessage:err?.message,elapsed:Date.now()-startTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     clearTimeout(timeoutId);
     throw err;
   });
 
   try {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabaseQuery.ts:supabaseQueryWithTimeout',message:'iniciando Promise.race',data:{queryId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-    
     // Promise.race vai retornar o primeiro que resolver/rejeitar
     // Se a query travar, o timeout vai rejeitar primeiro
     const result = await Promise.race([
@@ -98,28 +67,15 @@ export async function supabaseQueryWithTimeout<T>(
       timeoutPromise
     ]) as SupabaseQueryResult<T>;
 
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabaseQuery.ts:supabaseQueryWithTimeout',message:'Promise.race completou',data:{queryId,hasData:!!result.data,hasError:!!result.error,elapsed:Date.now()-startTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-
     // Verificar cancelamento externo após a race
     if (signal?.aborted) {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabaseQuery.ts:supabaseQueryWithTimeout',message:'signal cancelado após race',data:{queryId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
       throw new Error('Query cancelada');
     }
 
     return result;
   } catch (error: any) {
     clearTimeout(timeoutId);
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabaseQuery.ts:supabaseQueryWithTimeout',message:'erro capturado',data:{queryId,errorMessage:error?.message,isTimeout:error?.message?.includes('timeout'),elapsed:Date.now()-startTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
-    
     // Rejeitar com o erro (timeout ou outro)
     throw error;
   }
 }
-

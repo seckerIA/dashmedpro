@@ -30,18 +30,9 @@ const fetchAppointments = async (
   filters?: UseMedicalAppointmentsFilters,
   signal?: AbortSignal
 ): Promise<MedicalAppointmentWithRelations[]> => {
-  // #region agent log
-  const queryStartTime = Date.now();
-  fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useMedicalAppointments.tsx:fetchAppointments',message:'fetchAppointments iniciado',data:{userId,hasFilters:!!filters,hasSignal:!!signal},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
-
   // Verificar e garantir sessão válida
   const { ensureValidSession } = await import('@/utils/supabaseHelpers');
   await ensureValidSession();
-
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useMedicalAppointments.tsx:fetchAppointments',message:'sessão validada, criando query',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'D'})}).catch(()=>{});
-  // #endregion
 
   let query = supabase
     .from('medical_appointments')
@@ -51,9 +42,9 @@ const fetchAppointments = async (
       financial_transaction:financial_transactions(id, description, amount, type)
     `);
 
-  // CRITICAL: Filter by user_id FIRST - this was missing!
+  // Filter by user_id OR doctor_id to include appointments scheduled by others for this doctor
   if (userId) {
-    query = query.eq('user_id', userId);
+    query = query.or(`user_id.eq.${userId},doctor_id.eq.${userId}`);
   }
 
   query = query.order('start_time', { ascending: true });
@@ -83,17 +74,9 @@ const fetchAppointments = async (
     query = query.eq('contact_id', filters.contactId);
   }
 
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useMedicalAppointments.tsx:fetchAppointments',message:'antes executar query com wrapper',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
-
   // Usar wrapper com timeout
   const { supabaseQueryWithTimeout } = await import('@/utils/supabaseQuery');
   const { data, error } = await supabaseQueryWithTimeout(query, 30000, signal);
-
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useMedicalAppointments.tsx:fetchAppointments',message:'query resultado',data:{hasData:!!data,dataLength:data?.length,hasError:!!error,errorMessage:error?.message,elapsed:Date.now()-queryStartTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
 
   if (error) throw new Error(`Erro ao buscar consultas: ${error.message}`);
   return (data as MedicalAppointmentWithRelations[]) || [];
@@ -127,6 +110,7 @@ const createAppointment = async (
     .from('medical_appointments')
     .insert({
       ...appointmentData,
+      doctor_id: appointmentData.doctor_id || appointmentData.user_id,
       paid_in_advance: appointmentData.paid_in_advance ?? false,
     })
     .select(`

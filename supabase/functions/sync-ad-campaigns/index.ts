@@ -165,3 +165,4 @@ async function syncMetaAds(connection: any, supabase: any) {
 
 serve(handler);
 
+

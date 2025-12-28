@@ -346,3 +346,4 @@ CREATE POLICY "Users can delete own generated utms"
         OR public.is_admin_or_dono(auth.uid())
     );
 
+

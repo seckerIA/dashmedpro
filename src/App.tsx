@@ -106,12 +106,13 @@ const StuckQueryDetector = () => {
   useEffect(() => {
     // Rastrear quando queries começam a fazer fetch
     const fetchStartTimes = new Map<string, number>();
-    
+    let stuckCount = 0; // Contador de queries travadas consecutivas
+
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
       if (event?.type === 'updated') {
         const query = event.query;
         const state = query.state;
-        
+
         // Quando uma query começa a fazer fetch, registrar o tempo
         if (state.fetchStatus === 'fetching') {
           const queryKey = query.queryKey.join('/');
@@ -119,61 +120,80 @@ const StuckQueryDetector = () => {
             fetchStartTimes.set(queryKey, Date.now());
           }
         }
-        
+
         // Quando uma query termina (sucesso ou erro), remover do rastreamento
         if (state.fetchStatus === 'idle' || state.fetchStatus === 'paused') {
           const queryKey = query.queryKey.join('/');
           fetchStartTimes.delete(queryKey);
+          // Reset contador quando queries funcionam
+          stuckCount = 0;
         }
       }
     });
 
-    const checkInterval = setInterval(() => {
+    const checkInterval = setInterval(async () => {
       const queryCache = queryClient.getQueryCache();
       const allQueries = queryCache.getAll();
+      let foundStuck = false;
 
-      allQueries.forEach((query) => {
+      for (const query of allQueries) {
         const state = query.state;
         const queryKey = query.queryKey.join('/');
-        
-        // Verificar se a query está em fetching há mais de 25 segundos (antes do timeout de 30s)
+
+        // Verificar se a query está em fetching há mais de 20 segundos
         if (state.fetchStatus === 'fetching') {
           const fetchStartTime = fetchStartTimes.get(queryKey);
-          
+
           if (fetchStartTime) {
             const timeSinceStart = Date.now() - fetchStartTime;
-            const stuckThreshold = 25000; // 25 segundos (antes do timeout de 30s)
+            const stuckThreshold = 20000; // 20 segundos
 
             if (timeSinceStart > stuckThreshold) {
+              foundStuck = true;
               const stuckSeconds = Math.round(timeSinceStart / 1000);
-              console.warn(`⚠️ Query travada detectada: ${queryKey} (${stuckSeconds}s) - Cancelando e invalidando...`);
-              
-              // #region agent log
-              fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:StuckQueryDetector',message:'query travada detectada',data:{queryKey,stuckSeconds,timeSinceStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-              // #endregion
-              
-              // Cancelar a query travada mais agressivamente
+              console.warn(`⚠️ Query travada: ${queryKey} (${stuckSeconds}s)`);
+
+              // Cancelar a query travada
               queryClient.cancelQueries({ queryKey: query.queryKey });
-              
-              // Limpar do rastreamento
               fetchStartTimes.delete(queryKey);
-              
-              // Invalidar para forçar refetch na próxima vez
-              queryClient.invalidateQueries({ queryKey: query.queryKey });
-              
-              // Remover do cache para evitar reutilização de dados antigos
+
+              // Remover do cache
               queryClient.removeQueries({ queryKey: query.queryKey });
             }
           } else {
-            // Se não temos o tempo de início, registrar agora
             fetchStartTimes.set(queryKey, Date.now());
           }
         } else {
-          // Se não está mais em fetching, remover do rastreamento
           fetchStartTimes.delete(queryKey);
         }
-      });
-    }, 5000); // Verificar a cada 5 segundos (mais frequente)
+      }
+
+      // Se encontrou queries travadas, incrementar contador
+      if (foundStuck) {
+        stuckCount++;
+
+        // Se houver muitas queries travadas consecutivas, pode ser problema de sessão
+        if (stuckCount >= 3) {
+          console.warn('⚠️ Muitas queries travadas. Verificando sessão...');
+          stuckCount = 0;
+
+          // Tentar refresh da sessão
+          const { supabase } = await import('@/integrations/supabase/client');
+          try {
+            const { error } = await supabase.auth.refreshSession();
+            if (error) {
+              console.error('❌ Erro ao fazer refresh da sessão:', error.message);
+            } else {
+              console.log('✅ Sessão atualizada. Recarregando queries...');
+              // Invalidar todas as queries para forçar refetch com nova sessão
+              queryClient.invalidateQueries();
+            }
+          } catch (err) {
+            console.error('❌ Erro ao verificar sessão:', err);
+          }
+        }
+      }
+    }, 5000);
 
     return () => {
       clearInterval(checkInterval);

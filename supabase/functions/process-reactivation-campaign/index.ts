@@ -200,3 +200,4 @@ async function processCampaign(campaign: any, supabaseAdmin: any): Promise<Respo
 
 serve(handler);
 
+

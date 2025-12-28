@@ -243,3 +243,4 @@ export function determineOptimalContactHour(
   return conversionRates.length > 0 ? conversionRates[0].hour : null;
 }
 
+

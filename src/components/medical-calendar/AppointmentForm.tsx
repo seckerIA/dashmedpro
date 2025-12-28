@@ -13,6 +13,8 @@ import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { useAvailability } from '@/hooks/useAvailability';
 import { useCommercialProcedures } from '@/hooks/useCommercialProcedures';
+import { useDoctors } from '@/hooks/useDoctors';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { ContactForm } from '@/components/crm/ContactForm';
 import { UserPlus } from 'lucide-react';
@@ -41,6 +43,7 @@ import { parseISO } from 'date-fns';
 import { formatCurrencyInput, parseCurrencyToNumber, formatCurrency } from '@/lib/currency';
 
 const appointmentSchema = z.object({
+  doctor_id: z.string().uuid().optional(),
   contact_id: z.string().uuid({ message: 'Paciente é obrigatório' }),
   appointment_type: z.enum(['first_visit', 'return', 'procedure', 'urgent', 'follow_up', 'exam']),
   title: z.string().min(3, 'Título deve ter pelo menos 3 caracteres'),
@@ -84,6 +87,8 @@ export function AppointmentForm({
   const { contacts, isLoadingContacts, refetchContacts } = useCRM();
   const { checkAvailability } = useAvailability();
   const { procedures, isLoading: isLoadingProcedures } = useCommercialProcedures();
+  const { doctors, isLoading: isLoadingDoctors } = useDoctors();
+  const { canScheduleForOthers } = useUserProfile();
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [estimatedValueDisplay, setEstimatedValueDisplay] = useState<string>('');
@@ -176,6 +181,7 @@ export function AppointmentForm({
 
       const submitData = {
         user_id: user.id,
+        doctor_id: data.doctor_id || user.id,
         contact_id: data.contact_id,
         title: data.title,
         appointment_type: data.appointment_type,
@@ -207,11 +213,12 @@ export function AppointmentForm({
   useEffect(() => {
     if (appointment && open) {
       const startDate = parseISO(appointment.start_time);
-      const estimatedValueFormatted = appointment.estimated_value 
-        ? formatCurrency(appointment.estimated_value) 
+      const estimatedValueFormatted = appointment.estimated_value
+        ? formatCurrency(appointment.estimated_value)
         : '';
       setEstimatedValueDisplay(estimatedValueFormatted);
       reset({
+        doctor_id: appointment.doctor_id || undefined,
         contact_id: appointment.contact_id,
         appointment_type: appointment.appointment_type,
         title: appointment.title,
@@ -231,9 +238,10 @@ export function AppointmentForm({
       const estimatedValueFormatted = isConversion && conversionData.appointmentValue
         ? formatCurrency(conversionData.appointmentValue)
         : '';
-      
+
       setEstimatedValueDisplay(estimatedValueFormatted);
       reset({
+        doctor_id: undefined,
         appointment_type: 'first_visit',
         status: 'scheduled',
         duration_minutes: 30,
@@ -610,6 +618,50 @@ export function AppointmentForm({
               Cadastrar novo paciente
             </Button>
           </div>
+
+          {/* Doctor Selection - Only show for users who can schedule for others */}
+          {canScheduleForOthers && (
+            <div className="space-y-2">
+              <Label htmlFor="doctor_id">Medico Responsavel *</Label>
+              <Select
+                value={watch('doctor_id') || ''}
+                onValueChange={(value) => setValue('doctor_id', value)}
+                disabled={isLoadingDoctors}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={
+                    isLoadingDoctors
+                      ? "Carregando medicos..."
+                      : "Selecione o medico"
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  {isLoadingDoctors ? (
+                    <div className="p-2 text-sm text-muted-foreground flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Carregando medicos...
+                    </div>
+                  ) : doctors.length === 0 ? (
+                    <div className="p-2 text-sm text-muted-foreground">
+                      Nenhum medico encontrado.
+                    </div>
+                  ) : (
+                    doctors.map((doctor) => (
+                      <SelectItem key={doctor.id} value={doctor.id}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{doctor.full_name || 'Sem nome'}</span>
+                          <span className="text-xs text-muted-foreground">{doctor.email}</span>
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              {errors.doctor_id && (
+                <p className="text-sm text-destructive">{errors.doctor_id.message}</p>
+              )}
+            </div>
+          )}
 
           {/* Appointment Type */}
           <div className="grid grid-cols-2 gap-4">

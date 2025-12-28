@@ -93,3 +93,4 @@ export function validateGoogleAdsAccountId(accountId: string): boolean {
   return /^\d{10}$/.test(accountId);
 }
 
+

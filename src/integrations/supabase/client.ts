@@ -55,20 +55,9 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
       'apikey': SUPABASE_PUBLISHABLE_KEY,
     },
     fetch: (url, options = {}) => {
-      const requestId = Math.random().toString(36).substring(7);
-      const fetchStartTime = Date.now();
-      const urlStr = typeof url === 'string' ? url : url.toString();
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:fetch',message:'fetch iniciado',data:{requestId,url:urlStr.substring(0,100),method:options.method || 'GET',hasSignal:!!options.signal},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
-      
       // Usar fetch nativo com timeout no nível HTTP
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:fetch',message:'timeout no fetch customizado',data:{requestId,elapsed:Date.now()-fetchStartTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
         controller.abort();
       }, 30000);
 
@@ -76,9 +65,6 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
       const combinedSignal = options.signal || controller.signal;
       if (options.signal && controller.signal) {
         options.signal.addEventListener('abort', () => {
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:fetch',message:'signal externo abortado',data:{requestId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-          // #endregion
           controller.abort();
         });
       }
@@ -88,16 +74,10 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
         signal: combinedSignal,
       })
         .then((response) => {
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:fetch',message:'fetch response recebida',data:{requestId,status:response.status,ok:response.ok,elapsed:Date.now()-fetchStartTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-          // #endregion
           clearTimeout(timeoutId);
           return response;
         })
         .catch((error) => {
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:fetch',message:'fetch erro',data:{requestId,errorMessage:error?.message,errorName:error?.name,isAbort:error?.name === 'AbortError',elapsed:Date.now()-fetchStartTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-          // #endregion
           clearTimeout(timeoutId);
           throw error;
         });
@@ -112,26 +92,58 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 
 // Monitorar eventos de refresh de token
 if (typeof window !== 'undefined') {
+  // Listener para eventos de autenticação
   supabase.auth.onAuthStateChange((event, session) => {
-    // Monitoramento silencioso de mudanças de autenticação
+    if (event === 'TOKEN_REFRESHED') {
+      console.log('✅ Token refreshed successfully');
+    } else if (event === 'SIGNED_OUT') {
+      console.log('🔒 User signed out');
+    }
   });
-  
-  // Monitorar refresh de token periodicamente
-  setInterval(async () => {
+
+  // Função para verificar e fazer refresh do token proativamente
+  const checkAndRefreshToken = async () => {
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
+
+      if (error || !session) {
+        return;
+      }
+
       const now = Math.floor(Date.now() / 1000);
-      const tokenExpiry = session?.expires_at ? parseInt(session.expires_at.toString()) : null;
+      const tokenExpiry = session.expires_at;
       const timeUntilExpiry = tokenExpiry ? tokenExpiry - now : null;
-      
-      // Se o token está próximo de expirar (menos de 5 minutos), tentar refresh
-      if (session && timeUntilExpiry !== null && timeUntilExpiry > 0 && timeUntilExpiry < 300) {
-        await supabase.auth.refreshSession();
+
+      // Se o token está próximo de expirar (menos de 10 minutos), tentar refresh
+      // Aumentado de 5 para 10 minutos para ser mais proativo
+      if (timeUntilExpiry !== null && timeUntilExpiry > 0 && timeUntilExpiry < 600) {
+        console.log(`⏰ Token expira em ${Math.round(timeUntilExpiry / 60)} minutos. Fazendo refresh...`);
+        const { error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError) {
+          console.error('❌ Erro ao fazer refresh do token:', refreshError.message);
+        }
       }
     } catch (err: any) {
-      // Erro silencioso no monitoramento
+      console.error('❌ Erro ao verificar token:', err.message);
     }
-  }, 60000); // Verificar a cada minuto
+  };
+
+  // Verificar token a cada 30 segundos (mais frequente para evitar expiração)
+  setInterval(checkAndRefreshToken, 30000);
+
+  // Verificar imediatamente ao carregar
+  setTimeout(checkAndRefreshToken, 1000);
+
+  // Também verificar quando a janela recebe foco (usuário volta para a aba)
+  window.addEventListener('focus', () => {
+    checkAndRefreshToken();
+  });
+
+  // Verificar quando a conexão é restabelecida
+  window.addEventListener('online', () => {
+    console.log('🌐 Conexão restabelecida. Verificando token...');
+    checkAndRefreshToken();
+  });
 }
 
 // Exportar URL e Project Ref para uso em outros lugares

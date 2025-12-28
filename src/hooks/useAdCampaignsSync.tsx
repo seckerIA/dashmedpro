@@ -1,10 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import type { 
-  AdCampaignSync, 
-  AdCampaignSyncInsert, 
-  AdCampaignSyncUpdate,
-  AdCampaignWithConnection 
+import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
+import type {
+  AdCampaignWithConnection
 } from '@/types/adPlatforms';
 
 // =====================================================
@@ -18,7 +16,7 @@ export function useAdCampaignsSync(filters?: {
 }) {
   return useQuery({
     queryKey: ['ad-campaigns-sync', filters],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       let query = supabase
         .from('ad_campaigns_sync')
         .select(`
@@ -37,19 +35,25 @@ export function useAdCampaignsSync(filters?: {
         query = query.eq('status', filters.status);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await supabaseQueryWithTimeout(query, 30000, signal);
 
       if (error) throw error;
       return data as AdCampaignWithConnection[];
     },
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    retry: 2,
+    retryDelay: 1000,
   });
 }
 
 export function useAdCampaignSync(id: string) {
   return useQuery({
     queryKey: ['ad-campaign-sync', id],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    queryFn: async ({ signal }) => {
+      const query = supabase
         .from('ad_campaigns_sync')
         .select(`
           *,
@@ -58,10 +62,14 @@ export function useAdCampaignSync(id: string) {
         .eq('id', id)
         .single();
 
+      const { data, error } = await supabaseQueryWithTimeout(query, 30000, signal);
+
       if (error) throw error;
       return data as AdCampaignWithConnection;
     },
     enabled: !!id,
+    staleTime: 2 * 60 * 1000,
+    retry: 2,
   });
 }
 
@@ -146,7 +154,7 @@ export function useAdCampaignMetrics(filters?: {
 }) {
   return useQuery({
     queryKey: ['ad-campaign-metrics', filters],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       let query = supabase
         .from('ad_campaigns_sync')
         .select('spend, impressions, clicks, ctr, conversions, conversion_value, cpa, roas');
@@ -164,7 +172,7 @@ export function useAdCampaignMetrics(filters?: {
         query = query.lte('synced_at', filters.end_date);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await supabaseQueryWithTimeout(query, 30000, signal);
 
       if (error) throw error;
 
@@ -191,25 +199,30 @@ export function useAdCampaignMetrics(filters?: {
           metrics.total_clicks += Number(campaign.clicks) || 0;
           metrics.total_conversions += Number(campaign.conversions) || 0;
           metrics.total_conversion_value += Number(campaign.conversion_value) || 0;
-          
+
           if (campaign.ctr) ctrs.push(Number(campaign.ctr));
           if (campaign.cpa) cpas.push(Number(campaign.cpa));
           if (campaign.roas) roases.push(Number(campaign.roas));
         });
 
-        metrics.average_ctr = ctrs.length > 0 
-          ? ctrs.reduce((a, b) => a + b, 0) / ctrs.length 
+        metrics.average_ctr = ctrs.length > 0
+          ? ctrs.reduce((a, b) => a + b, 0) / ctrs.length
           : 0;
-        metrics.average_cpa = cpas.length > 0 
-          ? cpas.reduce((a, b) => a + b, 0) / cpas.length 
+        metrics.average_cpa = cpas.length > 0
+          ? cpas.reduce((a, b) => a + b, 0) / cpas.length
           : 0;
-        metrics.average_roas = roases.length > 0 
-          ? roases.reduce((a, b) => a + b, 0) / roases.length 
+        metrics.average_roas = roases.length > 0
+          ? roases.reduce((a, b) => a + b, 0) / roases.length
           : 0;
       }
 
       return metrics;
     },
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    retry: 2,
+    retryDelay: 1000,
   });
 }
-

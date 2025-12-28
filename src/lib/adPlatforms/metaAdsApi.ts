@@ -135,3 +135,4 @@ export function validateMetaAdsAccountId(accountId: string): boolean {
   return /^act_\d+$/.test(accountId);
 }
 
+

@@ -84,3 +84,4 @@ CREATE POLICY "Service role can manage WhatsApp messages"
   ON public.whatsapp_messages FOR ALL
   WITH CHECK (true);
 
+

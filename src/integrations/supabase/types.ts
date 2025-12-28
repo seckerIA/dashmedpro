@@ -1444,7 +1444,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "dono" | "vendedor" | "gestor_trafego"
+      app_role: "admin" | "dono" | "vendedor" | "gestor_trafego" | "secretaria" | "medico"
       crm_activity_type:
         | "call"
         | "email"
