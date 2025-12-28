@@ -24,14 +24,19 @@ export function useProspectingSessions() {
       today.setHours(0, 0, 0, 0);
       const todayISO = today.toISOString();
 
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowISO = tomorrow.toISOString();
+
       const queryPromise = supabase
         .from('prospecting_sessions')
         .select('*')
         .eq('user_id', user.id)
         .gte('ended_at', todayISO)
+        .lt('ended_at', tomorrowISO)
         .order('ended_at', { ascending: false });
 
-      const { data, error } = await supabaseQueryWithTimeout(queryPromise, 30000, signal);
+      const { data, error } = await supabaseQueryWithTimeout(queryPromise as any, 30000, signal);
 
       if (error) throw error;
       return data;
@@ -41,7 +46,14 @@ export function useProspectingSessions() {
     gcTime: 5 * 60 * 1000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
-    refetchInterval: 60000, // Refetch a cada 1 minuto
+    refetchInterval: (query) => {
+      // Se a query está carregando, não fazer refetch para evitar acúmulo
+      if (query.state.fetchStatus === 'fetching') {
+        return false;
+      }
+      return 60000; // 60s quando não está carregando
+    },
+    refetchIntervalInBackground: false, // Não refetch quando aba não está em foco
     retry: 2,
     retryDelay: 1000,
   });

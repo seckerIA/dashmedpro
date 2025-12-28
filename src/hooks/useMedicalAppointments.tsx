@@ -38,7 +38,7 @@ const fetchAppointments = async (
     .from('medical_appointments')
     .select(`
       *,
-      contact:crm_contacts(*),
+      contact:crm_contacts!medical_appointments_contact_id_fkey(*),
       financial_transaction:financial_transactions(id, description, amount, type)
     `);
 
@@ -115,7 +115,7 @@ const createAppointment = async (
     })
     .select(`
       *,
-      contact:crm_contacts(*),
+      contact:crm_contacts!medical_appointments_contact_id_fkey(*),
       financial_transaction:financial_transactions(id, description, amount, type)
     `)
     .single();
@@ -147,7 +147,7 @@ const updateAppointment = async ({
     .eq('id', id)
     .select(`
       *,
-      contact:crm_contacts(*),
+      contact:crm_contacts!medical_appointments_contact_id_fkey(*),
       financial_transaction:financial_transactions(id, description, amount, type)
     `)
     .single();

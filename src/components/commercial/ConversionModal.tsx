@@ -103,20 +103,12 @@ export function ConversionModal({
     setIsSubmitting(true);
 
     try {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConversionModal.tsx:102',message:'Iniciando conversão de lead',data:{leadId,leadName},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-
       // Buscar o lead completo para obter o procedure_id
       const { data: leadData, error: leadError } = await supabase
         .from("commercial_leads")
         .select("procedure_id")
         .eq("id", leadId)
         .single();
-
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConversionModal.tsx:110',message:'Lead buscado',data:{leadData,leadError,procedureId:leadData?.procedure_id},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
 
       if (leadError) {
         console.error("Erro ao buscar lead:", leadError);
@@ -127,9 +119,6 @@ export function ConversionModal({
       const customFields: any = {};
       if (leadData?.procedure_id) {
         customFields.procedure_id = leadData.procedure_id;
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConversionModal.tsx:125',message:'Adicionando procedure_id ao custom_fields',data:{procedureId:leadData.procedure_id,customFields},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
       }
 
       const contactData = {
@@ -143,15 +132,7 @@ export function ConversionModal({
         custom_fields: Object.keys(customFields).length > 0 ? customFields : undefined,
       };
 
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConversionModal.tsx:140',message:'Criando contato com custom_fields',data:{contactData},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-
       const newContact = await createContact.mutateAsync(contactData);
-
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConversionModal.tsx:145',message:'Contato criado',data:{contactId:newContact.id,customFields:newContact.custom_fields},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
 
       // 2. Converter o lead
       await convertLead.mutateAsync({

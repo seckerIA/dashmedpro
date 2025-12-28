@@ -275,8 +275,14 @@ export function useCRM(viewAsUserIds?: string[]) {
   const createContactMutation = useMutation({
     mutationFn: (contactData: Omit<CRMContactInsert, 'user_id'>) =>
       createContact({ ...contactData, user_id: user?.id || '' }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['crm-contacts', user?.id] });
+    onSuccess: async (newContact) => {
+      console.log('[DEBUG] useCRM - Contato criado:', newContact.id);
+
+      // Invalidar e forçar refetch
+      await queryClient.invalidateQueries({ queryKey: ['crm-contacts', user?.id] });
+      await queryClient.refetchQueries({ queryKey: ['crm-contacts', user?.id] });
+
+      console.log('[DEBUG] useCRM - Cache invalidado e refetch concluído');
     },
   });
 

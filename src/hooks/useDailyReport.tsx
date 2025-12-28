@@ -63,7 +63,7 @@ export function useDailyReport() {
   // Buscar relatório do dia atual
   const { data: todayReport, isLoading } = useQuery({
     queryKey: ['daily-report-today', user?.id],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!user?.id) return null;
 
       const today = new Date();
@@ -77,7 +77,8 @@ export function useDailyReport() {
         .eq('report_date', todayISO)
         .maybeSingle();
       
-      const reportResult = await supabaseQueryWithTimeout(reportQuery, 30000);
+      // Passar o query builder (não executado) para permitir abortSignal
+      const reportResult = await supabaseQueryWithTimeout(reportQuery as any, 30000, signal);
       const { data, error } = reportResult;
 
       if (error && error.code !== 'PGRST116') {
@@ -94,7 +95,16 @@ export function useDailyReport() {
       return data;
     },
     enabled: !!user?.id,
-    refetchInterval: 30000, // Refetch a cada 30 segundos
+    refetchInterval: (query) => {
+      // Se a query está carregando, não fazer refetch para evitar acúmulo
+      if (query.state.fetchStatus === 'fetching') {
+        return false;
+      }
+      return 60000; // 60s quando não está carregando
+    },
+    refetchIntervalInBackground: false, // Não refetch quando aba não está em foco
+    staleTime: 30000, // Considerar dados válidos por 30s
+    retry: 1, // Reduzir retries
   });
 
   // Iniciar/atualizar relatório diário (sem restrições)

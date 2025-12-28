@@ -291,9 +291,6 @@ export function AppointmentForm({
 
     // Função async para buscar e preencher procedimento
     const fetchAndFillProcedure = async () => {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppointmentForm.tsx:285',message:'Iniciando busca de procedimento',data:{selectedContactId,contactsLength:contacts.length,proceduresLength:procedures?.length||0},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       console.log('🔍 AppointmentForm - Iniciando busca de procedimento vinculado...');
       console.log('   Contato selecionado:', selectedContactId);
       console.log('   Total de contatos:', contacts.length);
@@ -336,10 +333,7 @@ export function AppointmentForm({
       if (!customFields || (typeof customFields === 'object' && Object.keys(customFields).length === 0)) {
         customFields = {};
       }
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppointmentForm.tsx:328',message:'custom_fields processado',data:{customFields,keys:Object.keys(customFields),procedureId:customFields?.procedure_id,procedureIdType:typeof customFields?.procedure_id},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
+
       console.log('🔍 AppointmentForm - custom_fields processado:', {
         customFields,
         keys: Object.keys(customFields),
@@ -348,16 +342,9 @@ export function AppointmentForm({
       });
 
       let procedureId = customFields?.procedure_id;
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppointmentForm.tsx:338',message:'Procedure ID extraído',data:{procedureId,hasProcedureId:!!procedureId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
 
       // Se não encontrou no custom_fields, buscar no lead comercial convertido
       if (!procedureId) {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppointmentForm.tsx:347',message:'procedure_id não encontrado em custom_fields, buscando no lead',data:{contactId:selectedContactId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
-        // #endregion
         console.log('ℹ️ AppointmentForm - procedure_id não encontrado em custom_fields, buscando no lead comercial...');
         
         try {
@@ -373,10 +360,6 @@ export function AppointmentForm({
             .eq('contact_id', selectedContactId)
             .order('created_at', { ascending: false })
             .limit(10);
-
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppointmentForm.tsx:365',message:'Todos os leads comerciais buscados',data:{allLeadsCount:allLeads?.length||0,leadsError,hasLeads:!!allLeads},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
-          // #endregion
 
           console.log('📊 AppointmentForm - Todos os leads encontrados:', {
             count: allLeads?.length || 0,
@@ -443,9 +426,6 @@ export function AppointmentForm({
           }
         } catch (error) {
           console.error('❌ AppointmentForm - Erro ao buscar lead comercial:', error);
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppointmentForm.tsx:410',message:'Erro ao buscar lead comercial',data:{error:error instanceof Error ? error.message : String(error)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
-          // #endregion
           return;
         }
       }
@@ -465,9 +445,6 @@ export function AppointmentForm({
         return;
       }
 
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppointmentForm.tsx:355',message:'Procedimento encontrado',data:{id:linkedProcedure.id,name:linkedProcedure.name,duration:linkedProcedure.duration_minutes,price:linkedProcedure.price},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
       console.log('✅ AppointmentForm - Procedimento encontrado:', {
         id: linkedProcedure.id,
         name: linkedProcedure.name,
@@ -512,9 +489,6 @@ export function AppointmentForm({
       setEstimatedValueDisplay(formattedPrice);
       setValue('estimated_value', formattedPrice as any);
 
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AppointmentForm.tsx:399',message:'Preenchimento automático concluído',data:{title:linkedProcedure.name,duration:linkedProcedure.duration_minutes,price:linkedProcedure.price},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
       console.log('✅ AppointmentForm - Preenchimento automático concluído!');
     };
 
