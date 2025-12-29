@@ -14,17 +14,21 @@ const fetchDoctors = async (signal?: AbortSignal): Promise<Doctor[]> => {
   // Verificar e garantir sessao valida
   await ensureValidSession();
 
-  // Buscar todos os perfis ativos, independente do role
-  // Isso permite que todos os perfis vejam todos os médicos/usuários no filtro
+  // Buscar apenas médicos, admin e dono (quem pode ter consultas/procedimentos)
   const queryPromise = supabase
     .from('profiles')
     .select('id, email, full_name, role')
     .eq('is_active', true)
+    .in('role', ['medico', 'admin', 'dono'])
     .order('full_name', { ascending: true });
 
   const { data, error } = await supabaseQueryWithTimeout(queryPromise as any, 30000, signal);
 
-  if (error) throw new Error(`Erro ao buscar medicos: ${error.message}`);
+  if (error) {
+    console.error('[useDoctors] ERRO:', error);
+    throw new Error(`Erro ao buscar medicos: ${error.message}`);
+  }
+
   return (data as Doctor[]) || [];
 };
 
