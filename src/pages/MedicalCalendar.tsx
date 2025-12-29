@@ -31,7 +31,7 @@ export default function MedicalCalendar() {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { isMedico, isAdmin } = useUserProfile();
+  const { isMedico, isAdmin, isSecretaria } = useUserProfile();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [view, setView] = useState<CalendarView>('monthly');
@@ -69,6 +69,7 @@ export default function MedicalCalendar() {
     appointmentType: typeFilter,
     status: statusFilter,
     paymentStatus: paymentFilter,
+    isSecretaria, // Secretária vê todos os agendamentos de todos os médicos
   };
 
   const {

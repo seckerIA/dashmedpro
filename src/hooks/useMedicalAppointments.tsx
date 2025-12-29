@@ -22,6 +22,7 @@ interface UseMedicalAppointmentsFilters {
   status?: AppointmentStatus | 'all';
   paymentStatus?: PaymentStatus | 'all';
   contactId?: string;
+  isSecretaria?: boolean; // Se true, busca TODOS os agendamentos (de todos os médicos)
 }
 
 // Fetch appointments with relations
@@ -39,11 +40,13 @@ const fetchAppointments = async (
     .select(`
       *,
       contact:crm_contacts!medical_appointments_contact_id_fkey(*),
-      financial_transaction:financial_transactions(id, description, amount, type)
+      financial_transaction:financial_transactions(id, description, amount, type),
+      doctor:profiles!medical_appointments_doctor_id_profiles_fk(id, full_name, email)
     `);
 
-  // Filter by user_id OR doctor_id to include appointments scheduled by others for this doctor
-  if (userId) {
+  // Se é secretária, não filtra por user_id - a RLS já garante acesso a todos
+  // Caso contrário, filtra por user_id OU doctor_id
+  if (!filters?.isSecretaria && userId) {
     query = query.or(`user_id.eq.${userId},doctor_id.eq.${userId}`);
   }
 
@@ -169,7 +172,7 @@ const deleteAppointment = async (id: string): Promise<void> => {
 // Helper para serializar filtros em uma query key estável
 const serializeFilters = (filters?: UseMedicalAppointmentsFilters): string => {
   if (!filters) return 'no-filters';
-  
+
   const parts: string[] = [];
   if (filters.startDate) parts.push(`start:${filters.startDate.toISOString()}`);
   if (filters.endDate) parts.push(`end:${filters.endDate.toISOString()}`);
@@ -177,7 +180,8 @@ const serializeFilters = (filters?: UseMedicalAppointmentsFilters): string => {
   if (filters.status && filters.status !== 'all') parts.push(`status:${filters.status}`);
   if (filters.paymentStatus && filters.paymentStatus !== 'all') parts.push(`payment:${filters.paymentStatus}`);
   if (filters.contactId) parts.push(`contact:${filters.contactId}`);
-  
+  if (filters.isSecretaria) parts.push('secretaria:true');
+
   return parts.length > 0 ? parts.join('|') : 'no-filters';
 };
 
