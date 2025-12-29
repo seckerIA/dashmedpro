@@ -69,7 +69,7 @@ export function useCommercialProcedures(options: UseCommercialProceduresOptions 
 
       const { data, error } = await supabase
         .from("commercial_procedures")
-        .insert({ ...procedure, user_id: user.id })
+        .insert({ ...procedure, user_id: procedure.user_id || user.id })
         .select()
         .single();
 
