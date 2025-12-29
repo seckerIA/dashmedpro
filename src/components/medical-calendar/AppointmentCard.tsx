@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Clock, User, Phone, Stethoscope, MoreVertical, Edit, Trash2, CheckCircle2, XCircle, DollarSign, UserCheck, UserX } from 'lucide-react';
+import { Clock, User, Phone, Stethoscope, MoreVertical, Edit, Trash2, CheckCircle2, XCircle, DollarSign, UserCheck, UserX, UserCog } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { MedicalAppointmentWithRelations, APPOINTMENT_TYPE_LABELS, APPOINTMENT_STATUS_LABELS } from '@/types/medicalAppointments';
@@ -37,6 +37,7 @@ export function AppointmentCard({
   const patientName = appointment.contact?.full_name || 'Sem paciente';
   const patientPhone = appointment.contact?.phone || 'Sem telefone';
   const appointmentType = APPOINTMENT_TYPE_LABELS[appointment.appointment_type] || appointment.appointment_type;
+  const doctorName = appointment.doctor?.full_name || appointment.doctor?.email;
 
   return (
     <Card className="hover:shadow-md hover:border-primary/30 transition-all duration-200 border-border bg-gradient-card">
@@ -64,6 +65,14 @@ export function AppointmentCard({
                 <Phone className="h-4 w-4" />
                 <span>{patientPhone}</span>
               </div>
+
+              {/* Médico Responsável */}
+              {doctorName && (
+                <div className="flex items-center gap-2 text-sm">
+                  <UserCog className="h-4 w-4 text-primary" />
+                  <span className="font-medium text-primary">Dr(a). {doctorName}</span>
+                </div>
+              )}
 
               {appointment.title && (
                 <div className="flex items-start gap-2 text-sm">
