@@ -25,14 +25,14 @@ async function runMigration() {
     await client.connect();
     console.log('✅ Conectado com sucesso!');
 
-    // Read fix migration file (handles existing partial tables)
-    const migrationPath = path.join(__dirname, 'supabase', 'migrations', '20251228100000_fix_medical_records.sql');
+    // Read migration file for commercial procedures FK
+    const migrationPath = path.join(__dirname, 'supabase', 'migrations', '20251229000000_add_commercial_procedures_profiles_fk.sql');
     const sql = fs.readFileSync(migrationPath, 'utf8');
 
-    console.log('📝 Executando migração de correção...');
+    console.log('📝 Executando migração de FK para commercial_procedures...');
     await client.query(sql);
     console.log('✅ Migração executada com sucesso!');
-    console.log('📋 Tabelas medical_records e prescriptions atualizadas com todos os campos.');
+    console.log('📋 Foreign keys adicionadas para permitir joins com profiles.');
 
   } catch (error) {
     console.error('❌ Erro ao executar migração:', error.message);

@@ -33,7 +33,7 @@ export function useCommercialProcedures(options: UseCommercialProceduresOptions 
           .from("commercial_procedures")
           .select(`
             *,
-            doctor:user_id (full_name, email)
+            doctor:profiles!commercial_procedures_user_id_profiles_fk (full_name, email)
           `)
           .order("name", { ascending: true });
       } else {
@@ -42,7 +42,7 @@ export function useCommercialProcedures(options: UseCommercialProceduresOptions 
           .from("commercial_procedures")
           .select(`
             *,
-            doctor:user_id (full_name, email)
+            doctor:profiles!commercial_procedures_user_id_profiles_fk (full_name, email)
           `)
           .eq("user_id", user.id)
           .order("name", { ascending: true });
