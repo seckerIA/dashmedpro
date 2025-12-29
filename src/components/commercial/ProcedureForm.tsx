@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,14 +13,16 @@ import { useCommercialProcedures } from "@/hooks/useCommercialProcedures";
 import { CommercialProcedure, CommercialProcedureInsert } from "@/types/commercial";
 import { COMMERCIAL_PROCEDURE_CATEGORY_LABELS } from "@/types/commercial";
 import { formatCurrencyInput, parseCurrencyToNumber } from "@/lib/currency";
-import { Loader2 } from "lucide-react";
+import { Loader2, Stethoscope, Clock, DollarSign, FileText, Tag, User } from "lucide-react";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { useDoctors } from "@/hooks/useDoctors";
 
 const procedureSchema = z.object({
   name: z.string().min(3, "Nome deve ter pelo menos 3 caracteres"),
   category: z.enum(['consultation', 'procedure', 'exam', 'surgery', 'other']),
   description: z.string().optional(),
   price: z.string().min(1, "Preço é obrigatório").transform((val) => parseCurrencyToNumber(val)),
-  duration_minutes: z.number().min(15).max(480),
+  duration_minutes: z.number().min(15, "Mínimo 15 minutos").max(480, "Máximo 480 minutos"),
   is_active: z.boolean(),
 });
 
@@ -33,8 +35,18 @@ interface ProcedureFormProps {
 }
 
 export function ProcedureForm({ open, onOpenChange, procedure }: ProcedureFormProps) {
-  const { createProcedure, updateProcedure } = useCommercialProcedures();
+  const { isSecretaria } = useUserProfile();
+  const { doctors } = useDoctors();
+  const { createProcedure, updateProcedure } = useCommercialProcedures({ isSecretaria });
   const isEditing = !!procedure;
+
+  // Estado para médico selecionado (usado apenas por secretária)
+  const [selectedDoctorId, setSelectedDoctorId] = useState<string>("");
+
+  // Filtrar apenas médicos, admin e dono
+  const availableDoctors = doctors.filter(
+    (d) => d.role === 'medico' || d.role === 'admin' || d.role === 'dono'
+  );
 
   const {
     register,
@@ -47,7 +59,7 @@ export function ProcedureForm({ open, onOpenChange, procedure }: ProcedureFormPr
     resolver: zodResolver(procedureSchema),
     defaultValues: {
       name: "",
-      category: "other",
+      category: "consultation",
       description: "",
       price: "",
       duration_minutes: 30,
@@ -65,20 +77,30 @@ export function ProcedureForm({ open, onOpenChange, procedure }: ProcedureFormPr
         duration_minutes: procedure.duration_minutes,
         is_active: procedure.is_active,
       });
+      // Se editando, definir o médico do procedimento
+      if (isSecretaria && procedure.user_id) {
+        setSelectedDoctorId(procedure.user_id);
+      }
     } else if (!procedure && open) {
       reset({
         name: "",
-        category: "other",
+        category: "consultation",
         description: "",
         price: "",
         duration_minutes: 30,
         is_active: true,
       });
+      setSelectedDoctorId("");
     }
-  }, [procedure, open, reset]);
+  }, [procedure, open, reset, isSecretaria]);
 
   const onSubmit = async (data: ProcedureFormData) => {
     try {
+      // Se secretária, validar que um médico foi selecionado
+      if (isSecretaria && !selectedDoctorId && !isEditing) {
+        return;
+      }
+
       const procedureData: CommercialProcedureInsert = {
         name: data.name,
         category: data.category,
@@ -86,6 +108,8 @@ export function ProcedureForm({ open, onOpenChange, procedure }: ProcedureFormPr
         price: data.price,
         duration_minutes: data.duration_minutes,
         is_active: data.is_active,
+        // Se secretária, usar o médico selecionado como user_id
+        ...(isSecretaria && selectedDoctorId ? { user_id: selectedDoctorId } : {}),
       };
 
       if (isEditing && procedure) {
@@ -96,6 +120,7 @@ export function ProcedureForm({ open, onOpenChange, procedure }: ProcedureFormPr
 
       onOpenChange(false);
       reset();
+      setSelectedDoctorId("");
     } catch (error) {
       console.error("Error submitting procedure:", error);
     }
@@ -108,32 +133,74 @@ export function ProcedureForm({ open, onOpenChange, procedure }: ProcedureFormPr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800">
-        <DialogHeader>
-          <DialogTitle className="text-blue-900 dark:text-blue-100">{isEditing ? "Editar Procedimento" : "Novo Procedimento"}</DialogTitle>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-gradient-card border-border">
+        <DialogHeader className="pb-4 border-b border-border">
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <Stethoscope className="h-5 w-5 text-primary" />
+            {isEditing ? "Editar Procedimento" : "Novo Procedimento"}
+          </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 pt-4">
+          {/* Seletor de Médico - Apenas para Secretária */}
+          {isSecretaria && (
+            <div className="space-y-2 p-4 bg-primary/5 rounded-xl border border-primary/20">
+              <Label htmlFor="doctor" className="flex items-center gap-2 text-sm font-medium">
+                <User className="h-4 w-4 text-primary" />
+                Médico Responsável *
+              </Label>
+              <Select
+                value={selectedDoctorId}
+                onValueChange={setSelectedDoctorId}
+              >
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Selecione o médico..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableDoctors.map((doctor) => (
+                    <SelectItem key={doctor.id} value={doctor.id}>
+                      {doctor.full_name || doctor.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!selectedDoctorId && !isEditing && (
+                <p className="text-xs text-muted-foreground">
+                  Selecione o médico para o qual este procedimento será cadastrado
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Nome do Procedimento */}
           <div className="space-y-2">
-            <Label htmlFor="name">Nome *</Label>
+            <Label htmlFor="name" className="flex items-center gap-2 text-sm font-medium">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              Nome do Procedimento *
+            </Label>
             <Input
               id="name"
               {...register("name")}
-              placeholder="Nome do procedimento"
+              placeholder="Ex: Consulta Dermatológica"
+              className="bg-background"
             />
             {errors.name && (
               <p className="text-sm text-destructive">{errors.name.message}</p>
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          {/* Categoria e Duração - 2 colunas */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="category">Categoria *</Label>
+              <Label htmlFor="category" className="flex items-center gap-2 text-sm font-medium">
+                <Tag className="h-4 w-4 text-muted-foreground" />
+                Categoria *
+              </Label>
               <Select
                 value={watch("category")}
                 onValueChange={(value) => setValue("category", value as any)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="bg-background">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -145,13 +212,17 @@ export function ProcedureForm({ open, onOpenChange, procedure }: ProcedureFormPr
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="duration_minutes">Duração (minutos) *</Label>
+              <Label htmlFor="duration_minutes" className="flex items-center gap-2 text-sm font-medium">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                Duração (minutos) *
+              </Label>
               <Input
                 id="duration_minutes"
                 type="number"
                 {...register("duration_minutes", { valueAsNumber: true })}
                 min={15}
                 max={480}
+                className="bg-background"
               />
               {errors.duration_minutes && (
                 <p className="text-sm text-destructive">{errors.duration_minutes.message}</p>
@@ -159,59 +230,84 @@ export function ProcedureForm({ open, onOpenChange, procedure }: ProcedureFormPr
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="price">Preço *</Label>
-            <Input
-              id="price"
-              type="text"
-              value={watch("price") || ""}
-              onChange={handlePriceChange}
-              placeholder="R$ 0,00"
-            />
-            {errors.price && (
-              <p className="text-sm text-destructive">{errors.price.message}</p>
-            )}
+          {/* Preço e Status - 2 colunas */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="price" className="flex items-center gap-2 text-sm font-medium">
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                Preço *
+              </Label>
+              <Input
+                id="price"
+                type="text"
+                value={watch("price") || ""}
+                onChange={handlePriceChange}
+                placeholder="R$ 0,00"
+                className="bg-background"
+              />
+              {errors.price && (
+                <p className="text-sm text-destructive">{errors.price.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-sm font-medium">
+                Status
+              </Label>
+              <div className="flex items-center gap-3 h-10 px-3 rounded-md border border-input bg-background">
+                <Switch
+                  id="is_active"
+                  checked={watch("is_active")}
+                  onCheckedChange={(checked) => setValue("is_active", checked)}
+                />
+                <Label htmlFor="is_active" className="text-sm cursor-pointer">
+                  {watch("is_active") ? "Ativo" : "Inativo"}
+                </Label>
+              </div>
+            </div>
           </div>
 
+          {/* Descrição */}
           <div className="space-y-2">
-            <Label htmlFor="description">Descrição</Label>
+            <Label htmlFor="description" className="text-sm font-medium">
+              Descrição (opcional)
+            </Label>
             <Textarea
               id="description"
               {...register("description")}
-              placeholder="Descrição do procedimento..."
-              rows={4}
+              placeholder="Descrição detalhada do procedimento..."
+              rows={3}
+              className="bg-background resize-none"
             />
           </div>
 
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="is_active"
-              checked={watch("is_active")}
-              onCheckedChange={(checked) => setValue("is_active", checked)}
-            />
-            <Label htmlFor="is_active">Ativo</Label>
+          {/* Botões */}
+          <div className="flex gap-3 pt-4 border-t border-border">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              className="flex-1"
+              disabled={isSubmitting || (isSecretaria && !selectedDoctorId && !isEditing)}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                isEditing ? "Salvar Alterações" : "Criar Procedimento"
+              )}
+            </Button>
           </div>
-
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Salvando...
-              </>
-            ) : (
-              isEditing ? "Salvar Alterações" : "Criar Procedimento"
-            )}
-          </Button>
         </form>
       </DialogContent>
     </Dialog>
   );
 }
-
-
-
-
-
-
-
-

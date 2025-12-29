@@ -65,6 +65,11 @@ export interface CommercialProcedure {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  // Dados do médico (join com profiles)
+  doctor?: {
+    full_name: string | null;
+    email: string;
+  } | null;
 }
 
 export interface CommercialProcedureInsert {

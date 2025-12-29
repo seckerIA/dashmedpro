@@ -6,25 +6,47 @@ import { supabaseQueryWithTimeout } from "@/utils/supabaseQuery";
 import { ensureValidSession } from "@/utils/supabaseHelpers";
 import { CommercialProcedure, CommercialProcedureInsert, CommercialProcedureUpdate } from "@/types/commercial";
 
-export function useCommercialProcedures() {
+interface UseCommercialProceduresOptions {
+  isSecretaria?: boolean;
+}
+
+export function useCommercialProcedures(options: UseCommercialProceduresOptions = {}) {
+  const { isSecretaria = false } = options;
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: procedures, isLoading, error } = useQuery({
-    queryKey: ["commercial-procedures", user?.id],
+    queryKey: ["commercial-procedures", user?.id, isSecretaria],
     queryFn: async ({ signal }) => {
       if (!user) throw new Error("User not authenticated");
 
       // Verificar e garantir sessão válida
       await ensureValidSession();
 
-      // Executar query com timeout
-      const queryPromise = supabase
-        .from("commercial_procedures")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("name", { ascending: true });
+      // Query com join para pegar dados do médico
+      let queryPromise;
+
+      if (isSecretaria) {
+        // Secretária vê TODOS os procedimentos de todos os médicos
+        queryPromise = supabase
+          .from("commercial_procedures")
+          .select(`
+            *,
+            doctor:user_id (full_name, email)
+          `)
+          .order("name", { ascending: true });
+      } else {
+        // Outros usuários veem apenas seus próprios procedimentos
+        queryPromise = supabase
+          .from("commercial_procedures")
+          .select(`
+            *,
+            doctor:user_id (full_name, email)
+          `)
+          .eq("user_id", user.id)
+          .order("name", { ascending: true });
+      }
 
       const { data, error } = await supabaseQueryWithTimeout(queryPromise, 30000, signal);
 

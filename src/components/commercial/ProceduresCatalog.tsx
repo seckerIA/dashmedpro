@@ -1,15 +1,17 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useCommercialProcedures } from "@/hooks/useCommercialProcedures";
 import { ProcedureCard } from "./ProcedureCard";
 import { ProcedureForm } from "./ProcedureForm";
 import { Loader2 } from "lucide-react";
 import { CommercialProcedure } from "@/types/commercial";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 export function ProceduresCatalog() {
-  const { procedures, isLoading, deleteProcedure } = useCommercialProcedures();
+  const { isSecretaria } = useUserProfile();
+  const { procedures, isLoading, deleteProcedure } = useCommercialProcedures({ isSecretaria });
   const [showForm, setShowForm] = useState(false);
   const [editingProcedure, setEditingProcedure] = useState<CommercialProcedure | null>(null);
 
@@ -62,6 +64,7 @@ export function ProceduresCatalog() {
               procedure={procedure}
               onEdit={() => handleEdit(procedure)}
               onDelete={() => handleDelete(procedure.id)}
+              showDoctor={isSecretaria}
             />
           ))}
         </div>
