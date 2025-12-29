@@ -34,10 +34,6 @@ export function MarketingDashboard() {
   const syncCampaigns = useSyncAdCampaigns();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MarketingDashboard.tsx:31',message:'componente renderizado',data:{isLoading,hasDashboardData:!!dashboardData,hasConnections:!!connections,connectionsCount:connections?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  // #endregion
 
   const handleSyncAll = async () => {
     if (!connections || connections.length === 0) {
@@ -68,9 +64,6 @@ export function MarketingDashboard() {
   };
 
   if (isLoading) {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MarketingDashboard.tsx:39',message:'loading state',data:{isLoading},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -79,9 +72,6 @@ export function MarketingDashboard() {
   }
 
   if (!dashboardData) {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MarketingDashboard.tsx:48',message:'sem dados do dashboard',data:{isLoading,hasDashboardData:!!dashboardData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
     return (
       <Card>
         <CardContent className="p-8 text-center">
@@ -90,10 +80,6 @@ export function MarketingDashboard() {
       </Card>
     );
   }
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MarketingDashboard.tsx:57',message:'renderizando dashboard',data:{totalSpend:dashboardData.totalSpend,totalRevenue:dashboardData.totalRevenue,averageROAS:dashboardData.averageROAS,totalLeads:dashboardData.totalLeads,alertsCount:dashboardData.alerts.length,hasConnections:dashboardData.hasConnections},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  // #endregion
 
   // Dados para gráfico de performance (últimos 30 dias - mockado por enquanto)
   const performanceData = [

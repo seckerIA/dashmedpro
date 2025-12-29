@@ -101,20 +101,21 @@ const queryClient = new QueryClient({
 });
 
 // Componente para detectar e cancelar queries travadas
+// REFATORADO: Agora renova a sessão ANTES de refazer queries (evita loop infinito)
 const StuckQueryDetector = () => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    // Rastrear quando queries começam a fazer fetch
     const fetchStartTimes = new Map<string, number>();
-    let stuckCount = 0; // Contador de queries travadas consecutivas
+    let stuckCount = 0;
+    let lastSessionRefresh = 0; // Timestamp do último refresh
+    let isRefreshing = false; // Flag para evitar refresh simultâneo
 
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
       if (event?.type === 'updated') {
         const query = event.query;
         const state = query.state;
 
-        // Quando uma query começa a fazer fetch, registrar o tempo
         if (state.fetchStatus === 'fetching') {
           const queryKey = query.queryKey.join('/');
           if (!fetchStartTimes.has(queryKey)) {
@@ -122,44 +123,41 @@ const StuckQueryDetector = () => {
           }
         }
 
-        // Quando uma query termina (sucesso ou erro), remover do rastreamento
         if (state.fetchStatus === 'idle' || state.fetchStatus === 'paused') {
           const queryKey = query.queryKey.join('/');
           fetchStartTimes.delete(queryKey);
-          // Reset contador quando queries funcionam
-          stuckCount = 0;
+          // Query funcionou, decrementar contador gradualmente
+          if (stuckCount > 0) stuckCount--;
         }
       }
     });
 
     const checkInterval = setInterval(async () => {
+      // Se estamos no meio de um refresh, pular verificação
+      if (isRefreshing) return;
+
       const queryCache = queryClient.getQueryCache();
       const allQueries = queryCache.getAll();
-      let foundStuck = false;
+      const stuckQueries: any[] = [];
 
       for (const query of allQueries) {
         const state = query.state;
         const queryKey = query.queryKey.join('/');
 
-        // Verificar se a query está em fetching há mais de 20 segundos
         if (state.fetchStatus === 'fetching') {
           const fetchStartTime = fetchStartTimes.get(queryKey);
 
           if (fetchStartTime) {
             const timeSinceStart = Date.now() - fetchStartTime;
-            const stuckThreshold = 20000; // 20 segundos
+            const stuckThreshold = 15000; // 15 segundos
 
             if (timeSinceStart > stuckThreshold) {
-              foundStuck = true;
-              const stuckSeconds = Math.round(timeSinceStart / 1000);
-              console.warn(`⚠️ Query travada: ${queryKey} (${stuckSeconds}s)`);
+              stuckQueries.push(query);
+              console.warn(`⚠️ Query travada: ${queryKey} (${Math.round(timeSinceStart / 1000)}s)`);
 
-              // Cancelar a query travada
+              // Apenas cancelar, NÃO resetar ainda
               queryClient.cancelQueries({ queryKey: query.queryKey });
               fetchStartTimes.delete(queryKey);
-
-              // Remover do cache
-              queryClient.removeQueries({ queryKey: query.queryKey });
             }
           } else {
             fetchStartTimes.set(queryKey, Date.now());
@@ -169,30 +167,52 @@ const StuckQueryDetector = () => {
         }
       }
 
-      // Se encontrou queries travadas, incrementar contador
-      if (foundStuck) {
-        stuckCount++;
+      // Se encontrou queries travadas
+      if (stuckQueries.length > 0) {
+        stuckCount += stuckQueries.length;
 
-        // Se houver muitas queries travadas consecutivas, pode ser problema de sessão
-        if (stuckCount >= 3) {
-          console.warn('⚠️ Muitas queries travadas. Verificando sessão...');
-          stuckCount = 0;
+        // Se 2+ queries travaram, provavelmente é problema de sessão
+        if (stuckCount >= 2) {
+          const now = Date.now();
+          const timeSinceLastRefresh = now - lastSessionRefresh;
 
-          // Tentar refresh da sessão
-          const { supabase } = await import('@/integrations/supabase/client');
-          try {
-            const { error } = await supabase.auth.refreshSession();
-            if (error) {
-              console.error('❌ Erro ao fazer refresh da sessão:', error.message);
-            } else {
-              console.log('✅ Sessão atualizada. Recarregando queries...');
-              // Invalidar todas as queries para forçar refetch com nova sessão
-              queryClient.invalidateQueries();
+          // Só fazer refresh se passaram pelo menos 30 segundos desde o último
+          if (timeSinceLastRefresh > 30000) {
+            isRefreshing = true;
+            console.warn('⚠️ Detectado problema de sessão. Renovando...');
+
+            try {
+              const { supabase } = await import('@/integrations/supabase/client');
+              const { error } = await supabase.auth.refreshSession();
+
+              if (error) {
+                console.error('❌ Erro ao renovar sessão:', error.message);
+                // Se falhou, pode ser que o usuário precisa relogar
+                // Limpar cache e recarregar página
+                queryClient.clear();
+                window.location.reload();
+              } else {
+                console.log('✅ Sessão renovada! Refazendo queries...');
+                lastSessionRefresh = now;
+                stuckCount = 0;
+
+                // Aguardar 1 segundo para sessão propagar
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                // Agora sim, invalidar todas as queries
+                queryClient.invalidateQueries();
+              }
+            } catch (err) {
+              console.error('❌ Erro crítico ao verificar sessão:', err);
+              window.location.reload();
+            } finally {
+              isRefreshing = false;
             }
-          } catch (err) {
-            console.error('❌ Erro ao verificar sessão:', err);
           }
         }
+      } else {
+        // Nenhuma query travada, resetar contador
+        if (stuckCount > 0) stuckCount = 0;
       }
     }, 5000);
 

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useMedicalRecords } from '@/hooks/useMedicalRecords';
@@ -13,19 +12,16 @@ import {
   Stethoscope,
   Pill,
   TestTube,
-  User,
-  Clock,
-  Plus
+  Clock
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface MedicalHistoryTabProps {
   contactId: string;
-  onNewRecord: () => void;
 }
 
-export function MedicalHistoryTab({ contactId, onNewRecord }: MedicalHistoryTabProps) {
+export function MedicalHistoryTab({ contactId }: MedicalHistoryTabProps) {
   const { records, isLoading, error } = useMedicalRecords(contactId);
   const [expandedRecords, setExpandedRecords] = useState<Set<string>>(new Set());
 
@@ -82,18 +78,12 @@ export function MedicalHistoryTab({ contactId, onNewRecord }: MedicalHistoryTabP
 
   return (
     <div className="space-y-4">
-      {/* Header com botão de novo atendimento */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">Histórico de Atendimentos</h3>
-          <p className="text-sm text-muted-foreground">
-            {records?.length || 0} registro(s) encontrado(s)
-          </p>
-        </div>
-        <Button onClick={onNewRecord} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Novo Atendimento
-        </Button>
+      {/* Header */}
+      <div>
+        <h3 className="text-lg font-semibold">Histórico de Atendimentos</h3>
+        <p className="text-sm text-muted-foreground">
+          {records?.length || 0} registro(s) encontrado(s)
+        </p>
       </div>
 
       {/* Lista de prontuários */}
@@ -115,13 +105,9 @@ export function MedicalHistoryTab({ contactId, onNewRecord }: MedicalHistoryTabP
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
             <h4 className="font-medium text-lg mb-2">Nenhum atendimento registrado</h4>
-            <p className="text-muted-foreground text-sm mb-4">
-              Clique no botão acima para registrar o primeiro atendimento
+            <p className="text-muted-foreground text-sm">
+              Registre o primeiro atendimento na aba "Ficha"
             </p>
-            <Button onClick={onNewRecord} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Registrar Atendimento
-            </Button>
           </CardContent>
         </Card>
       )}
@@ -313,6 +299,14 @@ function RecordCard({ record, isExpanded, onToggle, getTypeColor, getTypeInfo }:
               <div className="space-y-1">
                 <h5 className="text-sm font-medium text-muted-foreground">Conduta / Tratamento</h5>
                 <p className="text-sm whitespace-pre-line">{record.treatment_plan}</p>
+              </div>
+            )}
+
+            {/* Complicações */}
+            {record.complications && (
+              <div className="space-y-1 p-3 rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800">
+                <h5 className="text-sm font-medium text-red-700 dark:text-red-400">Complicações / Intercorrências</h5>
+                <p className="text-sm whitespace-pre-line">{record.complications}</p>
               </div>
             )}
 

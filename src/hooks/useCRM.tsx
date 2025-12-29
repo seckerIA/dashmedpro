@@ -13,20 +13,26 @@ import { useAuth } from './useAuth';
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
 
 // Fetch contacts
-const fetchContacts = async (userId: string, signal?: AbortSignal): Promise<CRMContact[]> => {
-  if (!userId) return [];
+const fetchContacts = async (userId: string, fetchAll: boolean = false, signal?: AbortSignal): Promise<CRMContact[]> => {
+  if (!userId && !fetchAll) return [];
 
-  const queryPromise = supabase
+  let queryPromise = supabase
     .from('crm_contacts')
-    .select('*')
-    .eq('user_id', userId)
+    .select('*');
+  
+  // Se fetchAll for false, filtrar apenas pelo user_id
+  if (!fetchAll && userId) {
+    queryPromise = queryPromise.eq('user_id', userId);
+  }
+  
+  queryPromise = queryPromise
     .order('created_at', { ascending: false })
     .limit(1000);
 
-  const { data, error } = await supabaseQueryWithTimeout(queryPromise, 30000, signal);
+  const { data, error } = await supabaseQueryWithTimeout(queryPromise as any, 30000, signal);
 
   if (error) throw new Error(`Erro ao buscar contatos: ${error.message}`);
-  return data || [];
+  return (data as CRMContact[]) || [];
 };
 
 // Fetch deals with contacts
@@ -45,14 +51,16 @@ const fetchDeals = async (userId: string, viewAsUserIds?: string[], signal?: Abo
     .order('position', { ascending: true })
     .limit(1000);
 
-  const { data, error } = await supabaseQueryWithTimeout(queryPromise, 30000, signal);
+  const { data, error } = await supabaseQueryWithTimeout(queryPromise as any, 30000, signal);
 
   if (error) throw new Error(`Erro ao buscar deals: ${error.message}`);
 
+  const dealsData = data as any[];
+
   // Buscar profiles em batch
-  if (data && data.length > 0) {
-    const userIds = [...new Set(data.map(d => d.user_id).filter(Boolean))];
-    const assignedToIds = [...new Set(data.map(d => d.assigned_to).filter((id): id is string => id !== null && id !== undefined))];
+  if (dealsData && dealsData.length > 0) {
+    const userIds = [...new Set(dealsData.map((d: any) => d.user_id).filter(Boolean))];
+    const assignedToIds = [...new Set(dealsData.map((d: any) => d.assigned_to).filter((id): id is string => id !== null && id !== undefined))];
     const allProfileIds = [...new Set([...userIds, ...assignedToIds])];
 
     if (allProfileIds.length > 0) {
@@ -61,23 +69,23 @@ const fetchDeals = async (userId: string, viewAsUserIds?: string[], signal?: Abo
         .select('id, full_name, email')
         .in('id', allProfileIds);
 
-      const profilesResult = await supabaseQueryWithTimeout(profilesQuery, 30000, signal);
-      const profiles = profilesResult.data;
-      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+      const profilesResult = await supabaseQueryWithTimeout(profilesQuery as any, 30000, signal);
+      const profiles = profilesResult.data as any[];
+      const profileMap = new Map(profiles?.map((p: any) => [p.id, p]) || []);
 
-      return data.map(deal => ({
+      return dealsData.map((deal: any) => ({
         ...deal,
         owner_profile: deal.user_id ? (profileMap.get(deal.user_id) || null) : null,
         assigned_to_profile: deal.assigned_to ? (profileMap.get(deal.assigned_to) || null) : null
-      }));
+      })) as CRMDealWithContact[];
     }
   }
 
-  return (data || []).map(deal => ({
+  return (dealsData || []).map((deal: any) => ({
     ...deal,
     owner_profile: null,
     assigned_to_profile: null
-  }));
+  })) as CRMDealWithContact[];
 };
 
 // Fetch activities
@@ -102,30 +110,56 @@ const fetchActivities = async (userId: string, contactId?: string): Promise<CRMA
 // Create contact
 const createContact = async (contactData: CRMContactInsert): Promise<CRMContact> => {
   const insertData = { ...contactData };
+  
+  // Garantir que custom_fields seja um objeto válido (JSONB)
   if (insertData.custom_fields && Array.isArray(insertData.custom_fields)) {
     insertData.custom_fields = {} as any;
   }
+  // Se custom_fields for null ou undefined, usar objeto vazio
+  if (!insertData.custom_fields) {
+    insertData.custom_fields = {} as any;
+  }
 
+  console.log('🔍 createContact - Dados antes do insert:', {
+    insertData,
+    custom_fields: insertData.custom_fields,
+    custom_fields_type: typeof insertData.custom_fields,
+  });
+
+  // Usar supabase diretamente ao invés de supabaseQueryWithTimeout para evitar problemas com .single()
   const { data, error } = await supabase
     .from('crm_contacts')
     .insert(insertData)
     .select()
     .single();
 
-  if (error) throw new Error(`Erro ao criar contato: ${error.message}`);
-  return data;
+  if (error) {
+    console.error('❌ Erro ao criar contato:', error);
+    throw new Error(`Erro ao criar contato: ${error.message}`);
+  }
+  
+  if (!data) {
+    console.error('❌ Nenhum dado retornado ao criar contato');
+    throw new Error('Erro ao criar contato: nenhum dado retornado');
+  }
+  
+  console.log('✅ Contato criado com sucesso:', data);
+  return data as CRMContact;
 };
 
 // Create deal
 const createDeal = async (dealData: CRMDealInsert): Promise<CRMDeal> => {
-  const { data, error } = await supabase
+  const queryPromise = supabase
     .from('crm_deals')
     .insert(dealData)
     .select()
     .single();
 
+  const { data, error } = await supabaseQueryWithTimeout(queryPromise as any, 30000);
+
   if (error) throw new Error(`Erro ao criar deal: ${error.message}`);
-  return data;
+  if (!data) throw new Error('Erro ao criar deal: nenhum dado retornado');
+  return data as CRMDeal;
 };
 
 // Create activity
@@ -208,7 +242,7 @@ const deleteDeal = async (dealId: string): Promise<void> => {
 };
 
 // Hook principal
-export function useCRM(viewAsUserIds?: string[]) {
+export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = false) {
   const { user, loading } = useAuth();
   const queryClient = useQueryClient();
 
@@ -217,24 +251,25 @@ export function useCRM(viewAsUserIds?: string[]) {
     isLoading: isLoadingContacts,
     refetch: refetchContacts,
   } = useQuery({
-    queryKey: ['crm-contacts', user?.id],
+    queryKey: ['crm-contacts', user?.id, fetchAllContacts],
     queryFn: async ({ signal }) => {
-      if (!user?.id) return [];
+      if (!user?.id && !fetchAllContacts) return [];
       try {
-        return await fetchContacts(user.id, signal);
+        return await fetchContacts(user?.id || '', fetchAllContacts, signal);
       } catch (error) {
         console.error('Erro ao buscar contatos:', error);
         return [];
       }
     },
-    enabled: !!user?.id && !loading,
-    staleTime: 2 * 60 * 1000,
-    gcTime: 5 * 60 * 1000,
+    enabled: (!!user?.id || fetchAllContacts) && !loading,
+    staleTime: 5 * 60 * 1000, // 5 minutos - usar cache por mais tempo
+    gcTime: 10 * 60 * 1000, // 10 minutos em cache
     refetchOnMount: false,
     refetchOnWindowFocus: false,
-    refetchOnReconnect: true,
-    retry: 2,
-    retryDelay: 1000,
+    refetchOnReconnect: false, // Não refetch ao reconectar - usar cache
+    refetchInterval: false, // Não fazer refetch automático
+    retry: 1, // Reduzir retries
+    retryDelay: 2000,
   });
 
   const {
@@ -252,13 +287,14 @@ export function useCRM(viewAsUserIds?: string[]) {
       }
     },
     enabled: !!user?.id && !loading,
-    staleTime: 2 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutos - usar cache por mais tempo
+    gcTime: 10 * 60 * 1000, // 10 minutos em cache
     refetchOnMount: false,
     refetchOnWindowFocus: false,
-    refetchOnReconnect: true,
-    retry: 2,
-    retryDelay: 1000,
+    refetchOnReconnect: false, // Não refetch ao reconectar - usar cache
+    refetchInterval: false, // Não fazer refetch automático
+    retry: 1, // Reduzir retries
+    retryDelay: 2000,
   });
 
   const {
@@ -275,22 +311,50 @@ export function useCRM(viewAsUserIds?: string[]) {
   const createContactMutation = useMutation({
     mutationFn: (contactData: Omit<CRMContactInsert, 'user_id'>) =>
       createContact({ ...contactData, user_id: user?.id || '' }),
-    onSuccess: async (newContact) => {
-      console.log('[DEBUG] useCRM - Contato criado:', newContact.id);
-
-      // Invalidar e forçar refetch
-      await queryClient.invalidateQueries({ queryKey: ['crm-contacts', user?.id] });
-      await queryClient.refetchQueries({ queryKey: ['crm-contacts', user?.id] });
-
-      console.log('[DEBUG] useCRM - Cache invalidado e refetch concluído');
+    onSuccess: (newContact) => {
+      // Atualizar cache otimisticamente em vez de invalidar imediatamente
+      if (user?.id) {
+        queryClient.setQueryData<CRMContact[]>(
+          ['crm-contacts', user.id],
+          (oldData = []) => [newContact, ...oldData]
+        );
+      }
+      // Invalidar de forma assíncrona e não bloqueante após um delay
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['crm-contacts', user?.id] }).catch(() => {
+          // Ignorar erros de invalidação
+        });
+      }, 100);
     },
   });
 
   const createDealMutation = useMutation({
     mutationFn: (dealData: Omit<CRMDealInsert, 'user_id'>) =>
       createDeal({ ...dealData, user_id: user?.id || '' }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['crm-deals', user?.id] });
+    onSuccess: (newDeal) => {
+      // Atualizar cache otimisticamente em vez de invalidar imediatamente
+      if (user?.id) {
+        queryClient.setQueryData<CRMDealWithContact[]>(
+          ['crm-deals', user.id, viewAsUserIds?.join(',')],
+          (oldData = []) => {
+            // Buscar o contato relacionado para incluir no deal
+            const contact = contacts.find(c => c.id === newDeal.contact_id);
+            const dealWithContact: CRMDealWithContact = {
+              ...newDeal,
+              contact: contact || null,
+              owner_profile: null,
+              assigned_to_profile: null,
+            };
+            return [dealWithContact, ...oldData];
+          }
+        );
+      }
+      // Invalidar de forma assíncrona e não bloqueante após um delay
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['crm-deals', user?.id] }).catch(() => {
+          // Ignorar erros de invalidação
+        });
+      }, 100);
     },
   });
 
@@ -304,9 +368,23 @@ export function useCRM(viewAsUserIds?: string[]) {
 
   const updateDealMutation = useMutation({
     mutationFn: updateDeal,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['crm-deals', user?.id] });
-      queryClient.refetchQueries({ queryKey: ['crm-deals', user?.id] });
+    onSuccess: (updatedDeal) => {
+      // Atualizar cache otimisticamente
+      if (user?.id) {
+        queryClient.setQueryData<CRMDealWithContact[]>(
+          ['crm-deals', user.id, viewAsUserIds?.join(',')],
+          (oldData = []) =>
+            oldData.map(deal =>
+              deal.id === updatedDeal.id
+                ? { ...deal, ...updatedDeal }
+                : deal
+            )
+        );
+      }
+      // Invalidar de forma assíncrona e não bloqueante
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['crm-deals', user?.id] }).catch(() => {});
+      }, 100);
     },
   });
 
@@ -314,31 +392,62 @@ export function useCRM(viewAsUserIds?: string[]) {
     mutationFn: updateDealsPositions,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['crm-deals', user?.id] });
-      queryClient.refetchQueries({ queryKey: ['crm-deals', user?.id] });
     },
   });
 
   const updateContactMutation = useMutation({
     mutationFn: updateContact,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['crm-contacts', user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['crm-deals', user?.id] });
-      queryClient.refetchQueries({ queryKey: ['crm-deals', user?.id] });
+    onSuccess: (updatedContact) => {
+      // Atualizar cache otimisticamente
+      if (user?.id) {
+        queryClient.setQueryData<CRMContact[]>(
+          ['crm-contacts', user.id],
+          (oldData = []) =>
+            oldData.map(contact =>
+              contact.id === updatedContact.id ? updatedContact : contact
+            )
+        );
+      }
+      // Invalidar de forma assíncrona e não bloqueante
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['crm-contacts', user?.id] }).catch(() => {});
+        queryClient.invalidateQueries({ queryKey: ['crm-deals', user?.id] }).catch(() => {});
+      }, 100);
     },
   });
 
   const deleteContactMutation = useMutation({
     mutationFn: deleteContact,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['crm-contacts', user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['crm-deals', user?.id] });
+    onSuccess: (_, contactId) => {
+      // Atualizar cache otimisticamente removendo o contato
+      if (user?.id) {
+        queryClient.setQueryData<CRMContact[]>(
+          ['crm-contacts', user.id],
+          (oldData = []) => oldData.filter(contact => contact.id !== contactId)
+        );
+      }
+      // Invalidar de forma assíncrona e não bloqueante
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['crm-contacts', user?.id] }).catch(() => {});
+        queryClient.invalidateQueries({ queryKey: ['crm-deals', user?.id] }).catch(() => {});
+      }, 100);
     },
   });
 
   const deleteDealMutation = useMutation({
     mutationFn: deleteDeal,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['crm-deals', user?.id] });
+    onSuccess: (_, dealId) => {
+      // Atualizar cache otimisticamente removendo o deal
+      if (user?.id) {
+        queryClient.setQueryData<CRMDealWithContact[]>(
+          ['crm-deals', user.id, viewAsUserIds?.join(',')],
+          (oldData = []) => oldData.filter(deal => deal.id !== dealId)
+        );
+      }
+      // Invalidar de forma assíncrona e não bloqueante
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['crm-deals', user?.id] }).catch(() => {});
+      }, 100);
     },
   });
 

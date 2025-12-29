@@ -38,7 +38,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 // Ensure ptBR is available (defensive check)
 const locale = ptBR || undefined;
 import { cn } from '@/lib/utils';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { parseISO } from 'date-fns';
 import { formatCurrencyInput, parseCurrencyToNumber, formatCurrency } from '@/lib/currency';
 
@@ -63,7 +63,7 @@ type AppointmentFormData = z.infer<typeof appointmentSchema>;
 interface AppointmentFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: any) => Promise<void>;
+  onSubmit: (data: any) => Promise<any>;
   appointment?: MedicalAppointment | null;
   prefilledStart?: Date;
   prefilledEnd?: Date;
@@ -72,6 +72,7 @@ interface AppointmentFormProps {
     appointmentValue?: number;
     paidInAdvance?: boolean;
   } | null;
+  onAppointmentCreated?: (appointment: any) => void;
 }
 
 export function AppointmentForm({
@@ -82,9 +83,10 @@ export function AppointmentForm({
   prefilledStart,
   prefilledEnd,
   conversionData,
+  onAppointmentCreated,
 }: AppointmentFormProps) {
   const { user } = useAuth();
-  const { contacts, isLoadingContacts, refetchContacts } = useCRM();
+  const { contacts, isLoadingContacts, refetchContacts } = useCRM(undefined, true); // true = buscar todos os contatos
   const { checkAvailability } = useAvailability();
   const { procedures, isLoading: isLoadingProcedures } = useCommercialProcedures();
   const { doctors, isLoading: isLoadingDoctors } = useDoctors();
@@ -96,24 +98,36 @@ export function AppointmentForm({
   const [showNewContactForm, setShowNewContactForm] = useState(false);
   const [formInitialized, setFormInitialized] = useState(false);
 
+  // Refs para evitar loops infinitos de re-renders
+  const contactsRef = useRef(contacts);
+  const proceduresRef = useRef(procedures);
+  const hasAutoFilledRef = useRef<string | null>(null); // Armazena o ID do contato já preenchido
+
+  // Atualizar refs quando arrays mudam (sem causar re-render)
+  useEffect(() => {
+    contactsRef.current = contacts;
+  }, [contacts]);
+
+  useEffect(() => {
+    proceduresRef.current = procedures;
+  }, [procedures]);
+
+  // Reset da flag de preenchimento quando fecha o modal ou muda o contato
+  useEffect(() => {
+    if (!open) {
+      hasAutoFilledRef.current = null;
+    }
+  }, [open]);
+
   // Invalidar cache quando o formulário abrir para garantir dados frescos
-  // Mas não remover completamente para evitar problemas de carregamento
   useEffect(() => {
     if (open && user?.id && !isLoadingContacts) {
-      console.log('🔄 AppointmentForm - Invalidando cache de contatos...');
-      console.log('   User ID:', user.id);
-      console.log('   Contacts array length:', contacts.length);
-      
       // Apenas invalidar o cache, não remover completamente
-      // Isso permite que os dados existentes sejam usados enquanto busca novos dados em background
       queryClient.invalidateQueries({ queryKey: ['crm-contacts', user.id] });
-      
+
       // Se não há contatos carregados, forçar refetch
       if (contacts.length === 0 && refetchContacts) {
-        console.log('🔄 AppointmentForm - Nenhum contato carregado, forçando refetch...');
-        refetchContacts().catch((error) => {
-          console.error('❌ AppointmentForm - Erro ao refetch contatos:', error);
-        });
+        refetchContacts().catch(() => {});
       }
     }
   }, [open, user?.id, queryClient, refetchContacts, isLoadingContacts, contacts.length]);
@@ -196,11 +210,16 @@ export function AppointmentForm({
         paid_in_advance: data.paid_in_advance || false,
       };
 
-      await onSubmit(submitData);
+      const result = await onSubmit(submitData);
       setAvailabilityError(null);
       setEstimatedValueDisplay('');
       reset();
       onOpenChange(false);
+
+      // Call callback if provided and if creating new appointment
+      if (!appointment && onAppointmentCreated && result) {
+        onAppointmentCreated(result);
+      }
     } catch (error) {
       console.error('Error submitting appointment:', error);
       setAvailabilityError('Erro ao salvar consulta. Tente novamente.');
@@ -267,93 +286,60 @@ export function AppointmentForm({
   const selectedType = watch('appointment_type');
 
   // Buscar procedimento vinculado ao contato selecionado e preencher automaticamente
+  // IMPORTANTE: Usamos refs para evitar loop infinito de re-renders
   useEffect(() => {
-    // Só executar se:
-    // 1. Não estiver editando uma consulta existente
-    // 2. Um contato foi selecionado
-    // 3. O formulário está aberto
-    // 4. Os procedimentos foram carregados
-    // 5. Os contatos foram carregados
-    if (appointment || !selectedContactId || !open || isLoadingProcedures || isLoadingContacts) {
-      if (appointment) {
-        console.log('⏭️ AppointmentForm - Pulando preenchimento automático: editando consulta existente');
-      } else if (!selectedContactId) {
-        console.log('⏭️ AppointmentForm - Pulando preenchimento automático: nenhum contato selecionado');
-      } else if (!open) {
-        console.log('⏭️ AppointmentForm - Pulando preenchimento automático: formulário fechado');
-      } else if (isLoadingProcedures) {
-        console.log('⏭️ AppointmentForm - Pulando preenchimento automático: carregando procedimentos...');
-      } else if (isLoadingContacts) {
-        console.log('⏭️ AppointmentForm - Pulando preenchimento automático: carregando contatos...');
-      }
+    // Evitar execução se já preencheu para este contato
+    if (hasAutoFilledRef.current === selectedContactId) {
       return;
     }
 
+    // Condições para pular preenchimento
+    if (appointment || !selectedContactId || !open || isLoadingProcedures || isLoadingContacts) {
+      return;
+    }
+
+    // Usar refs para acessar arrays sem causar re-render
+    const currentContacts = contactsRef.current;
+    const currentProcedures = proceduresRef.current;
+
+    // Precisamos ter contatos e procedimentos carregados
+    if (!currentContacts?.length || !currentProcedures?.length) {
+      return;
+    }
+
+    // Marcar como preenchido para este contato ANTES de executar
+    hasAutoFilledRef.current = selectedContactId;
+
     // Função async para buscar e preencher procedimento
     const fetchAndFillProcedure = async () => {
-      console.log('🔍 AppointmentForm - Iniciando busca de procedimento vinculado...');
-      console.log('   Contato selecionado:', selectedContactId);
-      console.log('   Total de contatos:', contacts.length);
-      console.log('   Total de procedimentos:', procedures?.length || 0);
-
       // Buscar o contato completo na lista de contatos
-      const selectedContact = contacts.find(c => c.id === selectedContactId);
-      
+      const selectedContact = currentContacts.find(c => c.id === selectedContactId);
+
       if (!selectedContact) {
-        console.log('❌ AppointmentForm - Contato não encontrado na lista:', selectedContactId);
-        console.log('   IDs disponíveis:', contacts.map(c => c.id).slice(0, 5));
         return;
       }
 
-      console.log('✅ AppointmentForm - Contato encontrado:', {
-        id: selectedContact.id,
-        name: selectedContact.full_name,
-        custom_fields: selectedContact.custom_fields,
-        custom_fields_type: typeof selectedContact.custom_fields,
-        custom_fields_is_null: selectedContact.custom_fields === null,
-        custom_fields_is_undefined: selectedContact.custom_fields === undefined,
-      });
-
       // Extrair procedure_id de custom_fields
-      // custom_fields pode ser um objeto, string JSON, ou null/undefined
       let customFields: any = selectedContact.custom_fields;
-      
+
       // Se custom_fields for uma string, tentar fazer parse
       if (typeof customFields === 'string') {
         try {
           customFields = JSON.parse(customFields);
-          console.log('📦 AppointmentForm - custom_fields parseado de string:', customFields);
         } catch (e) {
-          console.error('❌ AppointmentForm - Erro ao fazer parse de custom_fields:', e);
           customFields = {};
         }
       }
-      
-      // Se custom_fields for null ou undefined, usar objeto vazio
+
       if (!customFields || (typeof customFields === 'object' && Object.keys(customFields).length === 0)) {
         customFields = {};
       }
-
-      console.log('🔍 AppointmentForm - custom_fields processado:', {
-        customFields,
-        keys: Object.keys(customFields),
-        procedure_id: customFields?.procedure_id,
-        procedure_id_type: typeof customFields?.procedure_id,
-      });
 
       let procedureId = customFields?.procedure_id;
 
       // Se não encontrou no custom_fields, buscar no lead comercial convertido
       if (!procedureId) {
-        console.log('ℹ️ AppointmentForm - procedure_id não encontrado em custom_fields, buscando no lead comercial...');
-        
         try {
-          console.log('🔍 AppointmentForm - Buscando lead comercial com:', {
-            contactId: selectedContactId,
-            status: 'converted'
-          });
-
-          // Buscar TODOS os leads vinculados ao contato para encontrar algum com procedure_id
           const { data: allLeads, error: leadsError } = await supabase
             .from('commercial_leads' as any)
             .select('procedure_id, status, contact_id, name')
@@ -361,71 +347,25 @@ export function AppointmentForm({
             .order('created_at', { ascending: false })
             .limit(10);
 
-          console.log('📊 AppointmentForm - Todos os leads encontrados:', {
-            count: allLeads?.length || 0,
-            leads: allLeads?.map((l: any) => ({ 
-              id: l.id,
-              procedure_id: l.procedure_id, 
-              status: l.status,
-              name: l.name,
-              estimated_value: l.estimated_value,
-              notes: l.notes
-            })),
-            error: leadsError
-          });
-          
-          // Log detalhado de cada lead
-          if (allLeads && allLeads.length > 0) {
-            allLeads.forEach((lead: any, index: number) => {
-              console.log(`📋 Lead ${index + 1}:`, {
-                id: lead.id,
-                name: lead.name,
-                procedure_id: lead.procedure_id,
-                status: lead.status,
-                estimated_value: lead.estimated_value,
-                fullLead: lead
-              });
-            });
-          }
-
           if (!leadsError && allLeads && allLeads.length > 0) {
-            // Procurar o primeiro lead com procedure_id não nulo
             const leadWithProcedure = allLeads.find((lead: any) => lead.procedure_id && lead.procedure_id !== null);
-            
-            console.log('🔍 AppointmentForm - Lead com procedure_id encontrado:', leadWithProcedure);
-            
+
             if (leadWithProcedure) {
               procedureId = (leadWithProcedure as any).procedure_id;
-              console.log('✅ AppointmentForm - procedure_id encontrado no lead comercial:', procedureId);
-              
+
               // Atualizar o custom_fields do contato para futuras buscas
               const updatedCustomFields = { ...customFields, procedure_id: procedureId };
-              const updateResult = await supabase
+              await supabase
                 .from('crm_contacts')
                 .update({ custom_fields: updatedCustomFields })
                 .eq('id', selectedContactId);
-              
-              if (updateResult.error) {
-                console.error('❌ AppointmentForm - Erro ao atualizar custom_fields:', updateResult.error);
-              } else {
-                console.log('💾 AppointmentForm - custom_fields atualizado no contato');
-              }
             } else {
-              console.log('⚠️ AppointmentForm - Nenhum lead encontrado com procedure_id');
-              console.log('   Leads encontrados:', allLeads.length);
-              console.log('   Todos os leads têm procedure_id null ou vazio');
-              console.log('   Isso significa que os leads foram criados/convertidos sem procedimento associado');
-              console.log('   Para novos leads, certifique-se de selecionar um procedimento ao criar o lead');
               return;
             }
           } else {
-            console.log('ℹ️ AppointmentForm - Nenhum lead comercial encontrado');
-            console.log('   Erro:', leadsError);
-            console.log('   contactId usado:', selectedContactId);
             return;
           }
         } catch (error) {
-          console.error('❌ AppointmentForm - Erro ao buscar lead comercial:', error);
           return;
         }
       }
@@ -434,62 +374,33 @@ export function AppointmentForm({
         return;
       }
 
-      console.log('🔍 AppointmentForm - Procedure ID encontrado:', procedureId);
-
       // Buscar o procedimento correspondente
-      const linkedProcedure = procedures?.find(p => p.id === procedureId);
+      const linkedProcedure = currentProcedures?.find(p => p.id === procedureId);
 
       if (!linkedProcedure) {
-        console.log('⚠️ AppointmentForm - Procedimento vinculado não encontrado:', procedureId);
-        console.log('   IDs de procedimentos disponíveis:', procedures?.map(p => p.id).slice(0, 5));
         return;
       }
 
-      console.log('✅ AppointmentForm - Procedimento encontrado:', {
-        id: linkedProcedure.id,
-        name: linkedProcedure.name,
-        duration: linkedProcedure.duration_minutes,
-        price: linkedProcedure.price,
-      });
-
       // Preencher automaticamente os campos do formulário
-      // Sempre preencher quando um procedimento for encontrado (substituir valores padrão)
-      const currentTitle = watch('title');
-      const currentDuration = watch('duration_minutes');
-      const currentEstimatedValueDisplay = estimatedValueDisplay;
+      // Usar getValues() para verificar valores atuais sem causar re-render
+      const form = { setValue, getValues: () => ({ title: watch('title'), duration_minutes: watch('duration_minutes') }) };
+      const currentTitle = form.getValues().title;
+      const currentDuration = form.getValues().duration_minutes;
 
-      console.log('📝 AppointmentForm - Estado atual dos campos:', {
-        title: currentTitle,
-        duration: currentDuration,
-        estimatedValue: currentEstimatedValueDisplay,
-      });
-
-      // Sempre preencher título (substituir se estiver vazio ou for valor padrão)
-      const shouldUpdateTitle = !currentTitle || currentTitle.trim() === '';
-      if (shouldUpdateTitle) {
-        console.log('✏️ AppointmentForm - Preenchendo título:', linkedProcedure.name);
+      // Preencher título se estiver vazio
+      if (!currentTitle || currentTitle.trim() === '') {
         setValue('title', linkedProcedure.name);
-      } else {
-        console.log('⏭️ AppointmentForm - Título já preenchido, mantendo:', currentTitle);
       }
 
-      // Sempre preencher duração se for o valor padrão (30 minutos) ou se estiver vazio
-      const shouldUpdateDuration = !currentDuration || currentDuration === 30;
-      if (shouldUpdateDuration) {
-        console.log('✏️ AppointmentForm - Preenchendo duração:', linkedProcedure.duration_minutes);
+      // Preencher duração se for o valor padrão (30 minutos)
+      if (!currentDuration || currentDuration === 30) {
         setValue('duration_minutes', linkedProcedure.duration_minutes);
-      } else {
-        console.log('⏭️ AppointmentForm - Duração já preenchida, mantendo:', currentDuration);
       }
 
-      // Sempre preencher valor estimado com o preço do procedimento (substituir qualquer valor anterior)
-      // Isso garante que o valor correto do procedimento seja usado
+      // Preencher valor estimado
       const formattedPrice = formatCurrency(linkedProcedure.price);
-      console.log('✏️ AppointmentForm - Preenchendo valor estimado com preço do procedimento:', formattedPrice);
       setEstimatedValueDisplay(formattedPrice);
       setValue('estimated_value', formattedPrice as any);
-
-      console.log('✅ AppointmentForm - Preenchimento automático concluído!');
     };
 
     // Pequeno delay para garantir que o reset já foi executado
@@ -498,7 +409,10 @@ export function AppointmentForm({
     }, 100);
 
     return () => clearTimeout(timeoutId);
-  }, [selectedContactId, contacts, procedures, appointment, open, watch, setValue, estimatedValueDisplay, isLoadingProcedures, isLoadingContacts, setEstimatedValueDisplay]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedContactId, appointment, open, isLoadingProcedures, isLoadingContacts]);
+  // NOTA: setValue, watch e setEstimatedValueDisplay são funções estáveis do react-hook-form
+  // mas não devem estar nas dependências para evitar loop infinito de re-renders
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -522,18 +436,18 @@ export function AppointmentForm({
           {/* Patient Selection */}
           <div className="space-y-2">
             <Label htmlFor="contact_id">Paciente *</Label>
-            <Select 
-              value={watch('contact_id') || ''} 
+            <Select
+              value={watch('contact_id') || ''}
               onValueChange={(value) => {
-                console.log('👤 AppointmentForm - Contato selecionado manualmente:', value);
                 setValue('contact_id', value);
                 // Limpar campos quando mudar o contato (para permitir novo preenchimento)
                 if (!appointment) {
                   setValue('title', '');
                   setEstimatedValueDisplay('');
                   setValue('estimated_value', '' as any);
+                  // Reset da flag para permitir novo preenchimento automático
+                  hasAutoFilledRef.current = null;
                 }
-                // Forçar re-execução do useEffect de preenchimento
                 setFormInitialized(true);
               }}
               disabled={isLoadingContacts || !user?.id}
@@ -562,19 +476,16 @@ export function AppointmentForm({
                     Nenhum paciente cadastrado. Clique em "Cadastrar novo paciente" para adicionar.
                   </div>
                 ) : (
-                  contacts.map((contact) => {
-                    console.log('📋 Rendering contact:', { id: contact.id, name: contact.full_name });
-                    return (
-                      <SelectItem key={contact.id} value={contact.id}>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{contact.full_name || 'Sem nome'}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {contact.phone || ''} {contact.email && `• ${contact.email}`}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    );
-                  })
+                  contacts.map((contact) => (
+                    <SelectItem key={contact.id} value={contact.id}>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{contact.full_name || 'Sem nome'}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {contact.phone || ''} {contact.email && `• ${contact.email}`}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))
                 )}
               </SelectContent>
             </Select>
@@ -847,17 +758,15 @@ export function AppointmentForm({
         <ContactForm
           forceOpen={true}
           onContactCreated={async (contactId) => {
-            // Invalidar e refetch a lista de contatos para garantir que o novo paciente apareça
-            await queryClient.invalidateQueries({ queryKey: ['crm-contacts', user?.id] });
-            await queryClient.refetchQueries({ queryKey: ['crm-contacts', user?.id] });
+            // Invalidar a lista de contatos para garantir que o novo paciente apareça
+            queryClient.invalidateQueries({ queryKey: ['crm-contacts', user?.id] });
             setValue('contact_id', contactId);
             setShowNewContactForm(false);
           }}
           onCancel={() => setShowNewContactForm(false)}
-          onSuccess={async () => {
-            // Invalidar e refetch a lista de contatos
-            await queryClient.invalidateQueries({ queryKey: ['crm-contacts', user?.id] });
-            await queryClient.refetchQueries({ queryKey: ['crm-contacts', user?.id] });
+          onSuccess={() => {
+            // Invalidar a lista de contatos
+            queryClient.invalidateQueries({ queryKey: ['crm-contacts', user?.id] });
             setShowNewContactForm(false);
           }}
         />

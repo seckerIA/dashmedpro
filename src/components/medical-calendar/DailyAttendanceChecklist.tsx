@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, XCircle, ChevronDown, ChevronUp, Clock, User, Phone } from 'lucide-react';
 import { useMedicalAppointments } from '@/hooks/useMedicalAppointments';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import { format, isSameDay, parseISO, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -16,6 +18,8 @@ interface DailyAttendanceChecklistProps {
 
 export function DailyAttendanceChecklist({ selectedDate }: DailyAttendanceChecklistProps) {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { isMedico, isAdmin } = useUserProfile();
   const [isMinimized, setIsMinimized] = useState(true);
   const { appointments, markAsCompleted, markAsNoShow } = useMedicalAppointments({});
 
@@ -53,6 +57,11 @@ export function DailyAttendanceChecklist({ selectedDate }: DailyAttendanceCheckl
         title: 'Comparecimento confirmado',
         description: `${appointment.contact?.full_name || 'Paciente'} marcado como compareceu.`,
       });
+      
+      // Se for médico ou admin, redirecionar para o prontuário do paciente
+      if ((isMedico || isAdmin) && appointment.contact_id) {
+        navigate(`/prontuarios?patientId=${appointment.contact_id}&tab=historico`);
+      }
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -125,21 +134,21 @@ export function DailyAttendanceChecklist({ selectedDate }: DailyAttendanceCheckl
             return (
               <div
                 key={appointment.id}
-                className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors bg-card"
+                className="flex items-center justify-between gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors bg-card overflow-hidden"
               >
-                <div className="flex-1 min-w-0 space-y-1">
-                  <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0 space-y-1 overflow-hidden">
+                  <div className="flex items-center gap-2 min-w-0">
                     <Clock className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-                    <span className="font-semibold text-sm">{startTime}</span>
-                    <div className="h-3 w-px bg-border" />
-                    <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="font-semibold text-sm flex-shrink-0">{startTime}</span>
+                    <div className="h-3 w-px bg-border flex-shrink-0" />
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
                       <User className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
                       <span className="font-medium text-sm truncate">{patientName}</span>
                     </div>
                     {patientPhone !== 'Sem telefone' && (
                       <>
-                        <div className="h-3 w-px bg-border" />
-                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <div className="h-3 w-px bg-border flex-shrink-0" />
+                        <div className="flex items-center gap-1.5 text-muted-foreground min-w-0">
                           <Phone className="h-3 w-3 flex-shrink-0" />
                           <span className="text-xs truncate">{patientPhone}</span>
                         </div>
@@ -153,12 +162,12 @@ export function DailyAttendanceChecklist({ selectedDate }: DailyAttendanceCheckl
                   )}
                 </div>
 
-                <div className="flex gap-1.5 ml-2 flex-shrink-0">
+                <div className="flex gap-1.5 flex-shrink-0">
                   <Button
                     size="sm"
                     variant="default"
                     onClick={() => handleMarkAttended(appointment)}
-                    className="h-7 px-2 bg-green-600 hover:bg-green-700 text-xs"
+                    className="h-7 px-2 bg-green-600 hover:bg-green-700 text-xs whitespace-nowrap"
                   >
                     <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
                     Compareceu
@@ -167,7 +176,7 @@ export function DailyAttendanceChecklist({ selectedDate }: DailyAttendanceCheckl
                     size="sm"
                     variant="outline"
                     onClick={() => handleMarkNoShow(appointment)}
-                    className="h-7 px-2 border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950 text-xs"
+                    className="h-7 px-2 border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950 text-xs whitespace-nowrap"
                   >
                     <XCircle className="h-3.5 w-3.5 mr-1" />
                     Falta
@@ -181,3 +190,10 @@ export function DailyAttendanceChecklist({ selectedDate }: DailyAttendanceCheckl
     </Card>
   );
 }
+
+
+
+
+
+
+

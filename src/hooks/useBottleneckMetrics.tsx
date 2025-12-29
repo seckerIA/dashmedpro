@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "./useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { supabaseQueryWithTimeout } from "@/utils/supabaseQuery";
 import { startOfMonth, endOfMonth, subMonths, format, parseISO } from "date-fns";
 import { Bottleneck } from "@/components/dashboard/BottleneckCard";
 import { useCommercialMetrics } from "./useCommercialMetrics";
@@ -11,7 +12,7 @@ export function useBottleneckMetrics() {
 
   return useQuery({
     queryKey: ["bottleneck-metrics", user?.id],
-    queryFn: async (): Promise<Bottleneck[]> => {
+    queryFn: async ({ signal }): Promise<Bottleneck[]> => {
       if (!user) throw new Error("User not authenticated");
 
       const bottlenecks: Bottleneck[] = [];
@@ -64,12 +65,15 @@ export function useBottleneckMetrics() {
       }
 
       // 3. Verificar taxa de faltas
-      const { data: appointments } = await supabase
+      const appointmentsQuery = supabase
         .from("medical_appointments")
         .select("id, status")
         .eq("user_id", user.id)
         .gte("start_time", periodStart.toISOString())
         .lte("start_time", periodEnd.toISOString());
+      
+      const appointmentsResult = await supabaseQueryWithTimeout(appointmentsQuery as any, 30000, signal);
+      const { data: appointments } = appointmentsResult;
 
       if (appointments && appointments.length > 0) {
         const totalAppointments = appointments.length;
@@ -91,12 +95,15 @@ export function useBottleneckMetrics() {
       }
 
       // 4. Verificar tempo médio de ciclo de vendas
-      const { data: deals } = await supabase
+      const dealsQuery = supabase
         .from("crm_deals")
         .select("id, created_at, closed_at, stage")
         .eq("user_id", user.id)
         .gte("created_at", prevPeriodStart.toISOString())
         .lte("created_at", prevPeriodEnd.toISOString());
+      
+      const dealsResult = await supabaseQueryWithTimeout(dealsQuery as any, 30000, signal);
+      const { data: deals } = dealsResult;
 
       if (deals && deals.length > 0) {
         const closedDeals = deals.filter(d => d.closed_at);

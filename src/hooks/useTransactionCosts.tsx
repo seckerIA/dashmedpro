@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
+import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery'
 import { toast } from '@/hooks/use-toast'
 import { TransactionCost, TransactionCostInsert, CostBreakdown } from '@/types/financial'
 
@@ -33,7 +34,7 @@ export const useTransactionCosts = (transactionId?: string) => {
 export const useCostsBreakdown = (startDate?: string, endDate?: string) => {
   return useQuery({
     queryKey: ['costs-breakdown', startDate, endDate],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       let query = supabase
         .from('transaction_costs')
         .select(`
@@ -47,20 +48,22 @@ export const useCostsBreakdown = (startDate?: string, endDate?: string) => {
 
       if (startDate && endDate) {
         // Filtrar por data através da transação
-        const { data: filteredTransactions } = await supabase
+        const filteredTransactionsQuery = supabase
           .from('financial_transactions')
           .select('id')
           .gte('transaction_date', startDate)
           .lte('transaction_date', endDate)
 
-        const transactionIds = filteredTransactions?.map(t => t.id) || []
+        const filteredResult = await supabaseQueryWithTimeout(filteredTransactionsQuery as any, 30000, signal);
+        const transactionIds = filteredResult.data?.map(t => t.id) || []
         
         if (transactionIds.length > 0) {
           query = query.in('transaction_id', transactionIds)
         }
       }
 
-      const { data, error } = await query
+      const queryResult = await supabaseQueryWithTimeout(query as any, 30000, signal);
+      const { data, error } = queryResult;
 
       if (error) throw error
 

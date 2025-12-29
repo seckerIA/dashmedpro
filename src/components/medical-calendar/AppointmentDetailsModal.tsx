@@ -5,7 +5,7 @@ import { ptBR } from 'date-fns/locale';
 import { MedicalAppointmentWithRelations } from '@/types/medicalAppointments';
 import { AppointmentStatusBadge } from './AppointmentStatusBadge';
 import { PaymentStatusBadge } from './PaymentStatusBadge';
-import { Edit, Trash2, CheckCircle, XCircle, UserX } from 'lucide-react';
+import { Edit, Trash2, CheckCircle, XCircle, UserX, FileText } from 'lucide-react';
 import { formatCurrency } from '@/lib/currency';
 
 interface AppointmentDetailsModalProps {
@@ -17,6 +17,7 @@ interface AppointmentDetailsModalProps {
   onMarkCompleted?: () => void;
   onMarkNoShow?: () => void;
   onCancel?: () => void;
+  onViewMedicalRecord?: () => void;
 }
 
 export function AppointmentDetailsModal({
@@ -28,6 +29,7 @@ export function AppointmentDetailsModal({
   onMarkCompleted,
   onMarkNoShow,
   onCancel,
+  onViewMedicalRecord,
 }: AppointmentDetailsModalProps) {
   if (!appointment) return null;
 
@@ -115,6 +117,12 @@ export function AppointmentDetailsModal({
               <Button variant="outline" size="sm" onClick={onEdit}>
                 <Edit className="h-4 w-4 mr-2" />
                 Editar
+              </Button>
+            )}
+            {onViewMedicalRecord && (
+              <Button variant="outline" size="sm" onClick={onViewMedicalRecord}>
+                <FileText className="h-4 w-4 mr-2" />
+                Ver Prontuário
               </Button>
             )}
             {onMarkCompleted && appointment.status !== 'completed' && (

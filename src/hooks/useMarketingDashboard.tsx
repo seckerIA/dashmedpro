@@ -66,10 +66,6 @@ export function useMarketingDashboard() {
   return useQuery({
     queryKey: ['marketing-dashboard', campaigns, connections, metrics, allLeads],
     queryFn: async (): Promise<MarketingDashboardData> => {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useMarketingDashboard.tsx:66',message:'queryFn iniciado',data:{hasCampaigns:!!campaigns,campaignsCount:campaigns?.length,hasConnections:!!connections,connectionsCount:connections?.length,hasMetrics:!!metrics,hasAllLeads:!!allLeads,allLeadsCount:allLeads?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-      
       const campaignsData = campaigns || [];
       const connectionsData = connections || [];
       const metricsData = metrics || {
@@ -82,34 +78,18 @@ export function useMarketingDashboard() {
         average_cpa: 0,
         average_roas: 0,
       };
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useMarketingDashboard.tsx:81',message:'dados processados',data:{campaignsDataLength:campaignsData.length,connectionsDataLength:connectionsData.length,metricsDataTotalSpend:metricsData.total_spend,metricsDataTotalRevenue:metricsData.total_conversion_value},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-      
+
       // Filtrar leads do mês atual que vieram de anúncios
       const currentMonthLeads = (allLeads || []).filter(lead => {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useMarketingDashboard.tsx:83',message:'filtrando lead',data:{leadId:lead?.id,leadOrigin:lead?.origin,leadCreatedAt:lead?.created_at,startOfMonth:startOfCurrentMonth,endOfMonth:endOfCurrentMonth},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-        // #endregion
-        
         const leadDate = new Date(lead.created_at);
         const startDate = new Date(startOfCurrentMonth);
         const endDate = new Date(endOfCurrentMonth);
         const isInMonth = leadDate >= startDate && leadDate <= endDate;
         const isFromAds = lead.origin === 'google' || lead.origin === 'facebook' || lead.origin === 'instagram';
-        
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useMarketingDashboard.tsx:90',message:'filtro aplicado',data:{leadId:lead?.id,isInMonth,isFromAds,willInclude:isInMonth && isFromAds},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-        // #endregion
-        
+
         return isInMonth && isFromAds;
       });
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useMarketingDashboard.tsx:95',message:'leads filtrados',data:{totalLeads:allLeads?.length || 0,currentMonthLeadsCount:currentMonthLeads.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
-      
+
       // Calcular métricas por plataforma
       const googleCampaigns = campaignsData.filter(c => c.platform === 'google_ads');
       const metaCampaigns = campaignsData.filter(c => c.platform === 'meta_ads');
@@ -203,11 +183,7 @@ export function useMarketingDashboard() {
         lastSyncTime: lastSync,
         hasConnections: connectionsData.length > 0,
       };
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useMarketingDashboard.tsx:167',message:'resultado final',data:{totalSpend:result.totalSpend,totalRevenue:result.totalRevenue,averageROAS:result.averageROAS,totalLeads:result.totalLeads,alertsCount:result.alerts.length,activeConnections:result.activeConnections,hasConnections:result.hasConnections},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-      
+
       return result;
     },
     enabled: true,

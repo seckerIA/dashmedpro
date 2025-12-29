@@ -166,13 +166,28 @@ const deleteAppointment = async (id: string): Promise<void> => {
   if (error) throw new Error(`Erro ao excluir consulta: ${error.message}`);
 };
 
+// Helper para serializar filtros em uma query key estável
+const serializeFilters = (filters?: UseMedicalAppointmentsFilters): string => {
+  if (!filters) return 'no-filters';
+  
+  const parts: string[] = [];
+  if (filters.startDate) parts.push(`start:${filters.startDate.toISOString()}`);
+  if (filters.endDate) parts.push(`end:${filters.endDate.toISOString()}`);
+  if (filters.appointmentType && filters.appointmentType !== 'all') parts.push(`type:${filters.appointmentType}`);
+  if (filters.status && filters.status !== 'all') parts.push(`status:${filters.status}`);
+  if (filters.paymentStatus && filters.paymentStatus !== 'all') parts.push(`payment:${filters.paymentStatus}`);
+  if (filters.contactId) parts.push(`contact:${filters.contactId}`);
+  
+  return parts.length > 0 ? parts.join('|') : 'no-filters';
+};
+
 // Hook principal
 export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) {
   const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const queryKey = ['medical-appointments', user?.id, filters];
+  const queryKey = ['medical-appointments', user?.id, serializeFilters(filters)];
 
   // Invalidar cache quando o usuário mudar para evitar dados de outros usuários
   useEffect(() => {

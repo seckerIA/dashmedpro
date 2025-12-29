@@ -20,7 +20,7 @@ interface DashboardMetrics {
   recentDeals: Array<any>;
 }
 
-const fetchDashboardMetrics = async (userId: string, isAdminOrDono: boolean): Promise<DashboardMetrics> => {
+const fetchDashboardMetrics = async (userId: string, isAdminOrDono: boolean, signal?: AbortSignal): Promise<DashboardMetrics> => {
   // Buscar deals com contatos
   let dealsQuery = supabase
     .from('crm_deals')
@@ -34,7 +34,8 @@ const fetchDashboardMetrics = async (userId: string, isAdminOrDono: boolean): Pr
     dealsQuery = dealsQuery.or(`user_id.eq.${userId},assigned_to.eq.${userId}`);
   }
 
-  const dealsResult = await supabaseQueryWithTimeout(dealsQuery, 30000);
+  // Passar o query builder (não executado) para permitir abortSignal
+  const dealsResult = await supabaseQueryWithTimeout(dealsQuery as any, 30000, signal);
   const { data: deals, error: dealsError } = dealsResult;
 
   if (dealsError) throw new Error(`Erro ao buscar deals: ${dealsError.message}`);
@@ -49,7 +50,8 @@ const fetchDashboardMetrics = async (userId: string, isAdminOrDono: boolean): Pr
     contactsQuery = contactsQuery.eq('user_id', userId);
   }
 
-  const contactsResult = await supabaseQueryWithTimeout(contactsQuery, 30000);
+  // Passar o query builder (não executado) para permitir abortSignal
+  const contactsResult = await supabaseQueryWithTimeout(contactsQuery as any, 30000, signal);
   const { data: contacts, error: contactsError } = contactsResult;
 
   if (contactsError) throw new Error(`Erro ao buscar contatos: ${contactsError.message}`);
@@ -206,20 +208,31 @@ export function useDashboardMetrics() {
 
   return useQuery({
     queryKey: ['dashboard-metrics', user?.id, profile?.role],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!user?.id) {
         throw new Error('Usuário não autenticado');
       }
       try {
-        return await fetchDashboardMetrics(user.id, isAdminOrDono);
-      } catch (error) {
+        const result = await fetchDashboardMetrics(user.id, isAdminOrDono, signal);
+        return result;
+      } catch (error: any) {
         console.error('❌ useDashboardMetrics - Erro ao buscar métricas:', error);
         throw error;
       }
     },
     enabled: !!user?.id && !!profile && !authLoading && !isLoadingProfile,
-    refetchInterval: 30000,
+    refetchInterval: (query) => {
+      // Se a query está carregando, não fazer refetch para evitar acúmulo
+      if (query.state.fetchStatus === 'fetching') {
+        return false;
+      }
+      return 5 * 60 * 1000; // 5 minutos quando não está carregando
+    },
     refetchOnWindowFocus: false,
-    retry: 2,
+    refetchOnReconnect: false, // Não refetch ao reconectar - usar cache
+    refetchIntervalInBackground: false, // Não refetch quando aba não está em foco
+    staleTime: 5 * 60 * 1000, // Considerar dados válidos por 5 minutos (era 30s)
+    gcTime: 10 * 60 * 1000, // Manter em cache por 10 minutos
+    retry: 1, // Reduzir retries para evitar acúmulo
   });
 }

@@ -21,12 +21,6 @@ export function GlobalSearch({ onSelectDeal, onSelectContact }: GlobalSearchProp
   const [open, setOpen] = useState(false);
   const { deals, contacts, isLoading } = useCRM();
 
-  // #region agent log
-  useEffect(() => {
-    fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GlobalSearch.tsx:23',message:'GlobalSearch montado',data:{dealsLength:deals.length,contactsLength:contacts.length,isLoading,open},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-  }, [deals.length, contacts.length, isLoading, open]);
-  // #endregion
-
   // Handler para atalho de teclado Cmd+K (Mac) ou Ctrl+K (Windows/Linux)
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -71,23 +65,12 @@ export function GlobalSearch({ onSelectDeal, onSelectContact }: GlobalSearchProp
     onSelectContact?.(contact);
   };
 
-  // #region agent log
-  useEffect(() => {
-    if (open) {
-      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GlobalSearch.tsx:67',message:'Dialog aberto',data:{dealsLength:deals.length,contactsLength:contacts.length,isLoading},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
-    }
-  }, [open, deals.length, contacts.length, isLoading]);
-  // #endregion
-
   return (
     <>
       <Button
         variant="outline"
         className="relative w-full justify-start text-sm text-muted-foreground rounded-full border border-border bg-muted/60 hover:bg-muted/80 sm:pr-12"
         onClick={() => {
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GlobalSearch.tsx:78',message:'Botão clicado',data:{willOpen:!open},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
-          // #endregion
           setOpen(true);
         }}
       >
@@ -100,11 +83,8 @@ export function GlobalSearch({ onSelectDeal, onSelectContact }: GlobalSearchProp
           </span>K
         </kbd>
       </Button>
-      
+
       <CommandDialog open={open} onOpenChange={(newOpen) => {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GlobalSearch.tsx:93',message:'Dialog onOpenChange',data:{newOpen,currentOpen:open},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
-        // #endregion
         setOpen(newOpen);
       }}>
         <CommandInput 

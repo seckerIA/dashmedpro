@@ -92,17 +92,35 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 
 // Monitorar eventos de refresh de token
 if (typeof window !== 'undefined') {
+  // Flag para indicar se o refresh está em andamento
+  let isRefreshingToken = false;
+  let lastRefreshTime = 0;
+
   // Listener para eventos de autenticação
   supabase.auth.onAuthStateChange((event, session) => {
     if (event === 'TOKEN_REFRESHED') {
       console.log('✅ Token refreshed successfully');
+      isRefreshingToken = false;
+      lastRefreshTime = Date.now();
     } else if (event === 'SIGNED_OUT') {
       console.log('🔒 User signed out');
     }
   });
 
   // Função para verificar e fazer refresh do token proativamente
+  // IMPORTANTE: Só faz refresh quando não há queries em andamento
   const checkAndRefreshToken = async () => {
+    // Se já está fazendo refresh, não fazer novamente
+    if (isRefreshingToken) {
+      return;
+    }
+
+    // Cooldown de 60 segundos entre refreshes para evitar loops
+    const timeSinceLastRefresh = Date.now() - lastRefreshTime;
+    if (timeSinceLastRefresh < 60000) {
+      return;
+    }
+
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
 
@@ -114,35 +132,41 @@ if (typeof window !== 'undefined') {
       const tokenExpiry = session.expires_at;
       const timeUntilExpiry = tokenExpiry ? tokenExpiry - now : null;
 
-      // Se o token está próximo de expirar (menos de 10 minutos), tentar refresh
-      // Aumentado de 5 para 10 minutos para ser mais proativo
-      if (timeUntilExpiry !== null && timeUntilExpiry > 0 && timeUntilExpiry < 600) {
+      // Só fazer refresh se o token expira em menos de 2 minutos
+      // Reduzido de 10 para 2 minutos para minimizar conflitos com queries em andamento
+      // O refresh ainda é feito automaticamente pelo Supabase quando o token expira
+      if (timeUntilExpiry !== null && timeUntilExpiry > 0 && timeUntilExpiry < 120) {
+        isRefreshingToken = true;
         console.log(`⏰ Token expira em ${Math.round(timeUntilExpiry / 60)} minutos. Fazendo refresh...`);
         const { error: refreshError } = await supabase.auth.refreshSession();
         if (refreshError) {
           console.error('❌ Erro ao fazer refresh do token:', refreshError.message);
+          isRefreshingToken = false;
         }
+        // O flag isRefreshingToken será setado para false pelo onAuthStateChange
       }
     } catch (err: any) {
       console.error('❌ Erro ao verificar token:', err.message);
+      isRefreshingToken = false;
     }
   };
 
-  // Verificar token a cada 30 segundos (mais frequente para evitar expiração)
-  setInterval(checkAndRefreshToken, 30000);
+  // Verificar token a cada 60 segundos (reduzido de 30s para minimizar overhead)
+  setInterval(checkAndRefreshToken, 60000);
 
-  // Verificar imediatamente ao carregar
-  setTimeout(checkAndRefreshToken, 1000);
+  // NÃO verificar imediatamente ao carregar - deixar as queries iniciais terminarem primeiro
+  // setTimeout(checkAndRefreshToken, 1000); // REMOVIDO
 
-  // Também verificar quando a janela recebe foco (usuário volta para a aba)
+  // Verificar quando a janela recebe foco (usuário volta para a aba)
+  // Mas com delay para permitir que queries iniciais terminem
   window.addEventListener('focus', () => {
-    checkAndRefreshToken();
+    setTimeout(checkAndRefreshToken, 5000); // 5 segundos de delay
   });
 
   // Verificar quando a conexão é restabelecida
   window.addEventListener('online', () => {
     console.log('🌐 Conexão restabelecida. Verificando token...');
-    checkAndRefreshToken();
+    setTimeout(checkAndRefreshToken, 3000); // 3 segundos de delay
   });
 }
 

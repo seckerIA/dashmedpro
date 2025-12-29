@@ -44,11 +44,16 @@ const SecretaryDashboard = () => {
     );
   }
 
-  const getDateLabel = (dateString: string) => {
-    const date = parseISO(dateString);
-    if (isToday(date)) return "Hoje";
-    if (isTomorrow(date)) return "Amanhã";
-    return format(date, "dd/MM", { locale: ptBR });
+  const getDateLabel = (dateString: string | undefined | null) => {
+    if (!dateString) return "-";
+    try {
+      const date = parseISO(dateString);
+      if (isToday(date)) return "Hoje";
+      if (isTomorrow(date)) return "Amanhã";
+      return format(date, "dd/MM", { locale: ptBR });
+    } catch (error) {
+      return "-";
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -162,10 +167,10 @@ const SecretaryDashboard = () => {
                     <div className="flex items-center gap-4">
                       <div className="flex flex-col items-center justify-center min-w-[60px] p-2 rounded-md bg-primary/10">
                         <span className="text-xs font-medium text-primary">
-                          {getDateLabel(appointment.date)}
+                          {getDateLabel(appointment.startTime)}
                         </span>
                         <span className="text-lg font-bold text-foreground">
-                          {appointment.time}
+                          {appointment.startTime ? format(parseISO(appointment.startTime), "HH:mm", { locale: ptBR }) : "-"}
                         </span>
                       </div>
 

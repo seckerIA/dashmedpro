@@ -21,11 +21,16 @@ export function useDailyReport() {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
+      // Limitar busca para últimos 90 dias (evitar query open-ended)
+      const ninetyDaysAgo = new Date(today);
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
       // Verificar se há sessões de dias anteriores que precisam ser limpas
       const { data: oldSessions, error: sessionsError } = await supabase
         .from('prospecting_sessions')
         .select('*')
         .eq('user_id', user.id)
+        .gte('ended_at', ninetyDaysAgo.toISOString())
         .lt('ended_at', today.toISOString());
 
       if (sessionsError) {
@@ -100,11 +105,16 @@ export function useDailyReport() {
       if (query.state.fetchStatus === 'fetching') {
         return false;
       }
-      return 60000; // 60s quando não está carregando
+      // Aumentar intervalo para reduzir carga no servidor
+      return 5 * 60 * 1000; // 5 minutos
     },
     refetchIntervalInBackground: false, // Não refetch quando aba não está em foco
-    staleTime: 30000, // Considerar dados válidos por 30s
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false, // Não refetch ao reconectar - usar cache
+    staleTime: 5 * 60 * 1000, // 5 minutos - usar cache por mais tempo
+    gcTime: 10 * 60 * 1000, // 10 minutos em cache
     retry: 1, // Reduzir retries
+    retryDelay: 2000,
   });
 
   // Iniciar/atualizar relatório diário (sem restrições)
@@ -148,10 +158,6 @@ export function useDailyReport() {
         queryClient.invalidateQueries({ queryKey: ['daily-report-today'] }),
         queryClient.invalidateQueries({ queryKey: ['prospecting-sessions-today', user?.id] }),
       ]);
-      setTimeout(() => {
-        queryClient.refetchQueries({ queryKey: ['daily-report-today'] });
-        queryClient.refetchQueries({ queryKey: ['prospecting-sessions-today', user?.id] });
-      }, 300);
       toast({
         title: 'Expediente iniciado!',
         description: 'Suas metas foram registradas. Boa sorte!',
@@ -193,11 +199,16 @@ export function useDailyReport() {
         today.setHours(0, 0, 0, 0);
         const todayISO = today.toISOString();
 
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowISO = tomorrow.toISOString();
+
         const { error: deleteError } = await supabase
           .from('prospecting_sessions')
           .delete()
           .eq('user_id', user.id)
-          .gte('ended_at', todayISO);
+          .gte('ended_at', todayISO)
+          .lt('ended_at', tomorrowISO);
 
         if (deleteError) {
           console.error('Erro ao limpar sessões:', deleteError);
@@ -214,13 +225,6 @@ export function useDailyReport() {
         queryClient.invalidateQueries({ queryKey: ['prospecting-sessions-today', user?.id] }),
         queryClient.invalidateQueries({ queryKey: ['prospecting-sessions'] }),
       ]);
-      
-      // Aguardar um pouco para garantir que os dados foram atualizados
-      setTimeout(() => {
-        queryClient.refetchQueries({ queryKey: ['daily-report-today'] });
-        queryClient.refetchQueries({ queryKey: ['prospecting-sessions-today', user?.id] });
-        queryClient.refetchQueries({ queryKey: ['prospecting-sessions'] });
-      }, 500);
       
       toast({
         title: 'Expediente finalizado!',
@@ -406,11 +410,16 @@ export function useDailyReport() {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
+      // Limitar limpeza para últimos 90 dias (evitar query open-ended)
+      const ninetyDaysAgo = new Date(today);
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
       // Limpar sessões antigas
       const { error: sessionsError } = await supabase
         .from('prospecting_sessions')
         .delete()
         .eq('user_id', user.id)
+        .gte('ended_at', ninetyDaysAgo.toISOString())
         .lt('ended_at', today.toISOString());
 
       if (sessionsError) throw sessionsError;

@@ -146,6 +146,17 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
 
   const onSubmit = async (data: ContactFormData) => {
     console.log('📝 ContactForm onSubmit chamado com data:', data);
+    
+    // Função auxiliar para criar timeout em promises
+    const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> => {
+      return Promise.race([
+        promise,
+        new Promise<T>((_, reject) =>
+          setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+        ),
+      ]);
+    };
+
     try {
       const { create_deal, ...contactData } = data;
       
@@ -217,14 +228,29 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
           custom_fields_type: typeof updateData.custom_fields,
           custom_fields_keys: updateData.custom_fields ? Object.keys(updateData.custom_fields) : [],
         });
-        await updateContact({
-          contactId: contact.id,
-          data: updateData,
-        });
-        toast({
-          title: "Contato atualizado",
-          description: "O contato foi atualizado com sucesso.",
-        });
+        
+        try {
+          await withTimeout(
+            updateContact({
+              contactId: contact.id,
+              data: updateData,
+            }),
+            30000, // 30 segundos de timeout
+            "Timeout ao atualizar contato. Tente novamente."
+          );
+          
+          toast({
+            title: "Contato atualizado",
+            description: "O contato foi atualizado com sucesso.",
+          });
+          
+          setOpen(false);
+          form.reset();
+          onSuccess?.();
+        } catch (updateError) {
+          console.error('❌ Erro ao atualizar contato:', updateError);
+          throw updateError;
+        }
       } else {
         console.log('➕ Criando novo contato...');
         // Criar novo contato (sem service e service_value)
@@ -240,42 +266,88 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
           custom_fields_type: typeof createData.custom_fields,
           custom_fields_keys: createData.custom_fields ? Object.keys(createData.custom_fields) : [],
         });
-        const newContact = await createContact(createData as any);
-        console.log('✅ Contato criado:', {
-          id: newContact.id,
-          custom_fields: newContact.custom_fields,
-          custom_fields_type: typeof newContact.custom_fields,
-        });
+        
+        let newContact: CRMContact | null = null;
+        
+        try {
+          // Criar contato com timeout
+          newContact = await withTimeout(
+            createContact(createData as any),
+            30000, // 30 segundos de timeout
+            "Timeout ao criar contato. Tente novamente."
+          );
+          
+          console.log('✅ Contato criado:', {
+            id: newContact.id,
+            custom_fields: newContact.custom_fields,
+            custom_fields_type: typeof newContact.custom_fields,
+          });
+        } catch (contactError) {
+          console.error('❌ Erro ao criar contato:', contactError);
+          // Fechar o formulário mesmo em caso de erro para não travar a UI
+          setOpen(false);
+          form.reset();
+          throw contactError;
+        }
         
         // Criar contrato automaticamente se solicitado
         if (create_deal && newContact) {
           console.log('📄 Criando deal automático...');
           const dealStage = initialStage || "lead_novo";
-          const newDeal = await createDeal({
-            contact_id: newContact.id,
-            title: contactData.full_name,
-            description: `Contato adicionado automaticamente ao estágio`,
-            stage: dealStage,
-            value: serviceValue || null,
-            probability: 0,
-          });
-          console.log('✅ Deal criado:', newDeal);
           
-          toast({
-            title: "Contato e Contrato criados",
-            description: `O contato foi criado e adicionado ao pipeline.`,
-          });
-          
-          setOpen(false);
-          form.reset();
-          console.log('🔔 Chamando onSuccess com dealId:', newDeal.id);
-          // Chamar callback com contactId quando contato for criado (mesmo com deal)
-          if (newContact?.id) {
-            console.log('🔔 Chamando onContactCreated com contactId:', newContact.id);
-            onContactCreated?.(newContact.id);
+          try {
+            // Criar deal com timeout
+            const newDeal = await withTimeout(
+              createDeal({
+                contact_id: newContact.id,
+                title: contactData.full_name,
+                description: `Contato adicionado automaticamente ao estágio`,
+                stage: dealStage,
+                value: serviceValue || null,
+                probability: 0,
+              }),
+              30000, // 30 segundos de timeout
+              "Timeout ao criar contrato. O contato foi criado, mas o contrato não pôde ser adicionado ao pipeline."
+            );
+            
+            console.log('✅ Deal criado:', newDeal);
+            
+            toast({
+              title: "Contato e Contrato criados",
+              description: `O contato foi criado e adicionado ao pipeline.`,
+            });
+            
+            setOpen(false);
+            form.reset();
+            console.log('🔔 Chamando onSuccess com dealId:', newDeal.id);
+            // Chamar callback com contactId quando contato for criado (mesmo com deal)
+            if (newContact?.id) {
+              console.log('🔔 Chamando onContactCreated com contactId:', newContact.id);
+              onContactCreated?.(newContact.id);
+            }
+            onSuccess?.(newDeal.id);
+            return;
+          } catch (dealError) {
+            console.error('❌ Erro ao criar deal:', dealError);
+            // O contato foi criado, mas o deal falhou
+            // Ainda assim, fechar o formulário e mostrar mensagem
+            toast({
+              variant: "destructive",
+              title: "Contato criado, mas erro ao criar contrato",
+              description: dealError instanceof Error 
+                ? dealError.message 
+                : "O contato foi criado, mas não foi possível adicioná-lo ao pipeline. Tente adicionar manualmente.",
+            });
+            
+            setOpen(false);
+            form.reset();
+            // Chamar callback com contactId mesmo se o deal falhou
+            if (newContact?.id) {
+              onContactCreated?.(newContact.id);
+            }
+            onSuccess?.();
+            return;
           }
-          onSuccess?.(newDeal.id);
-          return;
         } else {
           console.log('ℹ️ Deal não será criado (create_deal:', create_deal, ')');
           toast({
@@ -289,14 +361,20 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
           console.log('🔔 Chamando onContactCreated com contactId:', newContact.id);
           onContactCreated?.(newContact.id);
         }
+        
+        setOpen(false);
+        form.reset();
+        console.log('🔔 Chamando onSuccess sem dealId');
+        onSuccess?.();
       }
-      
-      setOpen(false);
-      form.reset();
-      console.log('🔔 Chamando onSuccess sem dealId');
-      onSuccess?.();
     } catch (error) {
       console.error('❌ Erro no onSubmit:', error);
+      
+      // Garantir que o formulário sempre feche mesmo em caso de erro
+      // para não travar a UI
+      setOpen(false);
+      form.reset();
+      
       toast({
         variant: "destructive",
         title: "Erro",
@@ -436,36 +514,6 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
                         }}
                         className="border-blue-200 focus:border-blue-500"
                       />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="company"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Empresa</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Nome da empresa" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="position"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cargo</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Cargo na empresa" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

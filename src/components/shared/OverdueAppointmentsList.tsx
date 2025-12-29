@@ -8,6 +8,7 @@ import { ptBR } from "date-fns/locale";
 import { CheckCircle2, XCircle, Clock, Calendar, User, DollarSign, AlertTriangle } from "lucide-react";
 import { useOverdueAppointments } from "@/hooks/useOverdueAppointments";
 import { useMedicalAppointments } from "@/hooks/useMedicalAppointments";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -20,7 +21,8 @@ interface OverdueAppointmentsListProps {
 
 export function OverdueAppointmentsList({ open, onOpenChange }: OverdueAppointmentsListProps) {
   const { overdueAppointments, isLoading } = useOverdueAppointments();
-  const { markAsCompleted, markAsNoShow } = useMedicalAppointments({});
+  const { markAsCompleted, markAsNoShow, appointments } = useMedicalAppointments({});
+  const { isMedico, isAdmin } = useUserProfile();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
@@ -37,6 +39,14 @@ export function OverdueAppointmentsList({ open, onOpenChange }: OverdueAppointme
         title: "Status atualizado",
         description: "Consulta marcada como concluída.",
       });
+      
+      // Se for médico ou admin, buscar o appointment completo e redirecionar
+      if ((isMedico || isAdmin) && appointments) {
+        const appointment = appointments.find(apt => apt.id === appointmentId);
+        if (appointment && appointment.contact_id) {
+          navigate(`/prontuarios?patientId=${appointment.contact_id}&tab=historico`);
+        }
+      }
     } catch (error: any) {
       console.error('Erro ao marcar como concluída:', error);
       toast({

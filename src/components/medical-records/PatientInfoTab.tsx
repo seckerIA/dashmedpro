@@ -20,7 +20,9 @@ import {
   UserCheck,
   Edit2,
   Save,
-  X
+  X,
+  Plus,
+  Stethoscope
 } from 'lucide-react';
 import { format, differenceInYears, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -28,9 +30,10 @@ import { ptBR } from 'date-fns/locale';
 interface PatientInfoTabProps {
   patient: Patient;
   onUpdate?: () => void;
+  onNewRecord?: () => void;
 }
 
-export function PatientInfoTab({ patient, onUpdate }: PatientInfoTabProps) {
+export function PatientInfoTab({ patient, onUpdate, onNewRecord }: PatientInfoTabProps) {
   const { updatePatientMedicalInfo, isUpdating } = usePatients();
   const [isEditing, setIsEditing] = useState(false);
 
@@ -114,26 +117,34 @@ export function PatientInfoTab({ patient, onUpdate }: PatientInfoTabProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header com botão de edição */}
+      {/* Header com botões */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Ficha do Paciente</h3>
-        {!isEditing ? (
-          <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="gap-2">
-            <Edit2 className="h-4 w-4" />
-            Editar
-          </Button>
-        ) : (
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleCancel} className="gap-2">
-              <X className="h-4 w-4" />
-              Cancelar
+        <div className="flex gap-2">
+          {onNewRecord && (
+            <Button onClick={onNewRecord} className="gap-2">
+              <Stethoscope className="h-4 w-4" />
+              Novo Atendimento
             </Button>
-            <Button size="sm" onClick={handleSave} disabled={isUpdating} className="gap-2">
-              <Save className="h-4 w-4" />
-              Salvar
+          )}
+          {!isEditing ? (
+            <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="gap-2">
+              <Edit2 className="h-4 w-4" />
+              Editar Ficha
             </Button>
-          </div>
-        )}
+          ) : (
+            <>
+              <Button variant="outline" size="sm" onClick={handleCancel} className="gap-2">
+                <X className="h-4 w-4" />
+                Cancelar
+              </Button>
+              <Button size="sm" onClick={handleSave} disabled={isUpdating} className="gap-2">
+                <Save className="h-4 w-4" />
+                Salvar
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Dados Pessoais */}

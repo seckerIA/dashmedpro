@@ -103,10 +103,12 @@ const fetchTeamMetrics = async (
   if (selectedUserIds && selectedUserIds.length > 0) {
     targetUserIds = selectedUserIds;
   } else {
+    // Limitar busca de perfis para evitar queries muito pesadas
     const profilesQuery = supabase
       .from('profiles')
       .select('id, full_name, role')
-      .eq('is_active', true);
+      .eq('is_active', true)
+      .limit(100); // Limite razoável para evitar queries travadas
 
     const { data: profiles, error } = await supabaseQueryWithTimeout(profilesQuery, 30000, signal);
     if (!error && profiles && profiles.length > 0) {
@@ -281,18 +283,28 @@ export function useTeamMetrics(selectedUserIds?: string[]) {
       if (!user?.id) return emptyMetrics;
       try {
         return await fetchTeamMetrics(user.id, isAdmin, selectedUserIds, signal);
-      } catch (error) {
+      } catch (error: any) {
+        // Ignorar erros de cancelamento/timeout para evitar logs desnecessários
+        if (error?.message?.includes('cancelada') || 
+            error?.message?.includes('timeout') || 
+            error?.message?.includes('aborted') ||
+            error?.name === 'AbortError') {
+          console.log('Query cancelada, retornando métricas vazias');
+          return emptyMetrics;
+        }
         console.error('Erro ao buscar métricas:', error);
         return emptyMetrics;
       }
     },
     enabled: !!user?.id && !authLoading && !isLoadingProfile,
-    staleTime: 2 * 60 * 1000,
-    gcTime: 5 * 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutos - usar cache por mais tempo
+    gcTime: 10 * 60 * 1000, // 10 minutos em cache
     refetchOnMount: false,
     refetchOnWindowFocus: false,
-    retry: 2,
-    retryDelay: 1000,
+    refetchOnReconnect: false, // Não refetch ao reconectar - usar cache
+    refetchInterval: false, // Não fazer refetch automático
+    retry: 1, // Reduzir retries para evitar acúmulo de queries
+    retryDelay: 2000,
   });
 
   return {

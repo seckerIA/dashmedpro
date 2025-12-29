@@ -81,7 +81,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
 
   const queryResult = useQuery({
     queryKey: ["commercial-metrics", user?.id, filter, period.start.toISOString(), period.end.toISOString()],
-    queryFn: async (): Promise<CommercialMetrics> => {
+    queryFn: async ({ signal }): Promise<CommercialMetrics> => {
       if (!user) throw new Error("User not authenticated");
 
       const periodStartISO = period.start.toISOString();
@@ -110,7 +110,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .gte("start_time", periodStartISO)
         .lte("start_time", periodEndISO);
 
-      const appointmentsResult = await supabaseQueryWithTimeout(appointmentsQuery, 30000);
+      const appointmentsResult = await supabaseQueryWithTimeout(appointmentsQuery as any, 30000, signal);
       const { data: appointments, error: appointmentsError } = appointmentsResult;
 
       if (appointmentsError) throw appointmentsError;
@@ -140,7 +140,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .gte("transaction_date", format(period.start, "yyyy-MM-dd"))
         .lte("transaction_date", format(period.end, "yyyy-MM-dd"));
 
-      const transactionsResult = await supabaseQueryWithTimeout(transactionsQuery, 30000);
+      const transactionsResult = await supabaseQueryWithTimeout(transactionsQuery as any, 30000, signal);
       const { data: transactions, error: transactionsError } = transactionsResult;
 
       if (transactionsError) throw transactionsError;
@@ -160,8 +160,9 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
               supabase
                 .from("transaction_costs")
                 .select("*")
-                .in("transaction_id", allTransactionIds),
-              30000
+                .in("transaction_id", allTransactionIds) as any,
+              30000,
+              signal
             )
           : Promise.resolve({ data: [], error: null }),
         
@@ -172,8 +173,9 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
             .select("*")
             .eq("user_id", user.id)
             .gte("created_at", periodStartISO)
-            .lte("created_at", periodEndISO),
-          30000
+            .lte("created_at", periodEndISO) as any,
+          30000,
+          signal
         ),
         
         // 5. Buscar campanhas
@@ -181,8 +183,9 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
           supabase
             .from("commercial_campaigns")
             .select("*")
-            .eq("user_id", user.id),
-          30000
+            .eq("user_id", user.id) as any,
+          30000,
+          signal
         ),
       ]);
 
@@ -218,8 +221,9 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
             .select("*")
             .eq("user_id", user.id)
             .gte("sale_date", format(period.start, "yyyy-MM-dd"))
-            .lte("sale_date", format(period.end, "yyyy-MM-dd")),
-          30000
+            .lte("sale_date", format(period.end, "yyyy-MM-dd")) as any,
+          30000,
+          signal
         ),
         
         // 7. Buscar deals do CRM
@@ -237,8 +241,9 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
             `)
             .eq("user_id", user.id)
             .gte("created_at", periodStartISO)
-            .lte("created_at", periodEndISO),
-          30000
+            .lte("created_at", periodEndISO) as any,
+          30000,
+          signal
         ),
         
         // 8a. Buscar transações do período anterior
@@ -250,8 +255,9 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
             .eq("type", "entrada")
             .eq("status", "concluida")
             .gte("transaction_date", format(previousPeriod.start, "yyyy-MM-dd"))
-            .lte("transaction_date", format(previousPeriod.end, "yyyy-MM-dd")),
-          30000
+            .lte("transaction_date", format(previousPeriod.end, "yyyy-MM-dd")) as any,
+          30000,
+          signal
         ),
         
         // 8b. Buscar appointments do período anterior
@@ -261,8 +267,9 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
             .select("id")
             .eq("user_id", user.id)
             .gte("start_time", prevStartISO)
-            .lte("start_time", prevEndISO),
-          30000
+            .lte("start_time", prevEndISO) as any,
+          30000,
+          signal
         ),
       ]);
 
@@ -372,7 +379,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .gte("transaction_date", format(period.start, "yyyy-MM-dd"))
         .lte("transaction_date", format(period.end, "yyyy-MM-dd"));
       
-      const expensesResult = await supabaseQueryWithTimeout(expensesQuery, 30000);
+      const expensesResult = await supabaseQueryWithTimeout(expensesQuery as any, 30000, signal);
       const { data: expenses } = expensesResult;
 
       const totalExpenses = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
@@ -470,7 +477,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .eq("user_id", user.id)
         .eq("is_active", true);
       
-      const proceduresResult = await supabaseQueryWithTimeout(proceduresQuery, 30000);
+      const proceduresResult = await supabaseQueryWithTimeout(proceduresQuery as any, 30000, signal);
       const { data: procedures, error: proceduresError } = proceduresResult;
 
       if (proceduresError) {
@@ -565,7 +572,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .gte("created_at", periodStartISO)
         .lte("created_at", periodEndISO);
       
-      const newContactsResult = await supabaseQueryWithTimeout(newContactsQuery, 30000);
+      const newContactsResult = await supabaseQueryWithTimeout(newContactsQuery as any, 30000, signal);
       const { data: newContacts } = newContactsResult;
 
       const newPatients = newContacts?.length || 0;

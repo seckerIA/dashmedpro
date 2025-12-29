@@ -16,6 +16,25 @@ export interface VitalSigns {
   bmi?: number;              // IMC (calculado automaticamente)
 }
 
+// Validação de faixas para sinais vitais
+export const VITAL_SIGNS_RANGES = {
+  temperature: { min: 35, max: 42, unit: '°C' },
+  bp_systolic: { min: 60, max: 250, unit: 'mmHg' },
+  bp_diastolic: { min: 40, max: 150, unit: 'mmHg' },
+  heart_rate: { min: 30, max: 250, unit: 'bpm' },
+  respiratory_rate: { min: 8, max: 60, unit: 'irpm' },
+  spo2: { min: 50, max: 100, unit: '%' },
+  weight: { min: 1, max: 300, unit: 'kg' },
+  height: { min: 30, max: 250, unit: 'cm' },
+} as const;
+
+// Função para calcular IMC
+export function calculateBMI(weight?: number, height?: number): number | undefined {
+  if (!weight || !height || height <= 0) return undefined;
+  const heightInMeters = height / 100;
+  return Number((weight / (heightInMeters * heightInMeters)).toFixed(2));
+}
+
 // =====================================================
 // PRESCRIÇÃO DE MEDICAMENTO
 // =====================================================
@@ -87,6 +106,9 @@ export interface MedicalRecord {
   patient_instructions?: string | null;
   follow_up_notes?: string | null;
   next_appointment_date?: string | null;
+
+  // Complicações (importante para procedimentos)
+  complications?: string | null;
 
   // Prescrições e Exames
   prescriptions?: MedicationPrescription[] | null;
@@ -214,6 +236,9 @@ export interface CreateMedicalRecordInput {
   follow_up_notes?: string;
   next_appointment_date?: string;
 
+  // Complicações
+  complications?: string;
+
   // Prescrições e Exames
   prescriptions?: MedicationPrescription[];
   exams_requested?: RequestedExam[];
@@ -284,6 +309,18 @@ export const RECORD_TYPES = [
   { value: 'exam', label: 'Exame', description: 'Realização de exame' },
   { value: 'emergency', label: 'Emergência', description: 'Atendimento de emergência' },
 ] as const;
+
+// Labels para tipos de registro (compatibilidade)
+export const MEDICAL_RECORD_TYPE_LABELS: Record<string, string> = {
+  consultation: 'Consulta',
+  return: 'Retorno',
+  procedure: 'Procedimento',
+  exam: 'Exame',
+  emergency: 'Emergência',
+};
+
+// Alias para compatibilidade
+export type MedicalRecordInsert = CreateMedicalRecordInput;
 
 // =====================================================
 // TIPOS SANGUÍNEOS

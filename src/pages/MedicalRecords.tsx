@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { usePatients, usePatient } from "@/hooks/usePatients";
 import { PatientInfoTab } from "@/components/medical-records/PatientInfoTab";
 import { MedicalHistoryTab } from "@/components/medical-records/MedicalHistoryTab";
 import { NewRecordModal } from "@/components/medical-records/NewRecordModal";
+import { PatientSelectorModal } from "@/components/medical-records/PatientSelectorModal";
 import { PrescriptionsTab } from "@/components/medical-records/PrescriptionsTab";
 import {
   FileText,
@@ -33,13 +35,45 @@ import { ptBR } from "date-fns/locale";
 const MedicalRecords = () => {
   const { isMedico, isAdmin, profile, isLoading: profileLoading } = useUserProfile();
   const { patients, isLoading: patientsLoading } = usePatients();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  const [selectedPatientName, setSelectedPatientName] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("ficha");
   const [isNewRecordModalOpen, setIsNewRecordModalOpen] = useState(false);
+  const [isPatientSelectorModalOpen, setIsPatientSelectorModalOpen] = useState(false);
 
   // Buscar dados do paciente selecionado
   const { patient: selectedPatient, isLoading: patientLoading } = usePatient(selectedPatientId);
+
+  // Ler query params da URL para selecionar paciente e aba automaticamente
+  useEffect(() => {
+    const patientIdFromUrl = searchParams.get('patientId');
+    const tabFromUrl = searchParams.get('tab');
+    
+    if (patientIdFromUrl) {
+      setSelectedPatientId(patientIdFromUrl);
+      // Buscar o nome do paciente se disponível
+      if (patients && patients.length > 0) {
+        const patient = patients.find(p => p.id === patientIdFromUrl);
+        if (patient) {
+          setSelectedPatientName(patient.full_name || null);
+        }
+      }
+    }
+    
+    if (tabFromUrl && ['ficha', 'historico', 'receitas'].includes(tabFromUrl)) {
+      setActiveTab(tabFromUrl);
+    }
+    
+    // Limpar query params após processar para evitar problemas de navegação
+    if (patientIdFromUrl || tabFromUrl) {
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('patientId');
+      newSearchParams.delete('tab');
+      setSearchParams(newSearchParams, { replace: true });
+    }
+  }, [searchParams, patients, setSearchParams]);
 
   // Filtrar pacientes pela busca
   const filteredPatients = useMemo(() => {
@@ -50,7 +84,6 @@ const MedicalRecords = () => {
     return patients.filter(
       (patient) =>
         patient.full_name?.toLowerCase().includes(term) ||
-        patient.cpf?.includes(term) ||
         patient.phone?.includes(term) ||
         patient.email?.toLowerCase().includes(term)
     );
@@ -109,6 +142,10 @@ const MedicalRecords = () => {
             Gerencie prontuários, histórico clínico e receitas dos pacientes
           </p>
         </div>
+        <Button onClick={() => setIsPatientSelectorModalOpen(true)} className="gap-2">
+          <Plus className="h-4 w-4" />
+          Criar Novo Prontuário
+        </Button>
       </div>
 
       {/* Main Content */}
@@ -159,6 +196,7 @@ const MedicalRecords = () => {
                         key={patient.id}
                         onClick={() => {
                           setSelectedPatientId(patient.id);
+                          setSelectedPatientName(patient.full_name);
                           setActiveTab("ficha");
                         }}
                         className={`w-full p-4 text-left hover:bg-muted/50 transition-colors ${
@@ -296,13 +334,13 @@ const MedicalRecords = () => {
                     <PatientInfoTab
                       patient={selectedPatient}
                       onUpdate={() => {}}
+                      onNewRecord={() => setIsNewRecordModalOpen(true)}
                     />
                   </TabsContent>
 
                   <TabsContent value="historico" className="mt-6">
                     <MedicalHistoryTab
                       contactId={selectedPatientId}
-                      onNewRecord={() => setIsNewRecordModalOpen(true)}
                     />
                   </TabsContent>
 
@@ -337,13 +375,29 @@ const MedicalRecords = () => {
         </Card>
       </div>
 
+      {/* Modal de Seleção de Paciente */}
+      <PatientSelectorModal
+        open={isPatientSelectorModalOpen}
+        onOpenChange={setIsPatientSelectorModalOpen}
+        onSelectPatient={(patientId, patientName) => {
+          setSelectedPatientId(patientId);
+          setSelectedPatientName(patientName);
+          setActiveTab("historico");
+          setIsPatientSelectorModalOpen(false);
+          // Abrir modal de novo prontuário após um pequeno delay para garantir que o paciente foi selecionado
+          setTimeout(() => {
+            setIsNewRecordModalOpen(true);
+          }, 100);
+        }}
+      />
+
       {/* Modal de Novo Atendimento */}
-      {selectedPatientId && selectedPatient && (
+      {selectedPatientId && (selectedPatientName || selectedPatient?.full_name) && (
         <NewRecordModal
           open={isNewRecordModalOpen}
           onOpenChange={setIsNewRecordModalOpen}
           contactId={selectedPatientId}
-          patientName={selectedPatient.full_name || 'Paciente'}
+          patientName={selectedPatientName || selectedPatient?.full_name || 'Paciente'}
         />
       )}
     </div>

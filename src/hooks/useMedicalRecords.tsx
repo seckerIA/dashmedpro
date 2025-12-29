@@ -34,12 +34,12 @@ export function useMedicalRecords(contactId?: string) {
     queryFn: async ({ signal }) => {
       if (!contactId || !user?.id) return [];
 
+      // Buscar prontuários sem JOIN com profiles (não há FK direta)
       const query = supabase
         .from('medical_records')
         .select(`
           *,
-          contact:crm_contacts(id, full_name, phone, email, cpf),
-          doctor:profiles!medical_records_doctor_id_fkey(id, full_name, email)
+          contact:crm_contacts(id, full_name, phone, email)
         `)
         .eq('contact_id', contactId)
         .order('created_at', { ascending: false });
@@ -91,6 +91,9 @@ export function useMedicalRecords(contactId?: string) {
         patient_instructions: input.patient_instructions || null,
         follow_up_notes: input.follow_up_notes || null,
         next_appointment_date: input.next_appointment_date || null,
+
+        // Complicações
+        complications: input.complications || null,
 
         // Prescrições e Exames
         prescriptions: input.prescriptions || [],
@@ -157,6 +160,7 @@ export function useMedicalRecords(contactId?: string) {
       if (updates.patient_instructions !== undefined) updateData.patient_instructions = updates.patient_instructions;
       if (updates.follow_up_notes !== undefined) updateData.follow_up_notes = updates.follow_up_notes;
       if (updates.next_appointment_date !== undefined) updateData.next_appointment_date = updates.next_appointment_date;
+      if (updates.complications !== undefined) updateData.complications = updates.complications;
       if (updates.prescriptions !== undefined) updateData.prescriptions = updates.prescriptions;
       if (updates.exams_requested !== undefined) updateData.exams_requested = updates.exams_requested;
       if (updates.record_type !== undefined) updateData.record_type = updates.record_type;
@@ -220,12 +224,12 @@ export function useMedicalRecords(contactId?: string) {
 
   // Buscar prontuário por ID
   const getRecordById = async (recordId: string): Promise<MedicalRecord | null> => {
+    // Buscar prontuário sem JOIN com profiles (não há FK direta)
     const { data, error } = await supabase
       .from('medical_records')
       .select(`
         *,
-        contact:crm_contacts(id, full_name, phone, email, cpf),
-        doctor:profiles!medical_records_doctor_id_fkey(id, full_name, email)
+        contact:crm_contacts(id, full_name, phone, email, cpf)
       `)
       .eq('id', recordId)
       .single();
@@ -238,14 +242,49 @@ export function useMedicalRecords(contactId?: string) {
     return data as MedicalRecord;
   };
 
+  // Marcar como completo
+  const markAsCompletedMutation = useMutation({
+    mutationFn: async (recordId: string) => {
+      const { data, error } = await supabase
+        .from('medical_records')
+        .update({
+          record_status: 'completed',
+        })
+        .eq('id', recordId)
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error(`Erro ao finalizar prontuário: ${error.message}`);
+      }
+
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['medical-records'] });
+      toast({
+        title: 'Prontuário finalizado',
+        description: 'O prontuário foi marcado como completo.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao finalizar',
+        description: error.message,
+      });
+    },
+  });
+
   return {
     records,
     isLoading,
     error,
     refetch,
-    createRecord: createRecordMutation.mutate,
-    updateRecord: updateRecordMutation.mutate,
-    deleteRecord: deleteRecordMutation.mutate,
+    createRecord: createRecordMutation,
+    updateRecord: updateRecordMutation,
+    deleteRecord: deleteRecordMutation,
+    markAsCompleted: markAsCompletedMutation,
     getRecordById,
     isCreating: createRecordMutation.isPending,
     isUpdating: updateRecordMutation.isPending,
@@ -274,12 +313,12 @@ export function usePrescriptions(contactId?: string) {
     queryFn: async ({ signal }) => {
       if (!contactId || !user?.id) return [];
 
+      // Buscar receitas sem JOIN com profiles (não há FK direta)
       const query = supabase
         .from('prescriptions')
         .select(`
           *,
-          contact:crm_contacts(id, full_name, cpf),
-          doctor:profiles!prescriptions_doctor_id_fkey(id, full_name, email)
+          contact:crm_contacts(id, full_name)
         `)
         .eq('contact_id', contactId)
         .order('created_at', { ascending: false });
@@ -294,7 +333,14 @@ export function usePrescriptions(contactId?: string) {
       return (data || []) as Prescription[];
     },
     enabled: !!contactId && !!user?.id,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutos
+    gcTime: 10 * 60 * 1000, // 10 minutos
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchInterval: false,
+    retry: 1,
+    retryDelay: 2000,
   });
 
   // Criar nova receita
@@ -325,8 +371,8 @@ export function usePrescriptions(contactId?: string) {
 
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['prescriptions', variables.contact_id] });
       toast({
         title: 'Receita criada',
         description: 'A receita foi salva com sucesso.',
@@ -361,7 +407,7 @@ export function usePrescriptions(contactId?: string) {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
+      queryClient.invalidateQueries({ queryKey: ['prescriptions', contactId] });
     },
   });
 
@@ -428,6 +474,104 @@ export function usePatientMedicalHistory(contactId: string | null) {
     enabled: !!contactId && !!user?.id,
     staleTime: 2 * 60 * 1000,
   });
+}
+
+// =====================================================
+// HOOK: usePatientRecordHistory
+// Busca histórico de prontuários de um paciente
+// =====================================================
+
+export function usePatientRecordHistory(contactId: string | null) {
+  const { user } = useAuth();
+
+  const {
+    data: history = [],
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['patient-record-history', contactId, user?.id],
+    queryFn: async ({ signal }) => {
+      if (!contactId || !user?.id) return [];
+
+      const query = supabase
+        .from('medical_records')
+        .select(`
+          id,
+          created_at,
+          record_type,
+          record_status,
+          chief_complaint,
+          diagnostic_hypothesis,
+          cid_codes,
+          secondary_diagnoses,
+          doctor_id
+        `)
+        .eq('contact_id', contactId)
+        .eq('doctor_id', user.id)
+        .in('record_status', ['completed', 'signed'])
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      const { data, error } = await supabaseQueryWithTimeout(query, 10000, signal);
+
+      if (error) throw new Error(`Erro ao buscar histórico: ${error.message}`);
+      return data || [];
+    },
+    enabled: !!contactId && !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  return {
+    history,
+    isLoading,
+    error,
+  };
+}
+
+// =====================================================
+// HOOK: useMedicalRecord
+// Busca um prontuário específico por ID
+// =====================================================
+
+export function useMedicalRecord(recordId: string | null) {
+  const { user } = useAuth();
+
+  const {
+    data: record,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['medical-record', recordId],
+    queryFn: async ({ signal }) => {
+      if (!recordId || !user?.id) return null;
+
+      // Buscar prontuário sem JOIN com profiles (não há FK direta)
+      const query = supabase
+        .from('medical_records')
+        .select(`
+          *,
+          contact:crm_contacts(id, full_name, phone, email)
+        `)
+        .eq('id', recordId)
+        .single();
+
+      const { data, error } = await supabaseQueryWithTimeout(query, 10000, signal);
+
+      if (error) {
+        throw new Error(`Erro ao buscar prontuário: ${error.message}`);
+      }
+
+      return data as MedicalRecord;
+    },
+    enabled: !!recordId && !!user?.id,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  return {
+    record,
+    isLoading,
+    error,
+  };
 }
 
 // =====================================================

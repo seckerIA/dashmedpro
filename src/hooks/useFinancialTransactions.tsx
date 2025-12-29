@@ -23,39 +23,20 @@ export const useFinancialTransactions = (filters?: TransactionFilters) => {
   const queryResult = useQuery({
     queryKey: ["financial-transactions", user?.id, profile?.role, filters],
     queryFn: async () => {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useFinancialTransactions.tsx:24',message:'queryFn iniciado',data:{userId:user?.id,hasUser:!!user,role:profile?.role},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
-      
       if (!user) throw new Error("Usuário não autenticado");
 
       // Verificar sessão antes da query
       let session, sessionError;
       try {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useFinancialTransactions.tsx:32',message:'verificando sessão',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
-        
         const sessionResult = await supabase.auth.getSession();
         session = sessionResult.data?.session;
         sessionError = sessionResult.error;
-        
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useFinancialTransactions.tsx:38',message:'sessão verificada',data:{hasSession:!!session,hasError:!!sessionError,errorMessage:sessionError?.message,userId:session?.user?.id,tokenExpiry:session?.expires_at},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
       } catch (err: any) {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useFinancialTransactions.tsx:42',message:'erro verificação sessão',data:{errorMessage:err?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
         throw err;
       }
 
       // Admin e Dono veem dados de TODOS os usuários
       const isAdminOrDono = profile?.role === 'admin' || profile?.role === 'dono';
-
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useFinancialTransactions.tsx:50',message:'antes query',data:{isAdminOrDono,userId:user.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
 
       let query = supabase
         .from("financial_transactions")
@@ -113,25 +94,14 @@ export const useFinancialTransactions = (filters?: TransactionFilters) => {
         const result = await supabaseQueryWithTimeout(queryPromise, 30000);
         data = result.data;
         error = result.error;
-        
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useFinancialTransactions.tsx:121',message:'query resultado',data:{hasData:!!data,dataLength:data?.length,hasError:!!error,errorCode:error?.code,errorMessage:error?.message,elapsed:Date.now()-queryStartTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
       } catch (err: any) {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useFinancialTransactions.tsx:128',message:'erro query',data:{errorMessage:err?.message,isTimeout:err?.message?.includes('timeout'),elapsed:Date.now()-queryStartTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
         throw err;
       }
 
       console.log('useFinancialTransactions - Query result:', { data, error });
 
       if (error) throw error;
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useFinancialTransactions.tsx:116',message:'queryFn concluído',data:{dataLength:data?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
-      
+
       return data;
     },
     enabled: !!user && !!profile, // Aguardar profile carregar também
@@ -158,15 +128,6 @@ export const useFinancialTransactions = (filters?: TransactionFilters) => {
       return transformedData as unknown as FinancialTransactionWithDetails[];
     }
   });
-  
-  // #region agent log
-  useEffect(() => {
-    // Só logar quando há mudanças significativas para evitar spam
-    if (queryResult.status === 'error' || queryResult.fetchStatus === 'paused' || (queryResult.fetchStatus === 'fetching' && queryResult.isLoading)) {
-      fetch('http://127.0.0.1:7243/ingest/2b337c82-09e3-44a8-815b-68d986435be3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useFinancialTransactions.tsx:140',message:'query estado mudou',data:{status:queryResult.status,fetchStatus:queryResult.fetchStatus,isLoading:queryResult.isLoading,hasError:!!queryResult.error,errorMessage:queryResult.error?.message,dataLength:queryResult.data?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'C'})}).catch(()=>{});
-    }
-  }, [queryResult.status, queryResult.fetchStatus, queryResult.isLoading, queryResult.error]);
-  // #endregion
 
   const { data: transactions, isLoading, error } = queryResult;
 

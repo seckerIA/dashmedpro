@@ -43,30 +43,36 @@ export function MonthlyCalendarView({
     const map = new Map<string, { appointments: number; meetings: number }>();
     
     // Contar consultas
-    appointments.forEach(appt => {
-      try {
-        const date = parseISO(appt.start_time);
-        const dateKey = format(date, 'yyyy-MM-dd');
-        const current = map.get(dateKey) || { appointments: 0, meetings: 0 };
-        current.appointments += 1;
-        map.set(dateKey, current);
-      } catch {
-        // Ignore invalid dates
-      }
-    });
+    if (appointments && appointments.length > 0) {
+      appointments.forEach(appt => {
+        try {
+          if (!appt.start_time) return;
+          const date = parseISO(appt.start_time);
+          const dateKey = format(date, 'yyyy-MM-dd');
+          const current = map.get(dateKey) || { appointments: 0, meetings: 0 };
+          current.appointments += 1;
+          map.set(dateKey, current);
+        } catch {
+          // Ignore invalid dates
+        }
+      });
+    }
 
     // Contar reuniões
-    meetings.forEach(meeting => {
-      try {
-        const date = parseISO(meeting.start_time);
-        const dateKey = format(date, 'yyyy-MM-dd');
-        const current = map.get(dateKey) || { appointments: 0, meetings: 0 };
-        current.meetings += 1;
-        map.set(dateKey, current);
-      } catch {
-        // Ignore invalid dates
-      }
-    });
+    if (meetings && meetings.length > 0) {
+      meetings.forEach(meeting => {
+        try {
+          if (!meeting.start_time) return;
+          const date = parseISO(meeting.start_time);
+          const dateKey = format(date, 'yyyy-MM-dd');
+          const current = map.get(dateKey) || { appointments: 0, meetings: 0 };
+          current.meetings += 1;
+          map.set(dateKey, current);
+        } catch {
+          // Ignore invalid dates
+        }
+      });
+    }
 
     return map;
   }, [appointments, meetings]);
@@ -141,8 +147,10 @@ export function MonthlyCalendarView({
         <div className="grid grid-cols-7 gap-1">
           {days.map((day, dayIdx) => {
             const dateKey = format(day, 'yyyy-MM-dd');
-            const dayEvents = eventsByDate.get(dateKey) || { appointments: 0, meetings: 0 };
-            const hasEvents = dayEvents.appointments > 0 || dayEvents.meetings > 0;
+            const dayEvents = eventsByDate.get(dateKey);
+            const hasAppointments = dayEvents?.appointments > 0;
+            const hasMeetings = dayEvents?.meetings > 0;
+            const hasEvents = hasAppointments || hasMeetings;
             const isCurrentMonth = isSameMonth(day, currentMonth);
             const isSelected = isSameDay(day, selectedDate);
             const isCurrentDay = isToday(day);
@@ -177,7 +185,7 @@ export function MonthlyCalendarView({
                   </span>
                   {hasEvents && isCurrentMonth && (
                     <div className="mt-1 flex items-center justify-center gap-0.5">
-                      {dayEvents.appointments > 0 && (
+                      {hasAppointments && (
                         <div
                           className={cn(
                             'w-1.5 h-1.5 rounded-full',
@@ -187,7 +195,7 @@ export function MonthlyCalendarView({
                           )}
                         />
                       )}
-                      {dayEvents.meetings > 0 && (
+                      {hasMeetings && (
                         <div
                           className={cn(
                             'w-1.5 h-1.5 rounded-full',

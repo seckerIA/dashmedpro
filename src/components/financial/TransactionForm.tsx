@@ -76,7 +76,6 @@ const TransactionForm = () => {
   
   const handleRefreshAccounts = () => {
     queryClient.invalidateQueries({ queryKey: ['financial-accounts'] })
-    queryClient.refetchQueries({ queryKey: ['financial-accounts'] })
   }
   const createTransaction = useCreateFinancialTransaction()
   const updateTransaction = useUpdateFinancialTransaction()

@@ -41,7 +41,7 @@ interface PrescriptionsTabProps {
 }
 
 export function PrescriptionsTab({ contactId, patient }: PrescriptionsTabProps) {
-  const { prescriptions, isLoading, createPrescription, markAsPrinted, isCreating } = usePrescriptions(contactId);
+  const { prescriptions, isLoading, error, createPrescription, markAsPrinted, isCreating } = usePrescriptions(contactId);
   const { profile } = useUserProfile();
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [printingId, setPrintingId] = useState<string | null>(null);
@@ -134,6 +134,14 @@ export function PrescriptionsTab({ contactId, patient }: PrescriptionsTabProps) 
           <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4" />
           Carregando receitas...
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12 text-destructive">
+        Erro ao carregar receitas: {error.message}
       </div>
     );
   }

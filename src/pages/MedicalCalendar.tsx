@@ -1,22 +1,25 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import { useMedicalAppointments } from '@/hooks/useMedicalAppointments';
 import { useGeneralMeetings } from '@/hooks/useGeneralMeetings';
+import { useToast } from '@/hooks/use-toast';
 import { AppointmentForm } from '@/components/medical-calendar/AppointmentForm';
 import { AppointmentDetailsModal } from '@/components/medical-calendar/AppointmentDetailsModal';
 import { MeetingDetailsModal } from '@/components/medical-calendar/MeetingDetailsModal';
 import { MeetingForm } from '@/components/medical-calendar/MeetingForm';
+import { MedicalRecordModal } from '@/components/medical-records/MedicalRecordModal';
 import { MonthlyCalendarView } from '@/components/medical-calendar/MonthlyCalendarView';
 import { DailyAppointmentsList } from '@/components/medical-calendar/DailyAppointmentsList';
 import { TimeGridView } from '@/components/medical-calendar/TimeGridView';
 import { AppointmentMetrics } from '@/components/medical-calendar/AppointmentMetrics';
 import { AttendanceChecklist } from '@/components/medical-calendar/AttendanceChecklist';
-import { DailyAttendanceChecklist } from '@/components/medical-calendar/DailyAttendanceChecklist';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { useDoctors } from '@/hooks/useDoctors';
 import { MedicalAppointmentWithRelations, AppointmentType, AppointmentStatus, PaymentStatus } from '@/types/medicalAppointments';
 import { GeneralMeeting } from '@/types/generalMeetings';
 import { Calendar, Plus, CalendarDays, Clock } from 'lucide-react';
@@ -26,12 +29,16 @@ type CalendarView = 'monthly' | 'daily-hours';
 
 export default function MedicalCalendar() {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const { isMedico, isAdmin } = useUserProfile();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [view, setView] = useState<CalendarView>('monthly');
   const [typeFilter, setTypeFilter] = useState<AppointmentType | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<AppointmentStatus | 'all'>('all');
   const [paymentFilter, setPaymentFilter] = useState<PaymentStatus | 'all'>('all');
+  const [searchFilter, setSearchFilter] = useState<string>('all');
   const [showAppointmentForm, setShowAppointmentForm] = useState(false);
   const [showMeetingForm, setShowMeetingForm] = useState(false);
   const [showAppointmentDetails, setShowAppointmentDetails] = useState(false);
@@ -44,6 +51,12 @@ export default function MedicalCalendar() {
     appointmentValue?: number;
     paidInAdvance?: boolean;
   } | null>(null);
+
+  // Medical Record Modal state
+  const [showMedicalRecordModal, setShowMedicalRecordModal] = useState(false);
+  const [recordContactId, setRecordContactId] = useState<string | null>(null);
+  const [recordAppointmentId, setRecordAppointmentId] = useState<string | null>(null);
+  const [recordContactName, setRecordContactName] = useState<string | undefined>(undefined);
 
   // Calcular range do mês para carregar consultas
   const monthStart = startOfMonth(selectedDate);
@@ -68,6 +81,44 @@ export default function MedicalCalendar() {
     markAsNoShow,
     cancelAppointment,
   } = useMedicalAppointments(filters);
+
+  // Buscar lista de médicos
+  const { doctors } = useDoctors();
+
+  // Extrair lista única de pacientes das consultas
+  const uniquePatients = useMemo(() => {
+    const patientsMap = new Map<string, { id: string; name: string }>();
+    appointments.forEach((apt) => {
+      if (apt.contact && apt.contact_id) {
+        if (!patientsMap.has(apt.contact_id)) {
+          patientsMap.set(apt.contact_id, {
+            id: apt.contact_id,
+            name: apt.contact.full_name || 'Sem nome',
+          });
+        }
+      }
+    });
+    return Array.from(patientsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [appointments]);
+
+  // Filtrar consultas baseado no searchFilter
+  const filteredAppointments = useMemo(() => {
+    if (searchFilter === 'all') {
+      return appointments;
+    }
+
+    if (searchFilter.startsWith('doctor:')) {
+      const doctorId = searchFilter.replace('doctor:', '');
+      return appointments.filter((apt) => apt.doctor_id === doctorId);
+    }
+
+    if (searchFilter.startsWith('patient:')) {
+      const contactId = searchFilter.replace('patient:', '');
+      return appointments.filter((apt) => apt.contact_id === contactId);
+    }
+
+    return appointments;
+  }, [appointments, searchFilter]);
 
   // Buscar reuniões do mesmo período
   const {
@@ -127,19 +178,38 @@ export default function MedicalCalendar() {
       data.end_time = endDateTime.toISOString();
     }
 
+    let result;
     if (selectedAppointment) {
       // Editing existing appointment
-      await updateAppointment.mutateAsync({
+      result = await updateAppointment.mutateAsync({
         id: selectedAppointment.id,
         updates: data,
       });
     } else {
       // Creating new appointment
-      await createAppointment.mutateAsync(data);
+      result = await createAppointment.mutateAsync(data);
     }
     setShowAppointmentForm(false);
     setPrefilledDates({});
     setSelectedAppointment(null);
+    return result;
+  };
+
+  // Handle appointment created - manual opening only (no auto-open)
+  const handleAppointmentCreated = (appointment: MedicalAppointmentWithRelations) => {
+    // Prontuário é aberto manualmente via botão "Ver Prontuário"
+    // Não abre automaticamente
+  };
+
+  // Handle view medical record from appointment details
+  const handleViewMedicalRecord = () => {
+    if (selectedAppointment) {
+      setRecordContactId(selectedAppointment.contact_id);
+      setRecordAppointmentId(selectedAppointment.id);
+      setRecordContactName(selectedAppointment.contact?.full_name);
+      setShowAppointmentDetails(false);
+      setShowMedicalRecordModal(true);
+    }
   };
 
   // Handle meeting form submit
@@ -186,6 +256,11 @@ export default function MedicalCalendar() {
 
   const handleMarkAttended = async (appointment: MedicalAppointmentWithRelations) => {
     await markAsCompleted.mutateAsync(appointment.id);
+    
+    // Se for médico ou admin, redirecionar para o prontuário do paciente
+    if ((isMedico || isAdmin) && appointment.contact_id) {
+      navigate(`/prontuarios?patientId=${appointment.contact_id}&tab=historico`);
+    }
   };
 
   const handleMarkNoShow = async (appointment: MedicalAppointmentWithRelations) => {
@@ -353,7 +428,7 @@ export default function MedicalCalendar() {
       </div>
 
       {/* Metrics Cards */}
-      <AppointmentMetrics appointments={appointments} meetings={meetings} />
+      <AppointmentMetrics appointments={filteredAppointments} meetings={meetings} />
 
       {/* View Toggle */}
       <Card className="p-4">
@@ -384,7 +459,39 @@ export default function MedicalCalendar() {
 
       {/* Filters */}
       <Card className="p-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="space-y-2">
+            <Label>Médico / Paciente</Label>
+            <Select value={searchFilter} onValueChange={setSearchFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                {doctors.length > 0 && (
+                  <SelectGroup>
+                    <SelectLabel>Médicos</SelectLabel>
+                    {doctors.map((doctor) => (
+                      <SelectItem key={doctor.id} value={`doctor:${doctor.id}`}>
+                        {doctor.full_name || doctor.email}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                )}
+                {uniquePatients.length > 0 && (
+                  <SelectGroup>
+                    <SelectLabel>Pacientes</SelectLabel>
+                    {uniquePatients.map((patient) => (
+                      <SelectItem key={patient.id} value={`patient:${patient.id}`}>
+                        {patient.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-2">
             <Label>Tipo de Consulta</Label>
             <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as AppointmentType | 'all')}>
@@ -447,19 +554,17 @@ export default function MedicalCalendar() {
             <MonthlyCalendarView
               selectedDate={selectedDate}
               onDateSelect={handleDateSelect}
-              appointments={appointments}
+              appointments={filteredAppointments}
               meetings={meetings}
             />
             
-            {/* Daily Attendance Checklist - Below Calendar */}
-            <DailyAttendanceChecklist selectedDate={selectedDate} />
           </div>
 
           {/* Appointments List - Right Column */}
           <div className="lg:col-span-2 order-1 lg:order-2">
             <DailyAppointmentsList
               selectedDate={selectedDate}
-              appointments={appointments}
+              appointments={filteredAppointments}
               onEdit={handleEdit}
               onDelete={handleDelete}
               onMarkCompleted={handleMarkCompleted}
@@ -473,7 +578,7 @@ export default function MedicalCalendar() {
         /* Time Grid View */
         <TimeGridView
           selectedDate={selectedDate}
-          appointments={appointments}
+          appointments={filteredAppointments}
           meetings={meetings}
           onDateChange={setSelectedDate}
           onAppointmentClick={(appt) => {
@@ -508,6 +613,7 @@ export default function MedicalCalendar() {
         prefilledEnd={prefilledDates.end}
         appointment={selectedAppointment}
         conversionData={conversionData}
+        onAppointmentCreated={handleAppointmentCreated}
       />
 
       <MeetingForm
@@ -534,6 +640,7 @@ export default function MedicalCalendar() {
         onMarkCompleted={handleDetailsMarkCompleted}
         onMarkNoShow={handleDetailsMarkNoShow}
         onCancel={handleDetailsCancel}
+        onViewMedicalRecord={handleViewMedicalRecord}
       />
 
       <MeetingDetailsModal
@@ -544,6 +651,14 @@ export default function MedicalCalendar() {
         onDelete={handleMeetingDetailsDelete}
         onMarkCompleted={handleMeetingDetailsCompleted}
         onCancel={handleMeetingDetailsCancel}
+      />
+
+      <MedicalRecordModal
+        open={showMedicalRecordModal}
+        onOpenChange={setShowMedicalRecordModal}
+        contactId={recordContactId}
+        appointmentId={recordAppointmentId}
+        contactName={recordContactName}
       />
     </div>
   );

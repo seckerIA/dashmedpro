@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useUserProfile } from "./useUserProfile";
+import { supabaseQueryWithTimeout } from "@/utils/supabaseQuery";
 import type {
   FinancialMetrics,
   MonthlyData,
@@ -28,7 +29,7 @@ export const useFinancialMetrics = () => {
 
   const { data: metrics, isLoading, error } = useQuery({
     queryKey: ["financial-metrics", user?.id, profile?.role],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!user) throw new Error("Usuário não autenticado");
 
       // Admin e Dono veem dados de TODOS os usuários
@@ -44,7 +45,8 @@ export const useFinancialMetrics = () => {
         accountsQuery = accountsQuery.eq("user_id", user.id);
       }
 
-      const { data: accounts } = await accountsQuery;
+      const accountsResult = await supabaseQueryWithTimeout(accountsQuery as any, 30000, signal);
+      const { data: accounts } = accountsResult;
       const totalBalance = accounts?.reduce((sum, acc) => sum + (acc.current_balance || 0), 0) || 0;
 
       // 2. Buscar transações do mês atual (com custos)
@@ -59,7 +61,8 @@ export const useFinancialMetrics = () => {
         transactionsQuery = transactionsQuery.eq("user_id", user.id);
       }
 
-      const { data: currentMonthTransactions } = await transactionsQuery;
+      const transactionsResult = await supabaseQueryWithTimeout(transactionsQuery as any, 30000, signal);
+      const { data: currentMonthTransactions } = transactionsResult;
 
       const monthRevenue = currentMonthTransactions
         ?.filter(t => t.type === "entrada")
@@ -93,7 +96,8 @@ export const useFinancialMetrics = () => {
         countQuery = countQuery.eq("user_id", user.id);
       }
 
-      const { count: activeTransactions } = await countQuery;
+      const countResult = await supabaseQueryWithTimeout(countQuery as any, 30000, signal);
+      const { count: activeTransactions } = countResult;
 
       const metricsData: FinancialMetrics = {
         totalBalance,
@@ -116,7 +120,7 @@ export const useFinancialMetrics = () => {
   // Dados mensais dos últimos 5 meses
   const { data: monthlyData } = useQuery({
     queryKey: ["financial-monthly-data", user?.id, profile?.role],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!user) throw new Error("Usuário não autenticado");
 
       const isAdminOrDono = profile?.role === 'admin' || profile?.role === 'dono';
@@ -139,7 +143,8 @@ export const useFinancialMetrics = () => {
           query = query.eq("user_id", user.id);
         }
 
-        const { data } = await query;
+        const queryResult = await supabaseQueryWithTimeout(query as any, 30000, signal);
+        const { data } = queryResult;
 
         const receitas = data?.filter(t => t.type === "entrada").reduce((sum, t) => sum + t.amount, 0) || 0;
         const despesas = data?.filter(t => t.type === "saida").reduce((sum, t) => sum + t.amount, 0) || 0;
@@ -160,7 +165,7 @@ export const useFinancialMetrics = () => {
   // Despesas por categoria (mês atual)
   const { data: expensesByCategory } = useQuery({
     queryKey: ["financial-expenses-by-category", user?.id, profile?.role],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!user) throw new Error("Usuário não autenticado");
 
       const isAdminOrDono = profile?.role === 'admin' || profile?.role === 'dono';
@@ -183,7 +188,8 @@ export const useFinancialMetrics = () => {
         query = query.eq("user_id", user.id);
       }
 
-      const { data } = await query;
+      const queryResult = await supabaseQueryWithTimeout(query as any, 30000, signal);
+      const { data } = queryResult;
 
       // Agrupar por categoria
       const grouped = data?.reduce((acc, transaction) => {
@@ -203,15 +209,15 @@ export const useFinancialMetrics = () => {
         return acc;
       }, {} as Record<string, CategoryExpense>);
 
-      const result = Object.values(grouped || {});
-      const total = result.reduce((sum, cat) => sum + cat.value, 0);
+      const categoryResults = Object.values(grouped || {});
+      const total = categoryResults.reduce((sum, cat) => sum + cat.value, 0);
 
       // Calcular porcentagens
-      result.forEach(cat => {
+      categoryResults.forEach(cat => {
         cat.percentage = total > 0 ? (cat.value / total) * 100 : 0;
       });
 
-      return result.sort((a, b) => b.value - a.value);
+      return categoryResults.sort((a, b) => b.value - a.value);
     },
     enabled: !!user,
   });
@@ -219,7 +225,7 @@ export const useFinancialMetrics = () => {
   // Projeção de fluxo de caixa
   const { data: cashFlowProjection } = useQuery({
     queryKey: ["financial-cash-flow-projection", user?.id, profile?.role],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!user) throw new Error("Usuário não autenticado");
 
       const isAdminOrDono = profile?.role === 'admin' || profile?.role === 'dono';
@@ -236,7 +242,8 @@ export const useFinancialMetrics = () => {
         accountsQuery = accountsQuery.eq("user_id", user.id);
       }
 
-      const { data: accounts } = await accountsQuery;
+      const accountsResult = await supabaseQueryWithTimeout(accountsQuery as any, 30000, signal);
+      const { data: accounts } = accountsResult;
 
       let runningBalance = accounts?.reduce((sum, acc) => sum + (acc.current_balance || 0), 0) || 0;
 

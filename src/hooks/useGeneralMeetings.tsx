@@ -102,13 +102,27 @@ const deleteMeeting = async (id: string): Promise<void> => {
   if (error) throw new Error(`Erro ao excluir reunião: ${error.message}`);
 };
 
+// Helper para serializar filtros em uma query key estável
+const serializeFilters = (filters?: UseGeneralMeetingsFilters): string => {
+  if (!filters) return 'no-filters';
+  
+  const parts: string[] = [];
+  if (filters.startDate) parts.push(`start:${filters.startDate.toISOString()}`);
+  if (filters.endDate) parts.push(`end:${filters.endDate.toISOString()}`);
+  if (filters.meetingType && filters.meetingType !== 'all') parts.push(`type:${filters.meetingType}`);
+  if (filters.status && filters.status !== 'all') parts.push(`status:${filters.status}`);
+  if (filters.isBusy !== undefined && filters.isBusy !== 'all') parts.push(`busy:${filters.isBusy}`);
+  
+  return parts.length > 0 ? parts.join('|') : 'no-filters';
+};
+
 // Hook principal
 export function useGeneralMeetings(filters?: UseGeneralMeetingsFilters) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const queryKey = ['general-meetings', user?.id, filters];
+  const queryKey = ['general-meetings', user?.id, serializeFilters(filters)];
 
   // Query: List meetings
   const {

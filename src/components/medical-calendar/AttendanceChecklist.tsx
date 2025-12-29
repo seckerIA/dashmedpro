@@ -2,7 +2,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle, Clock, User, Phone } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useMedicalAppointments } from "@/hooks/useMedicalAppointments";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { format, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -11,6 +13,8 @@ import { AlertTriangle } from "lucide-react";
 
 export function AttendanceChecklist() {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { isMedico, isAdmin } = useUserProfile();
   const { appointments, markAsCompleted, markAsNoShow } = useMedicalAppointments({});
 
   // Filtrar apenas consultas de hoje com pagamento pendente
@@ -47,6 +51,14 @@ export function AttendanceChecklist() {
         title: "Comparecimento confirmado",
         description: "Pagamento registrado no financeiro automaticamente.",
       });
+      
+      // Se for médico ou admin, buscar o appointment completo e redirecionar
+      if ((isMedico || isAdmin) && appointments) {
+        const appointment = appointments.find(apt => apt.id === appointmentId);
+        if (appointment && appointment.contact_id) {
+          navigate(`/prontuarios?patientId=${appointment.contact_id}&tab=historico`);
+        }
+      }
     } catch (error) {
       toast({
         variant: "destructive",

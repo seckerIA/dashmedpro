@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
-import { ensureValidSession } from '@/utils/supabaseHelpers';
 import { ProspectingSessionInsert, SessionResult } from '@/types/prospecting';
 import { useToast } from './use-toast';
 
@@ -17,8 +16,8 @@ export function useProspectingSessions() {
     queryFn: async ({ signal }) => {
       if (!user?.id) return [];
 
-      // Verificar e garantir sessão válida
-      await ensureValidSession();
+      // REMOVIDO: ensureValidSession() - causa conflitos com queries em andamento
+      // O Supabase já faz refresh automático do token quando necessário
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -42,20 +41,22 @@ export function useProspectingSessions() {
       return data;
     },
     enabled: !!user?.id,
-    staleTime: 2 * 60 * 1000,
-    gcTime: 5 * 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutos - usar cache por mais tempo
+    gcTime: 10 * 60 * 1000, // 10 minutos em cache
     refetchOnMount: false,
     refetchOnWindowFocus: false,
+    refetchOnReconnect: false, // Não refetch ao reconectar - usar cache
+    retry: 1, // Reduzir retries
+    retryDelay: 2000,
     refetchInterval: (query) => {
       // Se a query está carregando, não fazer refetch para evitar acúmulo
       if (query.state.fetchStatus === 'fetching') {
         return false;
       }
-      return 60000; // 60s quando não está carregando
+      // Aumentar intervalo para reduzir carga no servidor
+      return 5 * 60 * 1000; // 5 minutos
     },
     refetchIntervalInBackground: false, // Não refetch quando aba não está em foco
-    retry: 2,
-    retryDelay: 1000,
   });
 
   // Registrar nova sessão

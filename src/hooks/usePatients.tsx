@@ -15,7 +15,7 @@ export function usePatients() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Buscar todos os pacientes
+  // Buscar todos os pacientes (apenas os que têm consultas marcadas)
   const {
     data: patients,
     isLoading,
@@ -26,37 +26,85 @@ export function usePatients() {
     queryFn: async ({ signal }) => {
       if (!user?.id) return [];
 
-      const query = supabase
-        .from('crm_contacts')
-        .select(`
-          id,
-          full_name,
-          email,
-          phone,
-          cpf,
-          gender,
-          birth_date,
-          blood_type,
-          insurance_type,
-          insurance_name,
-          allergies,
-          chronic_conditions,
-          current_medications,
-          emergency_contact,
-          created_at,
-          updated_at
-        `)
-        .order('full_name', { ascending: true })
-        .limit(500);
+      try {
+        // 1. Buscar todos os appointments (usando cast para contornar problema de tipos)
+        const appointmentsQuery = (supabase.from as any)('medical_appointments')
+          .select('contact_id, start_time')
+          .order('start_time', { ascending: false });
+        
+        const { data: appointmentsData, error: appointmentsError } = await appointmentsQuery;
 
-      const { data, error } = await supabaseQueryWithTimeout(query, 30000, signal);
+        if (appointmentsError) {
+          console.error('Erro ao buscar appointments:', appointmentsError);
+          throw new Error(`Erro ao buscar consultas: ${appointmentsError.message}`);
+        }
 
-      if (error) {
-        console.error('Erro ao buscar pacientes:', error);
-        throw new Error(`Erro ao buscar pacientes: ${error.message}`);
+        if (!appointmentsData || appointmentsData.length === 0) return [];
+
+        // 2. Extrair contact_ids únicos que têm consultas
+        const contactIdsSet = new Set<string>();
+        appointmentsData.forEach((apt: any) => {
+          if (apt.contact_id) {
+            contactIdsSet.add(apt.contact_id);
+          }
+        });
+
+        const contactIds = Array.from(contactIdsSet);
+        if (contactIds.length === 0) return [];
+
+        // 3. Buscar informações dos contatos que têm consultas
+        const query = supabase
+          .from('crm_contacts')
+          .select(`
+            id,
+            full_name,
+            email,
+            phone,
+            custom_fields,
+            created_at,
+            updated_at
+          `)
+          .in('id', contactIds)
+          .order('full_name', { ascending: true })
+          .limit(500);
+
+        const { data, error } = await query;
+
+        if (error) {
+          console.error('Erro ao buscar pacientes:', error);
+          throw new Error(`Erro ao buscar pacientes: ${error.message}`);
+        }
+
+        // 4. Mapear estatísticas de consultas
+        const appointmentsMap = new Map<string, { count: number; lastDate: string }>();
+        appointmentsData.forEach((apt: any) => {
+          const existing = appointmentsMap.get(apt.contact_id);
+          if (!existing || new Date(apt.start_time) > new Date(existing.lastDate)) {
+            appointmentsMap.set(apt.contact_id, {
+              count: (existing?.count || 0) + 1,
+              lastDate: apt.start_time,
+            });
+          } else {
+            appointmentsMap.set(apt.contact_id, {
+              count: existing.count + 1,
+              lastDate: existing.lastDate,
+            });
+          }
+        });
+
+        // 5. Adicionar estatísticas aos pacientes
+        return (data || []).map((patient: any) => {
+          const stats = appointmentsMap.get(patient.id);
+          return {
+            ...patient,
+            total_appointments: stats?.count || 0,
+            last_appointment: stats?.lastDate || null,
+          } as Patient;
+        });
+      } catch (error) {
+        console.error('Erro ao buscar pacientes com consultas:', error);
+        throw error;
       }
-
-      return (data || []) as Patient[];
     },
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
@@ -67,30 +115,19 @@ export function usePatients() {
   const getPatientById = async (patientId: string): Promise<Patient | null> => {
     if (!patientId) return null;
 
-    const query = supabase
+    const { data, error } = await supabase
       .from('crm_contacts')
       .select(`
         id,
         full_name,
         email,
         phone,
-        cpf,
-        gender,
-        birth_date,
-        blood_type,
-        insurance_type,
-        insurance_name,
-        allergies,
-        chronic_conditions,
-        current_medications,
-        emergency_contact,
+        custom_fields,
         created_at,
         updated_at
       `)
       .eq('id', patientId)
       .single();
-
-    const { data, error } = await supabaseQueryWithTimeout(query, 30000);
 
     if (error) {
       console.error('Erro ao buscar paciente:', error);
@@ -176,29 +213,29 @@ export function usePatients() {
       return [];
     }
 
-    // Buscar contagem de consultas por paciente
-    const { data: appointmentsCount } = await supabase
-      .from('medical_appointments')
+    // Buscar contagem de consultas por paciente (usando cast para contornar problema de tipos)
+    const appointmentsCountQuery = (supabase.from as any)('medical_appointments')
       .select('contact_id')
       .in('contact_id', patientsData?.map(p => p.id) || []);
+    const { data: appointmentsCount } = await appointmentsCountQuery;
 
     // Buscar última consulta por paciente
-    const { data: lastAppointments } = await supabase
-      .from('medical_appointments')
+    const lastAppointmentsQuery = (supabase.from as any)('medical_appointments')
       .select('contact_id, start_time')
       .in('contact_id', patientsData?.map(p => p.id) || [])
       .order('start_time', { ascending: false });
+    const { data: lastAppointments } = await lastAppointmentsQuery;
 
     // Mapear estatísticas
     const appointmentsByPatient = new Map<string, number>();
     const lastAppointmentByPatient = new Map<string, string>();
 
-    appointmentsCount?.forEach(apt => {
+    (appointmentsCount || []).forEach((apt: any) => {
       const count = appointmentsByPatient.get(apt.contact_id) || 0;
       appointmentsByPatient.set(apt.contact_id, count + 1);
     });
 
-    lastAppointments?.forEach(apt => {
+    (lastAppointments || []).forEach((apt: any) => {
       if (!lastAppointmentByPatient.has(apt.contact_id)) {
         lastAppointmentByPatient.set(apt.contact_id, apt.start_time);
       }
@@ -221,7 +258,6 @@ export function usePatients() {
     if (patients && patients.length > 0) {
       return patients.filter(patient =>
         patient.full_name?.toLowerCase().includes(term) ||
-        patient.cpf?.includes(term) ||
         patient.phone?.includes(term) ||
         patient.email?.toLowerCase().includes(term)
       );
@@ -231,7 +267,7 @@ export function usePatients() {
     const { data, error } = await supabase
       .from('crm_contacts')
       .select('*')
-      .or(`full_name.ilike.%${searchTerm}%,cpf.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`)
+      .or(`full_name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
       .order('full_name', { ascending: true })
       .limit(50);
 
@@ -281,23 +317,14 @@ export function usePatient(patientId: string | null) {
           full_name,
           email,
           phone,
-          cpf,
-          gender,
-          birth_date,
-          blood_type,
-          insurance_type,
-          insurance_name,
-          allergies,
-          chronic_conditions,
-          current_medications,
-          emergency_contact,
+          custom_fields,
           created_at,
           updated_at
         `)
         .eq('id', patientId)
         .single();
 
-      const { data, error } = await supabaseQueryWithTimeout(query, 30000, signal);
+      const { data, error } = await query;
 
       if (error) {
         if (error.code === 'PGRST116') {

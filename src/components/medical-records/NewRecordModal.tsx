@@ -57,6 +57,7 @@ const recordSchema = z.object({
   physical_exam_notes: z.string().optional(),
   diagnostic_hypothesis: z.string().optional(),
   treatment_plan: z.string().optional(),
+  complications: z.string().optional(),
   patient_instructions: z.string().optional(),
   follow_up_notes: z.string().optional(),
   next_appointment_date: z.string().optional(),
@@ -577,6 +578,21 @@ export function NewRecordModal({ open, onOpenChange, contactId, patientName }: N
                       id="treatment_plan"
                       placeholder="Descreva o tratamento proposto..."
                       {...form.register('treatment_plan')}
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="complications" className="flex items-center gap-2">
+                      Complicações
+                      <Badge variant="outline" className="text-xs font-normal">
+                        Importante para procedimentos
+                      </Badge>
+                    </Label>
+                    <Textarea
+                      id="complications"
+                      placeholder="Registre qualquer intercorrência, complicação ou evento adverso ocorrido durante o atendimento..."
+                      {...form.register('complications')}
                       rows={3}
                     />
                   </div>
