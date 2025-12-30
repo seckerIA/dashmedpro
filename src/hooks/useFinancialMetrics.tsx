@@ -47,7 +47,8 @@ export const useFinancialMetrics = () => {
 
       const accountsResult = await supabaseQueryWithTimeout(accountsQuery as any, 30000, signal);
       const { data: accounts } = accountsResult;
-      const totalBalance = accounts?.reduce((sum, acc) => sum + (acc.current_balance || 0), 0) || 0;
+      const accountsData = (accounts || []) as Array<{ current_balance: number }>;
+      const totalBalance = accountsData.reduce((sum, acc) => sum + (acc.current_balance || 0), 0);
 
       // 2. Buscar transações do mês atual (com custos)
       let transactionsQuery = supabase
@@ -63,19 +64,25 @@ export const useFinancialMetrics = () => {
 
       const transactionsResult = await supabaseQueryWithTimeout(transactionsQuery as any, 30000, signal);
       const { data: currentMonthTransactions } = transactionsResult;
+      const transactionsData = (currentMonthTransactions || []) as Array<{
+        type: string;
+        amount: number;
+        has_costs?: boolean;
+        total_costs?: number;
+      }>;
 
-      const monthRevenue = currentMonthTransactions
-        ?.filter(t => t.type === "entrada")
-        .reduce((sum, t) => sum + t.amount, 0) || 0;
+      const monthRevenue = transactionsData
+        .filter(t => t.type === "entrada")
+        .reduce((sum, t) => sum + t.amount, 0);
 
-      const monthExpenses = currentMonthTransactions
-        ?.filter(t => t.type === "saida")
-        .reduce((sum, t) => sum + t.amount, 0) || 0;
+      const monthExpenses = transactionsData
+        .filter(t => t.type === "saida")
+        .reduce((sum, t) => sum + t.amount, 0);
 
       // Calcular custos totais (apenas de entradas)
-      const monthTotalCosts = currentMonthTransactions
-        ?.filter(t => t.type === "entrada" && t.has_costs)
-        .reduce((sum, t) => sum + (t.total_costs || 0), 0) || 0;
+      const monthTotalCosts = transactionsData
+        .filter(t => t.type === "entrada" && t.has_costs)
+        .reduce((sum, t) => sum + (t.total_costs || 0), 0);
 
       // Lucro bruto (receitas - despesas)
       const monthProfit = monthRevenue - monthExpenses;
@@ -97,7 +104,7 @@ export const useFinancialMetrics = () => {
       }
 
       const countResult = await supabaseQueryWithTimeout(countQuery as any, 30000, signal);
-      const { count: activeTransactions } = countResult;
+      const activeTransactions = (countResult as any).count || 0;
 
       const metricsData: FinancialMetrics = {
         totalBalance,
@@ -105,7 +112,7 @@ export const useFinancialMetrics = () => {
         monthExpenses,
         monthProfit,
         profitMargin,
-        totalAccounts: accounts?.length || 0,
+        totalAccounts: accountsData?.length || 0,
         activeTransactions: activeTransactions || 0,
         monthTotalCosts,
         monthNetProfit,
@@ -114,7 +121,14 @@ export const useFinancialMetrics = () => {
 
       return metricsData;
     },
-    enabled: !!user,
+    enabled: !!user && !!profile,
+    staleTime: 5 * 60 * 1000, // 5 minutos
+    gcTime: 10 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: 1,
+    retryDelay: 2000,
   });
 
   // Dados mensais dos últimos 5 meses
@@ -145,9 +159,10 @@ export const useFinancialMetrics = () => {
 
         const queryResult = await supabaseQueryWithTimeout(query as any, 30000, signal);
         const { data } = queryResult;
+        const transactionsData = (data || []) as Array<{ type: string; amount: number }>;
 
-        const receitas = data?.filter(t => t.type === "entrada").reduce((sum, t) => sum + t.amount, 0) || 0;
-        const despesas = data?.filter(t => t.type === "saida").reduce((sum, t) => sum + t.amount, 0) || 0;
+        const receitas = transactionsData.filter(t => t.type === "entrada").reduce((sum, t) => sum + t.amount, 0);
+        const despesas = transactionsData.filter(t => t.type === "saida").reduce((sum, t) => sum + t.amount, 0);
 
         monthlyResults.push({
           month: format(monthDate, "MMM"),
@@ -159,7 +174,14 @@ export const useFinancialMetrics = () => {
 
       return monthlyResults;
     },
-    enabled: !!user,
+    enabled: !!user && !!profile,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: 1,
+    retryDelay: 2000,
   });
 
   // Despesas por categoria (mês atual)
@@ -190,9 +212,13 @@ export const useFinancialMetrics = () => {
 
       const queryResult = await supabaseQueryWithTimeout(query as any, 30000, signal);
       const { data } = queryResult;
+      const transactionsData = (data || []) as Array<{
+        amount: number;
+        category?: { name: string; color: string } | null;
+      }>;
 
       // Agrupar por categoria
-      const grouped = data?.reduce((acc, transaction) => {
+      const grouped = transactionsData.reduce((acc, transaction) => {
         const categoryName = transaction.category?.name || "Outros";
         const categoryColor = transaction.category?.color || "#6b7280";
         
@@ -209,7 +235,7 @@ export const useFinancialMetrics = () => {
         return acc;
       }, {} as Record<string, CategoryExpense>);
 
-      const categoryResults = Object.values(grouped || {});
+      const categoryResults = Object.values(grouped || {}) as CategoryExpense[];
       const total = categoryResults.reduce((sum, cat) => sum + cat.value, 0);
 
       // Calcular porcentagens
@@ -219,7 +245,14 @@ export const useFinancialMetrics = () => {
 
       return categoryResults.sort((a, b) => b.value - a.value);
     },
-    enabled: !!user,
+    enabled: !!user && !!profile,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: 1,
+    retryDelay: 2000,
   });
 
   // Projeção de fluxo de caixa
@@ -244,8 +277,9 @@ export const useFinancialMetrics = () => {
 
       const accountsResult = await supabaseQueryWithTimeout(accountsQuery as any, 30000, signal);
       const { data: accounts } = accountsResult;
+      const accountsData = (accounts || []) as Array<{ current_balance: number }>;
 
-      let runningBalance = accounts?.reduce((sum, acc) => sum + (acc.current_balance || 0), 0) || 0;
+      let runningBalance = accountsData.reduce((sum, acc) => sum + (acc.current_balance || 0), 0);
 
       // Últimos 5 meses (real)
       for (let i = 4; i >= 0; i--) {
@@ -258,7 +292,7 @@ export const useFinancialMetrics = () => {
       }
 
       // Calcular média de lucro dos últimos 3 meses para projeção
-      const avgProfit = monthlyData?.slice(-3).reduce((sum, m) => sum + m.lucro, 0) / 3 || 0;
+      const avgProfit = (monthlyData?.slice(-3) || []).reduce((sum, m) => sum + m.lucro, 0) / 3 || 0;
 
       // Próximos 2 meses (projetado)
       for (let i = 1; i <= 2; i++) {
@@ -274,7 +308,14 @@ export const useFinancialMetrics = () => {
 
       return projectionData;
     },
-    enabled: !!user && !!monthlyData,
+    enabled: !!user && !!profile && !!monthlyData,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: 1,
+    retryDelay: 2000,
   });
 
   return {

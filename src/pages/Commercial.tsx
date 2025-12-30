@@ -64,7 +64,7 @@ export default function Commercial() {
             <Target className="h-8 w-8 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-card-foreground">Comercial</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-card-foreground">CRM</h1>
             <p className="text-muted-foreground text-sm sm:text-lg">Gestão de vendas e relacionamento com clientes</p>
           </div>
         </div>

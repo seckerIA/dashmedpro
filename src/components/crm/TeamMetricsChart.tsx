@@ -4,6 +4,7 @@ import { TeamMetrics } from "@/hooks/useTeamMetrics";
 import { formatCurrencyShort, formatCurrency } from "@/lib/currency";
 import { EnhancedTooltip } from "@/components/charts/EnhancedTooltip";
 import { getChartColor } from "@/lib/chart-colors";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 interface TeamMetricsChartProps {
   teamMetrics: TeamMetrics[];
@@ -39,6 +40,8 @@ export function TeamMetricsChart({ teamMetrics, isLoading }: TeamMetricsChartPro
     );
   }
 
+  const { isSecretaria } = useUserProfile();
+
   // Preparar dados para gráficos
   const pipelineData = teamMetrics.map(tm => ({
     name: tm.userName.split(' ')[0], // Primeiro nome apenas
@@ -60,25 +63,27 @@ export function TeamMetricsChart({ teamMetrics, isLoading }: TeamMetricsChartPro
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Gráfico de Pipeline e Receita */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Pipeline vs Receita por Equipe</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={pipelineData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis tickFormatter={(value) => formatCurrencyShort(value)} />
-              <Tooltip content={<EnhancedTooltip valueFormatter={(value) => typeof value === 'number' ? formatCurrency(value) : String(value)} />} />
-              <Legend />
-              <Bar dataKey="pipeline" fill={getChartColor(0)} name="Pipeline" />
-              <Bar dataKey="revenue" fill={getChartColor(1)} name="Receita" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+      {/* Gráfico de Pipeline e Receita - oculto para secretária */}
+      {!isSecretaria && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Pipeline vs Receita por Equipe</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={pipelineData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis tickFormatter={(value) => formatCurrencyShort(value)} />
+                <Tooltip content={<EnhancedTooltip valueFormatter={(value) => typeof value === 'number' ? formatCurrency(value) : String(value)} />} />
+                <Legend />
+                <Bar dataKey="pipeline" fill={getChartColor(0)} name="Pipeline" />
+                <Bar dataKey="revenue" fill={getChartColor(1)} name="Receita" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Gráfico de Taxa de Conversão */}
       <Card>

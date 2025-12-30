@@ -8,6 +8,7 @@ import { ptBR } from "date-fns/locale";
 import { User, Calendar, DollarSign, Edit, Trash2, Phone, Copy } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { useToast } from "@/hooks/use-toast";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +33,7 @@ interface DealCardProps {
 
 export function DealCard({ deal, onClick, onEdit, onDelete, onScheduleCall, isDeleting, showOwnerBadge }: DealCardProps) {
   const { toast } = useToast();
+  const { isSecretaria } = useUserProfile();
 
   const handleCopyPhone = (phone: string) => {
     navigator.clipboard.writeText(phone);
@@ -175,8 +177,8 @@ export function DealCard({ deal, onClick, onEdit, onDelete, onScheduleCall, isDe
           </Button>
         )}
 
-        {/* Service Value - Destacado */}
-        {deal.contact?.service_value && (
+        {/* Service Value - Destacado - oculto para secretária */}
+        {!isSecretaria && deal.contact?.service_value && (
           <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-200/50 rounded-xl p-3 mb-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-green-600 uppercase tracking-wide">Valor do Serviço</span>
@@ -188,8 +190,8 @@ export function DealCard({ deal, onClick, onEdit, onDelete, onScheduleCall, isDe
           </div>
         )}
 
-        {/* Deal Value */}
-        {deal.value && (
+        {/* Deal Value - oculto para secretária */}
+        {!isSecretaria && deal.value && (
           <div className="flex items-center gap-1 text-sm font-semibold text-primary">
             <DollarSign className="w-4 h-4" />
             {formatCurrency(deal.value)}

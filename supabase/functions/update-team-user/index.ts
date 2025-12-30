@@ -10,8 +10,10 @@ const corsHeaders = {
 interface UpdateUserRequest {
   userId: string;
   full_name?: string;
-  role?: 'admin' | 'dono' | 'vendedor' | 'gestor_trafego';
+  role?: 'admin' | 'dono' | 'vendedor' | 'gestor_trafego' | 'secretaria' | 'medico';
   password?: string;
+  doctor_id?: string | null;
+  consultation_value?: number | null;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -43,9 +45,27 @@ const handler = async (req: Request): Promise<Response> => {
       return new Response(JSON.stringify({ error: 'Insufficient permissions' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const { userId, full_name, role, password }: UpdateUserRequest = await req.json();
+    const { userId, full_name, role, password, doctor_id, consultation_value }: UpdateUserRequest = await req.json();
     if (!userId) {
       return new Response(JSON.stringify({ error: 'User ID is required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Validate: secretaria must have doctor_id
+    if (role === 'secretaria' && doctor_id === undefined) {
+      // Se está mudando para secretaria mas não forneceu doctor_id, verificar se já tem
+      // Se não tiver, retornar erro
+      const { data: currentProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('role, doctor_id')
+        .eq('id', userId)
+        .single();
+      
+      if (currentProfile?.role !== 'secretaria' && !doctor_id) {
+        return new Response(
+          JSON.stringify({ error: 'Secretária deve ser vinculada a um médico (doctor_id obrigatório)' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Check if target user exists
@@ -66,6 +86,36 @@ const handler = async (req: Request): Promise<Response> => {
     // Try to update role in profiles table (if column exists)
     if (role !== undefined) {
       updateData.role = role;
+    }
+
+    // Update doctor_id if provided
+    if (doctor_id !== undefined) {
+      if (role === 'secretaria' && !doctor_id) {
+        return new Response(
+          JSON.stringify({ error: 'Secretária deve ser vinculada a um médico (doctor_id obrigatório)' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      // Se não for secretária, garantir que doctor_id seja NULL
+      updateData.doctor_id = (role === 'secretaria' && doctor_id) ? doctor_id : null;
+    } else if (role !== undefined && role !== 'secretaria') {
+      // Se mudou role para algo que não é secretaria, remover doctor_id
+      updateData.doctor_id = null;
+    }
+
+    // Update consultation_value if provided
+    if (consultation_value !== undefined) {
+      if ((role === 'medico' || role === 'dono') && (!consultation_value || consultation_value <= 0)) {
+        return new Response(
+          JSON.stringify({ error: 'Médico/dono deve ter um valor de consulta maior que zero' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      // Se não for médico/dono, garantir que consultation_value seja NULL
+      updateData.consultation_value = ((role === 'medico' || role === 'dono') && consultation_value) ? consultation_value : null;
+    } else if (role !== undefined && role !== 'medico' && role !== 'dono') {
+      // Se mudou role para algo que não é médico/dono, remover consultation_value
+      updateData.consultation_value = null;
     }
 
     if (Object.keys(updateData).length > 0) {
@@ -134,6 +184,50 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
+    // Criar ou atualizar procedimento "CONSULTA" se for médico/dono e tiver consultation_value
+    if ((role === 'medico' || role === 'dono') && consultation_value && consultation_value > 0) {
+      // Verificar se já existe procedimento CONSULTA para este médico
+      const { data: existingConsultation } = await supabaseAdmin
+        .from('commercial_procedures')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('name', 'CONSULTA')
+        .eq('category', 'consultation')
+        .single();
+
+      if (existingConsultation) {
+        // Atualizar procedimento existente
+        const { error: updateProcedureError } = await supabaseAdmin
+          .from('commercial_procedures')
+          .update({
+            price: consultation_value,
+            is_active: true
+          })
+          .eq('id', existingConsultation.id);
+
+        if (updateProcedureError) {
+          console.error('Error updating consultation procedure:', updateProcedureError);
+        }
+      } else {
+        // Criar novo procedimento CONSULTA
+        const { error: createProcedureError } = await supabaseAdmin
+          .from('commercial_procedures')
+          .insert({
+            user_id: userId,
+            name: 'CONSULTA',
+            category: 'consultation',
+            price: consultation_value,
+            duration_minutes: 30,
+            description: 'Consulta médica padrão',
+            is_active: true
+          });
+
+        if (createProcedureError) {
+          console.error('Error creating consultation procedure:', createProcedureError);
+        }
+      }
+    }
+
     return new Response(JSON.stringify({ success: true, message: 'User updated successfully' }), { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } });
   } catch (error: any) {
     console.error("Error in update-team-user function:", error);
@@ -142,6 +236,7 @@ const handler = async (req: Request): Promise<Response> => {
 };
 
 serve(handler);
+
 
 
 

@@ -232,13 +232,60 @@ const deleteContact = async (contactId: string): Promise<void> => {
 };
 
 // Delete deal
-const deleteDeal = async (dealId: string): Promise<void> => {
-  const { error } = await supabase
+const deleteDeal = async (dealId: string, userId?: string): Promise<void> => {
+  // Primeiro, verificar se o deal existe e se o usuário tem permissão
+  if (userId) {
+    const { data: deal, error: fetchError } = await supabase
+      .from('crm_deals')
+      .select('id, user_id, assigned_to')
+      .eq('id', dealId)
+      .single();
+
+    if (fetchError) {
+      console.error('Erro ao buscar deal para deleção:', fetchError);
+      throw new Error(`Erro ao verificar permissão: ${fetchError.message}`);
+    }
+
+    if (!deal) {
+      throw new Error('Deal não encontrado');
+    }
+
+    // Verificar se o usuário tem permissão (é o dono ou admin/dono)
+    const isOwner = deal.user_id === userId;
+    const isAssigned = deal.assigned_to === userId;
+    
+    if (!isOwner && !isAssigned) {
+      // Verificar se é admin/dono
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single();
+      
+      const isAdminOrDono = profile?.role === 'admin' || profile?.role === 'dono';
+      
+      if (!isAdminOrDono) {
+        throw new Error('Você não tem permissão para excluir este deal. Apenas o criador ou um administrador pode excluí-lo.');
+      }
+    }
+  }
+
+  // Tentar deletar
+  const { error, data } = await supabase
     .from('crm_deals')
     .delete()
-    .eq('id', dealId);
+    .eq('id', dealId)
+    .select();
 
-  if (error) throw new Error(`Erro ao excluir deal: ${error.message}`);
+  if (error) {
+    console.error('Erro ao deletar deal:', error);
+    throw new Error(`Erro ao excluir deal: ${error.message}`);
+  }
+
+  // Verificar se realmente foi deletado
+  if (!data || data.length === 0) {
+    throw new Error('O deal não foi excluído. Verifique se você tem permissão para excluí-lo.');
+  }
 };
 
 // Hook principal
@@ -435,7 +482,7 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
   });
 
   const deleteDealMutation = useMutation({
-    mutationFn: deleteDeal,
+    mutationFn: (dealId: string) => deleteDeal(dealId, user?.id),
     onSuccess: (_, dealId) => {
       // Atualizar cache otimisticamente removendo o deal
       if (user?.id) {
@@ -448,6 +495,9 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['crm-deals', user?.id] }).catch(() => {});
       }, 100);
+    },
+    onError: (error: Error) => {
+      console.error('Erro na mutation de deletar deal:', error);
     },
   });
 

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { useUserProfile } from './useUserProfile';
 import { useToast } from '@/hooks/use-toast';
 import { useMemo, useEffect } from 'react';
 import { addDays, isAfter, isBefore } from 'date-fns';
@@ -29,7 +30,8 @@ interface UseMedicalAppointmentsFilters {
 const fetchAppointments = async (
   userId: string,
   filters?: UseMedicalAppointmentsFilters,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  doctorIdFilter?: string | null
 ): Promise<MedicalAppointmentWithRelations[]> => {
   // Verificar e garantir sessão válida
   const { ensureValidSession } = await import('@/utils/supabaseHelpers');
@@ -44,9 +46,12 @@ const fetchAppointments = async (
       doctor:profiles!medical_appointments_doctor_id_profiles_fk(id, full_name, email)
     `);
 
-  // Se é secretária, não filtra por user_id - a RLS já garante acesso a todos
-  // Caso contrário, filtra por user_id OU doctor_id
-  if (!filters?.isSecretaria && userId) {
+  // Se secretária estiver vinculada a um médico, filtrar por doctor_id
+  if (doctorIdFilter) {
+    query = query.eq('doctor_id', doctorIdFilter);
+  } else if (!filters?.isSecretaria && userId) {
+    // Se é secretária sem vinculação, não filtra por user_id - a RLS já garante acesso a todos
+    // Caso contrário, filtra por user_id OU doctor_id
     query = query.or(`user_id.eq.${userId},doctor_id.eq.${userId}`);
   }
 
@@ -188,10 +193,16 @@ const serializeFilters = (filters?: UseMedicalAppointmentsFilters): string => {
 // Hook principal
 export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) {
   const { user, loading: authLoading } = useAuth();
+  const { profile } = useUserProfile();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const queryKey = ['medical-appointments', user?.id, serializeFilters(filters)];
+  // Se secretária estiver vinculada, usar doctor_id para filtrar
+  const doctorIdFilter = profile?.role === 'secretaria' && profile?.doctor_id 
+    ? profile.doctor_id 
+    : null;
+
+  const queryKey = ['medical-appointments', user?.id, doctorIdFilter, serializeFilters(filters)];
 
   // Invalidar cache quando o usuário mudar para evitar dados de outros usuários
   useEffect(() => {
@@ -212,7 +223,7 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
     refetch,
   } = useQuery({
     queryKey,
-    queryFn: ({ signal }) => fetchAppointments(user?.id || '', filters, signal),
+    queryFn: ({ signal }) => fetchAppointments(user?.id || '', filters, signal, doctorIdFilter),
     enabled: !!user?.id && !authLoading,
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,

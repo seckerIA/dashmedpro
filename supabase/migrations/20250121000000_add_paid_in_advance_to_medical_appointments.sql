@@ -9,3 +9,4 @@ COMMENT ON COLUMN public.medical_appointments.paid_in_advance IS 'Indica se o pa
 
 
 
+

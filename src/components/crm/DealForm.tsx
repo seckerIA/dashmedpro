@@ -44,11 +44,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { X, Plus, HandCoins, Phone, Mail, Copy, MoreVertical, Settings, Trash2, Archive, User, Edit3, Save } from "lucide-react";
+import { X, Plus, HandCoins, Phone, Mail, Copy, MoreVertical, Settings, Trash2, Archive, User, Edit3, Save, Stethoscope, AlertTriangle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useCRM } from "@/hooks/useCRM";
 import { useToast } from "@/hooks/use-toast";
 import { CRMDeal, CRMContact, PIPELINE_STAGES } from "@/types/crm";
 import { formatCurrency, formatCurrencyInput } from "@/lib/currency";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 const dealSchema = z.object({
   title: z.string().min(2, "Título deve ter pelo menos 2 caracteres"),
@@ -60,7 +62,10 @@ const dealSchema = z.object({
   }),
   stage: z.enum([
     "lead_novo",
-    "qualificado", 
+    "agendado",
+    "em_tratamento",
+    "inadimplente",
+    "qualificado",
     "apresentacao",
     "proposta",
     "negociacao",
@@ -70,6 +75,8 @@ const dealSchema = z.object({
   expected_close_date: z.string().optional(),
   contact_id: z.string().optional(),
   tags: z.array(z.string()).default([]),
+  is_in_treatment: z.boolean().optional(),
+  is_defaulting: z.boolean().optional(),
 });
 
 type DealFormData = z.infer<typeof dealSchema>;
@@ -83,6 +90,7 @@ interface DealFormProps {
 }
 
 export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFormProps) {
+  const { isSecretaria } = useUserProfile();
   const [open, setOpen] = useState(!!deal);
   const [tagInput, setTagInput] = useState("");
   const [showSidebar, setShowSidebar] = useState(false);
@@ -112,11 +120,13 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
       description: deal?.description || "",
       value: deal?.value ? formatCurrency(deal.value) : ("" as any),
       stage: deal?.stage || "lead_novo",
-      expected_close_date: deal?.expected_close_date 
+      expected_close_date: deal?.expected_close_date
         ? new Date(deal.expected_close_date).toISOString().split('T')[0]
         : "",
       contact_id: deal?.contact_id || contact?.id || "none",
       tags: deal?.tags || [],
+      is_in_treatment: (deal as any)?.is_in_treatment || false,
+      is_defaulting: (deal as any)?.is_defaulting || false,
     },
   });
 
@@ -265,6 +275,8 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
         contact_id: data.contact_id === "none" ? null : data.contact_id || null,
         probability: 0,
         updated_at: new Date().toISOString(),
+        is_in_treatment: data.is_in_treatment || false,
+        is_defaulting: data.is_defaulting || false,
       };
 
       if (deal) {
@@ -418,25 +430,28 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="value"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Valor</FormLabel>
-                  <FormControl>
-                    <Input 
-                      placeholder="R$ 0,00"
-                      value={field.value || ""}
-                      onChange={(e) => {
-                        handleValueChange(e.target.value);
-                      }}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Campo de valor - oculto para secretária */}
+            {!isSecretaria && (
+              <FormField
+                control={form.control}
+                name="value"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Valor</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="R$ 0,00"
+                        value={field.value || ""}
+                        onChange={(e) => {
+                          handleValueChange(e.target.value);
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -474,15 +489,62 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
                   <FormItem>
                     <FormLabel>Data Esperada de Fechamento</FormLabel>
                     <FormControl>
-                      <Input 
+                      <Input
                         type="date"
-                        {...field} 
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+            </div>
+
+            {/* Status do Paciente */}
+            <div className="space-y-3 border rounded-lg p-4 bg-muted/30">
+              <h4 className="text-sm font-semibold text-foreground">Status do Paciente</h4>
+              <div className="flex flex-wrap gap-4">
+                <FormField
+                  control={form.control}
+                  name="is_in_treatment"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-2 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="flex items-center gap-1.5">
+                        <Stethoscope className="w-4 h-4 text-green-600" />
+                        <FormLabel className="text-sm cursor-pointer font-normal">
+                          Em Tratamento
+                        </FormLabel>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="is_defaulting"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-2 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="flex items-center gap-1.5">
+                        <AlertTriangle className="w-4 h-4 text-red-600" />
+                        <FormLabel className="text-sm cursor-pointer font-normal">
+                          Inadimplente
+                        </FormLabel>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
 
             <FormField
@@ -576,15 +638,18 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
                         />
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Valor do Serviço (R$)</label>
-                      <Input
-                        value={contactFormData.service_value}
-                        onChange={(e) => setContactFormData(prev => ({ ...prev, service_value: e.target.value }))}
-                        placeholder="0,00"
-                        className="text-sm border-emerald-200 dark:border-emerald-700 focus:border-emerald-500"
-                      />
-                    </div>
+                    {/* Valor do Serviço - oculto para secretária */}
+                    {!isSecretaria && (
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Valor do Serviço (R$)</label>
+                        <Input
+                          value={contactFormData.service_value}
+                          onChange={(e) => setContactFormData(prev => ({ ...prev, service_value: e.target.value }))}
+                          placeholder="0,00"
+                          className="text-sm border-emerald-200 dark:border-emerald-700 focus:border-emerald-500"
+                        />
+                      </div>
+                    )}
                     <Button
                       type="button"
                       onClick={handleSaveContact}
@@ -632,7 +697,8 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
                       </div>
                     )}
 
-                    {selectedContact.service_value && (
+                    {/* Valor do Serviço - oculto para secretária */}
+                    {!isSecretaria && selectedContact.service_value && (
                       <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg p-3 border-2 border-emerald-200 dark:border-emerald-700 shadow-sm">
                         <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
                           💰 Valor: {formatCurrency(selectedContact.service_value)}
@@ -785,15 +851,18 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
                         className="text-sm"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-foreground">Valor do Serviço (R$)</label>
-                      <Input
-                        value={contactFormData.service_value}
-                        onChange={(e) => setContactFormData(prev => ({ ...prev, service_value: e.target.value }))}
-                        placeholder="0,00"
-                        className="text-sm"
-                      />
-                    </div>
+                    {/* Valor do Serviço - oculto para secretária */}
+                    {!isSecretaria && (
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-foreground">Valor do Serviço (R$)</label>
+                        <Input
+                          value={contactFormData.service_value}
+                          onChange={(e) => setContactFormData(prev => ({ ...prev, service_value: e.target.value }))}
+                          placeholder="0,00"
+                          className="text-sm"
+                        />
+                      </div>
+                    )}
                     <Button
                       onClick={handleSaveContact}
                       size="sm"
@@ -827,7 +896,8 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
                         <span className="text-sm">{selectedContact.company}</span>
                       </div>
                     )}
-                    {selectedContact.service_value && (
+                    {/* Valor do Serviço - oculto para secretária */}
+                    {!isSecretaria && selectedContact.service_value && (
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-muted-foreground">Valor do Serviço:</span>
                         <span className="text-sm font-semibold text-green-600">

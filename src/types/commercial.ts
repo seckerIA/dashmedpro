@@ -63,6 +63,7 @@ export interface CommercialProcedure {
   price: number;
   duration_minutes: number;
   is_active: boolean;
+  sinal_percentage?: number | null; // Porcentagem do sinal (entrada)
   created_at: string;
   updated_at: string;
   // Dados do médico (join com profiles)
@@ -80,6 +81,7 @@ export interface CommercialProcedureInsert {
   price: number;
   duration_minutes?: number;
   is_active?: boolean;
+  sinal_percentage?: number | null;
 }
 
 export interface CommercialProcedureUpdate {
@@ -89,6 +91,7 @@ export interface CommercialProcedureUpdate {
   price?: number;
   duration_minutes?: number;
   is_active?: boolean;
+  sinal_percentage?: number | null;
 }
 
 export interface CommercialSale {

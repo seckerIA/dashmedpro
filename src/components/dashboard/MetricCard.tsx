@@ -14,6 +14,7 @@ interface MetricCardProps {
   };
   illustration?: string;
   className?: string;
+  onClick?: () => void;
 }
 
 // Simplified to 2 alternating neutral color schemes
@@ -48,18 +49,28 @@ export function MetricCard({
   trend,
   illustration,
   className,
+  onClick,
 }: MetricCardProps) {
   const isPositive = trend && trend.value >= 0;
   const colors = getVariantColors(variant);
 
+  const Component = onClick ? motion.button : motion.div;
+  const componentProps = onClick ? {
+    onClick,
+    whileHover: { scale: 1.02 },
+    whileTap: { scale: 0.98 },
+  } : {};
+
   return (
-    <motion.div
+    <Component
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
+      {...componentProps}
       className={cn(
         'relative overflow-hidden rounded-2xl border bg-gradient-to-br text-card-foreground shadow-lg p-3 sm:p-4 lg:p-5 backdrop-blur-sm',
         'hover:shadow-xl transition-all duration-300',
+        onClick && 'cursor-pointer',
         colors.gradient,
         className
       )}
@@ -115,7 +126,7 @@ export function MetricCard({
         'absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r',
         colors.borderAccent
       )} />
-    </motion.div>
+    </Component>
   );
 }
 

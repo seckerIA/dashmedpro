@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
 import { useAuth } from './useAuth';
+import { useUserProfile } from './useUserProfile';
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, format, subDays } from 'date-fns';
 
 export interface SecretaryMetrics {
@@ -59,11 +60,17 @@ const emptyMetrics: SecretaryMetrics = {
 
 export function useSecretaryMetrics() {
   const { user } = useAuth();
+  const { profile } = useUserProfile();
 
   return useQuery({
-    queryKey: ['secretary-metrics', user?.id],
+    queryKey: ['secretary-metrics', user?.id, profile?.doctor_id],
     queryFn: async ({ signal }): Promise<SecretaryMetrics> => {
       if (!user?.id) return emptyMetrics;
+
+      // Se secretária estiver vinculada a um médico, usar doctor_id para filtrar
+      const doctorIdFilter = profile?.role === 'secretaria' && profile?.doctor_id 
+        ? profile.doctor_id 
+        : null;
 
       const now = new Date();
       const todayStart = startOfDay(now).toISOString();
@@ -73,8 +80,8 @@ export function useSecretaryMetrics() {
       const monthStart = startOfMonth(now).toISOString();
       const monthEnd = endOfMonth(now).toISOString();
 
-      // Buscar todas as consultas (secretária pode ver todas)
-      const appointmentsQuery = supabase
+      // Buscar consultas - filtrar por doctor_id se secretária estiver vinculada
+      let appointmentsQuery = supabase
         .from('medical_appointments')
         .select(`
           id,
@@ -87,33 +94,51 @@ export function useSecretaryMetrics() {
           contact:crm_contacts(id, full_name, phone, email)
         `)
         .gte('start_time', todayStart)
+        .lte('start_time', monthEnd) // Limitar até o fim do mês
+        .limit(500) // Limitar resultados para evitar queries pesadas
         .order('start_time', { ascending: true });
 
-      // Buscar médicos
-      const doctorsQuery = supabase
+      // Se secretária estiver vinculada, mostrar apenas consultas do médico vinculado
+      if (doctorIdFilter) {
+        appointmentsQuery = appointmentsQuery.eq('doctor_id', doctorIdFilter);
+      }
+
+      // Buscar médicos - se vinculada, mostrar apenas o médico vinculado
+      let doctorsQuery = supabase
         .from('profiles')
         .select('id, full_name, email, role')
         .in('role', ['dono', 'medico'])
         .eq('is_active', true);
 
-      // Buscar contatos criados hoje
-      const contactsTodayQuery = supabase
+      if (doctorIdFilter) {
+        doctorsQuery = doctorsQuery.eq('id', doctorIdFilter);
+      }
+
+      // Buscar contatos - filtrar por user_id do médico vinculado se houver
+      // Nota: contatos não têm doctor_id direto, então filtramos pelos contatos
+      // que estão vinculados a deals/consultas do médico
+      let contactsTodayQuery = supabase
         .from('crm_contacts')
         .select('id', { count: 'exact' })
         .gte('created_at', todayStart)
         .lte('created_at', todayEnd);
 
-      // Buscar contatos criados na semana
-      const contactsWeekQuery = supabase
+      let contactsWeekQuery = supabase
         .from('crm_contacts')
         .select('id', { count: 'exact' })
         .gte('created_at', weekStart)
         .lte('created_at', weekEnd);
 
-      // Buscar total de contatos
-      const totalContactsQuery = supabase
+      let totalContactsQuery = supabase
         .from('crm_contacts')
         .select('id', { count: 'exact' });
+
+      // Se secretária estiver vinculada, filtrar contatos por user_id do médico
+      if (doctorIdFilter) {
+        contactsTodayQuery = contactsTodayQuery.eq('user_id', doctorIdFilter);
+        contactsWeekQuery = contactsWeekQuery.eq('user_id', doctorIdFilter);
+        totalContactsQuery = totalContactsQuery.eq('user_id', doctorIdFilter);
+      }
 
       // Consultas agendadas por mim (user_id = secretária)
       const myAppointmentsQuery = supabase
@@ -219,12 +244,13 @@ export function useSecretaryMetrics() {
         })),
       };
     },
-    enabled: !!user?.id,
-    staleTime: 60 * 1000, // 1 minuto - atualiza mais frequentemente
-    gcTime: 5 * 60 * 1000,
-    refetchOnMount: true, // Secretária precisa de dados atualizados
-    refetchOnWindowFocus: true, // Atualizar ao voltar para a aba
-    retry: 2,
-    retryDelay: 1000,
+    enabled: !!user?.id && !!profile && profile?.role === 'secretaria',
+    staleTime: 5 * 60 * 1000, // 5 minutos - reduzir frequência de atualização
+    gcTime: 10 * 60 * 1000,
+    refetchOnMount: false, // Não refetch automático ao montar
+    refetchOnWindowFocus: false, // Não refetch ao voltar para a aba
+    refetchOnReconnect: false,
+    retry: 1, // Reduzir retries
+    retryDelay: 2000,
   });
 }

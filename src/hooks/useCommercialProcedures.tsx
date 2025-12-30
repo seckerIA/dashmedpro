@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "./useAuth";
+import { useUserProfile } from "./useUserProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { supabaseQueryWithTimeout } from "@/utils/supabaseQuery";
@@ -13,11 +14,12 @@ interface UseCommercialProceduresOptions {
 export function useCommercialProcedures(options: UseCommercialProceduresOptions = {}) {
   const { isSecretaria = false } = options;
   const { user } = useAuth();
+  const { profile } = useUserProfile();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: procedures, isLoading, error } = useQuery({
-    queryKey: ["commercial-procedures", user?.id, isSecretaria],
+    queryKey: ["commercial-procedures", user?.id, isSecretaria, profile?.doctor_id],
     queryFn: async ({ signal }) => {
       if (!user) throw new Error("User not authenticated");
 
@@ -27,15 +29,19 @@ export function useCommercialProcedures(options: UseCommercialProceduresOptions 
       // Query com join para pegar dados do médico
       let queryPromise;
 
-      if (isSecretaria) {
-        // Secretária vê TODOS os procedimentos de todos os médicos
+      if (isSecretaria && profile?.doctor_id) {
+        // Secretária vê apenas procedimentos do médico vinculado
         queryPromise = supabase
           .from("commercial_procedures")
           .select(`
             *,
             doctor:profiles!commercial_procedures_user_id_profiles_fk (full_name, email)
           `)
+          .eq("user_id", profile.doctor_id)
           .order("name", { ascending: true });
+      } else if (isSecretaria && !profile?.doctor_id) {
+        // Secretária sem médico vinculado - não mostra procedimentos
+        return [];
       } else {
         // Outros usuários veem apenas seus próprios procedimentos
         queryPromise = supabase
@@ -51,8 +57,17 @@ export function useCommercialProcedures(options: UseCommercialProceduresOptions 
       const { data, error } = await supabaseQueryWithTimeout(queryPromise, 30000, signal);
 
       if (error) throw error;
-      return data as CommercialProcedure[];
+      
+      // Ordenar para que CONSULTA apareça primeiro
+      const sortedProcedures = (data as CommercialProcedure[] || []).sort((a, b) => {
+        if (a.name === 'CONSULTA') return -1;
+        if (b.name === 'CONSULTA') return 1;
+        return a.name.localeCompare(b.name);
+      });
+      
+      return sortedProcedures;
     },
+    enabled: !!user && !!profile,
     enabled: !!user,
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,

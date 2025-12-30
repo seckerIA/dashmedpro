@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { CRMDealWithContact } from "@/types/crm";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { User, Calendar, Edit, Trash2, TrendingUp, Clock, Mail, Phone, Building2 } from "lucide-react";
+import { User, Calendar, Edit, Trash2, TrendingUp, Clock, Mail, Phone, Building2, Stethoscope, AlertTriangle } from "lucide-react";
 import { FollowUpAction } from "./FollowUpAction";
 import {
   AlertDialog,
@@ -20,6 +20,7 @@ import {
 import { useState } from "react";
 import { getServiceConfig } from "@/constants/services";
 import { formatCurrency } from "@/lib/currency";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 interface AnimatedDealCardProps {
   deal: CRMDealWithContact;
@@ -44,6 +45,7 @@ export function AnimatedDealCard({
   onToggleFollowUp,
   showOwnerBadge
 }: AnimatedDealCardProps) {
+  const { isSecretaria } = useUserProfile();
   const [isHovered, setIsHovered] = useState(false);
   
   const getStageColor = (stage: string) => {
@@ -189,8 +191,22 @@ export function AnimatedDealCard({
           </div>
         </div>
 
-        {/* Badges Row: Follow-up and Owner */}
+        {/* Badges Row: Status, Follow-up and Owner */}
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Badge de Em Tratamento */}
+          {deal.is_in_treatment && (
+            <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-green-500/10 text-green-600 border-green-500/20">
+              <Stethoscope className="w-3 h-3 mr-1" />
+              Em Tratamento
+            </Badge>
+          )}
+          {/* Badge de Inadimplente */}
+          {deal.is_defaulting && (
+            <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-red-500/10 text-red-600 border-red-500/20">
+              <AlertTriangle className="w-3 h-3 mr-1" />
+              Inadimplente
+            </Badge>
+          )}
           {deal.needs_follow_up && (
             <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-orange-500/10 text-orange-600 border-orange-500/20">
               <Clock className="w-3 h-3 mr-1" />
@@ -198,8 +214,8 @@ export function AnimatedDealCard({
             </Badge>
           )}
           {showOwnerBadge && deal.owner_profile && (
-            <Badge 
-              variant="outline" 
+            <Badge
+              variant="outline"
               className="text-xs px-2 py-0.5 bg-primary/5 border-primary/20 text-primary"
               title={`Responsável: ${ownerName}`}
             >
@@ -257,9 +273,9 @@ export function AnimatedDealCard({
           </div>
         )}
 
-        {/* Service Value - Highlighted */}
-        {displayedServiceValue !== null && (
-          <div 
+        {/* Service Value - Highlighted - oculto para secretária */}
+        {!isSecretaria && displayedServiceValue !== null && (
+          <div
             className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-200/50 rounded-lg p-2.5"
             style={{ width: '100%', boxSizing: 'border-box', overflow: 'hidden' }}
           >
@@ -274,8 +290,8 @@ export function AnimatedDealCard({
           </div>
         )}
 
-        {/* Deal Value (if different from service value) */}
-        {hasDifferentValue && (
+        {/* Deal Value (if different from service value) - oculto para secretária */}
+        {!isSecretaria && hasDifferentValue && (
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <span className="text-xs">Valor do Negócio:</span>
             <span className="font-semibold text-foreground tabular-nums">

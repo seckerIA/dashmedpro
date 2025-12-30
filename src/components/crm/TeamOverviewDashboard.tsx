@@ -2,6 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { MetricCard } from "@/components/commercial/MetricCard";
 import { ConsolidatedTeamMetrics } from "@/hooks/useTeamMetrics";
 import { formatCurrency } from "@/lib/currency";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 interface TeamOverviewDashboardProps {
   metrics: ConsolidatedTeamMetrics;
@@ -9,24 +10,32 @@ interface TeamOverviewDashboardProps {
 }
 
 export function TeamOverviewDashboard({ metrics, isLoading }: TeamOverviewDashboardProps) {
+  const { isSecretaria } = useUserProfile();
+
   return (
     <div className="space-y-6">
       {/* Métricas Consolidadas */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          title="Pipeline Total"
-          value={metrics.totalPipeline}
-          icon="dollar-sign"
-          format="currency"
-          isLoading={isLoading}
-        />
-        <MetricCard
-          title="Receita Total"
-          value={metrics.totalRevenue}
-          icon="trending-up"
-          format="currency"
-          isLoading={isLoading}
-        />
+        {/* Pipeline Total - oculto para secretária */}
+        {!isSecretaria && (
+          <MetricCard
+            title="Pipeline Total"
+            value={metrics.totalPipeline}
+            icon="dollar-sign"
+            format="currency"
+            isLoading={isLoading}
+          />
+        )}
+        {/* Receita Total - oculto para secretária */}
+        {!isSecretaria && (
+          <MetricCard
+            title="Receita Total"
+            value={metrics.totalRevenue}
+            icon="trending-up"
+            format="currency"
+            isLoading={isLoading}
+          />
+        )}
         <MetricCard
           title="Taxa de Conversão Média"
           value={metrics.averageConversionRate}
@@ -84,14 +93,20 @@ export function TeamOverviewDashboard({ metrics, isLoading }: TeamOverviewDashbo
                       <div className="space-y-2">
                         <h4 className="font-semibold text-lg">{teamMetric.userName}</h4>
                         <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div>
-                            <p className="text-muted-foreground">Pipeline</p>
-                            <p className="font-semibold">{formatCurrency(teamMetric.totalPipeline)}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Receita</p>
-                            <p className="font-semibold">{formatCurrency(teamMetric.totalRevenue)}</p>
-                          </div>
+                          {/* Pipeline - oculto para secretária */}
+                          {!isSecretaria && (
+                            <div>
+                              <p className="text-muted-foreground">Pipeline</p>
+                              <p className="font-semibold">{formatCurrency(teamMetric.totalPipeline)}</p>
+                            </div>
+                          )}
+                          {/* Receita - oculto para secretária */}
+                          {!isSecretaria && (
+                            <div>
+                              <p className="text-muted-foreground">Receita</p>
+                              <p className="font-semibold">{formatCurrency(teamMetric.totalRevenue)}</p>
+                            </div>
+                          )}
                           <div>
                             <p className="text-muted-foreground">Conversão</p>
                             <p className="font-semibold">{teamMetric.conversionRate.toFixed(2)}%</p>

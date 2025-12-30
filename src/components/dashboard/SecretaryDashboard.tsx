@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { MetricCard, QuickActionCard } from "@/components/dashboard/MetricCard";
 import { AnimatedWrapper } from "@/components/shared/AnimatedWrapper";
 import { useSecretaryMetrics } from "@/hooks/useSecretaryMetrics";
+import { useSecretarySinalMetrics } from "@/hooks/useSecretarySinalMetrics";
 import {
   Calendar,
   Users,
@@ -16,15 +17,19 @@ import {
   CalendarClock,
   Stethoscope,
   MessageSquare,
-  TrendingUp
+  TrendingUp,
+  DollarSign,
+  Receipt
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format, isToday, isTomorrow, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { formatCurrency } from "@/lib/currency";
 
 const SecretaryDashboard = () => {
   const navigate = useNavigate();
   const { data: metrics, isLoading, error } = useSecretaryMetrics();
+  const { data: sinalMetrics, isLoading: isLoadingSinal } = useSecretarySinalMetrics();
 
   if (isLoading) {
     return (
@@ -113,6 +118,7 @@ const SecretaryDashboard = () => {
               value: 0,
               label: "pacientes para contatar"
             }}
+            onClick={() => navigate('/calendar?status=scheduled')}
           />
 
           <MetricCard
@@ -138,6 +144,70 @@ const SecretaryDashboard = () => {
           />
         </div>
       </AnimatedWrapper>
+
+      {/* Card de Sinais - Mini Financeiro */}
+      {!isLoadingSinal && sinalMetrics && (
+        <AnimatedWrapper animationType="slideUp" delay={0.15}>
+          <Card className="bg-card border-border">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Receipt className="h-5 w-5 text-primary" />
+                    Sinais de Consultas
+                  </CardTitle>
+                  <CardDescription>Gestão de sinais pagos e pendentes</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => navigate('/secretaria/financeiro')}>
+                  Ver Detalhes
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="h-4 w-4 text-orange-600" />
+                    <p className="text-sm font-medium text-orange-600">Pendentes</p>
+                  </div>
+                  <p className="text-2xl font-bold text-orange-600">
+                    {formatCurrency(sinalMetrics.totalPending)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {sinalMetrics.pendingCount} consulta{sinalMetrics.pendingCount !== 1 ? 's' : ''}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <p className="text-sm font-medium text-green-600">Recebidos</p>
+                  </div>
+                  <p className="text-2xl font-bold text-green-600">
+                    {formatCurrency(sinalMetrics.totalPaid)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {sinalMetrics.paidCount} consulta{sinalMetrics.paidCount !== 1 ? 's' : ''}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <DollarSign className="h-4 w-4 text-blue-600" />
+                    <p className="text-sm font-medium text-blue-600">Total</p>
+                  </div>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {formatCurrency(sinalMetrics.totalSinal)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {sinalMetrics.totalCount} consulta{sinalMetrics.totalCount !== 1 ? 's' : ''} com sinal
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </AnimatedWrapper>
+      )}
 
       {/* Próximas Consultas */}
       <AnimatedWrapper animationType="slideUp" delay={0.2}>

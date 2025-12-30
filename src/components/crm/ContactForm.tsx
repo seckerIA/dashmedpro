@@ -28,6 +28,7 @@ import { useCRM } from "@/hooks/useCRM";
 import { useToast } from "@/hooks/use-toast";
 import { CRMContact, CRMPipelineStage } from "@/types/crm";
 import { useCommercialProcedures } from "@/hooks/useCommercialProcedures";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import {
   formatCurrencyInput,
   parseCurrencyToNumber,
@@ -81,7 +82,8 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
   const [open, setOpen] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const { createContact, updateContact, createDeal, isCreatingContact, isUpdatingContact } = useCRM();
-  const { procedures, isLoading: isLoadingProcedures } = useCommercialProcedures();
+  const { isSecretaria } = useUserProfile();
+  const { procedures, isLoading: isLoadingProcedures } = useCommercialProcedures({ isSecretaria });
   const { toast } = useToast();
 
   const form = useForm<ContactFormData>({
@@ -193,8 +195,13 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
       console.log('🔍 ContactForm - customFields keys:', Object.keys(customFields));
       
       // Remover campos que não existem na tabela crm_contacts
-      // (service e service_value não são campos do crm_contacts, apenas do formulário)
+      // service não é campo direto, mas service_value é
       const { service, service_value, ...contactDataForDB } = contactData;
+      
+      // Adicionar service_value ao objeto de dados para salvar
+      if (serviceValue) {
+        (contactDataForDB as any).service_value = serviceValue;
+      }
       
       // Remover formatação do telefone antes de salvar (manter apenas números)
       if (contactDataForDB.phone) {
@@ -253,12 +260,13 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
         }
       } else {
         console.log('➕ Criando novo contato...');
-        // Criar novo contato (sem service e service_value)
-        // IMPORTANTE: Garantir que custom_fields seja incluído explicitamente
+        // Criar novo contato
+        // IMPORTANTE: Garantir que custom_fields e service_value sejam incluídos explicitamente
         // A tabela crm_contacts usa 'full_name', não 'name'
         const createData = {
           ...contactDataForDB,
           custom_fields: contactDataForDB.custom_fields, // Garantir que custom_fields está presente
+          service_value: serviceValue || null, // Incluir service_value se houver
         };
         console.log('💾 ContactForm - Dados que serão enviados para createContact:', {
           createData,

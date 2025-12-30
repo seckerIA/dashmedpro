@@ -152,9 +152,25 @@ export default function MedicalCalendar() {
           paidInAdvance,
         });
         setShowAppointmentForm(true);
-        
+
         // Limpar query params
         setSearchParams({});
+      }
+    }
+  }, [searchParams, setSearchParams]);
+
+  // Detectar query param de status para aplicar filtro (ex: vindo do dashboard da secretaria)
+  useEffect(() => {
+    const statusParam = searchParams.get('status');
+    if (statusParam) {
+      // Mapear valores de status validos
+      const validStatuses: AppointmentStatus[] = ['scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'];
+      if (validStatuses.includes(statusParam as AppointmentStatus)) {
+        setStatusFilter(statusParam as AppointmentStatus);
+        // Limpar o query param apos aplicar o filtro
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('status');
+        setSearchParams(newParams);
       }
     }
   }, [searchParams, setSearchParams]);

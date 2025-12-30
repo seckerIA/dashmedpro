@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
 import { useAuth } from './useAuth';
 import { useUserProfile } from './useUserProfile';
+import { startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
 
 export interface TeamMetrics {
   userId: string;
@@ -45,6 +46,124 @@ const emptyMetrics: ConsolidatedTeamMetrics = {
   teamMetrics: [],
 };
 
+// Metricas especificas para secretarias
+export interface SecretaryMetrics {
+  appointmentsScheduledToday: number;
+  appointmentsScheduledThisMonth: number;
+  patientsRegisteredToday: number;
+  patientsRegisteredThisMonth: number;
+  confirmationsToday: number;
+  pendingConfirmations: number;
+  userName: string;
+  userEmail: string;
+}
+
+const emptySecretaryMetrics: SecretaryMetrics = {
+  appointmentsScheduledToday: 0,
+  appointmentsScheduledThisMonth: 0,
+  patientsRegisteredToday: 0,
+  patientsRegisteredThisMonth: 0,
+  confirmationsToday: 0,
+  pendingConfirmations: 0,
+  userName: '',
+  userEmail: '',
+};
+
+// Buscar metricas leves para secretarias
+const fetchSecretaryMetrics = async (
+  userId: string,
+  signal?: AbortSignal
+): Promise<SecretaryMetrics> => {
+  const now = new Date();
+  const todayStart = startOfDay(now).toISOString();
+  const todayEnd = endOfDay(now).toISOString();
+  const monthStart = startOfMonth(now).toISOString();
+  const monthEnd = endOfMonth(now).toISOString();
+
+  // Buscar perfil do usuario
+  const profileQuery = supabase
+    .from('profiles')
+    .select('id, email, full_name')
+    .eq('id', userId)
+    .single();
+
+  // Contar agendamentos criados pela secretaria hoje
+  const appointmentsTodayQuery = supabase
+    .from('medical_appointments')
+    .select('id', { count: 'exact', head: true })
+    .eq('created_by', userId)
+    .gte('created_at', todayStart)
+    .lte('created_at', todayEnd);
+
+  // Contar agendamentos criados pela secretaria este mes
+  const appointmentsMonthQuery = supabase
+    .from('medical_appointments')
+    .select('id', { count: 'exact', head: true })
+    .eq('created_by', userId)
+    .gte('created_at', monthStart)
+    .lte('created_at', monthEnd);
+
+  // Contar contatos criados pela secretaria hoje
+  const contactsTodayQuery = supabase
+    .from('crm_contacts')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .gte('created_at', todayStart)
+    .lte('created_at', todayEnd);
+
+  // Contar contatos criados pela secretaria este mes
+  const contactsMonthQuery = supabase
+    .from('crm_contacts')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .gte('created_at', monthStart)
+    .lte('created_at', monthEnd);
+
+  // Contar confirmacoes hoje (agendamentos com status confirmado atualizados hoje)
+  const confirmationsTodayQuery = supabase
+    .from('medical_appointments')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'confirmado')
+    .gte('updated_at', todayStart)
+    .lte('updated_at', todayEnd);
+
+  // Contar pendentes de confirmacao
+  const pendingConfirmationsQuery = supabase
+    .from('medical_appointments')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'agendado')
+    .gte('start_time', todayStart);
+
+  const [
+    profileResult,
+    appointmentsTodayResult,
+    appointmentsMonthResult,
+    contactsTodayResult,
+    contactsMonthResult,
+    confirmationsTodayResult,
+    pendingConfirmationsResult
+  ] = await Promise.all([
+    supabaseQueryWithTimeout(profileQuery, 10000, signal),
+    supabaseQueryWithTimeout(appointmentsTodayQuery, 10000, signal),
+    supabaseQueryWithTimeout(appointmentsMonthQuery, 10000, signal),
+    supabaseQueryWithTimeout(contactsTodayQuery, 10000, signal),
+    supabaseQueryWithTimeout(contactsMonthQuery, 10000, signal),
+    supabaseQueryWithTimeout(confirmationsTodayQuery, 10000, signal),
+    supabaseQueryWithTimeout(pendingConfirmationsQuery, 10000, signal),
+  ]);
+
+  return {
+    appointmentsScheduledToday: appointmentsTodayResult.count || 0,
+    appointmentsScheduledThisMonth: appointmentsMonthResult.count || 0,
+    patientsRegisteredToday: contactsTodayResult.count || 0,
+    patientsRegisteredThisMonth: contactsMonthResult.count || 0,
+    confirmationsToday: confirmationsTodayResult.count || 0,
+    pendingConfirmations: pendingConfirmationsResult.count || 0,
+    userName: profileResult.data?.full_name || profileResult.data?.email || 'Secretaria',
+    userEmail: profileResult.data?.email || '',
+  };
+};
+
 const fetchTeamMetrics = async (
   userId: string,
   isAdminOrDono: boolean,
@@ -55,8 +174,9 @@ const fetchTeamMetrics = async (
   if (!isAdminOrDono) {
     const dealsQuery = supabase
       .from('crm_deals')
-      .select(`*, contact:crm_contacts(*)`)
-      .or(`user_id.eq.${userId},assigned_to.eq.${userId}`);
+      .select(`id, title, value, stage, user_id, assigned_to, created_at, updated_at, contact:crm_contacts(id, full_name)`)
+      .or(`user_id.eq.${userId},assigned_to.eq.${userId}`)
+      .limit(500); // Limite para usuários individuais também
 
     const contactsQuery = supabase
       .from('crm_contacts')
@@ -101,14 +221,15 @@ const fetchTeamMetrics = async (
   let targetUserIds: string[] = [];
 
   if (selectedUserIds && selectedUserIds.length > 0) {
-    targetUserIds = selectedUserIds;
+    // Limitar a 50 usuários para evitar queries muito pesadas
+    targetUserIds = selectedUserIds.slice(0, 50);
   } else {
     // Limitar busca de perfis para evitar queries muito pesadas
     const profilesQuery = supabase
       .from('profiles')
       .select('id, full_name, role')
       .eq('is_active', true)
-      .limit(100); // Limite razoável para evitar queries travadas
+      .limit(50); // Reduzido de 100 para 50 para melhor performance
 
     const { data: profiles, error } = await supabaseQueryWithTimeout(profilesQuery, 30000, signal);
     if (!error && profiles && profiles.length > 0) {
@@ -120,14 +241,13 @@ const fetchTeamMetrics = async (
     return emptyMetrics;
   }
 
-  const orConditions = targetUserIds
-    .map(id => `user_id.eq.${id},assigned_to.eq.${id}`)
-    .join(',');
-
+  // Otimizar: usar in() ao invés de or() quando possível
+  // Para deals, buscar por user_id e assigned_to separadamente e combinar
   const dealsQuery = supabase
     .from('crm_deals')
-    .select(`*, contact:crm_contacts(*)`)
-    .or(orConditions);
+    .select(`id, title, value, stage, user_id, assigned_to, created_at, updated_at, contact:crm_contacts(id, full_name)`)
+    .or(`user_id.in.(${targetUserIds.join(',')}),assigned_to.in.(${targetUserIds.join(',')})`)
+    .limit(1000); // Limite de deals para evitar queries muito pesadas
 
   const contactsQuery = supabase
     .from('crm_contacts')
@@ -271,8 +391,9 @@ function calculateUserMetricsFromData(
 
 export function useTeamMetrics(selectedUserIds?: string[]) {
   const { user, loading: authLoading } = useAuth();
-  const { isAdmin, isLoading: isLoadingProfile } = useUserProfile();
+  const { isAdmin, isSecretaria, isLoading: isLoadingProfile } = useUserProfile();
 
+  // Query para metricas de equipe (admins/vendedores)
   const {
     data: metrics,
     isLoading,
@@ -285,8 +406,8 @@ export function useTeamMetrics(selectedUserIds?: string[]) {
         return await fetchTeamMetrics(user.id, isAdmin, selectedUserIds, signal);
       } catch (error: any) {
         // Ignorar erros de cancelamento/timeout para evitar logs desnecessários
-        if (error?.message?.includes('cancelada') || 
-            error?.message?.includes('timeout') || 
+        if (error?.message?.includes('cancelada') ||
+            error?.message?.includes('timeout') ||
             error?.message?.includes('aborted') ||
             error?.name === 'AbortError') {
           console.log('Query cancelada, retornando métricas vazias');
@@ -296,20 +417,57 @@ export function useTeamMetrics(selectedUserIds?: string[]) {
         return emptyMetrics;
       }
     },
-    enabled: !!user?.id && !authLoading && !isLoadingProfile,
-    staleTime: 5 * 60 * 1000, // 5 minutos - usar cache por mais tempo
-    gcTime: 10 * 60 * 1000, // 10 minutos em cache
+    // Nao executar para secretarias - elas usam secretaryMetrics
+    enabled: !!user?.id && !authLoading && !isLoadingProfile && !isSecretaria,
+    staleTime: 10 * 60 * 1000, // 10 minutos - aumentar cache
+    gcTime: 15 * 60 * 1000, // 15 minutos em cache
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false, // Não refetch ao reconectar - usar cache
     refetchInterval: false, // Não fazer refetch automático
     retry: 1, // Reduzir retries para evitar acúmulo de queries
     retryDelay: 2000,
+    // Cancelar queries anteriores quando uma nova é iniciada
+    networkMode: 'online',
+  });
+
+  // Query especifica para secretarias (mais leve e rapida)
+  const {
+    data: secretaryMetrics,
+    isLoading: isLoadingSecretary,
+    error: secretaryError,
+  } = useQuery({
+    queryKey: ['secretary-team-metrics', user?.id],
+    queryFn: async ({ signal }) => {
+      if (!user?.id) return emptySecretaryMetrics;
+      try {
+        return await fetchSecretaryMetrics(user.id, signal);
+      } catch (error: any) {
+        if (error?.message?.includes('cancelada') ||
+            error?.message?.includes('timeout') ||
+            error?.message?.includes('aborted') ||
+            error?.name === 'AbortError') {
+          console.log('Query secretaria cancelada');
+          return emptySecretaryMetrics;
+        }
+        console.error('Erro ao buscar métricas da secretaria:', error);
+        return emptySecretaryMetrics;
+      }
+    },
+    // So executar para secretarias
+    enabled: !!user?.id && !authLoading && !isLoadingProfile && isSecretaria,
+    staleTime: 5 * 60 * 1000, // 5 minutos
+    gcTime: 10 * 60 * 1000, // 10 minutos
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    retry: 1,
   });
 
   return {
     metrics: metrics || emptyMetrics,
-    isLoading,
-    error,
+    secretaryMetrics: secretaryMetrics || emptySecretaryMetrics,
+    isLoading: isSecretaria ? isLoadingSecretary : isLoading,
+    error: isSecretaria ? secretaryError : error,
+    isSecretaria,
   };
 }

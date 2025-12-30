@@ -25,6 +25,8 @@ import CRM from "./pages/CRM";
 import MedicalCalendar from "./pages/MedicalCalendar";
 import Financial from "./pages/Financial";
 import FinancialTransactions from "./pages/FinancialTransactions";
+import FinancialSinais from "./pages/FinancialSinais";
+import SecretaryFinancial from "./pages/SecretaryFinancial";
 import TransactionForm from "./components/financial/TransactionForm";
 import ProspectingGuide from "./pages/ProspectingGuide";
 import Commercial from "./pages/Commercial";
@@ -349,13 +351,29 @@ const AppRoutes = () => {
             </RoleProtectedRoute>
           } 
         />
-        <Route 
-          path="/financeiro/editar-transacao/:id" 
+        <Route
+          path="/financeiro/editar-transacao/:id"
           element={
             <RoleProtectedRoute allowedRoles={['admin', 'dono', 'vendedor', 'gestor_trafego', 'medico']}>
               <TransactionForm />
             </RoleProtectedRoute>
-          } 
+          }
+        />
+        <Route
+          path="/financeiro/sinais"
+          element={
+            <RoleProtectedRoute allowedRoles={['admin', 'dono', 'medico', 'secretaria']}>
+              <FinancialSinais />
+            </RoleProtectedRoute>
+          }
+        />
+        <Route
+          path="/secretaria/financeiro"
+          element={
+            <RoleProtectedRoute allowedRoles={['secretaria']}>
+              <SecretaryFinancial />
+            </RoleProtectedRoute>
+          }
         />
         <Route path="/crm" element={<CRM />} />
         <Route path="/calendar" element={<MedicalCalendar />} />

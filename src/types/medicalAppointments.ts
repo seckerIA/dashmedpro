@@ -61,6 +61,12 @@ export interface MedicalAppointment {
   financial_transaction_id?: string | null;
   paid_in_advance?: boolean;
 
+  // Campos de Sinal (entrada/depósito)
+  sinal_amount?: number | null;
+  sinal_paid?: boolean;
+  sinal_receipt_url?: string | null;
+  sinal_paid_at?: string | null;
+
   completed_at?: string | null;
   cancelled_at?: string | null;
   cancellation_reason?: string | null;
@@ -106,6 +112,11 @@ export interface MedicalAppointmentInsert {
   payment_status?: PaymentStatus;
   financial_transaction_id?: string | null;
   paid_in_advance?: boolean;
+  // Campos de Sinal
+  sinal_amount?: number | null;
+  sinal_paid?: boolean;
+  sinal_receipt_url?: string | null;
+  sinal_paid_at?: string | null;
 }
 
 // Update type
@@ -123,6 +134,11 @@ export interface MedicalAppointmentUpdate {
   payment_status?: PaymentStatus;
   financial_transaction_id?: string | null;
   paid_in_advance?: boolean;
+  // Campos de Sinal
+  sinal_amount?: number | null;
+  sinal_paid?: boolean;
+  sinal_receipt_url?: string | null;
+  sinal_paid_at?: string | null;
   completed_at?: string | null;
   cancelled_at?: string | null;
   cancellation_reason?: string | null;

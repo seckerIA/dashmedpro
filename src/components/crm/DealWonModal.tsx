@@ -13,6 +13,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CRMDealWithContact } from "@/types/crm";
 import { formatCurrency, formatCurrencyInput, parseCurrencyToNumber } from "@/lib/currency";
 import { DollarSign, Trophy, Calendar } from "lucide-react";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 interface DealWonModalProps {
   open: boolean;
@@ -22,6 +23,7 @@ interface DealWonModalProps {
 }
 
 export function DealWonModal({ open, deal, onConfirm, onCancel }: DealWonModalProps) {
+  const { isSecretaria } = useUserProfile();
   const [appointmentValue, setAppointmentValue] = useState<string>(
     deal?.value ? formatCurrency(deal.value) : ''
   );
@@ -80,7 +82,8 @@ export function DealWonModal({ open, deal, onConfirm, onCancel }: DealWonModalPr
                 Cliente: {deal.contact.full_name}
               </p>
             )}
-            {deal.value && (
+            {/* Valor do negócio - oculto para secretária */}
+            {!isSecretaria && deal.value && (
               <div className="flex items-center gap-2 mt-2">
                 <DollarSign className="w-5 h-5 text-green-500" />
                 <span className="text-lg font-bold text-green-500">
@@ -90,23 +93,25 @@ export function DealWonModal({ open, deal, onConfirm, onCancel }: DealWonModalPr
             )}
           </div>
 
-          {/* Valor da Consulta */}
-          <div className="space-y-2">
-            <Label htmlFor="appointmentValue">Valor da Primeira Consulta *</Label>
-            <Input
-              id="appointmentValue"
-              type="text"
-              value={appointmentValue}
-              onChange={(e) => {
-                const formatted = formatCurrencyInput(e.target.value);
-                setAppointmentValue(formatted);
-              }}
-              placeholder="R$ 0,00"
-            />
-            <p className="text-xs text-muted-foreground">
-              Valor que será cobrado na primeira consulta
-            </p>
-          </div>
+          {/* Valor da Consulta - oculto para secretária */}
+          {!isSecretaria && (
+            <div className="space-y-2">
+              <Label htmlFor="appointmentValue">Valor da Primeira Consulta *</Label>
+              <Input
+                id="appointmentValue"
+                type="text"
+                value={appointmentValue}
+                onChange={(e) => {
+                  const formatted = formatCurrencyInput(e.target.value);
+                  setAppointmentValue(formatted);
+                }}
+                placeholder="R$ 0,00"
+              />
+              <p className="text-xs text-muted-foreground">
+                Valor que será cobrado na primeira consulta
+              </p>
+            </div>
+          )}
 
           {/* Timing do Pagamento */}
           <div className="space-y-3">

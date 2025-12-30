@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { TeamMetrics } from "@/hooks/useTeamMetrics";
 import { formatCurrency } from "@/lib/currency";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 interface TeamComparisonTableProps {
   teamMetrics: TeamMetrics[];
@@ -39,6 +40,8 @@ export function TeamComparisonTable({ teamMetrics, isLoading }: TeamComparisonTa
     );
   }
 
+  const { isSecretaria } = useUserProfile();
+
   // Calcular médias para comparação
   const avgPipeline = teamMetrics.reduce((sum, tm) => sum + tm.totalPipeline, 0) / teamMetrics.length;
   const avgRevenue = teamMetrics.reduce((sum, tm) => sum + tm.totalRevenue, 0) / teamMetrics.length;
@@ -61,8 +64,8 @@ export function TeamComparisonTable({ teamMetrics, isLoading }: TeamComparisonTa
             <TableHeader>
               <TableRow>
                 <TableHead>Equipe</TableHead>
-                <TableHead className="text-right">Pipeline</TableHead>
-                <TableHead className="text-right">Receita</TableHead>
+                {!isSecretaria && <TableHead className="text-right">Pipeline</TableHead>}
+                {!isSecretaria && <TableHead className="text-right">Receita</TableHead>}
                 <TableHead className="text-right">Conversão</TableHead>
                 <TableHead className="text-right">Contratos Ativos</TableHead>
                 <TableHead className="text-right">Ganhos</TableHead>
@@ -75,18 +78,22 @@ export function TeamComparisonTable({ teamMetrics, isLoading }: TeamComparisonTa
               {teamMetrics.map((metric) => (
                 <TableRow key={metric.userId}>
                   <TableCell className="font-medium">{metric.userName}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      {formatCurrency(metric.totalPipeline)}
-                      {getTrendIcon(metric.totalPipeline, avgPipeline)}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      {formatCurrency(metric.totalRevenue)}
-                      {getTrendIcon(metric.totalRevenue, avgRevenue)}
-                    </div>
-                  </TableCell>
+                  {!isSecretaria && (
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {formatCurrency(metric.totalPipeline)}
+                        {getTrendIcon(metric.totalPipeline, avgPipeline)}
+                      </div>
+                    </TableCell>
+                  )}
+                  {!isSecretaria && (
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {formatCurrency(metric.totalRevenue)}
+                        {getTrendIcon(metric.totalRevenue, avgRevenue)}
+                      </div>
+                    </TableCell>
+                  )}
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
                       {metric.conversionRate.toFixed(2)}%

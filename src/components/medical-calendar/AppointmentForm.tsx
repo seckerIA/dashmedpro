@@ -32,8 +32,11 @@ import {
 } from '@/types/medicalAppointments';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarIcon, Loader2, AlertCircle } from 'lucide-react';
+import { CalendarIcon, Loader2, AlertCircle, Upload, Eye, X } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { useSinalReceipts } from '@/hooks/useSinalReceipts';
 
 // Ensure ptBR is available (defensive check)
 const locale = ptBR || undefined;
@@ -98,6 +101,13 @@ export function AppointmentForm({
   const [showNewContactForm, setShowNewContactForm] = useState(false);
   const [formInitialized, setFormInitialized] = useState(false);
 
+  // Estados para Sinal (entrada/depósito)
+  const [sinalPaid, setSinalPaid] = useState(false);
+  const [sinalFile, setSinalFile] = useState<File | null>(null);
+  const [sinalAmount, setSinalAmount] = useState<number | null>(null);
+  const [linkedProcedure, setLinkedProcedure] = useState<any>(null);
+  const { uploadReceipt, isUploading } = useSinalReceipts();
+
   // Refs para evitar loops infinitos de re-renders
   const contactsRef = useRef(contacts);
   const proceduresRef = useRef(procedures);
@@ -116,6 +126,11 @@ export function AppointmentForm({
   useEffect(() => {
     if (!open) {
       hasAutoFilledRef.current = null;
+      // Resetar estados de sinal
+      setSinalPaid(false);
+      setSinalFile(null);
+      setSinalAmount(null);
+      setLinkedProcedure(null);
     }
   }, [open]);
 
@@ -193,6 +208,17 @@ export function AppointmentForm({
         return;
       }
 
+      // Upload do comprovante de sinal se existir
+      let sinalReceiptUrl: string | null = null;
+      if (sinalPaid && sinalFile) {
+        sinalReceiptUrl = await uploadReceipt(sinalFile, `appointment-${Date.now()}`);
+        if (!sinalReceiptUrl) {
+          setAvailabilityError('Erro ao fazer upload do comprovante. Tente novamente.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       const submitData = {
         user_id: user.id,
         doctor_id: data.doctor_id || user.id,
@@ -208,11 +234,21 @@ export function AppointmentForm({
         estimated_value: data.estimated_value || null,
         payment_status: data.payment_status,
         paid_in_advance: data.paid_in_advance || false,
+        // Campos de Sinal
+        sinal_amount: sinalAmount || null,
+        sinal_paid: sinalPaid,
+        sinal_receipt_url: sinalReceiptUrl,
+        sinal_paid_at: sinalPaid ? new Date().toISOString() : null,
       };
 
       const result = await onSubmit(submitData);
       setAvailabilityError(null);
       setEstimatedValueDisplay('');
+      // Resetar estados de sinal
+      setSinalPaid(false);
+      setSinalFile(null);
+      setSinalAmount(null);
+      setLinkedProcedure(null);
       reset();
       onOpenChange(false);
 
@@ -370,12 +406,38 @@ export function AppointmentForm({
         }
       }
 
-      if (!procedureId) {
-        return;
+      // Buscar o procedimento correspondente se houver procedureId
+      let linkedProcedure: any = null;
+      if (procedureId) {
+        linkedProcedure = currentProcedures?.find(p => p.id === procedureId);
       }
 
-      // Buscar o procedimento correspondente
-      const linkedProcedure = currentProcedures?.find(p => p.id === procedureId);
+      // Se não encontrou procedimento mas contato tem service_value, usar esse valor
+      if (!linkedProcedure && (selectedContact as any).service_value) {
+        const serviceValue = (selectedContact as any).service_value;
+        const currentEstimatedValue = watch('estimated_value');
+        
+        // Preencher valor estimado se estiver vazio
+        if (!currentEstimatedValue || currentEstimatedValue === '') {
+          const formattedPrice = formatCurrency(serviceValue);
+          setEstimatedValueDisplay(formattedPrice);
+          setValue('estimated_value', formattedPrice as any);
+        }
+        
+        // Preencher título se estiver vazio
+        const currentTitle = watch('title');
+        if (!currentTitle || currentTitle.trim() === '') {
+          // Verificar se é consulta baseado no service ou custom_fields
+          const service = (selectedContact as any).service;
+          if (service === 'CONSULTA' || customFields?.service === 'CONSULTA') {
+            setValue('title', 'CONSULTA');
+          } else {
+            setValue('title', service || 'Consulta');
+          }
+        }
+        
+        return; // Não precisa continuar se não tem procedimento vinculado
+      }
 
       if (!linkedProcedure) {
         return;
@@ -401,6 +463,14 @@ export function AppointmentForm({
       const formattedPrice = formatCurrency(linkedProcedure.price);
       setEstimatedValueDisplay(formattedPrice);
       setValue('estimated_value', formattedPrice as any);
+
+      // Armazenar o procedimento vinculado para cálculo do sinal
+      setLinkedProcedure(linkedProcedure);
+
+      // Calcular valor do sinal automaticamente
+      const sinalPercentage = linkedProcedure.sinal_percentage || 30;
+      const calculatedSinal = linkedProcedure.price * (sinalPercentage / 100);
+      setSinalAmount(calculatedSinal);
     };
 
     // Pequeno delay para garantir que o reset já foi executado
@@ -734,6 +804,72 @@ export function AppointmentForm({
               </Select>
             </div>
           </div>
+
+          {/* Seção de Sinal (Entrada/Depósito) */}
+          {sinalAmount && sinalAmount > 0 && (
+            <div className="space-y-3 border-t pt-4 mt-4 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20 -mx-6 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-semibold flex items-center gap-2">
+                  <span className="text-yellow-600 dark:text-yellow-400">Sinal (Entrada)</span>
+                </Label>
+                <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50 dark:bg-green-950/50 font-bold">
+                  {formatCurrency(sinalAmount)}
+                </Badge>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  id="sinal_paid"
+                  checked={sinalPaid}
+                  onCheckedChange={(checked) => setSinalPaid(!!checked)}
+                />
+                <Label htmlFor="sinal_paid" className="cursor-pointer font-normal">
+                  Sinal já foi pago
+                </Label>
+              </div>
+
+              {sinalPaid && (
+                <div className="space-y-2 pl-7">
+                  <Label htmlFor="sinal_receipt" className="text-sm">Comprovante de Pagamento</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="sinal_receipt"
+                      type="file"
+                      accept="image/*,application/pdf"
+                      onChange={(e) => setSinalFile(e.target.files?.[0] || null)}
+                      className="flex-1"
+                    />
+                    {sinalFile && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSinalFile(null)}
+                        className="h-8 w-8 p-0"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  {sinalFile && (
+                    <p className="text-xs text-green-600 flex items-center gap-1">
+                      <Upload className="h-3 w-3" />
+                      {sinalFile.name}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Formatos aceitos: JPG, PNG, PDF (máx. 5MB)
+                  </p>
+                </div>
+              )}
+
+              {linkedProcedure && (
+                <p className="text-xs text-muted-foreground">
+                  Sinal de {linkedProcedure.sinal_percentage || 30}% sobre o valor do procedimento
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex justify-end gap-2 pt-4">

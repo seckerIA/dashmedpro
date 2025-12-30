@@ -11,7 +11,9 @@ interface CreateUserRequest {
   email: string;
   password: string;
   full_name?: string;
-  role: 'admin' | 'dono' | 'vendedor' | 'gestor_trafego';
+  role: 'admin' | 'dono' | 'vendedor' | 'gestor_trafego' | 'secretaria' | 'medico';
+  doctor_id?: string;
+  consultation_value?: number;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -66,7 +68,7 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    const { email, password, full_name, role }: CreateUserRequest = await req.json();
+    const { email, password, full_name, role, doctor_id, consultation_value }: CreateUserRequest = await req.json();
 
     // Validate required fields
     if (!email || !password || !role) {
@@ -75,6 +77,9 @@ const handler = async (req: Request): Promise<Response> => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Validate: secretaria should have doctor_id (mas não é obrigatório na criação para flexibilidade)
+    // A validação obrigatória será feita no frontend (TeamManagement)
 
     // Create the user using admin client
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
@@ -94,17 +99,60 @@ const handler = async (req: Request): Promise<Response> => {
     // The profile will be created automatically by the trigger
     // But we need to update the role since the trigger sets default role
     if (newUser.user) {
+      const updateData: any = {
+        role,
+        full_name: full_name || null,
+        invited_by: user.id
+      };
+
+      // Add doctor_id if role is secretaria
+      if (role === 'secretaria' && doctor_id) {
+        updateData.doctor_id = doctor_id;
+      }
+
+      // Add consultation_value if role is medico or dono
+      if ((role === 'medico' || role === 'dono') && consultation_value) {
+        updateData.consultation_value = consultation_value;
+      }
+
       const { error: profileError } = await supabaseAdmin
         .from('profiles')
-        .update({ 
-          role,
-          full_name: full_name || null,
-          invited_by: user.id
-        })
+        .update(updateData)
         .eq('id', newUser.user.id);
 
       if (profileError) {
         console.error('Error updating profile:', profileError);
+      }
+
+      // Criar procedimento "CONSULTA" automaticamente para médico/dono
+      if ((role === 'medico' || role === 'dono') && consultation_value && consultation_value > 0) {
+        // Verificar se já existe procedimento CONSULTA para este médico
+        const { data: existingConsultation } = await supabaseAdmin
+          .from('commercial_procedures')
+          .select('id')
+          .eq('user_id', newUser.user.id)
+          .eq('name', 'CONSULTA')
+          .eq('category', 'consultation')
+          .single();
+
+        if (!existingConsultation) {
+          // Criar procedimento CONSULTA
+          const { error: procedureError } = await supabaseAdmin
+            .from('commercial_procedures')
+            .insert({
+              user_id: newUser.user.id,
+              name: 'CONSULTA',
+              category: 'consultation',
+              price: consultation_value,
+              duration_minutes: 30,
+              description: 'Consulta médica padrão',
+              is_active: true
+            });
+
+          if (procedureError) {
+            console.error('Error creating consultation procedure:', procedureError);
+          }
+        }
       }
     }
 

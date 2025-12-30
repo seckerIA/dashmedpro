@@ -23,7 +23,8 @@ import {
   Workflow,
   Brain,
   ShoppingCart,
-  Megaphone
+  Megaphone,
+  Receipt
 } from "lucide-react"
 import { NavLink, useLocation, useNavigate } from "react-router-dom"
 import {
@@ -54,6 +55,7 @@ type NavigationItem = {
   variant?: 'new';
   adminOnly?: boolean;
   medicoOnly?: boolean;
+  secretariaOnly?: boolean;
   subItems?: NavigationItem[];
 };
 
@@ -73,7 +75,7 @@ const navigationGroups: Array<{
     items: [
       { title: "Marketing", url: "/marketing", icon: TrendingUp },
       {
-        title: "Comercial",
+        title: "CRM",
         url: "/comercial",
         icon: Target,
         subItems: [
@@ -88,7 +90,7 @@ const navigationGroups: Array<{
       },
       { title: "Guia de Prospecção", url: "/comercial/guia-prospeccao", icon: Compass, badge: "Novo", variant: "new" as const },
       { title: "Calculadora", url: "/calculadora", icon: Calculator, badge: "Novo", variant: "new" as const },
-      { title: "CRM", url: "/crm", icon: Users },
+      { title: "Métricas de Equipe", url: "/crm", icon: Users },
       { title: "Calendário", url: "/calendar", icon: Calendar, badge: "Novo", variant: "new" as const },
       // { title: "Follow-ups", url: "/follow-ups", icon: RotateCcw }, // Ocultado
       { title: "Funil de Vendas", url: "/funil-vendas", icon: BarChart3 },
@@ -98,6 +100,7 @@ const navigationGroups: Array<{
     label: "Atendimento",
     items: [
       { title: "Prontuários", url: "/prontuarios", icon: ClipboardList, medicoOnly: true },
+      { title: "Meu Financeiro", url: "/secretaria/financeiro", icon: Receipt, secretariaOnly: true },
     ]
   },
   {
@@ -137,7 +140,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
   // Auto-expandir se URL atual corresponde a um item com subItems
   useEffect(() => {
     if (currentPath.startsWith('/comercial')) {
-      setExpandedItems(prev => prev.includes('Comercial') ? prev : [...prev, 'Comercial'])
+      setExpandedItems(prev => prev.includes('CRM') ? prev : [...prev, 'CRM'])
     }
   }, [currentPath])
 
@@ -277,6 +280,18 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                     }
                     const userRole = profile.role;
                     const canSee = userRole === 'medico' || userRole === 'admin' || userRole === 'dono';
+                    if (!canSee) {
+                      return false;
+                    }
+                  }
+
+                  // Se o item tem secretariaOnly, só mostrar para secretária e admin/dono
+                  if (item.secretariaOnly === true) {
+                    if (isLoadingProfile || !profile) {
+                      return false;
+                    }
+                    const userRole = profile.role;
+                    const canSee = userRole === 'secretaria' || userRole === 'admin' || userRole === 'dono';
                     if (!canSee) {
                       return false;
                     }

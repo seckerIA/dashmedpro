@@ -1,11 +1,11 @@
 import { Database } from '@/integrations/supabase/types';
-import { 
-  UserPlus, 
-  CheckCircle, 
-  Presentation, 
-  FileText, 
-  MessageSquare, 
-  Trophy, 
+import {
+  UserPlus,
+  CheckCircle,
+  Presentation,
+  FileText,
+  MessageSquare,
+  Trophy,
   XCircle,
   Phone,
   Mail,
@@ -14,6 +14,9 @@ import {
   StickyNote,
   CheckSquare,
   Bot,
+  Calendar,
+  Stethoscope,
+  AlertTriangle,
   LucideIcon
 } from 'lucide-react';
 
@@ -49,6 +52,9 @@ export interface CRMDealWithContact extends CRMDeal {
     full_name: string | null;
     email: string;
   } | null;
+  // Campos adicionais do novo modelo de clínica médica
+  is_in_treatment?: boolean | null;
+  is_defaulting?: boolean | null;
 }
 
 export interface CRMContactWithDeals extends CRMContact {
@@ -56,72 +62,110 @@ export interface CRMContactWithDeals extends CRMContact {
   activities?: CRMActivity[];
 }
 
-// Constantes para estágios do pipeline
-export const PIPELINE_STAGES: { 
-  value: CRMPipelineStage; 
-  label: string; 
+// Constantes para estágios do pipeline (Modelo Clínica Médica)
+export const PIPELINE_STAGES: {
+  value: CRMPipelineStage;
+  label: string;
   color: string;
   icon: LucideIcon;
   bgColor: string;
   textColor: string;
 }[] = [
-  { 
-    value: 'lead_novo', 
-    label: 'Lead Novo', 
-    color: 'bg-slate-500', 
+  {
+    value: 'lead_novo',
+    label: 'Lead Novo',
+    color: 'bg-slate-500',
     icon: UserPlus,
     bgColor: 'bg-slate-500/10',
     textColor: 'text-slate-400'
   },
-  { 
-    value: 'qualificado', 
-    label: 'Qualificado', 
-    color: 'bg-blue-500', 
+  {
+    value: 'agendado',
+    label: 'Agendado',
+    color: 'bg-blue-500',
+    icon: Calendar,
+    bgColor: 'bg-blue-500/10',
+    textColor: 'text-blue-400'
+  },
+  {
+    value: 'em_tratamento',
+    label: 'Em Tratamento',
+    color: 'bg-green-500',
+    icon: Stethoscope,
+    bgColor: 'bg-green-500/10',
+    textColor: 'text-green-400'
+  },
+  {
+    value: 'inadimplente',
+    label: 'Inadimplentes',
+    color: 'bg-red-500',
+    icon: AlertTriangle,
+    bgColor: 'bg-red-500/10',
+    textColor: 'text-red-400'
+  },
+];
+
+// Stages legados (para compatibilidade com dados antigos)
+export const LEGACY_PIPELINE_STAGES: {
+  value: CRMPipelineStage;
+  label: string;
+  color: string;
+  icon: LucideIcon;
+  bgColor: string;
+  textColor: string;
+}[] = [
+  {
+    value: 'qualificado',
+    label: 'Qualificado',
+    color: 'bg-blue-500',
     icon: CheckCircle,
     bgColor: 'bg-blue-500/10',
     textColor: 'text-blue-400'
   },
-  { 
-    value: 'apresentacao', 
-    label: 'Apresentação', 
-    color: 'bg-purple-500', 
+  {
+    value: 'apresentacao',
+    label: 'Apresentação',
+    color: 'bg-purple-500',
     icon: Presentation,
     bgColor: 'bg-purple-500/10',
     textColor: 'text-purple-400'
   },
-  { 
-    value: 'proposta', 
-    label: 'Proposta', 
-    color: 'bg-orange-500', 
+  {
+    value: 'proposta',
+    label: 'Proposta',
+    color: 'bg-orange-500',
     icon: FileText,
     bgColor: 'bg-orange-500/10',
     textColor: 'text-orange-400'
   },
-  { 
-    value: 'negociacao', 
-    label: 'Negociação', 
-    color: 'bg-yellow-500', 
+  {
+    value: 'negociacao',
+    label: 'Negociação',
+    color: 'bg-yellow-500',
     icon: MessageSquare,
     bgColor: 'bg-yellow-500/10',
     textColor: 'text-yellow-400'
   },
-  { 
-    value: 'fechado_ganho', 
-    label: 'Fechado Ganho', 
-    color: 'bg-green-500', 
+  {
+    value: 'fechado_ganho',
+    label: 'Fechado Ganho',
+    color: 'bg-green-500',
     icon: Trophy,
     bgColor: 'bg-green-500/10',
     textColor: 'text-green-400'
   },
-  { 
-    value: 'fechado_perdido', 
-    label: 'Fechado Perdido', 
-    color: 'bg-red-500', 
+  {
+    value: 'fechado_perdido',
+    label: 'Fechado Perdido',
+    color: 'bg-red-500',
     icon: XCircle,
     bgColor: 'bg-red-500/10',
     textColor: 'text-red-400'
   },
 ];
+
+// Todos os stages (novos + legados) para busca de informações
+export const ALL_PIPELINE_STAGES = [...PIPELINE_STAGES, ...LEGACY_PIPELINE_STAGES];
 
 // Constantes para tipos de atividade
 export const ACTIVITY_TYPES: {

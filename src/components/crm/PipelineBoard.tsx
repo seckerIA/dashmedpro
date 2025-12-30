@@ -10,6 +10,7 @@ import { Plus, TrendingUp, Users } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ContactActionSelector } from "./ContactActionSelector";
 import { formatCurrency } from "@/lib/currency";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import {
   DndContext,
   DragEndEvent,
@@ -153,6 +154,7 @@ export function PipelineBoard({
   onEditFollowUp,
   showOwnerBadge
 }: PipelineBoardProps) {
+  const { isSecretaria } = useUserProfile();
   const [activeDeal, setActiveDeal] = useState<CRMDealWithContact | null>(null);
   
   const sensors = useSensors(
@@ -310,9 +312,12 @@ export function PipelineBoard({
                     <CardTitle className="text-base font-semibold text-foreground">
                       {stage.label}
                     </CardTitle>
-                    <p className="text-sm text-muted-foreground mt-0.5 font-medium">
-                      {getTotalValueByStage(stage.value)}
-                    </p>
+                    {/* Valor total do estágio - oculto para secretária */}
+                    {!isSecretaria && (
+                      <p className="text-sm text-muted-foreground mt-0.5 font-medium">
+                        {getTotalValueByStage(stage.value)}
+                      </p>
+                    )}
                     <div className="flex items-center gap-3 mt-1">
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Users className="w-3 h-3" />

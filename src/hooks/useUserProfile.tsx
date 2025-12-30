@@ -18,35 +18,56 @@ export function useUserProfile() {
         // Primeiro, tentar buscar do profiles com colunas específicas para evitar erro 406
         const profileQuery = supabase
           .from('profiles')
-          .select('id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by')
+          .select('id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by, doctor_id')
           .eq('id', user.id)
           .single();
 
-        const profileResult = await supabaseQueryWithTimeout(profileQuery, 30000);
+        const profileResult = await supabaseQueryWithTimeout(profileQuery as any, 30000);
         const { data: profileData, error: profileError } = profileResult;
 
+        // Se erro 42703 (coluna não existe) ou 406, tentar buscar sem doctor_id
         if (profileError && profileError.code !== 'PGRST116') {
-          // Se erro 406, tentar buscar apenas colunas básicas
-          if (profileError.code === 'PGRST116' || profileError.message?.includes('406') || profileError.code === '406') {
+          const isColumnError = profileError.code === '42703' || 
+                               profileError.message?.includes('does not exist') ||
+                               profileError.message?.includes('doctor_id');
+          
+          if (isColumnError || profileError.code === 'PGRST116' || 
+              profileError.message?.includes('406') || profileError.code === '406') {
+            // Tentar buscar sem doctor_id (coluna pode não existir ainda)
             const basicQuery = supabase
               .from('profiles')
-              .select('id, email, full_name, role')
+              .select('id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by')
               .eq('id', user.id)
               .single();
             
-            const basicResult = await supabaseQueryWithTimeout(basicQuery, 30000);
+            const basicResult = await supabaseQueryWithTimeout(basicQuery as any, 30000);
             const { data: basicData, error: basicError } = basicResult;
             
             if (basicError && basicError.code !== 'PGRST116') {
-              throw basicError;
+              // Se ainda falhar, tentar apenas colunas essenciais
+              const minimalQuery = supabase
+                .from('profiles')
+                .select('id, email, full_name, role')
+                .eq('id', user.id)
+                .single();
+              
+              const minimalResult = await supabaseQueryWithTimeout(minimalQuery as any, 30000);
+              const { data: minimalData, error: minimalError } = minimalResult;
+              
+              if (minimalError && minimalError.code !== 'PGRST116') {
+                throw minimalError;
+              }
+              // Adicionar doctor_id como undefined se não existir
+              return { ...(minimalData as any), doctor_id: undefined };
             }
-            return basicData;
+            // Adicionar doctor_id como undefined se não existir
+            return { ...(basicData as any), doctor_id: undefined };
           }
           throw profileError;
         }
 
         // Se profile existe mas não tem role, tentar buscar de user_roles como fallback
-        if (profileData && !profileData.role) {
+        if (profileData && !(profileData as any).role) {
           console.log('useUserProfile - Profile sem role, tentando buscar de user_roles');
           const { data: roleData, error: roleError } = await supabase
             .from('user_roles')
@@ -56,7 +77,7 @@ export function useUserProfile() {
             .single();
 
           if (!roleError && roleData) {
-            profileData.role = roleData.role;
+            (profileData as any).role = roleData.role;
             console.log('useUserProfile - Role encontrado em user_roles:', roleData.role);
           } else if (roleError) {
             console.warn('useUserProfile - Erro ao buscar role de user_roles:', roleError);
@@ -64,12 +85,21 @@ export function useUserProfile() {
         }
 
         if (profileData) {
+          // Garantir que doctor_id existe (pode ser undefined se coluna não existir)
+          const profileWithDoctorId: any = {
+            ...(profileData as any),
+            doctor_id: (profileData as any).doctor_id ?? undefined
+          };
+          
           console.log('useUserProfile - Profile carregado com sucesso:', {
-            id: profileData.id,
-            email: profileData.email,
-            fullName: profileData.full_name,
-            role: profileData.role
+            id: profileWithDoctorId.id,
+            email: profileWithDoctorId.email,
+            fullName: profileWithDoctorId.full_name,
+            role: profileWithDoctorId.role,
+            doctor_id: profileWithDoctorId.doctor_id
           });
+          
+          return profileWithDoctorId;
         }
 
         return profileData;

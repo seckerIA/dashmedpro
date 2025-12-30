@@ -17,6 +17,8 @@ export interface Profile {
   avatar_url?: string | null;
   invited_by?: string | null;
   updated_at?: string | null;
+  doctor_id?: string | null;
+  consultation_value?: number | null;
 }
 
 const getRoleLabel = (role: string) => {

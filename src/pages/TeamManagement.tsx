@@ -7,10 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { UserPlus, Users, Eye, EyeOff } from 'lucide-react';
+import { UserPlus, Users, Eye, EyeOff, Stethoscope } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { useSecretaryDoctorLinks } from '@/hooks/useSecretaryDoctors';
 
 import { DataTable } from '@/components/datatable/DataTable';
 import { getColumns, Profile } from '@/components/datatable/DataColumns';
@@ -21,26 +23,32 @@ const TeamManagement = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
+  const [doctors, setDoctors] = useState<Array<{ id: string; full_name: string; email: string }>>([]);
+  const [loadingDoctors, setLoadingDoctors] = useState(false);
+  const [selectedDoctorIds, setSelectedDoctorIds] = useState<string[]>([]); // Para multiplos medicos
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     full_name: '',
-    role: 'vendedor' as Profile['role']
+    role: 'vendedor' as Profile['role'],
+    doctor_id: '' as string | undefined,
+    consultation_value: '' as string | undefined
   });
   const { toast } = useToast();
+  const { updateSecretaryLinks, getLinksForSecretary } = useSecretaryDoctorLinks();
 
   const fetchProfiles = async () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by')
+        .select('id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by, doctor_id, consultation_value')
         .order('created_at', { ascending: false });
 
       if (error) {
         throw error;
       }
 
-      setProfiles(data || []);
+      setProfiles((data || []) as unknown as Profile[]);
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -50,9 +58,59 @@ const TeamManagement = () => {
     }
   };
 
+  const fetchDoctors = async () => {
+    setLoadingDoctors(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('role', ['medico', 'dono'])
+        .eq('is_active', true)
+        .order('full_name', { ascending: true });
+
+      if (error) {
+        throw error;
+      }
+
+      setDoctors(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar médicos:', error);
+    } finally {
+      setLoadingDoctors(false);
+    }
+  };
+
   useEffect(() => {
     fetchProfiles();
+    fetchDoctors();
   }, []);
+
+  // Buscar médicos quando role mudar para secretaria
+  useEffect(() => {
+    if (formData.role === 'secretaria') {
+      fetchDoctors();
+    }
+  }, [formData.role]);
+
+  // Carregar medicos vinculados ao editar secretaria
+  useEffect(() => {
+    if (editingProfile && editingProfile.role === 'secretaria') {
+      const links = getLinksForSecretary(editingProfile.id);
+      const doctorIds = links.map(l => l.doctor_id);
+      setSelectedDoctorIds(doctorIds);
+    }
+  }, [editingProfile, getLinksForSecretary]);
+
+  // Alternar selecao de medico
+  const toggleDoctorSelection = (doctorId: string) => {
+    setSelectedDoctorIds(prev => {
+      if (prev.includes(doctorId)) {
+        return prev.filter(id => id !== doctorId);
+      } else {
+        return [...prev, doctorId];
+      }
+    });
+  };
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,33 +118,92 @@ const TeamManagement = () => {
 
     try {
       if (editingProfile) {
-        // Atualizar usuário existente
+        // Atualizar usuario existente
         await handleUpdateUser();
       } else {
-        // Criar novo usuário
+        // Criar novo usuario
+        const createData: any = { ...formData };
+
+        // Validacao para secretaria - precisa ter pelo menos um medico
+        if (formData.role === 'secretaria') {
+          if (selectedDoctorIds.length === 0) {
+            toast({
+              variant: 'destructive',
+              title: 'Medico obrigatorio',
+              description: 'Uma secretaria deve ser vinculada a pelo menos um medico.',
+            });
+            setLoading(false);
+            return;
+          }
+          // Usar o primeiro medico como doctor_id principal (compatibilidade)
+          createData.doctor_id = selectedDoctorIds[0];
+        } else {
+          // Remover doctor_id se nao for secretaria
+          delete createData.doctor_id;
+        }
+
+        // Validacao para medico/dono - consultation_value obrigatorio
+        if (formData.role === 'medico' || formData.role === 'dono') {
+          if (!formData.consultation_value || formData.consultation_value.trim() === '') {
+            toast({
+              variant: 'destructive',
+              title: 'Valor da consulta obrigatorio',
+              description: 'Medicos e donos devem ter um valor de consulta cadastrado.',
+            });
+            setLoading(false);
+            return;
+          }
+          // Converter valor para numero (aceita virgula ou ponto)
+          const consultationValue = parseFloat(formData.consultation_value.replace(',', '.'));
+          if (isNaN(consultationValue) || consultationValue <= 0) {
+            toast({
+              variant: 'destructive',
+              title: 'Valor invalido',
+              description: 'O valor da consulta deve ser um numero maior que zero.',
+            });
+            setLoading(false);
+            return;
+          }
+          createData.consultation_value = consultationValue;
+        } else {
+          // Remover consultation_value se nao for medico/dono
+          delete createData.consultation_value;
+        }
+
         const { data, error } = await supabase.functions.invoke('create-team-user', {
-          body: formData
+          body: createData
         });
 
         if (error) {
           throw error;
         }
 
+        // Se for secretaria, criar vinculos com medicos na tabela secretary_doctor_links
+        if (formData.role === 'secretaria' && data?.user?.id && selectedDoctorIds.length > 0) {
+          try {
+            await updateSecretaryLinks(data.user.id, selectedDoctorIds);
+          } catch (linkError) {
+            console.error('Erro ao criar vinculos de secretaria:', linkError);
+            // Nao falhar a criacao do usuario se os vinculos falharem
+          }
+        }
+
         toast({
-          title: 'Usuário criado com sucesso!',
-          description: `${formData.full_name || formData.email} foi adicionado à equipe.`,
+          title: 'Usuario criado com sucesso!',
+          description: `${formData.full_name || formData.email} foi adicionado a equipe.`,
         });
       }
 
-      setFormData({ email: '', password: '', full_name: '', role: 'vendedor' });
+      setFormData({ email: '', password: '', full_name: '', role: 'vendedor', doctor_id: '', consultation_value: '' });
+      setSelectedDoctorIds([]);
       setEditingProfile(null);
       setDialogOpen(false);
       fetchProfiles();
     } catch (error: any) {
       toast({
         variant: 'destructive',
-        title: editingProfile ? 'Erro ao atualizar usuário' : 'Erro ao criar usuário',
-        description: error.message || (editingProfile ? 'Não foi possível atualizar o usuário.' : 'Não foi possível criar o usuário.'),
+        title: editingProfile ? 'Erro ao atualizar usuario' : 'Erro ao criar usuario',
+        description: error.message || (editingProfile ? 'Nao foi possivel atualizar o usuario.' : 'Nao foi possivel criar o usuario.'),
       });
     } finally {
       setLoading(false);
@@ -97,7 +214,7 @@ const TeamManagement = () => {
     if (!editingProfile) return;
 
     try {
-      // Chama edge function para atualizar usuário
+      // Chama edge function para atualizar usuario
       const updateData: any = {
         userId: editingProfile.id,
         full_name: formData.full_name || null,
@@ -109,6 +226,49 @@ const TeamManagement = () => {
         updateData.password = formData.password;
       }
 
+      // Se for secretaria, validar e incluir doctor_id
+      if (formData.role === 'secretaria') {
+        if (selectedDoctorIds.length === 0) {
+          toast({
+            variant: 'destructive',
+            title: 'Medico obrigatorio',
+            description: 'Uma secretaria deve ser vinculada a pelo menos um medico.',
+          });
+          throw new Error('Medico obrigatorio para secretaria');
+        }
+        // Usar o primeiro medico como doctor_id principal (compatibilidade)
+        updateData.doctor_id = selectedDoctorIds[0];
+      } else {
+        // Remover doctor_id se nao for mais secretaria
+        updateData.doctor_id = null;
+      }
+
+      // Se for medico/dono, incluir/atualizar consultation_value
+      if (formData.role === 'medico' || formData.role === 'dono') {
+        if (!formData.consultation_value || formData.consultation_value.trim() === '') {
+          toast({
+            variant: 'destructive',
+            title: 'Valor da consulta obrigatorio',
+            description: 'Medicos e donos devem ter um valor de consulta cadastrado.',
+          });
+          throw new Error('Valor da consulta obrigatorio para medico/dono');
+        }
+        // Converter valor para numero (aceita virgula ou ponto)
+        const consultationValue = parseFloat(formData.consultation_value.replace(',', '.'));
+        if (isNaN(consultationValue) || consultationValue <= 0) {
+          toast({
+            variant: 'destructive',
+            title: 'Valor invalido',
+            description: 'O valor da consulta deve ser um numero maior que zero.',
+          });
+          throw new Error('Valor da consulta invalido');
+        }
+        updateData.consultation_value = consultationValue;
+      } else {
+        // Remover consultation_value se nao for mais medico/dono
+        updateData.consultation_value = null;
+      }
+
       const { data, error } = await supabase.functions.invoke('update-team-user', {
         body: updateData
       });
@@ -117,8 +277,18 @@ const TeamManagement = () => {
         throw error;
       }
 
+      // Se for secretaria, atualizar vinculos com medicos
+      if (formData.role === 'secretaria') {
+        try {
+          await updateSecretaryLinks(editingProfile.id, selectedDoctorIds);
+        } catch (linkError) {
+          console.error('Erro ao atualizar vinculos de secretaria:', linkError);
+          // Nao falhar a atualizacao se os vinculos falharem
+        }
+      }
+
       toast({
-        title: 'Usuário atualizado com sucesso!',
+        title: 'Usuario atualizado com sucesso!',
         description: `Os dados de ${formData.full_name || formData.email} foram atualizados.`,
       });
     } catch (error: any) {
@@ -130,11 +300,19 @@ const TeamManagement = () => {
     setEditingProfile(profile);
     setFormData({
       email: profile.email,
-      password: '', // Não preencher senha por segurança
+      password: '', // Nao preencher senha por seguranca
       full_name: profile.full_name || '',
-      role: (profile.role || 'vendedor') as Profile['role']
+      role: (profile.role || 'vendedor') as Profile['role'],
+      doctor_id: (profile as any).doctor_id || '',
+      consultation_value: (profile as any).consultation_value ? (profile as any).consultation_value.toString().replace('.', ',') : ''
     });
+    // Limpar selecao de medicos - sera recarregada pelo useEffect
+    setSelectedDoctorIds([]);
     setDialogOpen(true);
+    // Buscar medicos se for secretaria
+    if (profile.role === 'secretaria') {
+      fetchDoctors();
+    }
   };
 
   const handleToggleActive = async (userId: string, currentActive: boolean) => {
@@ -229,7 +407,8 @@ const TeamManagement = () => {
           setDialogOpen(open);
           if (!open) {
             setEditingProfile(null);
-            setFormData({ email: '', password: '', full_name: '', role: 'vendedor' });
+            setFormData({ email: '', password: '', full_name: '', role: 'vendedor', doctor_id: '', consultation_value: '' });
+            setSelectedDoctorIds([]);
           }
         }}>
           <DialogTrigger asChild>
@@ -303,7 +482,15 @@ const TeamManagement = () => {
                   <Label htmlFor="role">Função *</Label>
                   <Select 
                     value={formData.role} 
-                    onValueChange={(value) => setFormData({ ...formData, role: value as Profile['role'] })}
+                    onValueChange={(value) => {
+                      const newRole = value as Profile['role'];
+                      setFormData({ 
+                        ...formData, 
+                        role: newRole,
+                        // Limpar doctor_id se não for secretária
+                        doctor_id: newRole === 'secretaria' ? formData.doctor_id : ''
+                      });
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione uma função" />
@@ -311,21 +498,101 @@ const TeamManagement = () => {
                     <SelectContent>
                       <SelectItem value="admin">Administrador</SelectItem>
                       <SelectItem value="dono">Dono</SelectItem>
+                      <SelectItem value="medico">Médico</SelectItem>
+                      <SelectItem value="secretaria">Secretária</SelectItem>
                       <SelectItem value="vendedor">Vendedor</SelectItem>
                       <SelectItem value="gestor_trafego">Gestor de Tráfego</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Campo de selecao de medicos - apenas para secretaria (multipla selecao) */}
+                {formData.role === 'secretaria' && (
+                  <div className="grid gap-2">
+                    <Label className="flex items-center gap-2">
+                      <Stethoscope className="h-4 w-4" />
+                      Medicos Vinculados *
+                    </Label>
+                    {loadingDoctors ? (
+                      <div className="p-4 text-sm text-muted-foreground border rounded-md">
+                        Carregando medicos...
+                      </div>
+                    ) : doctors.length === 0 ? (
+                      <div className="p-4 text-sm text-muted-foreground border rounded-md">
+                        Nenhum medico cadastrado
+                      </div>
+                    ) : (
+                      <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2">
+                        {doctors.map((doctor) => (
+                          <div
+                            key={doctor.id}
+                            className="flex items-center space-x-3 p-2 rounded-md hover:bg-muted/50 transition-colors"
+                          >
+                            <Checkbox
+                              id={`doctor-${doctor.id}`}
+                              checked={selectedDoctorIds.includes(doctor.id)}
+                              onCheckedChange={() => toggleDoctorSelection(doctor.id)}
+                            />
+                            <label
+                              htmlFor={`doctor-${doctor.id}`}
+                              className="text-sm font-medium cursor-pointer flex-1"
+                            >
+                              {doctor.full_name || doctor.email}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {selectedDoctorIds.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {selectedDoctorIds.map(id => {
+                          const doctor = doctors.find(d => d.id === id);
+                          return doctor ? (
+                            <Badge key={id} variant="secondary" className="text-xs">
+                              {doctor.full_name || doctor.email}
+                            </Badge>
+                          ) : null;
+                        })}
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Selecione um ou mais medicos. A secretaria tera acesso aos dados de todos os medicos selecionados.
+                    </p>
+                  </div>
+                )}
+
+                {/* Campo de valor da consulta - apenas para médico ou dono */}
+                {(formData.role === 'medico' || formData.role === 'dono') && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="consultation_value">Valor da Consulta (R$) *</Label>
+                    <Input
+                      id="consultation_value"
+                      type="text"
+                      value={formData.consultation_value || ''}
+                      onChange={(e) => {
+                        // Permitir apenas números e vírgula/ponto
+                        const value = e.target.value.replace(/[^\d,.-]/g, '');
+                        setFormData({ ...formData, consultation_value: value });
+                      }}
+                      placeholder="Ex: 150,00"
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      O procedimento "CONSULTA" será criado automaticamente com este valor.
+                    </p>
+                  </div>
+                )}
               </div>
               
               <DialogFooter>
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => {
                     setDialogOpen(false);
                     setEditingProfile(null);
-                    setFormData({ email: '', password: '', full_name: '', role: 'vendedor' });
+                    setFormData({ email: '', password: '', full_name: '', role: 'vendedor', doctor_id: '', consultation_value: '' });
+                    setSelectedDoctorIds([]);
                   }}
                   disabled={loading}
                 >

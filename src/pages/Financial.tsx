@@ -524,6 +524,7 @@ const Financial = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
             {[
               { icon: Receipt, label: 'Transações', color: 'blue', path: '/financeiro/transacoes' },
+              { icon: DollarSign, label: 'Sinais', color: 'yellow', path: '/financeiro/sinais' },
               { icon: Building2, label: 'Contas', color: 'emerald', path: null },
               { icon: ShoppingCart, label: 'Categorias', color: 'purple', path: null },
               { icon: Zap, label: 'Recorrências', color: 'orange', path: null },

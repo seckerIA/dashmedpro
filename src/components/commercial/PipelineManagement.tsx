@@ -135,7 +135,7 @@ export function PipelineManagement() {
         paidInAdvance: (data.paymentTiming === 'advance').toString(),
       });
       
-      navigate(`/calendario-medico?${params.toString()}`);
+      navigate(`/calendar?${params.toString()}`);
       
       setShowDealWonModal(false);
       setWonDeal(null);
@@ -161,7 +161,7 @@ export function PipelineManagement() {
     try {
       await updateDeal({ 
         dealId, 
-        data: { needs_follow_up: needsFollowUp }
+        data: { needs_follow_up: needsFollowUp } as any
       });
       toast({
         title: "Status de Follow-up Atualizado",
@@ -210,11 +210,12 @@ export function PipelineManagement() {
         title: "Contrato excluído",
         description: "O contrato foi excluído com sucesso.",
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Erro ao deletar deal:', error);
       toast({
         variant: "destructive",
-        title: "Erro",
-        description: "Não foi possível excluir o contrato.",
+        title: "Erro ao excluir contrato",
+        description: error?.message || "Não foi possível excluir o contrato. Verifique se você tem permissão.",
       });
     }
   };
