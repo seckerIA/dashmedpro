@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
 import { useAuth } from './useAuth';
 import { useUserProfile } from './useUserProfile';
+import { useSecretaryDoctors } from './useSecretaryDoctors';
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, format } from 'date-fns';
 
 export interface SecretarySinalMetrics {
@@ -54,10 +55,11 @@ const emptyMetrics: SecretarySinalMetrics = {
 
 export function useSecretarySinalMetrics() {
   const { user } = useAuth();
-  const { profile } = useUserProfile();
+  const { profile, isSecretaria } = useUserProfile();
+  const { doctorIds, isLoading: isLoadingDoctors } = useSecretaryDoctors();
 
   return useQuery({
-    queryKey: ['secretary-sinal-metrics', user?.id, profile?.doctor_id],
+    queryKey: ['secretary-sinal-metrics', user?.id, doctorIds],
     queryFn: async ({ signal }): Promise<SecretarySinalMetrics> => {
       if (!user?.id) return emptyMetrics;
 
@@ -88,15 +90,13 @@ export function useSecretarySinalMetrics() {
         .gt('sinal_amount', 0)
         .order('start_time', { ascending: false });
 
-      // Se secretária estiver vinculada a um médico, filtrar por doctor_id
-      // Só filtrar se doctor_id existir e não for undefined
-      if (profile?.role === 'secretaria' && profile?.doctor_id) {
-        try {
-          appointmentsQuery = appointmentsQuery.eq('doctor_id', profile.doctor_id);
-        } catch (err) {
-          // Se houver erro ao filtrar por doctor_id (coluna pode não existir), continuar sem filtro
-          console.warn('Não foi possível filtrar por doctor_id, mostrando todos os sinais:', err);
-        }
+      // Secretária vê consultas de todos os médicos vinculados
+      if (isSecretaria && doctorIds.length > 0) {
+        appointmentsQuery = appointmentsQuery.in('doctor_id', doctorIds);
+      } else if (isSecretaria && doctorIds.length === 0) {
+        // Secretária sem médicos vinculados - não mostra nada
+        console.log('[useSecretarySinalMetrics] Secretária sem médicos vinculados');
+        return emptyMetrics;
       }
 
       const { data: appointments, error } = await supabaseQueryWithTimeout(
@@ -198,7 +198,7 @@ export function useSecretarySinalMetrics() {
         appointments: appointmentsList,
       };
     },
-    enabled: !!user?.id && !!profile && profile?.role === 'secretaria',
+    enabled: !!user?.id && !!profile && isSecretaria && !isLoadingDoctors,
     staleTime: 5 * 60 * 1000, // 5 minutos - aumentar staleTime
     gcTime: 10 * 60 * 1000,
     refetchOnMount: false, // Não refetch automático

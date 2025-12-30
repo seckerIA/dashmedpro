@@ -37,7 +37,7 @@ interface ProcedureFormProps {
 export function ProcedureForm({ open, onOpenChange, procedure }: ProcedureFormProps) {
   const { isSecretaria } = useUserProfile();
   const { doctors } = useDoctors();
-  const { createProcedure, updateProcedure } = useCommercialProcedures({ isSecretaria });
+  const { createProcedure, updateProcedure } = useCommercialProcedures();
   const isEditing = !!procedure;
 
   // Estado para médico selecionado (usado apenas por secretária)

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useUserProfile } from './useUserProfile';
+import { useSecretaryDoctors } from './useSecretaryDoctors';
 import { useToast } from '@/hooks/use-toast';
 import { useMemo, useEffect } from 'react';
 import { addDays, isAfter, isBefore } from 'date-fns';
@@ -26,12 +27,120 @@ interface UseMedicalAppointmentsFilters {
   isSecretaria?: boolean; // Se true, busca TODOS os agendamentos (de todos os médicos)
 }
 
+// Tipos de estágio do pipeline para clínica médica
+type MedicalPipelineStage = 'lead_novo' | 'agendado' | 'em_tratamento' | 'inadimplente' | 'follow_up' | 'fechado_ganho' | 'fechado_perdido';
+
+/**
+ * Função auxiliar para atualizar o pipeline automaticamente
+ * Regras:
+ * - Consulta criada COM sinal pago -> agendado
+ * - Consulta criada SEM sinal pago (ou sinal pendente) -> inadimplente
+ * - Consulta concluída sem pendências -> follow_up
+ * - Consulta com pagamento pendente -> inadimplente
+ */
+const updateDealPipeline = async (
+  contactId: string,
+  doctorId: string,
+  appointmentData: {
+    title: string;
+    estimated_value?: number | null;
+    sinal_amount?: number | null;
+    sinal_paid?: boolean;
+    status?: AppointmentStatus;
+    payment_status?: PaymentStatus;
+  }
+): Promise<void> => {
+  try {
+    // Determinar o estágio do pipeline baseado nos dados
+    let pipelineStage: MedicalPipelineStage;
+    let isDefaulting = false;
+
+    // Lógica de determinação do estágio
+    if (appointmentData.status === 'completed') {
+      // Consulta concluída
+      if (appointmentData.payment_status === 'pending' || appointmentData.payment_status === 'partial') {
+        // Ainda tem pagamento pendente -> inadimplente
+        pipelineStage = 'inadimplente';
+        isDefaulting = true;
+      } else {
+        // Tudo pago -> follow_up (para acompanhamento)
+        pipelineStage = 'follow_up';
+        isDefaulting = false;
+      }
+    } else if (appointmentData.status === 'cancelled' || appointmentData.status === 'no_show') {
+      // Consulta cancelada ou não compareceu - manter deal mas não mover
+      return;
+    } else {
+      // Consulta agendada/confirmada/em andamento
+      if (appointmentData.sinal_amount && appointmentData.sinal_amount > 0) {
+        // Tem sinal definido
+        if (appointmentData.sinal_paid) {
+          // Sinal pago -> agendado
+          pipelineStage = 'agendado';
+          isDefaulting = false;
+        } else {
+          // Sinal não pago -> inadimplente
+          pipelineStage = 'inadimplente';
+          isDefaulting = true;
+        }
+      } else {
+        // Sem sinal definido -> apenas agendado
+        pipelineStage = 'agendado';
+        isDefaulting = false;
+      }
+    }
+
+    // Buscar deal existente para este contato/médico
+    const { data: existingDeal } = await supabase
+      .from('crm_deals')
+      .select('id, stage')
+      .eq('contact_id', contactId)
+      .eq('user_id', doctorId)
+      .not('stage', 'in', '("fechado_ganho","fechado_perdido")')
+      .maybeSingle();
+
+    const dealValue = appointmentData.estimated_value || appointmentData.sinal_amount || 0;
+
+    if (existingDeal) {
+      // Atualizar deal existente
+      await supabase
+        .from('crm_deals')
+        .update({
+          stage: pipelineStage,
+          is_defaulting: isDefaulting,
+          value: dealValue,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingDeal.id);
+
+      console.log(`[Pipeline] Deal ${existingDeal.id} atualizado para ${pipelineStage}`);
+    } else {
+      // Criar novo deal
+      await supabase
+        .from('crm_deals')
+        .insert({
+          user_id: doctorId,
+          contact_id: contactId,
+          title: appointmentData.title,
+          value: dealValue,
+          stage: pipelineStage,
+          is_defaulting: isDefaulting,
+        });
+
+      console.log(`[Pipeline] Novo deal criado com stage ${pipelineStage}`);
+    }
+  } catch (error) {
+    console.error('[Pipeline] Erro ao atualizar pipeline:', error);
+    // Não propagar erro - pipeline é secundário
+  }
+};
+
 // Fetch appointments with relations
 const fetchAppointments = async (
   userId: string,
   filters?: UseMedicalAppointmentsFilters,
   signal?: AbortSignal,
-  doctorIdFilter?: string | null
+  doctorIds?: string[] // Agora aceita array de IDs de médicos
 ): Promise<MedicalAppointmentWithRelations[]> => {
   // Verificar e garantir sessão válida
   const { ensureValidSession } = await import('@/utils/supabaseHelpers');
@@ -46,12 +155,11 @@ const fetchAppointments = async (
       doctor:profiles!medical_appointments_doctor_id_profiles_fk(id, full_name, email)
     `);
 
-  // Se secretária estiver vinculada a um médico, filtrar por doctor_id
-  if (doctorIdFilter) {
-    query = query.eq('doctor_id', doctorIdFilter);
+  // Secretária vê consultas de todos os médicos vinculados
+  if (doctorIds && doctorIds.length > 0) {
+    query = query.in('doctor_id', doctorIds);
   } else if (!filters?.isSecretaria && userId) {
-    // Se é secretária sem vinculação, não filtra por user_id - a RLS já garante acesso a todos
-    // Caso contrário, filtra por user_id OU doctor_id
+    // Outros usuários veem apenas suas próprias consultas
     query = query.or(`user_id.eq.${userId},doctor_id.eq.${userId}`);
   }
 
@@ -133,6 +241,21 @@ const createAppointment = async (
     console.error('Dados enviados:', appointmentData);
     throw new Error(`Erro ao criar consulta: ${error.message}`);
   }
+
+  // Atualizar pipeline automaticamente ao criar consulta
+  await updateDealPipeline(
+    appointmentData.contact_id,
+    appointmentData.doctor_id || appointmentData.user_id,
+    {
+      title: appointmentData.title,
+      estimated_value: appointmentData.estimated_value,
+      sinal_amount: appointmentData.sinal_amount,
+      sinal_paid: appointmentData.sinal_paid,
+      status: appointmentData.status || 'scheduled',
+      payment_status: appointmentData.payment_status || 'pending',
+    }
+  );
+
   return data as MedicalAppointmentWithRelations;
 };
 
@@ -148,7 +271,7 @@ const updateAppointment = async ({
     ...updates,
     paid_in_advance: updates.paid_in_advance !== undefined ? updates.paid_in_advance : undefined,
   };
-  
+
   const { data, error } = await supabase
     .from('medical_appointments')
     .update(updateData)
@@ -161,7 +284,34 @@ const updateAppointment = async ({
     .single();
 
   if (error) throw new Error(`Erro ao atualizar consulta: ${error.message}`);
-  return data as MedicalAppointmentWithRelations;
+
+  const appointment = data as MedicalAppointmentWithRelations;
+
+  // Atualizar pipeline automaticamente quando houver mudança de status ou pagamento
+  if (appointment.contact_id && (appointment.doctor_id || appointment.user_id)) {
+    const shouldUpdatePipeline =
+      updates.status !== undefined ||
+      updates.payment_status !== undefined ||
+      updates.sinal_paid !== undefined ||
+      updates.sinal_amount !== undefined;
+
+    if (shouldUpdatePipeline) {
+      await updateDealPipeline(
+        appointment.contact_id,
+        appointment.doctor_id || appointment.user_id,
+        {
+          title: appointment.title,
+          estimated_value: appointment.estimated_value,
+          sinal_amount: appointment.sinal_amount,
+          sinal_paid: appointment.sinal_paid,
+          status: appointment.status as AppointmentStatus,
+          payment_status: appointment.payment_status as PaymentStatus,
+        }
+      );
+    }
+  }
+
+  return appointment;
 };
 
 // Delete appointment
@@ -193,16 +343,15 @@ const serializeFilters = (filters?: UseMedicalAppointmentsFilters): string => {
 // Hook principal
 export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) {
   const { user, loading: authLoading } = useAuth();
-  const { profile } = useUserProfile();
+  const { profile, isSecretaria } = useUserProfile();
+  const { doctorIds, isLoading: isLoadingDoctors } = useSecretaryDoctors();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // Se secretária estiver vinculada, usar doctor_id para filtrar
-  const doctorIdFilter = profile?.role === 'secretaria' && profile?.doctor_id 
-    ? profile.doctor_id 
-    : null;
+  // Secretária usa lista de médicos vinculados
+  const doctorIdsToUse = isSecretaria ? doctorIds : [];
 
-  const queryKey = ['medical-appointments', user?.id, doctorIdFilter, serializeFilters(filters)];
+  const queryKey = ['medical-appointments', user?.id, doctorIdsToUse, serializeFilters(filters)];
 
   // Invalidar cache quando o usuário mudar para evitar dados de outros usuários
   useEffect(() => {
@@ -223,8 +372,8 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
     refetch,
   } = useQuery({
     queryKey,
-    queryFn: ({ signal }) => fetchAppointments(user?.id || '', filters, signal, doctorIdFilter),
-    enabled: !!user?.id && !authLoading,
+    queryFn: ({ signal }) => fetchAppointments(user?.id || '', filters, signal, doctorIdsToUse.length > 0 ? doctorIdsToUse : undefined),
+    enabled: !!user?.id && !authLoading && (!isSecretaria || !isLoadingDoctors),
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
     refetchOnMount: false,
@@ -239,6 +388,9 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
     mutationFn: createAppointment,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['medical-appointments'] });
+      // Invalidar queries do CRM/pipeline para refletir mudanças
+      queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
+      queryClient.invalidateQueries({ queryKey: ['crm-pipeline'] });
       toast({
         title: 'Consulta agendada com sucesso!',
         description: 'A consulta foi adicionada à agenda.',
@@ -284,6 +436,9 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['medical-appointments'] });
+      // Invalidar queries do CRM/pipeline para refletir mudanças
+      queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
+      queryClient.invalidateQueries({ queryKey: ['crm-pipeline'] });
     },
   });
 
@@ -426,12 +581,15 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
       queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['financial-metrics'] });
       queryClient.invalidateQueries({ queryKey: ['financial-accounts'] });
-      
+      // Invalidar queries do CRM/pipeline para refletir mudanças
+      queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
+      queryClient.invalidateQueries({ queryKey: ['crm-pipeline'] });
+
       // Verificar se uma transação foi criada
       const hasTransaction = data?.financial_transaction_id;
       toast({
         title: 'Consulta concluída',
-        description: hasTransaction 
+        description: hasTransaction
           ? 'A consulta foi marcada como concluída e a transação financeira foi criada automaticamente.'
           : 'A consulta foi marcada como concluída.',
       });

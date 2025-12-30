@@ -83,7 +83,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
   const [tagInput, setTagInput] = useState("");
   const { createContact, updateContact, createDeal, isCreatingContact, isUpdatingContact } = useCRM();
   const { isSecretaria } = useUserProfile();
-  const { procedures, isLoading: isLoadingProcedures } = useCommercialProcedures({ isSecretaria });
+  const { procedures, isLoading: isLoadingProcedures } = useCommercialProcedures();
   const { toast } = useToast();
 
   const form = useForm<ContactFormData>({

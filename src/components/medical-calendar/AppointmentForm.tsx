@@ -105,7 +105,9 @@ export function AppointmentForm({
   const [sinalPaid, setSinalPaid] = useState(false);
   const [sinalFile, setSinalFile] = useState<File | null>(null);
   const [sinalAmount, setSinalAmount] = useState<number | null>(null);
+  const [sinalAmountDisplay, setSinalAmountDisplay] = useState<string>('');
   const [linkedProcedure, setLinkedProcedure] = useState<any>(null);
+  const [selectedProcedureId, setSelectedProcedureId] = useState<string | null>(null);
   const { uploadReceipt, isUploading } = useSinalReceipts();
 
   // Refs para evitar loops infinitos de re-renders
@@ -130,7 +132,9 @@ export function AppointmentForm({
       setSinalPaid(false);
       setSinalFile(null);
       setSinalAmount(null);
+      setSinalAmountDisplay('');
       setLinkedProcedure(null);
+      setSelectedProcedureId(null);
     }
   }, [open]);
 
@@ -320,6 +324,41 @@ export function AppointmentForm({
 
   const selectedContactId = watch('contact_id');
   const selectedType = watch('appointment_type');
+  const selectedDoctorId = watch('doctor_id');
+
+  // Filtrar procedimentos pelo médico selecionado
+  const filteredProcedures = procedures.filter(p => {
+    // Se não tem médico selecionado, não mostrar procedimentos
+    if (!selectedDoctorId) return false;
+    // Mostrar procedimentos do médico selecionado
+    return p.user_id === selectedDoctorId;
+  });
+
+  // Handler para quando seleciona um procedimento
+  const handleProcedureSelect = (procedureId: string) => {
+    setSelectedProcedureId(procedureId);
+    const procedure = procedures.find(p => p.id === procedureId);
+    if (procedure) {
+      setLinkedProcedure(procedure);
+      // Preencher título
+      setValue('title', procedure.name);
+      // Preencher duração
+      if (procedure.duration_minutes) {
+        setValue('duration_minutes', procedure.duration_minutes);
+      }
+      // Preencher valor estimado
+      if (procedure.price) {
+        const formattedPrice = formatCurrency(procedure.price);
+        setEstimatedValueDisplay(formattedPrice);
+        setValue('estimated_value', formattedPrice as any);
+      }
+      // Calcular valor do sinal
+      const sinalPercentage = procedure.sinal_percentage || 30;
+      const calculatedSinal = procedure.price * (sinalPercentage / 100);
+      setSinalAmount(calculatedSinal);
+      setSinalAmountDisplay(formatCurrency(calculatedSinal));
+    }
+  };
 
   // Buscar procedimento vinculado ao contato selecionado e preencher automaticamente
   // IMPORTANTE: Usamos refs para evitar loop infinito de re-renders
@@ -471,6 +510,7 @@ export function AppointmentForm({
       const sinalPercentage = linkedProcedure.sinal_percentage || 30;
       const calculatedSinal = linkedProcedure.price * (sinalPercentage / 100);
       setSinalAmount(calculatedSinal);
+      setSinalAmountDisplay(formatCurrency(calculatedSinal));
     };
 
     // Pequeno delay para garantir que o reset já foi executado
@@ -659,6 +699,55 @@ export function AppointmentForm({
             </div>
           </div>
 
+          {/* Procedure Selection - Only show when type is 'procedure' and doctor is selected */}
+          {selectedType === 'procedure' && selectedDoctorId && (
+            <div className="space-y-2">
+              <Label htmlFor="procedure_id">Procedimento *</Label>
+              <Select
+                value={selectedProcedureId || ''}
+                onValueChange={handleProcedureSelect}
+                disabled={isLoadingProcedures}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={
+                    isLoadingProcedures
+                      ? "Carregando procedimentos..."
+                      : filteredProcedures.length === 0
+                        ? "Nenhum procedimento cadastrado para este médico"
+                        : "Selecione o procedimento"
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  {isLoadingProcedures ? (
+                    <div className="p-2 text-sm text-muted-foreground flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Carregando procedimentos...
+                    </div>
+                  ) : filteredProcedures.length === 0 ? (
+                    <div className="p-2 text-sm text-muted-foreground">
+                      Nenhum procedimento cadastrado para este médico.
+                    </div>
+                  ) : (
+                    filteredProcedures.map((procedure) => (
+                      <SelectItem key={procedure.id} value={procedure.id}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{procedure.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {formatCurrency(procedure.price)} • {procedure.duration_minutes} min
+                            {procedure.sinal_percentage > 0 && ` • Sinal: ${procedure.sinal_percentage}%`}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              {selectedType === 'procedure' && !selectedDoctorId && (
+                <p className="text-sm text-amber-600">Selecione um médico primeiro</p>
+              )}
+            </div>
+          )}
+
           {/* Title */}
           <div className="space-y-2">
             <Label htmlFor="title">Título *</Label>
@@ -805,71 +894,82 @@ export function AppointmentForm({
             </div>
           </div>
 
-          {/* Seção de Sinal (Entrada/Depósito) */}
-          {sinalAmount && sinalAmount > 0 && (
-            <div className="space-y-3 border-t pt-4 mt-4 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20 -mx-6 px-6 py-4">
-              <div className="flex items-center justify-between">
-                <Label className="text-base font-semibold flex items-center gap-2">
-                  <span className="text-yellow-600 dark:text-yellow-400">Sinal (Entrada)</span>
-                </Label>
-                <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50 dark:bg-green-950/50 font-bold">
-                  {formatCurrency(sinalAmount)}
-                </Badge>
-              </div>
+          {/* Seção de Sinal (Entrada/Depósito) - Sempre visível */}
+          <div className="space-y-3 border-t pt-4 mt-4 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20 -mx-6 px-6 py-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-base font-semibold flex items-center gap-2">
+                <span className="text-yellow-600 dark:text-yellow-400">Sinal (Entrada)</span>
+              </Label>
+            </div>
 
-              <div className="flex items-center gap-3">
-                <Checkbox
-                  id="sinal_paid"
-                  checked={sinalPaid}
-                  onCheckedChange={(checked) => setSinalPaid(!!checked)}
-                />
-                <Label htmlFor="sinal_paid" className="cursor-pointer font-normal">
-                  Sinal já foi pago
-                </Label>
-              </div>
-
-              {sinalPaid && (
-                <div className="space-y-2 pl-7">
-                  <Label htmlFor="sinal_receipt" className="text-sm">Comprovante de Pagamento</Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="sinal_receipt"
-                      type="file"
-                      accept="image/*,application/pdf"
-                      onChange={(e) => setSinalFile(e.target.files?.[0] || null)}
-                      className="flex-1"
-                    />
-                    {sinalFile && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setSinalFile(null)}
-                        className="h-8 w-8 p-0"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                  {sinalFile && (
-                    <p className="text-xs text-green-600 flex items-center gap-1">
-                      <Upload className="h-3 w-3" />
-                      {sinalFile.name}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    Formatos aceitos: JPG, PNG, PDF (máx. 5MB)
-                  </p>
-                </div>
-              )}
-
+            {/* Campo editável para valor do sinal */}
+            <div className="space-y-2">
+              <Label htmlFor="sinal_amount" className="text-sm">Valor do Sinal</Label>
+              <Input
+                id="sinal_amount"
+                type="text"
+                value={sinalAmountDisplay}
+                onChange={(e) => {
+                  const formatted = formatCurrencyInput(e.target.value);
+                  setSinalAmountDisplay(formatted);
+                  setSinalAmount(parseCurrencyToNumber(formatted));
+                }}
+                placeholder="R$ 0,00"
+                className="max-w-[200px]"
+              />
               {linkedProcedure && (
                 <p className="text-xs text-muted-foreground">
-                  Sinal de {linkedProcedure.sinal_percentage || 30}% sobre o valor do procedimento
+                  Sugestão: {linkedProcedure.sinal_percentage || 30}% do procedimento = {formatCurrency((linkedProcedure.price || 0) * ((linkedProcedure.sinal_percentage || 30) / 100))}
                 </p>
               )}
             </div>
-          )}
+
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="sinal_paid"
+                checked={sinalPaid}
+                onCheckedChange={(checked) => setSinalPaid(!!checked)}
+              />
+              <Label htmlFor="sinal_paid" className="cursor-pointer font-normal">
+                Sinal já foi pago
+              </Label>
+            </div>
+
+            {sinalPaid && (
+              <div className="space-y-2 pl-7">
+                <Label htmlFor="sinal_receipt" className="text-sm">Comprovante de Pagamento</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="sinal_receipt"
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={(e) => setSinalFile(e.target.files?.[0] || null)}
+                    className="flex-1"
+                  />
+                  {sinalFile && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSinalFile(null)}
+                      className="h-8 w-8 p-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                {sinalFile && (
+                  <p className="text-xs text-green-600 flex items-center gap-1">
+                    <Upload className="h-3 w-3" />
+                    {sinalFile.name}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Formatos aceitos: JPG, PNG, PDF (máx. 5MB)
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* Actions */}
           <div className="flex justify-end gap-2 pt-4">

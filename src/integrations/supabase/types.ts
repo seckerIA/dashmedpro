@@ -1461,6 +1461,10 @@ export type Database = {
         | "negociacao"
         | "fechado_ganho"
         | "fechado_perdido"
+        | "agendado"
+        | "em_tratamento"
+        | "inadimplente"
+        | "follow_up"
     }
     CompositeTypes: {
       [_ in never]: never

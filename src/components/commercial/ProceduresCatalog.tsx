@@ -11,7 +11,7 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 
 export function ProceduresCatalog() {
   const { isSecretaria } = useUserProfile();
-  const { procedures, isLoading, deleteProcedure } = useCommercialProcedures({ isSecretaria });
+  const { procedures, isLoading, deleteProcedure } = useCommercialProcedures();
   const [showForm, setShowForm] = useState(false);
   const [editingProcedure, setEditingProcedure] = useState<CommercialProcedure | null>(null);
 
