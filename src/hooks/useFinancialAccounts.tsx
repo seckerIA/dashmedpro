@@ -30,14 +30,15 @@ export const useFinancialAccounts = () => {
         .from("financial_accounts")
         .select("*")
         .eq("is_active", true)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(100); // Limitar para performance
 
       // Se não for admin/dono, filtrar apenas pelo user_id
       if (!isAdminOrDono) {
         query = query.eq("user_id", user.id);
       }
 
-      const result = await supabaseQueryWithTimeout(query, 30000);
+      const result = await supabaseQueryWithTimeout(query, 15000); // Timeout reduzido
       const { data, error } = result;
 
       if (error) throw error;

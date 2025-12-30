@@ -47,14 +47,13 @@ export const useFinancialTransactions = (filters?: TransactionFilters) => {
           deal:crm_deals(id, title, value),
           contact:crm_contacts(id, full_name, company)
         `)
-        .order("transaction_date", { ascending: false });
+        .order("transaction_date", { ascending: false })
+        .limit(500); // Limitar para performance
 
       // Se não for admin/dono, filtrar apenas pelo user_id
       if (!isAdminOrDono) {
         query = query.eq("user_id", user.id);
       }
-
-      console.log('useFinancialTransactions - Executando query para user:', user.id, '- Role:', profile?.role, '- Admin/Dono:', isAdminOrDono);
 
       // Aplicar filtros
       if (filters?.startDate) {
@@ -91,14 +90,12 @@ export const useFinancialTransactions = (filters?: TransactionFilters) => {
       
       let data, error;
       try {
-        const result = await supabaseQueryWithTimeout(queryPromise, 30000);
+        const result = await supabaseQueryWithTimeout(queryPromise, 15000); // Timeout reduzido
         data = result.data;
         error = result.error;
       } catch (err: any) {
         throw err;
       }
-
-      console.log('useFinancialTransactions - Query result:', { data, error });
 
       if (error) throw error;
 
@@ -123,19 +120,13 @@ export const useFinancialTransactions = (filters?: TransactionFilters) => {
         contact_name: transaction.contact?.full_name,
       })) || [];
 
-      console.log('useFinancialTransactions - Transformed data (via select):', transformedData);
-      
       return transformedData as unknown as FinancialTransactionWithDetails[];
     }
   });
 
   const { data: transactions, isLoading, error } = queryResult;
 
-  console.log('useFinancialTransactions - Hook return:');
-  console.log('  - transactions:', transactions);
-  console.log('  - isLoading:', isLoading);
-  console.log('  - error:', error);
-  console.log('  - queryResult.data:', queryResult.data);
+  // Debug removido para reduzir ruído no console
 
   // Buscar transação específica
   const getTransaction = async (id: string) => {
