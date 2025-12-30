@@ -11,7 +11,7 @@ import * as z from "zod";
 import { useCommercialLeads } from "@/hooks/useCommercialLeads";
 import { useCommercialProcedures } from "@/hooks/useCommercialProcedures";
 import { CommercialLead, CommercialLeadInsert } from "@/types/commercial";
-import { COMMERCIAL_LEAD_STATUS_LABELS, COMMERCIAL_LEAD_ORIGIN_LABELS } from "@/types/commercial";
+import { COMMERCIAL_LEAD_ORIGIN_LABELS } from "@/types/commercial";
 import { formatCurrencyInput, parseCurrencyToNumber, formatCurrency } from "@/lib/currency";
 import { Loader2 } from "lucide-react";
 
@@ -20,7 +20,6 @@ const leadSchema = z.object({
   email: z.string().email("Email inválido").optional().or(z.literal("")),
   phone: z.string().optional(),
   origin: z.enum(['google', 'instagram', 'facebook', 'indication', 'website', 'other']),
-  status: z.enum(['new', 'contacted', 'qualified', 'converted', 'lost']),
   procedure_id: z.string().optional(),
   estimated_value: z.string().optional().transform((val) => val ? parseCurrencyToNumber(val) : undefined),
   notes: z.string().optional(),
@@ -53,7 +52,6 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
       email: "",
       phone: "",
       origin: "other",
-      status: "new",
       procedure_id: "",
       estimated_value: "",
       notes: "",
@@ -67,7 +65,6 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
         email: lead.email || "",
         phone: lead.phone || "",
         origin: lead.origin,
-        status: lead.status,
         procedure_id: lead.procedure_id || "",
         estimated_value: lead.estimated_value ? formatCurrency(lead.estimated_value) : "",
         notes: lead.notes || "",
@@ -78,7 +75,6 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
         email: "",
         phone: "",
         origin: "other",
-        status: "new",
         procedure_id: "",
         estimated_value: "",
         notes: "",
@@ -97,7 +93,7 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
         email: data.email || null,
         phone: data.phone || null,
         origin: data.origin,
-        status: data.status,
+        status: "new", // Sempre criar como "new" (lead novo)
         procedure_id: data.procedure_id && data.procedure_id !== "none" ? data.procedure_id : null,
         estimated_value: estimatedValue,
         notes: data.notes || null,
@@ -185,23 +181,6 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="status">Status *</Label>
-              <Select
-                value={watch("status")}
-                onValueChange={(value) => setValue("status", value as any)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(COMMERCIAL_LEAD_STATUS_LABELS).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="procedure_id">Procedimento de Interesse</Label>
               <Select

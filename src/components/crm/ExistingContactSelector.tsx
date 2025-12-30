@@ -20,6 +20,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCRM } from "@/hooks/useCRM";
 import { CRMPipelineStage } from "@/types/crm";
 import { formatCurrency } from "@/lib/currency";
+import { getContactService } from "@/lib/crm";
 import { 
   User, 
   Building2, 
@@ -118,7 +119,8 @@ export function ExistingContactSelector({
             <CommandGroup>
               <ScrollArea className="max-h-[400px]">
                 {filteredContacts.map((contact) => {
-                  const serviceConfig = contact.service ? getServiceConfig(contact.service) : null;
+                  const contactService = getContactService(contact);
+                  const serviceConfig = contactService ? getServiceConfig(contactService) : null;
                   const isInPipeline = contactsInPipeline.has(contact.id);
                   
                   return (

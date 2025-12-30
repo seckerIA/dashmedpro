@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -131,6 +131,7 @@ export interface PipelineBoardProps {
   onCompleteFollowUp?: (followUpId: string) => void;
   onEditFollowUp?: (followUp: FollowUp) => void;
   showOwnerBadge?: boolean;
+  onDealMovedToAgendado?: (deal: CRMDealWithContact) => void;
 }
 
 export function PipelineBoard({ 
@@ -152,7 +153,8 @@ export function PipelineBoard({
   onToggleFollowUp,
   onCompleteFollowUp,
   onEditFollowUp,
-  showOwnerBadge
+  showOwnerBadge,
+  onDealMovedToAgendado
 }: PipelineBoardProps) {
   const { isSecretaria } = useUserProfile();
   const [activeDeal, setActiveDeal] = useState<CRMDealWithContact | null>(null);
@@ -165,24 +167,62 @@ export function PipelineBoard({
     })
   );
 
+  // Memoizar deals por stage para evitar recálculos
+  const dealsByStage = useMemo(() => {
+    const grouped: Record<string, CRMDealWithContact[]> = {};
+    PIPELINE_STAGES.forEach(stage => {
+      grouped[stage.value] = [];
+    });
+    
+    deals.forEach(deal => {
+      if (grouped[deal.stage]) {
+        grouped[deal.stage].push(deal);
+      }
+    });
+    
+    // Ordenar cada grupo por position
+    Object.keys(grouped).forEach(stage => {
+      grouped[stage].sort((a, b) => (a.position || 0) - (b.position || 0));
+    });
+    
+    return grouped;
+  }, [deals]);
+
+  // Memoizar totais por stage
+  const totalsByStage = useMemo(() => {
+    const totals: Record<string, string> = {};
+    PIPELINE_STAGES.forEach(stage => {
+      const stageDeals = dealsByStage[stage.value] || [];
+      const total = stageDeals.reduce((sum, deal) => {
+        const value = typeof deal.value === 'string' ? parseFloat(deal.value) : deal.value;
+        return sum + (value || 0);
+      }, 0);
+      totals[stage.value] = formatCurrency(total);
+    });
+    return totals;
+  }, [dealsByStage]);
+
+  // Memoizar contatos únicos por stage
+  const uniqueContactsByStage = useMemo(() => {
+    const counts: Record<string, number> = {};
+    PIPELINE_STAGES.forEach(stage => {
+      const stageDeals = dealsByStage[stage.value] || [];
+      const uniqueContacts = new Set(stageDeals.map(deal => deal.contact_id).filter(Boolean));
+      counts[stage.value] = uniqueContacts.size;
+    });
+    return counts;
+  }, [dealsByStage]);
+
   const getDealsByStage = (stage: string) => {
-    return deals.filter(deal => deal.stage === stage).sort((a, b) => (a.position || 0) - (b.position || 0));
+    return dealsByStage[stage] || [];
   };
 
   const getTotalValueByStage = (stage: string) => {
-    const stageDeals = getDealsByStage(stage);
-    const total = stageDeals.reduce((sum, deal) => {
-      const value = typeof deal.value === 'string' ? parseFloat(deal.value) : deal.value;
-      return sum + (value || 0);
-    }, 0);
-    return formatCurrency(total);
+    return totalsByStage[stage] || formatCurrency(0);
   };
 
-
   const getUniqueContactsByStage = (stage: string) => {
-    const stageDeals = getDealsByStage(stage);
-    const uniqueContacts = new Set(stageDeals.map(deal => deal.contact_id).filter(Boolean));
-    return uniqueContacts.size;
+    return uniqueContactsByStage[stage] || 0;
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -253,6 +293,15 @@ export function PipelineBoard({
     // A posição será gerenciada automaticamente pela query
     try {
       await onUpdateDeal(activeId, targetStage);
+      
+      // Se mudou para "agendado", chamar callback
+      if (targetStage === 'agendado' && activeDeal) {
+        // Buscar deal atualizado da lista
+        const updatedDeal = deals.find(d => d.id === activeId);
+        if (updatedDeal) {
+          onDealMovedToAgendado?.(updatedDeal);
+        }
+      }
     } catch (error) {
       console.error('Erro ao atualizar deal:', error);
     }

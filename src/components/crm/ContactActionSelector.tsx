@@ -17,6 +17,7 @@ import { Plus, UserPlus, Users, ChevronDown } from "lucide-react";
 import { CRMPipelineStage } from "@/types/crm";
 import { useCRM } from "@/hooks/useCRM";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface ContactActionSelectorProps {
   stage: CRMPipelineStage;
@@ -39,6 +40,7 @@ export function ContactActionSelector({
   const [showExistingContactSelector, setShowExistingContactSelector] = useState(false);
   const { createDeal, contacts } = useCRM();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const handleNewContact = () => {
     setShowNewContactForm(true);
@@ -73,6 +75,12 @@ export function ContactActionSelector({
         stage: stage,
         value: contact.service_value || null,
         probability: 0,
+      });
+
+      // Invalidar cache de deals para garantir que apareça imediatamente no pipeline
+      queryClient.invalidateQueries({ 
+        queryKey: ['crm-deals'],
+        exact: false 
       });
 
       toast({

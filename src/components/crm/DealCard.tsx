@@ -82,11 +82,6 @@ export function DealCard({ deal, onClick, onEdit, onDelete, onScheduleCall, isDe
             </div>
           </div>
           <div className="flex items-center gap-1">
-            {deal.probability && (
-              <Badge variant="secondary" className="text-xs">
-                {deal.probability}%
-              </Badge>
-            )}
             <div className="flex gap-1">
               {onEdit && (
                 <Button

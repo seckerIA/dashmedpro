@@ -46,10 +46,11 @@ const fetchDeals = async (userId: string, viewAsUserIds?: string[], signal?: Abo
 
   const queryPromise = supabase
     .from('crm_deals')
-    .select(`*, contact:crm_contacts(*)`)
+    .select(`*, contact:crm_contacts(id, full_name, email, phone, company, service_value, custom_fields)`)
     .or(orConditions)
     .order('position', { ascending: true })
-    .limit(1000);
+    .order('created_at', { ascending: false })
+    .limit(500); // Reduzido de 1000 para 500 para melhor performance
 
   const { data, error } = await supabaseQueryWithTimeout(queryPromise as any, 30000, signal);
 
@@ -334,14 +335,16 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
       }
     },
     enabled: !!user?.id && !loading,
-    staleTime: 5 * 60 * 1000, // 5 minutos - usar cache por mais tempo
-    gcTime: 10 * 60 * 1000, // 10 minutos em cache
+    staleTime: 10 * 60 * 1000, // 10 minutos - aumentar cache para melhor performance
+    gcTime: 15 * 60 * 1000, // 15 minutos em cache
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false, // Não refetch ao reconectar - usar cache
     refetchInterval: false, // Não fazer refetch automático
     retry: 1, // Reduzir retries
     retryDelay: 2000,
+    // Adicionar placeholderData para melhor UX durante loading
+    placeholderData: (previousData) => previousData,
   });
 
   const {
@@ -379,11 +382,23 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
     mutationFn: (dealData: Omit<CRMDealInsert, 'user_id'>) =>
       createDeal({ ...dealData, user_id: user?.id || '' }),
     onSuccess: (newDeal) => {
-      // Atualizar cache otimisticamente em vez de invalidar imediatamente
+      // Invalidar todas as queries de deals para garantir que apareça imediatamente
+      // Usar queryKey prefix para invalidar todas as variações (com e sem viewAsUserIds)
+      queryClient.invalidateQueries({ 
+        queryKey: ['crm-deals'],
+        exact: false 
+      });
+      
+      // Também atualizar cache otimisticamente se possível
       if (user?.id) {
+        const queryKey = ['crm-deals', user.id, viewAsUserIds?.join(',')];
         queryClient.setQueryData<CRMDealWithContact[]>(
-          ['crm-deals', user.id, viewAsUserIds?.join(',')],
+          queryKey,
           (oldData = []) => {
+            // Verificar se o deal já existe no cache (evitar duplicatas)
+            const exists = oldData.some(d => d.id === newDeal.id);
+            if (exists) return oldData;
+            
             // Buscar o contato relacionado para incluir no deal
             const contact = contacts.find(c => c.id === newDeal.contact_id);
             const dealWithContact: CRMDealWithContact = {
@@ -396,12 +411,6 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
           }
         );
       }
-      // Invalidar de forma assíncrona e não bloqueante após um delay
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['crm-deals', user?.id] }).catch(() => {
-          // Ignorar erros de invalidação
-        });
-      }, 100);
     },
   });
 
@@ -416,10 +425,17 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
   const updateDealMutation = useMutation({
     mutationFn: updateDeal,
     onSuccess: (updatedDeal) => {
-      // Atualizar cache otimisticamente
+      // Invalidar todas as queries de deals para garantir atualização imediata
+      queryClient.invalidateQueries({ 
+        queryKey: ['crm-deals'],
+        exact: false 
+      });
+      
+      // Também atualizar cache otimisticamente se possível
       if (user?.id) {
+        const queryKey = ['crm-deals', user.id, viewAsUserIds?.join(',')];
         queryClient.setQueryData<CRMDealWithContact[]>(
-          ['crm-deals', user.id, viewAsUserIds?.join(',')],
+          queryKey,
           (oldData = []) =>
             oldData.map(deal =>
               deal.id === updatedDeal.id
@@ -428,10 +444,6 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
             )
         );
       }
-      // Invalidar de forma assíncrona e não bloqueante
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['crm-deals', user?.id] }).catch(() => {});
-      }, 100);
     },
   });
 
@@ -484,17 +496,20 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
   const deleteDealMutation = useMutation({
     mutationFn: (dealId: string) => deleteDeal(dealId, user?.id),
     onSuccess: (_, dealId) => {
-      // Atualizar cache otimisticamente removendo o deal
+      // Invalidar todas as queries de deals para garantir atualização imediata
+      queryClient.invalidateQueries({ 
+        queryKey: ['crm-deals'],
+        exact: false 
+      });
+      
+      // Também atualizar cache otimisticamente se possível
       if (user?.id) {
+        const queryKey = ['crm-deals', user.id, viewAsUserIds?.join(',')];
         queryClient.setQueryData<CRMDealWithContact[]>(
-          ['crm-deals', user.id, viewAsUserIds?.join(',')],
+          queryKey,
           (oldData = []) => oldData.filter(deal => deal.id !== dealId)
         );
       }
-      // Invalidar de forma assíncrona e não bloqueante
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['crm-deals', user?.id] }).catch(() => {});
-      }, 100);
     },
     onError: (error: Error) => {
       console.error('Erro na mutation de deletar deal:', error);

@@ -10,14 +10,17 @@ import { DealWonModal } from "@/components/crm/DealWonModal";
 import { FollowUpScheduleModal } from "@/components/crm/FollowUpScheduleModal";
 import { TeamMemberSelector } from "@/components/crm/TeamMemberSelector";
 import { SalesCallForm } from "@/components/calendar/SalesCallForm";
+import { AppointmentForm } from "@/components/medical-calendar/AppointmentForm";
 import { useCRM } from "@/hooks/useCRM";
 import { useFollowUps } from "@/hooks/useFollowUps";
+import { useMedicalAppointments } from "@/hooks/useMedicalAppointments";
 import { useAuth } from "@/hooks/useAuth";
 import { FollowUp } from "@/types/followUp";
 import { Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { CRMDealWithContact } from "@/types/crm";
+import { format } from "date-fns";
 
 export function PipelineManagement() {
   const { user } = useAuth();
@@ -54,6 +57,7 @@ export function PipelineManagement() {
     updateFollowUp, 
     isLoading: isLoadingFollowUps 
   } = useFollowUps();
+  const { createAppointment } = useMedicalAppointments();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [editingDeal, setEditingDeal] = useState<CRMDealWithContact | null>(null);
@@ -64,6 +68,8 @@ export function PipelineManagement() {
   const [showFollowUpEditModal, setShowFollowUpEditModal] = useState(false);
   const [showCallForm, setShowCallForm] = useState(false);
   const [dealForCall, setDealForCall] = useState<CRMDealWithContact | null>(null);
+  const [showAppointmentForm, setShowAppointmentForm] = useState(false);
+  const [dealForAppointment, setDealForAppointment] = useState<CRMDealWithContact | null>(null);
 
   const handleReorderDealsInStage = async (stage: string, dealIds: string[]) => {
     try {
@@ -203,6 +209,41 @@ export function PipelineManagement() {
     setShowFollowUpEditModal(true);
   };
 
+  const handleDealMovedToAgendado = (deal: CRMDealWithContact) => {
+    setDealForAppointment(deal);
+    setShowAppointmentForm(true);
+  };
+
+  const handleAppointmentSubmit = async (data: any) => {
+    if (!dealForAppointment?.contact_id || !user?.id) return;
+    
+    try {
+      // O AppointmentForm já calcula end_time e formata os dados corretamente
+      // Apenas garantir que o contact_id está correto (pode vir do conversionData)
+      const appointmentData = {
+        ...data,
+        contact_id: dealForAppointment.contact_id,
+        user_id: user.id,
+      };
+      
+      await createAppointment.mutateAsync(appointmentData);
+      
+      toast({
+        title: "Agendamento criado",
+        description: "O agendamento foi criado com sucesso.",
+      });
+      
+      setShowAppointmentForm(false);
+      setDealForAppointment(null);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: error instanceof Error ? error.message : "Erro ao criar agendamento",
+      });
+    }
+  };
+
   const handleDeleteDeal = async (dealId: string) => {
     try {
       await deleteDeal(dealId);
@@ -310,6 +351,7 @@ export function PipelineManagement() {
         onCompleteFollowUp={handleCompleteFollowUp}
         onEditFollowUp={handleEditFollowUp}
         showOwnerBadge={viewAllMode && selectedUserIds.length > 1}
+        onDealMovedToAgendado={handleDealMovedToAgendado}
         onDealClick={(deal) => {
           console.log('Deal clicked:', deal);
         }}
@@ -391,6 +433,29 @@ export function PipelineManagement() {
         preSelectedContactId={dealForCall?.contact_id}
         preSelectedDealId={dealForCall?.id}
       />
+
+      {/* Appointment Form - Abre quando lead é arrastado para agendado */}
+      {dealForAppointment && (
+        <AppointmentForm
+          open={showAppointmentForm}
+          onOpenChange={(open) => {
+            setShowAppointmentForm(open);
+            if (!open) {
+              setDealForAppointment(null);
+            }
+          }}
+          onSubmit={handleAppointmentSubmit}
+          conversionData={{
+            contactId: dealForAppointment.contact_id || undefined,
+            appointmentValue: dealForAppointment.value || undefined,
+            paidInAdvance: false,
+          }}
+          onAppointmentCreated={() => {
+            setShowAppointmentForm(false);
+            setDealForAppointment(null);
+          }}
+        />
+      )}
     </div>
   );
 }

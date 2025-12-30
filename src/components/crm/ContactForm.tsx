@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -23,12 +24,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { X, Plus, UserPlus, Phone } from "lucide-react";
+import { X, Plus, UserPlus, Phone, AlertCircle } from "lucide-react";
 import { useCRM } from "@/hooks/useCRM";
 import { useToast } from "@/hooks/use-toast";
 import { CRMContact, CRMPipelineStage } from "@/types/crm";
 import { useCommercialProcedures } from "@/hooks/useCommercialProcedures";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { ProcedureForm } from "@/components/commercial/ProcedureForm";
 import {
   formatCurrencyInput,
   parseCurrencyToNumber,
@@ -55,9 +57,20 @@ const contactSchema = z.object({
   company: z.string().optional(),
   position: z.string().optional(),
   service: z.string().optional(),
-  service_value: z.string().optional().transform((val) => parseCurrencyToNumber(val)),
+  service_value: z.string()
+    .min(1, "Valor da consulta é obrigatório")
+    .refine(
+      (val) => {
+        const numValue = parseCurrencyToNumber(val);
+        return numValue > 0;
+      },
+      {
+        message: "Valor da consulta deve ser maior que zero",
+      }
+    )
+    .transform((val) => parseCurrencyToNumber(val)),
   tags: z.array(z.string()).default([]),
-  create_deal: z.boolean().default(false),
+  create_deal: z.boolean().default(true),
 });
 
 type ContactFormData = z.infer<typeof contactSchema>;
@@ -81,6 +94,8 @@ interface ContactFormProps {
 export function ContactForm({ contact, trigger, initialStage, onSuccess, onContactCreated, forceOpen, onCancel, initialData }: ContactFormProps) {
   const [open, setOpen] = useState(false);
   const [tagInput, setTagInput] = useState("");
+  const [showProcedureForm, setShowProcedureForm] = useState(false);
+  const queryClient = useQueryClient();
   const { createContact, updateContact, createDeal, isCreatingContact, isUpdatingContact } = useCRM();
   const { isSecretaria } = useUserProfile();
   const { procedures, isLoading: isLoadingProcedures } = useCommercialProcedures();
@@ -97,9 +112,30 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
       service: contact?.service || (contact?.custom_fields as any)?.procedure_id || "none",
       service_value: (contact?.service_value?.toString() || "") as any,
       tags: contact?.tags || [],
-      create_deal: !!initialStage,
+      create_deal: !contact ? true : !!initialStage, // Sempre true para novos contatos
     },
   });
+
+  // Verificar se existe procedimento CONSULTA
+  const hasConsultationProcedure = useMemo(() => {
+    if (!procedures || procedures.length === 0) return false;
+    return procedures.some(
+      (p) =>
+        p.is_active &&
+        (p.name.toUpperCase() === "CONSULTA" || p.category === "consultation")
+    );
+  }, [procedures]);
+
+  const consultationProcedure = useMemo(() => {
+    if (!procedures || procedures.length === 0) return null;
+    return (
+      procedures.find(
+        (p) =>
+          p.is_active &&
+          (p.name.toUpperCase() === "CONSULTA" || p.category === "consultation")
+      ) || null
+    );
+  }, [procedures]);
 
   // Abrir automaticamente quando forceOpen é true
   useEffect(() => {
@@ -119,16 +155,17 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
         phone: initialData.phone ? formatPhone(initialData.phone) : "",
         company: "",
         position: "",
-        service: "none",
-        service_value: "" as any,
-        tags: [],
-        create_deal: !!initialStage,
+      service: "none",
+      service_value: "" as any,
+      tags: [],
+      create_deal: true, // Sempre true para novos contatos
       });
     }
   }, [initialData, open, contact, initialStage, form]);
 
   const watchedTags = form.watch("tags");
   const watchedService = form.watch("service");
+  const watchedServiceValue = form.watch("service_value");
   
   // Atualizar valor automaticamente quando um procedimento for selecionado
   useEffect(() => {
@@ -146,6 +183,19 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
     }
   }, [watchedService, procedures, form]);
 
+  // Quando procedimento CONSULTA for criado ou aparecer, selecionar automaticamente se não houver seleção
+  useEffect(() => {
+    if (consultationProcedure && !contact && (!watchedService || watchedService === "none")) {
+      form.setValue("service", consultationProcedure.id);
+      const currentValue = form.getValues("service_value");
+      // Só preencher o valor se o campo estiver vazio e o procedimento tiver preço
+      if ((!currentValue || currentValue === "") && consultationProcedure.price && consultationProcedure.price > 0) {
+        const formattedPrice = formatCurrency(consultationProcedure.price);
+        form.setValue("service_value", formattedPrice);
+      }
+    }
+  }, [consultationProcedure, contact, watchedService, form]);
+
   const onSubmit = async (data: ContactFormData) => {
     console.log('📝 ContactForm onSubmit chamado com data:', data);
     
@@ -160,7 +210,34 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
     };
 
     try {
-      const { create_deal, ...contactData } = data;
+      // Validação: verificar se há procedimento CONSULTA para novos contatos
+      if (!contact && !hasConsultationProcedure) {
+        toast({
+          variant: "destructive",
+          title: "Valor da consulta não cadastrado",
+          description: "É necessário cadastrar o valor da consulta antes de criar um novo paciente.",
+        });
+        return;
+      }
+
+      // Validação: verificar se service_value está preenchido e válido
+      const serviceValueNum = parseCurrencyToNumber(data.service_value || "");
+      if (!contact && (!data.service_value || serviceValueNum <= 0)) {
+        toast({
+          variant: "destructive",
+          title: "Valor da consulta obrigatório",
+          description: "Por favor, preencha o valor estimado da 1ª consulta.",
+        });
+        form.setError("service_value", {
+          type: "manual",
+          message: "Valor da consulta é obrigatório",
+        });
+        return;
+      }
+
+      // Para novos contatos, sempre criar deal
+      const create_deal = !contact ? true : data.create_deal;
+      const { create_deal: _, ...contactData } = data;
       
       // Buscar o procedimento selecionado para obter o valor
       const selectedProcedure = procedures?.find(p => p.id === contactData.service);
@@ -298,10 +375,11 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
           throw contactError;
         }
         
-        // Criar contrato automaticamente se solicitado
+        // Criar contrato automaticamente (sempre para novos contatos)
         if (create_deal && newContact) {
           console.log('📄 Criando deal automático...');
-          const dealStage = initialStage || "lead_novo";
+          // Sempre usar "lead_novo" para novos contatos
+          const dealStage = "lead_novo";
           
           try {
             // Criar deal com timeout
@@ -319,6 +397,12 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
             );
             
             console.log('✅ Deal criado:', newDeal);
+            
+            // Invalidar cache de deals para garantir que apareça imediatamente no pipeline
+            queryClient.invalidateQueries({ 
+              queryKey: ['crm-deals'],
+              exact: false 
+            });
             
             toast({
               title: "Contato e Contrato criados",
@@ -413,6 +497,21 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
 
   const handleOpenChange = (newOpen: boolean) => {
     console.log('🔧 handleOpenChange chamado - newOpen:', newOpen, 'forceOpen:', forceOpen);
+    
+    // Se não há procedimento CONSULTA e é um novo contato, não permitir fechar
+    if (!contact && !hasConsultationProcedure && !newOpen) {
+      console.log('⚠️ Bloqueando fechamento - procedimento CONSULTA não cadastrado');
+      toast({
+        variant: "destructive",
+        title: "Não é possível fechar",
+        description: "É necessário cadastrar o valor da consulta antes de criar um novo paciente.",
+      });
+      // Abrir o modal de procedimento se ainda não estiver aberto
+      if (!showProcedureForm) {
+        setShowProcedureForm(true);
+      }
+      return;
+    }
     
     // Se forceOpen é true e está tentando fechar, chamar onCancel se disponível
     // mas ainda permitir fechar se onCancel foi fornecido (para controle externo)
@@ -581,9 +680,12 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
               name="service_value"
               render={({ field }) => {
                 const selectedProcedure = procedures?.find(p => p.id === watchedService);
+                const isEmpty = !field.value || field.value === "";
+                const showAlert = !contact && (!hasConsultationProcedure || isEmpty);
+                
                 return (
                   <FormItem>
-                    <FormLabel>Valor do Procedimento</FormLabel>
+                    <FormLabel>Valor Estimado da 1ª Consulta *</FormLabel>
                     <FormControl>
                       <Input 
                         placeholder="R$ 0,00"
@@ -593,12 +695,42 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
                           const formattedValue = formatCurrencyInput(e.target.value);
                           field.onChange(formattedValue);
                         }}
+                        className={showAlert ? "border-red-500 focus:border-red-500" : ""}
                       />
                     </FormControl>
                     {selectedProcedure && selectedProcedure.price && (
                       <p className="text-xs text-muted-foreground">
                         Valor sugerido: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(selectedProcedure.price))}
                       </p>
+                    )}
+                    {showAlert && (
+                      <div className="mt-2 p-3 rounded-lg border-2 border-red-500 bg-red-50 dark:bg-red-950/20">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-red-700 dark:text-red-400 mb-2">
+                              É necessário cadastrar o valor da consulta para criar um novo paciente.
+                            </p>
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => {
+                                if (!hasConsultationProcedure) {
+                                  setShowProcedureForm(true);
+                                } else {
+                                  // Se já existe procedimento, apenas focar no campo
+                                  form.setFocus("service_value");
+                                }
+                              }}
+                            >
+                              {!hasConsultationProcedure 
+                                ? "Cadastrar Valor da Consulta" 
+                                : "Preencher Valor"}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
                     )}
                     <FormMessage />
                   </FormItem>
@@ -652,30 +784,6 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
               )}
             />
 
-            {!contact && (
-              <FormField
-                control={form.control}
-                name="create_deal"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>
-                        Criar contrato automaticamente
-                      </FormLabel>
-                      <p className="text-sm text-muted-foreground">
-                        Adicionar este contato como "Lead Novo" no pipeline de vendas
-                      </p>
-                    </div>
-                  </FormItem>
-                )}
-              />
-            )}
 
             <div className="flex justify-end gap-2 pt-4">
               {!forceOpen && (
@@ -694,6 +802,39 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
             </div>
           </form>
         </Form>
+
+        {/* Modal para cadastrar procedimento CONSULTA */}
+        <ProcedureForm
+          open={showProcedureForm}
+          onOpenChange={(open) => {
+            // Só permitir fechar se já houver procedimento CONSULTA cadastrado
+            if (!open && !hasConsultationProcedure && !contact) {
+              // Não permitir fechar se não há procedimento e é novo contato
+              return;
+            }
+            setShowProcedureForm(open);
+          }}
+          procedure={null}
+          required={!contact && !hasConsultationProcedure} // Obrigatório se não há procedimento e é novo contato
+          initialData={{
+            name: "CONSULTA",
+            category: "consultation",
+            is_active: true,
+          }}
+          onSuccess={(newProcedure) => {
+            // Invalidar cache e atualizar procedimentos
+            queryClient.invalidateQueries({ queryKey: ["commercial-procedures"] });
+            if (newProcedure) {
+              // Selecionar automaticamente o procedimento criado
+              form.setValue("service", newProcedure.id);
+              if (newProcedure.price) {
+                form.setValue("service_value", formatCurrency(newProcedure.price));
+              }
+              // Fechar o modal de procedimento
+              setShowProcedureForm(false);
+            }
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

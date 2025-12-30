@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useUserProfile } from './useUserProfile';
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
+import { getContactService } from '@/lib/crm';
 
 interface DashboardMetrics {
   totalPipelineValue: number;
@@ -155,8 +156,9 @@ const fetchDashboardMetrics = async (userId: string, isAdminOrDono: boolean, sig
   const serviceCounts: Record<string, number> = {};
   
   contactsData.forEach(contact => {
-    if (contact.service) {
-      serviceCounts[contact.service] = (serviceCounts[contact.service] || 0) + 1;
+    const contactService = getContactService(contact);
+    if (contactService) {
+      serviceCounts[contactService] = (serviceCounts[contactService] || 0) + 1;
     }
   });
   

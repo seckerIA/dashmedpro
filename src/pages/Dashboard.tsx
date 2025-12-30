@@ -50,6 +50,7 @@ import {
 } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
 import { formatCurrency } from "@/lib/currency"
+import { getContactService } from "@/lib/crm"
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -406,12 +407,12 @@ const VendedorDashboard = () => {
                             {stageInfo.label}
                           </Badge>
                         )}
-                        {deal.contact?.service && (
+                        {getContactService(deal.contact) && (
                           <Badge 
                             variant="outline" 
                             className="text-xs"
                           >
-                            {deal.contact.service}
+                            {getContactService(deal.contact)}
                           </Badge>
                         )}
                       </div>

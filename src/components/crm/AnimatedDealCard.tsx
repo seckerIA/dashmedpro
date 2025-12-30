@@ -21,6 +21,7 @@ import { useState } from "react";
 import { getServiceConfig } from "@/constants/services";
 import { formatCurrency } from "@/lib/currency";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { getContactService } from "@/lib/crm";
 
 interface AnimatedDealCardProps {
   deal: CRMDealWithContact;
@@ -85,7 +86,7 @@ export function AnimatedDealCard({
     .toUpperCase();
 
   // Service pode estar no custom_fields do contato como procedure_id
-  const contactService = (deal.contact as any)?.service || (deal.contact?.custom_fields as any)?.procedure_id;
+  const contactService = getContactService(deal.contact);
   const serviceConfig = contactService ? getServiceConfig(contactService) : null;
 
   return (
@@ -128,17 +129,6 @@ export function AnimatedDealCard({
           </div>
           
           <div className="flex items-center gap-1 flex-shrink-0">
-            {/* Probability Badge */}
-            {deal.probability && (
-              <Badge 
-                variant="secondary" 
-                className="text-xs"
-              >
-                <TrendingUp className="w-3 h-3 mr-1" />
-                {deal.probability}%
-              </Badge>
-            )}
-            
             {/* Edit Button */}
             {onEdit && (
               <Button

@@ -21,7 +21,6 @@ import { ConversionModal } from "./ConversionModal";
 import { useCRM } from "@/hooks/useCRM";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { LeadScoreBadge } from "./LeadScoreBadge";
 import { getScoreLevel } from "@/types/leadScoring";
 
 interface LeadCardProps {
@@ -121,12 +120,6 @@ export function LeadCard({ lead }: LeadCardProps) {
                 <Badge variant="outline" className="text-xs">
                   {COMMERCIAL_LEAD_ORIGIN_LABELS[lead.origin]}
                 </Badge>
-                {(lead as any).conversion_score !== undefined && (lead as any).conversion_score !== null && (
-                  <LeadScoreBadge 
-                    score={(lead as any).conversion_score} 
-                    size="sm"
-                  />
-                )}
               </div>
             </div>
             <div className="flex items-center gap-2">

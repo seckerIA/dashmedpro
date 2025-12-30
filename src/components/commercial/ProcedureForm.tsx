@@ -32,9 +32,12 @@ interface ProcedureFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   procedure?: CommercialProcedure | null;
+  required?: boolean; // Se true, não permite fechar o modal até cadastrar
+  initialData?: Partial<CommercialProcedureInsert>; // Dados iniciais para pré-preencher
+  onSuccess?: (procedure: CommercialProcedure | null) => void; // Callback quando cadastrado com sucesso
 }
 
-export function ProcedureForm({ open, onOpenChange, procedure }: ProcedureFormProps) {
+export function ProcedureForm({ open, onOpenChange, procedure, required = false, initialData, onSuccess }: ProcedureFormProps) {
   const { isSecretaria } = useUserProfile();
   const { doctors } = useDoctors();
   const { createProcedure, updateProcedure } = useCommercialProcedures();
@@ -83,12 +86,12 @@ export function ProcedureForm({ open, onOpenChange, procedure }: ProcedureFormPr
       }
     } else if (!procedure && open) {
       reset({
-        name: "",
-        category: "consultation",
-        description: "",
-        price: "",
-        duration_minutes: 30,
-        is_active: true,
+        name: initialData?.name || "",
+        category: initialData?.category || "consultation",
+        description: initialData?.description || "",
+        price: initialData?.price ? formatCurrencyInput(initialData.price.toString()) : "",
+        duration_minutes: initialData?.duration_minutes || 30,
+        is_active: initialData?.is_active !== undefined ? initialData.is_active : true,
       });
       setSelectedDoctorId("");
     }
@@ -112,12 +115,17 @@ export function ProcedureForm({ open, onOpenChange, procedure }: ProcedureFormPr
         ...(isSecretaria && selectedDoctorId ? { user_id: selectedDoctorId } : {}),
       };
 
+      let newProcedure: CommercialProcedure | null = null;
       if (isEditing && procedure) {
         await updateProcedure.mutateAsync({ id: procedure.id, updates: procedureData });
+        newProcedure = { ...procedure, ...procedureData } as CommercialProcedure;
       } else {
-        await createProcedure.mutateAsync(procedureData);
+        newProcedure = await createProcedure.mutateAsync(procedureData);
       }
 
+      // Chamar callback de sucesso antes de fechar
+      onSuccess?.(newProcedure);
+      
       onOpenChange(false);
       reset();
       setSelectedDoctorId("");
@@ -131,8 +139,16 @@ export function ProcedureForm({ open, onOpenChange, procedure }: ProcedureFormPr
     setValue("price", formatted, { shouldValidate: true });
   };
 
+  const handleOpenChange = (newOpen: boolean) => {
+    // Se required é true e está tentando fechar, não permitir
+    if (required && !newOpen) {
+      return;
+    }
+    onOpenChange(newOpen);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-gradient-card border-border">
         <DialogHeader className="pb-4 border-b border-border">
           <DialogTitle className="flex items-center gap-2 text-xl">
