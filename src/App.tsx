@@ -32,6 +32,8 @@ import Commercial from "./pages/Commercial";
 import FollowUps from "./pages/FollowUps";
 import Marketing from "./pages/Marketing";
 import MedicalRecords from "./pages/MedicalRecords";
+import WhatsAppInbox from "./pages/WhatsAppInbox";
+import WhatsAppSettings from "./pages/WhatsAppSettings";
 import { 
   TrendingUp, 
   Target, 
@@ -374,6 +376,22 @@ const AppRoutes = () => {
           }
         />
         <Route path="/crm" element={<CRM />} />
+        <Route
+          path="/whatsapp"
+          element={
+            <RoleProtectedRoute allowedRoles={['admin', 'dono', 'secretaria']}>
+              <WhatsAppInbox />
+            </RoleProtectedRoute>
+          }
+        />
+        <Route
+          path="/whatsapp/settings"
+          element={
+            <RoleProtectedRoute allowedRoles={['admin', 'dono', 'secretaria']}>
+              <WhatsAppSettings />
+            </RoleProtectedRoute>
+          }
+        />
         <Route path="/calendar" element={<MedicalCalendar />} />
         <Route path="/follow-ups" element={<FollowUps />} />
         <Route

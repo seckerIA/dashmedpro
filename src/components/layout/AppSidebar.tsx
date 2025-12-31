@@ -24,7 +24,8 @@ import {
   Brain,
   ShoppingCart,
   Megaphone,
-  Receipt
+  Receipt,
+  MessageCircle
 } from "lucide-react"
 import { NavLink, useLocation, useNavigate } from "react-router-dom"
 import {
@@ -99,6 +100,7 @@ const navigationGroups: Array<{
   {
     label: "Atendimento",
     items: [
+      { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle, badge: "Novo", variant: "new" as const },
       { title: "Prontuários", url: "/prontuarios", icon: ClipboardList, medicoOnly: true },
       { title: "Meu Financeiro", url: "/secretaria/financeiro", icon: Receipt, secretariaOnly: true },
     ]
