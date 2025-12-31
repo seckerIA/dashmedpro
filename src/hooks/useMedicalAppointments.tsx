@@ -90,14 +90,38 @@ const updateDealPipeline = async (
       }
     }
 
-    // Buscar deal existente para este contato/médico
-    const { data: existingDeal } = await supabase
+    // Buscar deal existente para este contato
+    // Primeiro, tentar encontrar deal no stage "agendado" (caso já tenha sido movido para lá)
+    // Depois, tentar qualquer deal ativo para o contato
+    let existingDeal = null;
+    
+    // Buscar deal no stage "agendado" primeiro (mais específico)
+    const { data: dealInAgendado } = await supabase
       .from('crm_deals')
-      .select('id, stage')
+      .select('id, stage, user_id')
       .eq('contact_id', contactId)
-      .eq('user_id', doctorId)
+      .eq('stage', 'agendado')
       .not('stage', 'in', '("fechado_ganho","fechado_perdido")')
       .maybeSingle();
+    
+    if (dealInAgendado) {
+      existingDeal = dealInAgendado;
+    } else {
+      // Se não encontrou no stage "agendado", buscar qualquer deal ativo para o contato
+      // Não usar user_id como filtro para evitar criar duplicados quando o médico é diferente
+      const { data: anyActiveDeal } = await supabase
+        .from('crm_deals')
+        .select('id, stage, user_id')
+        .eq('contact_id', contactId)
+        .not('stage', 'in', '("fechado_ganho","fechado_perdido")')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (anyActiveDeal) {
+        existingDeal = anyActiveDeal;
+      }
+    }
 
     const dealValue = appointmentData.estimated_value || appointmentData.sinal_amount || 0;
 
@@ -115,7 +139,8 @@ const updateDealPipeline = async (
 
       console.log(`[Pipeline] Deal ${existingDeal.id} atualizado para ${pipelineStage}`);
     } else {
-      // Criar novo deal
+      // Só criar novo deal se realmente não existir nenhum para este contato
+      // Isso evita duplicação quando o deal já foi movido para "agendado" manualmente
       await supabase
         .from('crm_deals')
         .insert({
@@ -131,6 +156,173 @@ const updateDealPipeline = async (
     }
   } catch (error) {
     console.error('[Pipeline] Erro ao atualizar pipeline:', error);
+    // Não propagar erro - pipeline é secundário
+  }
+};
+
+/**
+ * Verifica se paciente deve ir para "Aguardando Retorno" e move o deal se necessário
+ * Critérios:
+ * 1. Exatamente 1 consulta completa (status='completed')
+ * 2. Pagamento da consulta está OK (payment_status='paid')
+ * 3. Não há próxima consulta agendada (start_time > now())
+ * 4. Paciente não está em tratamento (is_in_treatment = false)
+ */
+export const checkAndMoveToAguardandoRetorno = async (contactId: string): Promise<void> => {
+  try {
+    // 1. Buscar consultas completadas do contato
+    const { data: completedAppointments, error: appointmentsError } = await supabase
+      .from('medical_appointments')
+      .select('id, status, payment_status, start_time')
+      .eq('contact_id', contactId)
+      .eq('status', 'completed')
+      .order('start_time', { ascending: false });
+
+    if (appointmentsError) {
+      console.error('[Aguardando Retorno] Erro ao buscar consultas:', appointmentsError);
+      return;
+    }
+
+    // 2. Verificar se tem exatamente 1 consulta completa
+    if (!completedAppointments || completedAppointments.length !== 1) {
+      return; // Não atende critério
+    }
+
+    const lastAppointment = completedAppointments[0];
+
+    // 3. Verificar se pagamento está OK
+    if (lastAppointment.payment_status !== 'paid') {
+      return; // Pagamento não está OK
+    }
+
+    // 4. Verificar se há consultas futuras agendadas
+    const now = new Date().toISOString();
+    const { data: futureAppointments, error: futureError } = await supabase
+      .from('medical_appointments')
+      .select('id')
+      .eq('contact_id', contactId)
+      .gt('start_time', now)
+      .in('status', ['scheduled', 'confirmed', 'in_progress'])
+      .limit(1);
+
+    if (futureError) {
+      console.error('[Aguardando Retorno] Erro ao buscar consultas futuras:', futureError);
+      return;
+    }
+
+    // Se há consulta futura, não deve ir para aguardando retorno
+    if (futureAppointments && futureAppointments.length > 0) {
+      return;
+    }
+
+    // 5. Buscar deal do contato e verificar is_in_treatment
+    const { data: deal, error: dealError } = await supabase
+      .from('crm_deals')
+      .select('id, is_in_treatment, stage')
+      .eq('contact_id', contactId)
+      .not('stage', 'in', '("fechado_ganho","fechado_perdido")')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (dealError) {
+      console.error('[Aguardando Retorno] Erro ao buscar deal:', dealError);
+      return;
+    }
+
+    if (!deal) {
+      return; // Sem deal para atualizar
+    }
+
+    // 6. Verificar se não está em tratamento
+    if (deal.is_in_treatment === true) {
+      return; // Está em tratamento, não deve ir para aguardando retorno
+    }
+
+    // 7. Se já está em aguardando_retorno, não precisa atualizar
+    if (deal.stage === 'aguardando_retorno') {
+      return;
+    }
+
+    // 8. Mover deal para aguardando_retorno
+    const { error: updateError } = await supabase
+      .from('crm_deals')
+      .update({
+        stage: 'aguardando_retorno' as any,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', deal.id);
+
+    if (updateError) {
+      console.error('[Aguardando Retorno] Erro ao atualizar deal:', updateError);
+      return;
+    }
+
+    console.log(`[Aguardando Retorno] Deal ${deal.id} movido para aguardando_retorno`);
+  } catch (error) {
+    console.error('[Aguardando Retorno] Erro ao verificar critérios:', error);
+    // Não propagar erro - pipeline é secundário
+  }
+};
+
+/**
+ * Atualiza deal do contato para estágio "em_tratamento" e marca is_in_treatment = true
+ */
+export const updateDealToTreatment = async (contactId: string, doctorId: string): Promise<void> => {
+  try {
+    // Buscar deal ativo do contato
+    const { data: deal, error: dealError } = await supabase
+      .from('crm_deals')
+      .select('id')
+      .eq('contact_id', contactId)
+      .not('stage', 'in', '("fechado_ganho","fechado_perdido")')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (dealError) {
+      console.error('[Em Tratamento] Erro ao buscar deal:', dealError);
+      return;
+    }
+
+    if (deal) {
+      // Atualizar deal existente
+      const { error: updateError } = await supabase
+        .from('crm_deals')
+        .update({
+          stage: 'em_tratamento' as any,
+          is_in_treatment: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', deal.id);
+
+      if (updateError) {
+        console.error('[Em Tratamento] Erro ao atualizar deal:', updateError);
+        return;
+      }
+
+      console.log(`[Em Tratamento] Deal ${deal.id} atualizado para em_tratamento`);
+    } else {
+      // Se não existe deal, criar um novo
+      const { error: insertError } = await supabase
+        .from('crm_deals')
+        .insert({
+          user_id: doctorId,
+          contact_id: contactId,
+          title: 'Paciente em tratamento',
+          stage: 'em_tratamento' as any,
+          is_in_treatment: true,
+        });
+
+      if (insertError) {
+        console.error('[Em Tratamento] Erro ao criar deal:', insertError);
+        return;
+      }
+
+      console.log('[Em Tratamento] Novo deal criado para em_tratamento');
+    }
+  } catch (error) {
+    console.error('[Em Tratamento] Erro ao atualizar deal:', error);
     // Não propagar erro - pipeline é secundário
   }
 };
@@ -308,6 +500,14 @@ const updateAppointment = async ({
           payment_status: appointment.payment_status as PaymentStatus,
         }
       );
+
+      // Se a consulta foi marcada como completed, verificar se deve ir para aguardando retorno
+      if (updates.status === 'completed' && appointment.contact_id) {
+        // Executar de forma assíncrona sem bloquear
+        checkAndMoveToAguardandoRetorno(appointment.contact_id).catch((error) => {
+          console.error('[updateAppointment] Erro ao verificar aguardando retorno:', error);
+        });
+      }
     }
   }
 
@@ -463,7 +663,11 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
 
   // Helper: Mark as completed
   const markAsCompleted = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async (params: string | { id: string; confirmedPayment?: boolean }) => {
+      // Suportar tanto string (compatibilidade) quanto objeto com confirmação
+      const id = typeof params === 'string' ? params : params.id;
+      const confirmedPayment = typeof params === 'object' ? params.confirmedPayment : undefined;
+
       // Buscar a consulta completa antes de atualizar
       const { data: appointment, error: fetchError } = await supabase
         .from('medical_appointments')
@@ -477,43 +681,64 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
       // Verificar se já existe transação financeira vinculada
       let financialTransactionId = appointment.financial_transaction_id;
 
-      // Se não existe transação e tem valor estimado, criar uma transação financeira
-      if (!financialTransactionId && appointment.estimated_value && appointment.estimated_value > 0) {
+      // Verificar se deve criar transação financeira
+      const paymentStatus = appointment.payment_status;
+      const alreadyPaid = paymentStatus === 'paid' || paymentStatus === 'partial';
+      
+      // Só criar transação se:
+      // 1. Não existe transação ainda
+      // 2. Tem valor estimado
+      // 3. E (pagamento já está confirmado OU confirmação explícita de que pagou)
+      const shouldCreateTransaction = !financialTransactionId 
+        && appointment.estimated_value 
+        && appointment.estimated_value > 0
+        && (alreadyPaid || confirmedPayment === true);
+
+      // Se não existe transação e tem valor estimado e confirmação de pagamento, criar uma transação financeira
+      if (shouldCreateTransaction) {
+        // VALIDAÇÃO PRÉVIA: Verificar se account e category existem antes de tentar criar transação
         // Buscar categoria padrão de entrada (consultas médicas)
         const { data: categories, error: categoriesError } = await supabase
           .from('financial_categories')
-          .select('id')
+          .select('id, name')
           .eq('type', 'entrada')
           .limit(1);
 
         if (categoriesError) {
           console.error('Erro ao buscar categorias:', categoriesError);
+          throw new Error(`Erro ao verificar categorias financeiras: ${categoriesError.message}`);
         }
 
         // Buscar primeira conta disponível (sempre precisa ter uma conta)
         const { data: accounts, error: accountsError } = await supabase
           .from('financial_accounts')
-          .select('id')
+          .select('id, name')
           .eq('is_active', true)
           .limit(1);
 
         if (accountsError) {
           console.error('Erro ao buscar contas:', accountsError);
+          throw new Error(`Erro ao verificar contas financeiras: ${accountsError.message}`);
         }
 
         const categoryId = categories && categories.length > 0 ? categories[0].id : null;
         const accountId = accounts && accounts.length > 0 ? accounts[0].id : null;
         
-        // Só criar transação se tiver conta e categoria
+        // Validar ANTES de tentar criar transação
         if (!accountId || !categoryId) {
           const missingItems = [];
-          if (!accountId) missingItems.push('conta financeira');
+          if (!accountId) missingItems.push('conta financeira ativa');
           if (!categoryId) missingItems.push('categoria de entrada');
           
-          console.warn(`Não foi possível criar transação: ${missingItems.join(' e ')} não encontrada(s).`);
+          const errorMessage = `Não foi possível criar a transação financeira: ${missingItems.join(' e ')} não encontrada(s). Por favor, configure uma conta financeira ativa e uma categoria de entrada no sistema antes de finalizar consultas.`;
+          
+          console.warn(errorMessage);
+          
+          // Não criar a transação, mas não falhar a operação principal
+          // A consulta será marcada como concluída mesmo sem transação
           toast({
-            title: 'Aviso',
-            description: `Consulta concluída, mas não foi possível criar a transação financeira: ${missingItems.join(' e ')} não encontrada(s). Verifique se há contas e categorias cadastradas.`,
+            title: 'Aviso - Configuração Financeira',
+            description: errorMessage,
             variant: 'default',
           });
         } else {
@@ -575,7 +800,7 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
         },
       });
     },
-    onSuccess: (data, variables) => {
+    onSuccess: async (data, variables) => {
       // Invalidar todas as queries relacionadas
       queryClient.invalidateQueries({ queryKey: ['medical-appointments'] });
       queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
@@ -593,6 +818,16 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
           ? 'A consulta foi marcada como concluída e a transação financeira foi criada automaticamente.'
           : 'A consulta foi marcada como concluída.',
       });
+
+      // Verificar se paciente deve ir para "Aguardando Retorno"
+      // Isso só acontece se não estiver em tratamento (verificação feita dentro da função)
+      if (data?.contact_id) {
+        // Executar de forma assíncrona sem bloquear a UI
+        checkAndMoveToAguardandoRetorno(data.contact_id).catch((error) => {
+          console.error('[markAsCompleted] Erro ao verificar aguardando retorno:', error);
+          // Não mostrar erro ao usuário - é uma operação secundária
+        });
+      }
     },
     onError: (error: Error) => {
       toast({

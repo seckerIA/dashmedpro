@@ -106,6 +106,7 @@ export function AppointmentForm({
   const [sinalFile, setSinalFile] = useState<File | null>(null);
   const [sinalAmount, setSinalAmount] = useState<number | null>(null);
   const [sinalAmountDisplay, setSinalAmountDisplay] = useState<string>('');
+  const [hasNoSinal, setHasNoSinal] = useState(false);
   const [linkedProcedure, setLinkedProcedure] = useState<any>(null);
   const [selectedProcedureId, setSelectedProcedureId] = useState<string | null>(null);
   const { uploadReceipt, isUploading } = useSinalReceipts();
@@ -133,6 +134,7 @@ export function AppointmentForm({
       setSinalFile(null);
       setSinalAmount(null);
       setSinalAmountDisplay('');
+      setHasNoSinal(false);
       setLinkedProcedure(null);
       setSelectedProcedureId(null);
     }
@@ -214,7 +216,7 @@ export function AppointmentForm({
 
       // Upload do comprovante de sinal se existir
       let sinalReceiptUrl: string | null = null;
-      if (sinalPaid && sinalFile) {
+      if (sinalPaid && sinalFile && !hasNoSinal) {
         sinalReceiptUrl = await uploadReceipt(sinalFile, `appointment-${Date.now()}`);
         if (!sinalReceiptUrl) {
           setAvailabilityError('Erro ao fazer upload do comprovante. Tente novamente.');
@@ -238,11 +240,11 @@ export function AppointmentForm({
         estimated_value: data.estimated_value || null,
         payment_status: data.payment_status,
         paid_in_advance: data.paid_in_advance || false,
-        // Campos de Sinal
-        sinal_amount: sinalAmount || null,
-        sinal_paid: sinalPaid,
-        sinal_receipt_url: sinalReceiptUrl,
-        sinal_paid_at: sinalPaid ? new Date().toISOString() : null,
+        // Campos de Sinal - se hasNoSinal for true, definir como null/false
+        sinal_amount: hasNoSinal ? null : (sinalAmount || null),
+        sinal_paid: hasNoSinal ? false : sinalPaid,
+        sinal_receipt_url: hasNoSinal ? null : sinalReceiptUrl,
+        sinal_paid_at: (hasNoSinal || !sinalPaid) ? null : new Date().toISOString(),
       };
 
       const result = await onSubmit(submitData);
@@ -252,6 +254,7 @@ export function AppointmentForm({
       setSinalPaid(false);
       setSinalFile(null);
       setSinalAmount(null);
+      setHasNoSinal(false);
       setLinkedProcedure(null);
       reset();
       onOpenChange(false);
@@ -909,6 +912,7 @@ export function AppointmentForm({
                 id="sinal_amount"
                 type="text"
                 value={sinalAmountDisplay}
+                disabled={hasNoSinal}
                 onChange={(e) => {
                   const formatted = formatCurrencyInput(e.target.value);
                   setSinalAmountDisplay(formatted);
@@ -917,25 +921,52 @@ export function AppointmentForm({
                 placeholder="R$ 0,00"
                 className="max-w-[200px]"
               />
-              {linkedProcedure && (
+              {linkedProcedure && !hasNoSinal && (
                 <p className="text-xs text-muted-foreground">
                   Sugestão: {linkedProcedure.sinal_percentage || 30}% do procedimento = {formatCurrency((linkedProcedure.price || 0) * ((linkedProcedure.sinal_percentage || 30) / 100))}
                 </p>
               )}
             </div>
 
-            <div className="flex items-center gap-3">
-              <Checkbox
-                id="sinal_paid"
-                checked={sinalPaid}
-                onCheckedChange={(checked) => setSinalPaid(!!checked)}
-              />
-              <Label htmlFor="sinal_paid" className="cursor-pointer font-normal">
-                Sinal já foi pago
-              </Label>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  id="sinal_paid"
+                  checked={sinalPaid}
+                  disabled={hasNoSinal}
+                  onCheckedChange={(checked) => {
+                    setSinalPaid(!!checked);
+                    if (checked) {
+                      setHasNoSinal(false);
+                    }
+                  }}
+                />
+                <Label htmlFor="sinal_paid" className="cursor-pointer font-normal">
+                  Sinal já foi pago
+                </Label>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  id="has_no_sinal"
+                  checked={hasNoSinal}
+                  onCheckedChange={(checked) => {
+                    setHasNoSinal(!!checked);
+                    if (checked) {
+                      setSinalPaid(false);
+                      setSinalFile(null);
+                      setSinalAmount(null);
+                      setSinalAmountDisplay('');
+                    }
+                  }}
+                />
+                <Label htmlFor="has_no_sinal" className="cursor-pointer font-normal text-muted-foreground">
+                  Não tem sinal
+                </Label>
+              </div>
             </div>
 
-            {sinalPaid && (
+            {sinalPaid && !hasNoSinal && (
               <div className="space-y-2 pl-7">
                 <Label htmlFor="sinal_receipt" className="text-sm">Comprovante de Pagamento</Label>
                 <div className="flex items-center gap-2">

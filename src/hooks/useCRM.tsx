@@ -10,21 +10,32 @@ import {
   CRMDealWithContact,
 } from '@/types/crm';
 import { useAuth } from './useAuth';
+import { useUserProfile } from './useUserProfile';
+import { useSecretaryDoctors } from './useSecretaryDoctors';
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
 
 // Fetch contacts
-const fetchContacts = async (userId: string, fetchAll: boolean = false, signal?: AbortSignal): Promise<CRMContact[]> => {
-  if (!userId && !fetchAll) return [];
+const fetchContacts = async (
+  userId: string,
+  fetchAll: boolean = false,
+  signal?: AbortSignal,
+  doctorIds?: string[] // IDs dos médicos vinculados (para secretárias)
+): Promise<CRMContact[]> => {
+  if (!userId && !fetchAll && (!doctorIds || doctorIds.length === 0)) return [];
 
   let queryPromise = supabase
     .from('crm_contacts')
     .select('*');
-  
-  // Se fetchAll for false, filtrar apenas pelo user_id
-  if (!fetchAll && userId) {
+
+  // Secretária vê contatos dos médicos vinculados
+  if (doctorIds && doctorIds.length > 0) {
+    queryPromise = queryPromise.in('user_id', doctorIds);
+  } else if (!fetchAll && userId) {
+    // Usuário normal vê apenas seus próprios contatos
     queryPromise = queryPromise.eq('user_id', userId);
   }
-  
+  // Se fetchAll for true, não aplica filtro (admin/dono)
+
   queryPromise = queryPromise
     .order('created_at', { ascending: false })
     .limit(1000);
@@ -36,10 +47,20 @@ const fetchContacts = async (userId: string, fetchAll: boolean = false, signal?:
 };
 
 // Fetch deals with contacts
-const fetchDeals = async (userId: string, viewAsUserIds?: string[], signal?: AbortSignal): Promise<CRMDealWithContact[]> => {
-  if (!userId) return [];
+const fetchDeals = async (
+  userId: string,
+  viewAsUserIds?: string[],
+  signal?: AbortSignal,
+  doctorIds?: string[] // IDs dos médicos vinculados (para secretárias)
+): Promise<CRMDealWithContact[]> => {
+  if (!userId && (!doctorIds || doctorIds.length === 0)) return [];
 
-  const targetUserIds = viewAsUserIds && viewAsUserIds.length > 0 ? viewAsUserIds : [userId];
+  // Secretária vê deals dos médicos vinculados
+  // Outros usuários veem seus próprios deals ou dos viewAsUserIds
+  const targetUserIds = doctorIds && doctorIds.length > 0
+    ? doctorIds
+    : (viewAsUserIds && viewAsUserIds.length > 0 ? viewAsUserIds : [userId]);
+
   const orConditions = targetUserIds
     .map(id => `user_id.eq.${id},assigned_to.eq.${id}`)
     .join(',');
@@ -234,7 +255,9 @@ const deleteContact = async (contactId: string): Promise<void> => {
 
 // Delete deal
 const deleteDeal = async (dealId: string, userId?: string): Promise<void> => {
-  // Primeiro, verificar se o deal existe e se o usuário tem permissão
+  console.log('🗑️ deleteDeal chamado:', { dealId, userId });
+  
+  // Se não tem userId, ainda tenta deletar (para casos onde a validação já foi feita)
   if (userId) {
     const { data: deal, error: fetchError } = await supabase
       .from('crm_deals')
@@ -243,13 +266,16 @@ const deleteDeal = async (dealId: string, userId?: string): Promise<void> => {
       .single();
 
     if (fetchError) {
-      console.error('Erro ao buscar deal para deleção:', fetchError);
+      console.error('❌ Erro ao buscar deal para deleção:', fetchError);
       throw new Error(`Erro ao verificar permissão: ${fetchError.message}`);
     }
 
     if (!deal) {
+      console.error('❌ Deal não encontrado:', dealId);
       throw new Error('Deal não encontrado');
     }
+
+    console.log('🔍 Deal encontrado:', { dealId: deal.id, userId: deal.user_id, assignedTo: deal.assigned_to });
 
     // Verificar se o usuário tem permissão (é o dono ou admin/dono)
     const isOwner = deal.user_id === userId;
@@ -257,21 +283,28 @@ const deleteDeal = async (dealId: string, userId?: string): Promise<void> => {
     
     if (!isOwner && !isAssigned) {
       // Verificar se é admin/dono
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', userId)
         .single();
       
+      if (profileError) {
+        console.error('❌ Erro ao buscar perfil:', profileError);
+        throw new Error(`Erro ao verificar permissão: ${profileError.message}`);
+      }
+      
       const isAdminOrDono = profile?.role === 'admin' || profile?.role === 'dono';
+      console.log('🔐 Verificação de permissão:', { isOwner, isAssigned, role: profile?.role, isAdminOrDono });
       
       if (!isAdminOrDono) {
-        throw new Error('Você não tem permissão para excluir este deal. Apenas o criador ou um administrador pode excluí-lo.');
+        throw new Error('Você não tem permissão para excluir este deal. Apenas o criador, responsável ou um administrador pode excluí-lo.');
       }
     }
   }
 
   // Tentar deletar
+  console.log('✅ Tentando deletar deal:', dealId);
   const { error, data } = await supabase
     .from('crm_deals')
     .delete()
@@ -279,37 +312,50 @@ const deleteDeal = async (dealId: string, userId?: string): Promise<void> => {
     .select();
 
   if (error) {
-    console.error('Erro ao deletar deal:', error);
+    console.error('❌ Erro ao deletar deal:', error);
     throw new Error(`Erro ao excluir deal: ${error.message}`);
   }
 
   // Verificar se realmente foi deletado
   if (!data || data.length === 0) {
-    throw new Error('O deal não foi excluído. Verifique se você tem permissão para excluí-lo.');
+    console.error('❌ Deal não foi deletado (nenhum dado retornado):', dealId);
+    throw new Error('O deal não foi excluído. Verifique se você tem permissão para excluí-lo ou se o deal ainda existe.');
   }
+
+  console.log('✅ Deal deletado com sucesso:', dealId);
 };
 
 // Hook principal
 export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = false) {
   const { user, loading } = useAuth();
+  const { isSecretaria, isLoading: isLoadingProfile } = useUserProfile();
+  const { doctorIds, isLoading: isLoadingDoctors } = useSecretaryDoctors();
   const queryClient = useQueryClient();
+
+  // Secretária usa lista de médicos vinculados para filtrar
+  const doctorIdsToUse = isSecretaria ? doctorIds : [];
 
   const {
     data: contacts = [],
     isLoading: isLoadingContacts,
     refetch: refetchContacts,
   } = useQuery({
-    queryKey: ['crm-contacts', user?.id, fetchAllContacts],
+    queryKey: ['crm-contacts', user?.id, fetchAllContacts, doctorIdsToUse],
     queryFn: async ({ signal }) => {
-      if (!user?.id && !fetchAllContacts) return [];
+      if (!user?.id && !fetchAllContacts && doctorIdsToUse.length === 0) return [];
       try {
-        return await fetchContacts(user?.id || '', fetchAllContacts, signal);
+        return await fetchContacts(
+          user?.id || '',
+          fetchAllContacts,
+          signal,
+          doctorIdsToUse.length > 0 ? doctorIdsToUse : undefined
+        );
       } catch (error) {
         console.error('Erro ao buscar contatos:', error);
         return [];
       }
     },
-    enabled: (!!user?.id || fetchAllContacts) && !loading,
+    enabled: (!!user?.id || fetchAllContacts || doctorIdsToUse.length > 0) && !loading && (!isSecretaria || !isLoadingDoctors),
     staleTime: 5 * 60 * 1000, // 5 minutos - usar cache por mais tempo
     gcTime: 10 * 60 * 1000, // 10 minutos em cache
     refetchOnMount: false,
@@ -324,17 +370,22 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
     data: deals = [],
     isLoading: isLoadingDeals,
   } = useQuery({
-    queryKey: ['crm-deals', user?.id, viewAsUserIds?.join(',')],
+    queryKey: ['crm-deals', user?.id, viewAsUserIds?.join(','), doctorIdsToUse],
     queryFn: async ({ signal }) => {
-      if (!user?.id) return [];
+      if (!user?.id && doctorIdsToUse.length === 0) return [];
       try {
-        return await fetchDeals(user.id, viewAsUserIds, signal);
+        return await fetchDeals(
+          user?.id || '',
+          viewAsUserIds,
+          signal,
+          doctorIdsToUse.length > 0 ? doctorIdsToUse : undefined
+        );
       } catch (error) {
         console.error('Erro ao buscar deals:', error);
         return [];
       }
     },
-    enabled: !!user?.id && !loading,
+    enabled: (!!user?.id || doctorIdsToUse.length > 0) && !loading && (!isSecretaria || !isLoadingDoctors),
     staleTime: 10 * 60 * 1000, // 10 minutos - aumentar cache para melhor performance
     gcTime: 15 * 60 * 1000, // 15 minutos em cache
     refetchOnMount: false,

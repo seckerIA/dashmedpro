@@ -17,6 +17,7 @@ import {
   Calendar,
   Stethoscope,
   AlertTriangle,
+  Clock,
   LucideIcon
 } from 'lucide-react';
 
@@ -102,6 +103,14 @@ export const PIPELINE_STAGES: {
     icon: AlertTriangle,
     bgColor: 'bg-red-500/10',
     textColor: 'text-red-400'
+  },
+  {
+    value: 'aguardando_retorno',
+    label: 'Aguardando Retorno',
+    color: 'bg-yellow-500',
+    icon: Clock,
+    bgColor: 'bg-yellow-500/10',
+    textColor: 'text-yellow-400'
   },
 ];
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -95,6 +95,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
   const [open, setOpen] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const [showProcedureForm, setShowProcedureForm] = useState(false);
+  const forceOpenRef = useRef<boolean | undefined>(forceOpen);
   const queryClient = useQueryClient();
   const { createContact, updateContact, createDeal, isCreatingContact, isUpdatingContact } = useCRM();
   const { isSecretaria } = useUserProfile();
@@ -139,10 +140,11 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
 
   // Abrir automaticamente quando forceOpen é true
   useEffect(() => {
-    console.log('🔄 ContactForm useEffect - forceOpen:', forceOpen);
-    if (forceOpen !== undefined) {
-      console.log('📂 Abrindo dialog com forceOpen:', forceOpen);
-      setOpen(forceOpen);
+    if (forceOpenRef.current !== forceOpen) {
+      forceOpenRef.current = forceOpen;
+      if (forceOpen !== undefined) {
+        setOpen(forceOpen);
+      }
     }
   }, [forceOpen]);
 
@@ -496,11 +498,8 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
   const isLoading = isCreatingContact || isUpdatingContact;
 
   const handleOpenChange = (newOpen: boolean) => {
-    console.log('🔧 handleOpenChange chamado - newOpen:', newOpen, 'forceOpen:', forceOpen);
-    
     // Se não há procedimento CONSULTA e é um novo contato, não permitir fechar
     if (!contact && !hasConsultationProcedure && !newOpen) {
-      console.log('⚠️ Bloqueando fechamento - procedimento CONSULTA não cadastrado');
       toast({
         variant: "destructive",
         title: "Não é possível fechar",
@@ -516,35 +515,25 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
     // Se forceOpen é true e está tentando fechar, chamar onCancel se disponível
     // mas ainda permitir fechar se onCancel foi fornecido (para controle externo)
     if (forceOpen && !newOpen) {
-      console.log('⚠️ Tentativa de fechar Dialog com forceOpen=true');
       if (onCancel) {
-        console.log('📞 Chamando onCancel para controle externo');
         onCancel();
         return; // Deixar o componente pai controlar o estado
       }
-      console.log('⚠️ Bloqueando fechamento - forceOpen sem onCancel');
       return;
     }
     
     setOpen(newOpen);
     if (!newOpen) {
-      console.log('🧹 Fechando dialog e limpando formulário');
       // Limpar o formulário quando fechar
       form.reset();
       if (onCancel) {
-        console.log('📞 Chamando onCancel');
         onCancel();
       }
     }
   };
 
-  // Log para debug
-  useEffect(() => {
-    console.log('🔍 ContactForm estado - open:', open, 'forceOpen:', forceOpen, 'Dialog open:', forceOpen || open);
-  }, [open, forceOpen]);
-
   return (
-    <Dialog open={forceOpen || open} onOpenChange={handleOpenChange}>
+    <Dialog open={forceOpen !== undefined ? forceOpen : open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger || (
           <Button>

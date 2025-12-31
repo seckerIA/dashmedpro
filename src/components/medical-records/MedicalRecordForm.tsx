@@ -17,11 +17,14 @@ import { useMedicalRecords, useMedicalRecord } from '@/hooks/useMedicalRecords';
 import { useAuth } from '@/hooks/useAuth';
 import { VitalSignsInput } from './VitalSignsInput';
 import { PrescriptionBuilder } from './PrescriptionBuilder';
+import { TreatmentConfirmationModal } from './TreatmentConfirmationModal';
+import { updateDealToTreatment, checkAndMoveToAguardandoRetorno } from '@/hooks/useMedicalAppointments';
 import { VitalSigns, Prescription, MedicalRecordInsert } from '@/types/medicalRecords';
 import { Save, CheckCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { useQueryClient } from '@tanstack/react-query';
 
 const formSchema = z.object({
   // Anamnese
@@ -73,10 +76,12 @@ export function MedicalRecordForm({
   onCancel,
 }: MedicalRecordFormProps) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { createRecord, updateRecord, markAsCompleted } = useMedicalRecords();
   const { record, isLoading: loadingRecord } = useMedicalRecord(recordId || null);
   const [vitalSigns, setVitalSigns] = useState<VitalSigns>({});
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
+  const [showTreatmentModal, setShowTreatmentModal] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -212,7 +217,32 @@ export function MedicalRecordForm({
       }
     }
 
-    onSave?.();
+    // Abrir modal de confirmação de tratamento após salvar
+    setShowTreatmentModal(true);
+  };
+
+  const handleTreatmentConfirm = async (isInTreatment: boolean) => {
+    if (!user || !contactId) return;
+
+    try {
+      if (isInTreatment) {
+        // Marcar como em tratamento e mover para stage em_tratamento
+        await updateDealToTreatment(contactId, user.id);
+      } else {
+        // Verificar se deve ir para aguardando retorno
+        await checkAndMoveToAguardandoRetorno(contactId);
+      }
+
+      // Invalidar queries do CRM para atualizar o pipeline
+      queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
+      
+      // Chamar callback onSave após tudo
+      onSave?.();
+    } catch (error) {
+      console.error('Erro ao atualizar status de tratamento:', error);
+      // Mesmo com erro, chamar onSave para fechar o formulário
+      onSave?.();
+    }
   };
 
   if (loadingRecord) {
@@ -577,6 +607,13 @@ export function MedicalRecordForm({
           )}
         </div>
       </form>
+
+      {/* Modal de confirmação de tratamento */}
+      <TreatmentConfirmationModal
+        open={showTreatmentModal}
+        onOpenChange={setShowTreatmentModal}
+        onConfirm={handleTreatmentConfirm}
+      />
     </Form>
   );
 }

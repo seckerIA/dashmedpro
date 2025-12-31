@@ -15,6 +15,7 @@ import { DailyAppointmentsList } from '@/components/medical-calendar/DailyAppoin
 import { TimeGridView } from '@/components/medical-calendar/TimeGridView';
 import { AppointmentMetrics } from '@/components/medical-calendar/AppointmentMetrics';
 import { AttendanceChecklist } from '@/components/medical-calendar/AttendanceChecklist';
+import { PaymentConfirmationModal } from '@/components/medical-calendar/PaymentConfirmationModal';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
@@ -57,6 +58,10 @@ export default function MedicalCalendar() {
   const [recordContactId, setRecordContactId] = useState<string | null>(null);
   const [recordAppointmentId, setRecordAppointmentId] = useState<string | null>(null);
   const [recordContactName, setRecordContactName] = useState<string | undefined>(undefined);
+
+  // Payment Confirmation Modal state
+  const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false);
+  const [appointmentForPayment, setAppointmentForPayment] = useState<MedicalAppointmentWithRelations | null>(null);
 
   // Calcular range do mês para carregar consultas
   const monthStart = startOfMonth(selectedDate);
@@ -266,17 +271,37 @@ export default function MedicalCalendar() {
   };
 
   const handleMarkCompleted = async (appointment: MedicalAppointmentWithRelations) => {
-    await markAsCompleted.mutateAsync(appointment.id);
-    setShowAppointmentDetails(false);
-    setSelectedAppointment(null);
+    // Usar o mesmo fluxo de confirmação de pagamento
+    setAppointmentForPayment(appointment);
+    setShowPaymentConfirmation(true);
   };
 
   const handleMarkAttended = async (appointment: MedicalAppointmentWithRelations) => {
-    await markAsCompleted.mutateAsync(appointment.id);
-    
-    // Se for médico ou admin, redirecionar para o prontuário do paciente
-    if ((isMedico || isAdmin) && appointment.contact_id) {
-      navigate(`/prontuarios?patientId=${appointment.contact_id}&tab=historico`);
+    // Abrir modal de confirmação de pagamento antes de marcar como compareceu
+    setAppointmentForPayment(appointment);
+    setShowPaymentConfirmation(true);
+  };
+
+  const handlePaymentConfirmation = async (paid: boolean) => {
+    if (!appointmentForPayment) return;
+
+    try {
+      // Marcar como completado com confirmação de pagamento
+      await markAsCompleted.mutateAsync({
+        id: appointmentForPayment.id,
+        confirmedPayment: paid,
+      });
+      
+      // Fechar modal
+      setShowPaymentConfirmation(false);
+      setAppointmentForPayment(null);
+
+      // Se for médico ou admin, redirecionar para o prontuário do paciente
+      if ((isMedico || isAdmin) && appointmentForPayment.contact_id) {
+        navigate(`/prontuarios?patientId=${appointmentForPayment.contact_id}&tab=historico`);
+      }
+    } catch (error) {
+      console.error('Erro ao marcar consulta como compareceu:', error);
     }
   };
 
@@ -385,9 +410,10 @@ export default function MedicalCalendar() {
 
   const handleDetailsMarkCompleted = async () => {
     if (selectedAppointment) {
-      await markAsCompleted.mutateAsync(selectedAppointment.id);
+      // Fechar modal de detalhes e abrir modal de confirmação de pagamento
       setShowAppointmentDetails(false);
-      setSelectedAppointment(null);
+      setAppointmentForPayment(selectedAppointment);
+      setShowPaymentConfirmation(true);
     }
   };
 
@@ -614,6 +640,20 @@ export default function MedicalCalendar() {
 
       {/* Attendance Checklist */}
       <AttendanceChecklist />
+
+      {/* Payment Confirmation Modal */}
+      <PaymentConfirmationModal
+        open={showPaymentConfirmation}
+        onOpenChange={(open) => {
+          setShowPaymentConfirmation(open);
+          if (!open) {
+            setAppointmentForPayment(null);
+          }
+        }}
+        appointment={appointmentForPayment}
+        onConfirm={handlePaymentConfirmation}
+        isProcessing={markAsCompleted.isPending}
+      />
 
       {/* Modals */}
       <AppointmentForm

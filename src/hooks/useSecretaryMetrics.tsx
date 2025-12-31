@@ -148,24 +148,71 @@ export function useSecretaryMetrics() {
         .gte('created_at', monthStart);
 
       // Executar todas as queries em paralelo
-      const [
-        appointmentsResult,
-        doctorsResult,
-        contactsTodayResult,
-        contactsWeekResult,
-        totalContactsResult,
-        myAppointmentsResult,
-      ] = await Promise.all([
-        supabaseQueryWithTimeout(appointmentsQuery as any, 30000, signal),
-        supabaseQueryWithTimeout(doctorsQuery as any, 30000, signal),
-        supabaseQueryWithTimeout(contactsTodayQuery as any, 30000, signal),
-        supabaseQueryWithTimeout(contactsWeekQuery as any, 30000, signal),
-        supabaseQueryWithTimeout(totalContactsQuery as any, 30000, signal),
-        supabaseQueryWithTimeout(myAppointmentsQuery as any, 30000, signal),
-      ]);
+      let appointments: any[] = [];
+      let doctors: any[] = [];
+      let contactsTodayCount = 0;
+      let contactsWeekCount = 0;
+      let totalContactsCount = 0;
+      let myAppointmentsCount = 0;
 
-      const appointments = appointmentsResult.data || [];
-      const doctors = doctorsResult.data || [];
+      try {
+        const [
+          appointmentsResult,
+          doctorsResult,
+          contactsTodayResult,
+          contactsWeekResult,
+          totalContactsResult,
+          myAppointmentsResult,
+        ] = await Promise.all([
+          supabaseQueryWithTimeout(appointmentsQuery as any, 30000, signal),
+          supabaseQueryWithTimeout(doctorsQuery as any, 30000, signal),
+          supabaseQueryWithTimeout(contactsTodayQuery as any, 30000, signal),
+          supabaseQueryWithTimeout(contactsWeekQuery as any, 30000, signal),
+          supabaseQueryWithTimeout(totalContactsQuery as any, 30000, signal),
+          supabaseQueryWithTimeout(myAppointmentsQuery as any, 30000, signal),
+        ]);
+
+        // Tratar erros individualmente para não quebrar toda a query se uma falhar
+        if (appointmentsResult.error) {
+          console.error('[useSecretaryMetrics] Erro ao buscar consultas:', appointmentsResult.error);
+        } else {
+          appointments = appointmentsResult.data || [];
+        }
+
+        if (doctorsResult.error) {
+          console.error('[useSecretaryMetrics] Erro ao buscar médicos:', doctorsResult.error);
+        } else {
+          doctors = doctorsResult.data || [];
+        }
+
+        if (contactsTodayResult.error) {
+          console.error('[useSecretaryMetrics] Erro ao buscar contatos de hoje:', contactsTodayResult.error);
+        } else {
+          contactsTodayCount = contactsTodayResult.data?.length || 0;
+        }
+
+        if (contactsWeekResult.error) {
+          console.error('[useSecretaryMetrics] Erro ao buscar contatos da semana:', contactsWeekResult.error);
+        } else {
+          contactsWeekCount = contactsWeekResult.data?.length || 0;
+        }
+
+        if (totalContactsResult.error) {
+          console.error('[useSecretaryMetrics] Erro ao buscar total de contatos:', totalContactsResult.error);
+        } else {
+          totalContactsCount = totalContactsResult.data?.length || 0;
+        }
+
+        if (myAppointmentsResult.error) {
+          console.error('[useSecretaryMetrics] Erro ao buscar consultas agendadas por mim:', myAppointmentsResult.error);
+        } else {
+          myAppointmentsCount = myAppointmentsResult.data?.length || 0;
+        }
+      } catch (error) {
+        console.error('[useSecretaryMetrics] Erro geral ao buscar métricas:', error);
+        // Retornar métricas vazias em caso de erro crítico
+        return emptyMetrics;
+      }
 
       // Criar mapa de médicos para lookup rápido
       const doctorsMap = new Map(doctors.map(d => [d.id, d]));
@@ -231,11 +278,11 @@ export function useSecretaryMetrics() {
         monthAppointments: monthAppointments.length,
         confirmedToday,
         pendingConfirmation,
-        appointmentsScheduledByMe: myAppointmentsResult.data?.length || 0,
+        appointmentsScheduledByMe: myAppointmentsCount,
         appointmentsThisWeek,
-        newContactsToday: contactsTodayResult.data?.length || 0,
-        newContactsWeek: contactsWeekResult.data?.length || 0,
-        totalContacts: totalContactsResult.data?.length || 0,
+        newContactsToday: contactsTodayCount,
+        newContactsWeek: contactsWeekCount,
+        totalContacts: totalContactsCount,
         upcomingAppointments,
         doctors: doctors.map(d => ({
           id: d.id,
@@ -245,12 +292,13 @@ export function useSecretaryMetrics() {
       };
     },
     enabled: !!user?.id && !!profile && profile?.role === 'secretaria',
-    staleTime: 5 * 60 * 1000, // 5 minutos - reduzir frequência de atualização
-    gcTime: 10 * 60 * 1000,
+    // TODO: Migrar para CACHE_TIMES.NORMAL e GC_TIMES.NORMAL de queryConstants.ts
+    staleTime: 5 * 60 * 1000, // 5 minutos - dados normais que mudam ocasionalmente
+    gcTime: 10 * 60 * 1000, // 10 minutos em cache
     refetchOnMount: false, // Não refetch automático ao montar
     refetchOnWindowFocus: false, // Não refetch ao voltar para a aba
     refetchOnReconnect: false,
-    retry: 1, // Reduzir retries
+    retry: 1, // Reduzir retries para evitar sobrecarga
     retryDelay: 2000,
   });
 }

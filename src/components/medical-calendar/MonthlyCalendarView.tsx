@@ -184,25 +184,27 @@ export function MonthlyCalendarView({
                     {format(day, 'd')}
                   </span>
                   {hasEvents && isCurrentMonth && (
-                    <div className="mt-1 flex items-center justify-center gap-0.5">
+                    <div className="mt-1 flex items-center justify-center gap-1">
                       {hasAppointments && (
                         <div
                           className={cn(
-                            'w-1.5 h-1.5 rounded-full',
+                            'w-2 h-2 rounded-full flex-shrink-0',
                             isSelected
                               ? 'bg-primary-foreground'
                               : 'bg-primary'
                           )}
+                          title={`${dayEvents.appointments} ${dayEvents.appointments === 1 ? 'consulta' : 'consultas'}`}
                         />
                       )}
                       {hasMeetings && (
                         <div
                           className={cn(
-                            'w-1.5 h-1.5 rounded-full',
+                            'w-2 h-2 rounded-full flex-shrink-0',
                             isSelected
                               ? 'bg-primary-foreground'
                               : 'bg-orange-500'
                           )}
+                          title={`${dayEvents.meetings} ${dayEvents.meetings === 1 ? 'reunião' : 'reuniões'}`}
                         />
                       )}
                     </div>

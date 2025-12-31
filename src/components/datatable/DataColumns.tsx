@@ -26,7 +26,9 @@ const getRoleLabel = (role: string) => {
     admin: 'Administrador',
     dono: 'Dono',
     vendedor: 'Vendedor',
-    gestor_trafego: 'Gestor de Tráfego'
+    gestor_trafego: 'Gestor de Tráfego',
+    medico: 'Médico',
+    secretaria: 'Secretária'
   };
   return labels[role as keyof typeof labels] || role;
 };
@@ -36,7 +38,9 @@ const getRoleColor = (role: string) => {
     admin: 'destructive',
     dono: 'default',
     vendedor: 'secondary',
-    gestor_trafego: 'outline'
+    gestor_trafego: 'outline',
+    medico: 'default',
+    secretaria: 'secondary'
   };
   return colors[role as keyof typeof colors] || 'secondary';
 };

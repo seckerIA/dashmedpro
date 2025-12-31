@@ -20,7 +20,6 @@ import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import TeamManagement from "./pages/TeamManagement";
 import Tasks from "./pages/Tasks";
-import TasksDebug from "./pages/TasksDebug";
 import CRM from "./pages/CRM";
 import MedicalCalendar from "./pages/MedicalCalendar";
 import Financial from "./pages/Financial";
@@ -317,7 +316,6 @@ const AppRoutes = () => {
           } 
         />
         <Route path="/tarefas" element={<Tasks />} />
-        <Route path="/tarefas-debug" element={<TasksDebug />} />
         <Route 
           path="/marketing" 
           element={

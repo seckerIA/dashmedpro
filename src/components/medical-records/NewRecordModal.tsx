@@ -111,7 +111,7 @@ export function NewRecordModal({ open, onOpenChange, contactId, patientName }: N
       )
     : COMMON_CID_CODES;
 
-  const handleSubmit = (data: RecordFormData) => {
+  const handleSubmit = async (data: RecordFormData) => {
     const recordInput: CreateMedicalRecordInput = {
       contact_id: contactId,
       ...data,
@@ -122,12 +122,14 @@ export function NewRecordModal({ open, onOpenChange, contactId, patientName }: N
       exams_requested: examsRequested.length > 0 ? examsRequested : undefined,
     };
 
-    createRecord(recordInput, {
-      onSuccess: () => {
-        onOpenChange(false);
-        resetForm();
-      },
-    });
+    try {
+      await createRecord.mutateAsync(recordInput);
+      onOpenChange(false);
+      resetForm();
+    } catch (error) {
+      // Erro já é tratado pelo hook useMedicalRecords com toast
+      console.error('Erro ao criar prontuário:', error);
+    }
   };
 
   const resetForm = () => {

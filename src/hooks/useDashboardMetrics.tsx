@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useUserProfile } from './useUserProfile';
+import { useSecretaryDoctors } from './useSecretaryDoctors';
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
 import { getContactService } from '@/lib/crm';
 
@@ -21,7 +22,12 @@ interface DashboardMetrics {
   recentDeals: Array<any>;
 }
 
-const fetchDashboardMetrics = async (userId: string, isAdminOrDono: boolean, signal?: AbortSignal): Promise<DashboardMetrics> => {
+const fetchDashboardMetrics = async (
+  userId: string,
+  isAdminOrDono: boolean,
+  signal?: AbortSignal,
+  doctorIds?: string[] // IDs dos médicos vinculados (para secretárias)
+): Promise<DashboardMetrics> => {
   // Buscar deals com contatos
   let dealsQuery = supabase
     .from('crm_deals')
@@ -30,10 +36,20 @@ const fetchDashboardMetrics = async (userId: string, isAdminOrDono: boolean, sig
       contact:crm_contacts(*)
     `);
 
-  // Apenas filtrar por usuário se NÃO for Admin/Dono
+  // Aplicar filtros baseados no papel do usuário
   if (!isAdminOrDono) {
-    dealsQuery = dealsQuery.or(`user_id.eq.${userId},assigned_to.eq.${userId}`);
+    if (doctorIds && doctorIds.length > 0) {
+      // Secretária: ver deals dos médicos vinculados
+      const orConditions = doctorIds
+        .map(id => `user_id.eq.${id},assigned_to.eq.${id}`)
+        .join(',');
+      dealsQuery = dealsQuery.or(orConditions);
+    } else {
+      // Outros usuários: ver apenas seus próprios deals
+      dealsQuery = dealsQuery.or(`user_id.eq.${userId},assigned_to.eq.${userId}`);
+    }
   }
+  // Admin/Dono: ver todos os deals (sem filtro)
 
   // Passar o query builder (não executado) para permitir abortSignal
   const dealsResult = await supabaseQueryWithTimeout(dealsQuery as any, 30000, signal);
@@ -46,10 +62,17 @@ const fetchDashboardMetrics = async (userId: string, isAdminOrDono: boolean, sig
     .from('crm_contacts')
     .select('*');
 
-  // Apenas filtrar por usuário se NÃO for Admin/Dono
+  // Aplicar filtros baseados no papel do usuário
   if (!isAdminOrDono) {
-    contactsQuery = contactsQuery.eq('user_id', userId);
+    if (doctorIds && doctorIds.length > 0) {
+      // Secretária: ver contatos dos médicos vinculados
+      contactsQuery = contactsQuery.in('user_id', doctorIds);
+    } else {
+      // Outros usuários: ver apenas seus próprios contatos
+      contactsQuery = contactsQuery.eq('user_id', userId);
+    }
   }
+  // Admin/Dono: ver todos os contatos (sem filtro)
 
   // Passar o query builder (não executado) para permitir abortSignal
   const contactsResult = await supabaseQueryWithTimeout(contactsQuery as any, 30000, signal);
@@ -205,24 +228,33 @@ const fetchDashboardMetrics = async (userId: string, isAdminOrDono: boolean, sig
 
 export function useDashboardMetrics() {
   const { user, loading: authLoading } = useAuth();
-  const { profile, isLoading: isLoadingProfile } = useUserProfile();
+  const { profile, isSecretaria, isLoading: isLoadingProfile } = useUserProfile();
+  const { doctorIds, isLoading: isLoadingDoctors } = useSecretaryDoctors();
   const isAdminOrDono = profile?.role === 'admin' || profile?.role === 'dono';
 
+  // Secretária usa lista de médicos vinculados para filtrar
+  const doctorIdsToUse = isSecretaria ? doctorIds : [];
+
   return useQuery({
-    queryKey: ['dashboard-metrics', user?.id, profile?.role],
+    queryKey: ['dashboard-metrics', user?.id, profile?.role, doctorIdsToUse],
     queryFn: async ({ signal }) => {
       if (!user?.id) {
         throw new Error('Usuário não autenticado');
       }
       try {
-        const result = await fetchDashboardMetrics(user.id, isAdminOrDono, signal);
+        const result = await fetchDashboardMetrics(
+          user.id,
+          isAdminOrDono,
+          signal,
+          doctorIdsToUse.length > 0 ? doctorIdsToUse : undefined
+        );
         return result;
       } catch (error: any) {
         console.error('❌ useDashboardMetrics - Erro ao buscar métricas:', error);
         throw error;
       }
     },
-    enabled: !!user?.id && !!profile && !authLoading && !isLoadingProfile,
+    enabled: !!user?.id && !!profile && !authLoading && !isLoadingProfile && (!isSecretaria || !isLoadingDoctors),
     refetchInterval: (query) => {
       // Se a query está carregando, não fazer refetch para evitar acúmulo
       if (query.state.fetchStatus === 'fetching') {

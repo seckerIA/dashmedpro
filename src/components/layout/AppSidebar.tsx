@@ -93,7 +93,7 @@ const navigationGroups: Array<{
       { title: "Métricas de Equipe", url: "/crm", icon: Users },
       { title: "Calendário", url: "/calendar", icon: Calendar, badge: "Novo", variant: "new" as const },
       // { title: "Follow-ups", url: "/follow-ups", icon: RotateCcw }, // Ocultado
-      { title: "Funil de Vendas", url: "/funil-vendas", icon: BarChart3 },
+      // { title: "Funil de Vendas", url: "/funil-vendas", icon: BarChart3 }, // Ocultado - placeholder
     ]
   },
   {
@@ -107,8 +107,8 @@ const navigationGroups: Array<{
     label: "Ferramentas",
     items: [
       { title: "Financeiro", url: "/financeiro", icon: PieChart },
-      { title: "E-mail Marketing", url: "/email-marketing", icon: Mail },
-      { title: "Landing Pages", url: "/landing-pages", icon: FileText },
+      // { title: "E-mail Marketing", url: "/email-marketing", icon: Mail }, // Ocultado - placeholder
+      // { title: "Landing Pages", url: "/landing-pages", icon: FileText }, // Ocultado - placeholder
       { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
     ]
   },
@@ -285,13 +285,14 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                     }
                   }
 
-                  // Se o item tem secretariaOnly, só mostrar para secretária e admin/dono
+                  // Se o item tem secretariaOnly, só mostrar para secretária (admin/dono já têm acesso ao financeiro completo)
                   if (item.secretariaOnly === true) {
                     if (isLoadingProfile || !profile) {
                       return false;
                     }
                     const userRole = profile.role;
-                    const canSee = userRole === 'secretaria' || userRole === 'admin' || userRole === 'dono';
+                    // Apenas secretária vê "Meu Financeiro", médicos e admins já têm acesso ao financeiro completo
+                    const canSee = userRole === 'secretaria';
                     if (!canSee) {
                       return false;
                     }

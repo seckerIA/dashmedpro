@@ -138,17 +138,9 @@ export function ContactActionSelector({
       <ContactForm
         initialStage={stage}
         onSuccess={handleContactFormSuccess}
-        trigger={
-          <button 
-            style={{ display: 'none' }} 
-            ref={(el) => {
-              if (el && showNewContactForm) {
-                el.click();
-                setShowNewContactForm(false);
-              }
-            }}
-          />
-        }
+        forceOpen={showNewContactForm}
+        onCancel={() => setShowNewContactForm(false)}
+        trigger={<button style={{ display: 'none' }} />}
       />
 
       {/* Modal para contato existente */}

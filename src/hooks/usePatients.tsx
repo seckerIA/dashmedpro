@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
 import { useAuth } from './useAuth';
+import { useUserProfile } from './useUserProfile';
+import { useSecretaryDoctors } from './useSecretaryDoctors';
 import { Patient, UpdatePatientMedicalInfoInput, EmergencyContact } from '@/types/medicalRecords';
 import { useToast } from '@/hooks/use-toast';
 
@@ -14,6 +16,12 @@ export function usePatients() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isAdmin, isSecretaria, isMedico, isLoading: isLoadingProfile } = useUserProfile();
+  const { doctorIds, isLoading: isLoadingDoctors } = useSecretaryDoctors();
+
+  // Determinar IDs de médicos para filtrar
+  const doctorIdsToUse = isSecretaria ? doctorIds : [];
+  const isAdminOrDono = isAdmin; // isAdmin já inclui dono
 
   // Buscar todos os pacientes (apenas os que têm consultas marcadas)
   const {
@@ -22,16 +30,28 @@ export function usePatients() {
     error,
     refetch
   } = useQuery({
-    queryKey: ['patients', user?.id],
+    queryKey: ['patients', user?.id, doctorIdsToUse, isAdminOrDono],
     queryFn: async ({ signal }) => {
       if (!user?.id) return [];
 
       try {
-        // 1. Buscar todos os appointments (usando cast para contornar problema de tipos)
-        const appointmentsQuery = (supabase.from as any)('medical_appointments')
-          .select('contact_id, start_time')
+        // 1. Buscar appointments com filtro de permissão
+        let appointmentsQuery = (supabase.from as any)('medical_appointments')
+          .select('contact_id, start_time, user_id, doctor_id')
           .order('start_time', { ascending: false });
-        
+
+        // Aplicar filtros baseados no papel do usuário
+        if (!isAdminOrDono) {
+          if (doctorIdsToUse.length > 0) {
+            // Secretária: ver consultas dos médicos vinculados
+            appointmentsQuery = appointmentsQuery.in('doctor_id', doctorIdsToUse);
+          } else {
+            // Médico ou outros: ver apenas suas próprias consultas
+            appointmentsQuery = appointmentsQuery.or(`user_id.eq.${user.id},doctor_id.eq.${user.id}`);
+          }
+        }
+        // Admin/Dono: ver todas as consultas (sem filtro adicional)
+
         const { data: appointmentsData, error: appointmentsError } = await appointmentsQuery;
 
         if (appointmentsError) {
@@ -106,7 +126,7 @@ export function usePatients() {
         throw error;
       }
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !isLoadingProfile && (!isSecretaria || !isLoadingDoctors),
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });

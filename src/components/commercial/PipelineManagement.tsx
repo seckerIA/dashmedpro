@@ -210,21 +210,43 @@ export function PipelineManagement() {
   };
 
   const handleDealMovedToAgendado = (deal: CRMDealWithContact) => {
+    // Garantir que temos contact_id antes de abrir o formulário
+    if (!deal.contact_id) {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Não é possível agendar: o contato não está associado a este deal.",
+      });
+      return;
+    }
     setDealForAppointment(deal);
     setShowAppointmentForm(true);
   };
 
   const handleAppointmentSubmit = async (data: any) => {
-    if (!dealForAppointment?.contact_id || !user?.id) return;
+    if (!dealForAppointment?.contact_id || !user?.id) {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Dados incompletos para criar agendamento.",
+      });
+      return;
+    }
     
     try {
       // O AppointmentForm já calcula end_time e formata os dados corretamente
-      // Apenas garantir que o contact_id está correto (pode vir do conversionData)
+      // Garantir que o contact_id está correto e vem do deal (não criar novo contato)
       const appointmentData = {
         ...data,
-        contact_id: dealForAppointment.contact_id,
+        contact_id: dealForAppointment.contact_id, // Usar sempre o contact_id do deal existente
         user_id: user.id,
       };
+      
+      console.log('📅 Criando agendamento para deal existente:', {
+        dealId: dealForAppointment.id,
+        contactId: dealForAppointment.contact_id,
+        appointmentData
+      });
       
       await createAppointment.mutateAsync(appointmentData);
       
@@ -236,6 +258,7 @@ export function PipelineManagement() {
       setShowAppointmentForm(false);
       setDealForAppointment(null);
     } catch (error) {
+      console.error('❌ Erro ao criar agendamento:', error);
       toast({
         variant: "destructive",
         title: "Erro",
@@ -245,18 +268,30 @@ export function PipelineManagement() {
   };
 
   const handleDeleteDeal = async (dealId: string) => {
+    if (!dealId) {
+      console.error('❌ handleDeleteDeal: dealId não fornecido');
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "ID do contrato não fornecido.",
+      });
+      return;
+    }
+
     try {
+      console.log('🗑️ handleDeleteDeal: Iniciando exclusão do deal:', dealId);
       await deleteDeal(dealId);
       toast({
         title: "Contrato excluído",
         description: "O contrato foi excluído com sucesso.",
       });
     } catch (error: any) {
-      console.error('Erro ao deletar deal:', error);
+      console.error('❌ handleDeleteDeal: Erro ao deletar deal:', error);
+      const errorMessage = error?.message || "Não foi possível excluir o contrato. Verifique se você tem permissão.";
       toast({
         variant: "destructive",
         title: "Erro ao excluir contrato",
-        description: error?.message || "Não foi possível excluir o contrato. Verifique se você tem permissão.",
+        description: errorMessage,
       });
     }
   };
