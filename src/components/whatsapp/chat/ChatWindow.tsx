@@ -92,12 +92,13 @@ export function ChatWindow({
   const handleSendText = useCallback(
     async (text: string) => {
       await sendText({
+        conversation_id: conversation.id,
         content: text,
-        replyToMessageId: replyTo?.id,
+        reply_to_message_id: replyTo?.id,
       });
       setReplyTo(null);
     },
-    [sendText, replyTo]
+    [sendText, replyTo, conversation.id]
   );
 
   const handleReply = useCallback((message: WhatsAppMessageWithRelations) => {

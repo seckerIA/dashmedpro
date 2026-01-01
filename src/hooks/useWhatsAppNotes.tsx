@@ -30,14 +30,11 @@ export function useWhatsAppNotes(options: UseWhatsAppNotesOptions) {
     queryFn: async (): Promise<WhatsAppInternalNote[]> => {
       if (!conversationId) return [];
 
-      const { data, error } = await supabase
+      const { data, error} = await supabase
         .from('whatsapp_internal_notes')
-        .select(`
-          *,
-          user:profiles!whatsapp_internal_notes_user_id_fkey(id, full_name, email, avatar_url)
-        `)
+        .select('*')
         .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false});
 
       if (error) {
         console.error('[useWhatsAppNotes] Error:', error);
@@ -64,10 +61,7 @@ export function useWhatsAppNotes(options: UseWhatsAppNotesOptions) {
           user_id: user.id,
           content,
         })
-        .select(`
-          *,
-          user:profiles!whatsapp_internal_notes_user_id_fkey(id, full_name, email, avatar_url)
-        `)
+        .select('*')
         .single();
 
       if (error) throw error;

@@ -43,8 +43,7 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
         .from('whatsapp_messages')
         .select(`
           *,
-          media:whatsapp_media(*),
-          reply_to:whatsapp_messages!whatsapp_messages_reply_to_message_id_fkey(id, content, message_type, direction)
+          media:whatsapp_media(*)
         `)
         .eq('conversation_id', conversationId)
         .order('sent_at', { ascending: false })
@@ -77,6 +76,9 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
     mutationFn: async (payload: SendTextMessagePayload): Promise<WhatsAppMessage> => {
       if (!user?.id) throw new Error('Usuário não autenticado');
 
+      console.log('[sendText] User ID:', user.id);
+      console.log('[sendText] Conversation ID:', payload.conversation_id);
+
       // Buscar dados da conversa
       const { data: conversation, error: convError } = await supabase
         .from('whatsapp_conversations')
@@ -84,8 +86,11 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
         .eq('id', payload.conversation_id)
         .single();
 
+      console.log('[sendText] Query result:', { conversation, error: convError });
+
       if (convError || !conversation) {
-        throw new Error('Conversa não encontrada');
+        console.error('[sendText] Conversation not found. Error:', convError);
+        throw new Error(`Conversa não encontrada: ${convError?.message || 'desconhecido'}`);
       }
 
       // Criar mensagem no banco (status: sending)

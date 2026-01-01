@@ -3,6 +3,7 @@
  */
 
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Search,
   Filter,
@@ -13,6 +14,7 @@ import {
   AlertOctagon,
   UserCircle,
   Users,
+  Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -71,6 +73,7 @@ export function ConversationFilters({
   onFiltersChange,
   stats,
 }: ConversationFiltersProps) {
+  const navigate = useNavigate();
   const [searchValue, setSearchValue] = useState(filters.search || '');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
@@ -121,6 +124,19 @@ export function ConversationFilters({
 
   return (
     <div className="space-y-3 p-3 border-b">
+      {/* Header com título e botão de configurações */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Conversas</h2>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate('/whatsapp/settings')}
+          title="Configurações do WhatsApp"
+        >
+          <Settings className="h-4 w-4" />
+        </Button>
+      </div>
+
       {/* Barra de busca */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
