@@ -9,6 +9,7 @@ import { Phone, Mail, MessageSquare, Edit } from "lucide-react";
 import { useCommercialLeads } from "@/hooks/useCommercialLeads";
 import { useState } from "react";
 import { LeadForm } from "./LeadForm";
+import { useNavigate } from "react-router-dom";
 
 interface LeadDetailsModalProps {
   open: boolean;
@@ -18,10 +19,13 @@ interface LeadDetailsModalProps {
 
 export function LeadDetailsModal({ open, onOpenChange, lead }: LeadDetailsModalProps) {
   const [showEditForm, setShowEditForm] = useState(false);
+  const navigate = useNavigate();
 
   const handleCall = () => {
     if (lead.phone) {
-      window.open(`tel:${lead.phone}`, '_blank');
+      const cleanPhone = lead.phone.replace(/\D/g, '');
+      navigate(`/whatsapp?phone=${cleanPhone}`);
+      onOpenChange(false);
     }
   };
 
@@ -33,8 +37,9 @@ export function LeadDetailsModal({ open, onOpenChange, lead }: LeadDetailsModalP
 
   const handleWhatsApp = () => {
     if (lead.phone) {
-      const phone = lead.phone.replace(/\D/g, '');
-      window.open(`https://wa.me/55${phone}`, '_blank');
+      const cleanPhone = lead.phone.replace(/\D/g, '');
+      navigate(`/whatsapp?phone=${cleanPhone}`);
+      onOpenChange(false);
     }
   };
 

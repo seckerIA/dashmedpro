@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "./useAuth";
+import { useUserProfile } from "./useUserProfile";
+import { useSecretaryDoctors } from "./useSecretaryDoctors";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { supabaseQueryWithTimeout } from "@/utils/supabaseQuery";
@@ -7,35 +9,69 @@ import { CommercialLead, CommercialLeadInsert, CommercialLeadUpdate } from "@/ty
 
 export function useCommercialLeads(filters?: { status?: string; origin?: string }) {
   const { user } = useAuth();
+  const { isSecretaria, isLoading: isLoadingProfile } = useUserProfile();
+  const { doctorIds, isLoading: isLoadingDoctors } = useSecretaryDoctors();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // Fetch leads
   const { data: leads, isLoading, error } = useQuery({
-    queryKey: ["commercial-leads", user?.id, filters],
+    queryKey: ["commercial-leads", user?.id, filters, doctorIds],
     queryFn: async ({ signal }) => {
       if (!user) throw new Error("User not authenticated");
 
-      let query = supabase
-        .from("commercial_leads")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+      const targetUserIds = isSecretaria
+        ? [user.id, ...(doctorIds || [])]
+        : [user.id];
+
+      console.log('🔍 useCommercialLeads - Fetching leads for:', {
+        isSecretaria,
+        targetUserIds,
+        userId: user.id,
+        doctorIdsCount: doctorIds?.length || 0
+      });
+
+      let queryPromise;
+
+      if (isSecretaria && (doctorIds || []).length > 0) {
+        queryPromise = supabase
+          .from("commercial_leads" as any)
+          .select(`
+            *,
+            doctor:profiles!commercial_leads_user_id_profiles_fk (full_name, email)
+          `)
+          .in("user_id", [user.id, ...(doctorIds || [])])
+          .order("created_at", { ascending: false });
+      } else {
+        queryPromise = supabase
+          .from("commercial_leads" as any)
+          .select(`
+            *,
+            doctor:profiles!commercial_leads_user_id_profiles_fk (full_name, email)
+          `)
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+      }
 
       if (filters?.status) {
-        query = query.eq("status", filters.status);
+        queryPromise = (queryPromise as any).eq("status", filters.status);
       }
 
       if (filters?.origin) {
-        query = query.eq("origin", filters.origin);
+        queryPromise = (queryPromise as any).eq("origin", filters.origin);
       }
 
-      const { data, error } = await supabaseQueryWithTimeout(query, 30000, signal);
+      const { data, error } = await supabaseQueryWithTimeout(queryPromise, 30000, signal);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ useCommercialLeads - Error:', error);
+        throw error;
+      }
+
+      console.log(`✅ useCommercialLeads - Found ${data?.length || 0} leads`);
       return data as CommercialLead[];
     },
-    enabled: !!user,
+    enabled: !!user && (!isSecretaria || !isLoadingDoctors),
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
     refetchOnMount: false,

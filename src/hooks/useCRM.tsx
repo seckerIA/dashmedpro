@@ -27,9 +27,9 @@ const fetchContacts = async (
     .from('crm_contacts')
     .select('*');
 
-  // Secretária vê contatos dos médicos vinculados
+  // Secretária vê contatos dos médicos vinculados + os seus próprios
   if (doctorIds && doctorIds.length > 0) {
-    queryPromise = queryPromise.in('user_id', doctorIds);
+    queryPromise = queryPromise.in('user_id', [userId, ...doctorIds]);
   } else if (!fetchAll && userId) {
     // Usuário normal vê apenas seus próprios contatos
     queryPromise = queryPromise.eq('user_id', userId);
@@ -55,10 +55,10 @@ const fetchDeals = async (
 ): Promise<CRMDealWithContact[]> => {
   if (!userId && (!doctorIds || doctorIds.length === 0)) return [];
 
-  // Secretária vê deals dos médicos vinculados
+  // Secretária vê deals dos médicos vinculados + os seus próprios
   // Outros usuários veem seus próprios deals ou dos viewAsUserIds
   const targetUserIds = doctorIds && doctorIds.length > 0
-    ? doctorIds
+    ? [userId, ...doctorIds]
     : (viewAsUserIds && viewAsUserIds.length > 0 ? viewAsUserIds : [userId]);
 
   const orConditions = targetUserIds
@@ -132,7 +132,7 @@ const fetchActivities = async (userId: string, contactId?: string): Promise<CRMA
 // Create contact
 const createContact = async (contactData: CRMContactInsert): Promise<CRMContact> => {
   const insertData = { ...contactData };
-  
+
   // Garantir que custom_fields seja um objeto válido (JSONB)
   if (insertData.custom_fields && Array.isArray(insertData.custom_fields)) {
     insertData.custom_fields = {} as any;
@@ -159,12 +159,12 @@ const createContact = async (contactData: CRMContactInsert): Promise<CRMContact>
     console.error('❌ Erro ao criar contato:', error);
     throw new Error(`Erro ao criar contato: ${error.message}`);
   }
-  
+
   if (!data) {
     console.error('❌ Nenhum dado retornado ao criar contato');
     throw new Error('Erro ao criar contato: nenhum dado retornado');
   }
-  
+
   console.log('✅ Contato criado com sucesso:', data);
   return data as CRMContact;
 };
@@ -256,7 +256,7 @@ const deleteContact = async (contactId: string): Promise<void> => {
 // Delete deal
 const deleteDeal = async (dealId: string, userId?: string): Promise<void> => {
   console.log('🗑️ deleteDeal chamado:', { dealId, userId });
-  
+
   // Se não tem userId, ainda tenta deletar (para casos onde a validação já foi feita)
   if (userId) {
     const { data: deal, error: fetchError } = await supabase
@@ -280,7 +280,7 @@ const deleteDeal = async (dealId: string, userId?: string): Promise<void> => {
     // Verificar se o usuário tem permissão (é o dono ou admin/dono)
     const isOwner = deal.user_id === userId;
     const isAssigned = deal.assigned_to === userId;
-    
+
     if (!isOwner && !isAssigned) {
       // Verificar se é admin/dono
       const { data: profile, error: profileError } = await supabase
@@ -288,15 +288,15 @@ const deleteDeal = async (dealId: string, userId?: string): Promise<void> => {
         .select('role')
         .eq('id', userId)
         .single();
-      
+
       if (profileError) {
         console.error('❌ Erro ao buscar perfil:', profileError);
         throw new Error(`Erro ao verificar permissão: ${profileError.message}`);
       }
-      
+
       const isAdminOrDono = profile?.role === 'admin' || profile?.role === 'dono';
       console.log('🔐 Verificação de permissão:', { isOwner, isAssigned, role: profile?.role, isAdminOrDono });
-      
+
       if (!isAdminOrDono) {
         throw new Error('Você não tem permissão para excluir este deal. Apenas o criador, responsável ou um administrador pode excluí-lo.');
       }
@@ -435,11 +435,11 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
     onSuccess: (newDeal) => {
       // Invalidar todas as queries de deals para garantir que apareça imediatamente
       // Usar queryKey prefix para invalidar todas as variações (com e sem viewAsUserIds)
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ['crm-deals'],
-        exact: false 
+        exact: false
       });
-      
+
       // Também atualizar cache otimisticamente se possível
       if (user?.id) {
         const queryKey = ['crm-deals', user.id, viewAsUserIds?.join(',')];
@@ -449,7 +449,7 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
             // Verificar se o deal já existe no cache (evitar duplicatas)
             const exists = oldData.some(d => d.id === newDeal.id);
             if (exists) return oldData;
-            
+
             // Buscar o contato relacionado para incluir no deal
             const contact = contacts.find(c => c.id === newDeal.contact_id);
             const dealWithContact: CRMDealWithContact = {
@@ -477,11 +477,11 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
     mutationFn: updateDeal,
     onSuccess: (updatedDeal) => {
       // Invalidar todas as queries de deals para garantir atualização imediata
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ['crm-deals'],
-        exact: false 
+        exact: false
       });
-      
+
       // Também atualizar cache otimisticamente se possível
       if (user?.id) {
         const queryKey = ['crm-deals', user.id, viewAsUserIds?.join(',')];
@@ -520,8 +520,8 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
       }
       // Invalidar de forma assíncrona e não bloqueante
       setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['crm-contacts', user?.id] }).catch(() => {});
-        queryClient.invalidateQueries({ queryKey: ['crm-deals', user?.id] }).catch(() => {});
+        queryClient.invalidateQueries({ queryKey: ['crm-contacts', user?.id] }).catch(() => { });
+        queryClient.invalidateQueries({ queryKey: ['crm-deals', user?.id] }).catch(() => { });
       }, 100);
     },
   });
@@ -538,8 +538,8 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
       }
       // Invalidar de forma assíncrona e não bloqueante
       setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['crm-contacts', user?.id] }).catch(() => {});
-        queryClient.invalidateQueries({ queryKey: ['crm-deals', user?.id] }).catch(() => {});
+        queryClient.invalidateQueries({ queryKey: ['crm-contacts', user?.id] }).catch(() => { });
+        queryClient.invalidateQueries({ queryKey: ['crm-deals', user?.id] }).catch(() => { });
       }, 100);
     },
   });
@@ -587,19 +587,22 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
   }): Promise<{ contact: CRMContact; deal: CRMDeal }> => {
     if (!user?.id) throw new Error('Usuário não autenticado');
 
+    // IDs para busca (próprio usuário + médicos vinculados)
+    const targetUserIds = isSecretaria ? [user.id, ...(doctorIds || [])] : [user.id];
+
     // 1. Verificar se contato já existe pelo telefone
     const normalizedPhone = phoneNumber.replace(/\D/g, '');
     let contact: CRMContact | null = null;
 
     const { data: existingContacts } = await supabase
-      .from('crm_contacts')
+      .from('crm_contacts' as any)
       .select('*')
       .or(`phone.ilike.%${normalizedPhone}%,phone.ilike.%${phoneNumber}%`)
-      .eq('user_id', user.id)
+      .in('user_id', targetUserIds)
       .limit(1);
 
     if (existingContacts && existingContacts.length > 0) {
-      contact = existingContacts[0] as CRMContact;
+      contact = (existingContacts[0] as any) as CRMContact;
     } else {
       // 2. Criar novo contato
       const { data: newContact, error: contactError } = await supabase
@@ -617,7 +620,7 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
         .single();
 
       if (contactError) throw new Error(`Erro ao criar contato: ${contactError.message}`);
-      contact = newContact as CRMContact;
+      contact = (newContact as any) as CRMContact;
     }
 
     // 3. Verificar se já existe deal ativo para este contato
@@ -673,8 +676,8 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
     }
 
     // 5. Atualizar análise do WhatsApp com referência ao deal/contato
-    await supabase
-      .from('whatsapp_conversation_analysis')
+    await (supabase
+      .from('whatsapp_conversation_analysis' as any) as any)
       .update({
         deal_created: true,
         deal_id: deal.id,

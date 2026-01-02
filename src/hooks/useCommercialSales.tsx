@@ -1,23 +1,32 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "./useAuth";
+import { useUserProfile } from "./useUserProfile";
+import { useSecretaryDoctors } from "./useSecretaryDoctors";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CommercialSale, CommercialSaleInsert, CommercialSaleUpdate } from "@/types/commercial";
 
 export function useCommercialSales(filters?: { status?: string; procedure_id?: string }) {
   const { user } = useAuth();
+  const { isSecretaria } = useUserProfile();
+  const { doctorIds } = useSecretaryDoctors();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: sales, isLoading, error } = useQuery({
-    queryKey: ["commercial-sales", user?.id, filters],
+    queryKey: ["commercial-sales", user?.id, filters, isSecretaria, doctorIds],
     queryFn: async () => {
       if (!user) throw new Error("User not authenticated");
 
+      const targetUserIds = isSecretaria ? [user.id, ...(doctorIds || [])] : [user.id];
+
       let query = supabase
-        .from("commercial_sales")
-        .select("*")
-        .eq("user_id", user.id)
+        .from("commercial_sales" as any)
+        .select(`
+          *,
+          doctor:profiles!commercial_sales_user_id_profiles_fk (full_name, email)
+        `)
+        .in("user_id", targetUserIds)
         .order("created_at", { ascending: false });
 
       if (filters?.status) {

@@ -43,6 +43,11 @@ export function SalesList() {
                     <Badge variant="secondary">
                       {COMMERCIAL_SALE_STATUS_LABELS[sale.status]}
                     </Badge>
+                    {(sale as any).doctor?.full_name && (
+                      <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-400 border-blue-500/20">
+                        Dr(a). {(sale as any).doctor.full_name}
+                      </Badge>
+                    )}
                   </div>
                   {sale.sale_date && (
                     <p className="text-sm text-muted-foreground">

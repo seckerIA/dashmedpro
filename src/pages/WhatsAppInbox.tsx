@@ -50,14 +50,41 @@ export default function WhatsAppInbox() {
 
   // Load conversation from URL
   useEffect(() => {
+    if (isLoadingConversations) return;
+
     const conversationId = searchParams.get('conversation');
-    if (conversationId && conversations.length > 0) {
-      const found = conversations.find(c => c.id === conversationId);
+    const phone = searchParams.get('phone');
+
+    if (conversations.length > 0) {
+      let found: WhatsAppConversationWithRelations | undefined;
+
+      if (conversationId) {
+        found = conversations.find(c => c.id === conversationId);
+      } else if (phone) {
+        const cleanPhone = phone.replace(/\D/g, '');
+        found = conversations.find(c => {
+          const cPhone = (c.phone_number || '').replace(/\D/g, '');
+          return cPhone.includes(cleanPhone) || cleanPhone.includes(cPhone);
+        });
+      }
+
       if (found) {
         setSelectedConversation(found);
+        // Se encontramos por telefone, atualizamos a URL para o ID da conversa e removemos o phone
+        if (phone || (conversationId && conversationId !== found.id)) {
+          setSearchParams({ conversation: found.id }, { replace: true });
+        }
+      } else if (phone) {
+        // Se temos telefone mas não achamos na lista atual, tentamos filtrar a pesquisa
+        if (filters.search !== phone) {
+          setFilters(prev => ({ ...prev, search: phone }));
+        }
       }
+    } else if (phone && !isLoadingConversations && filters.search !== phone) {
+      // Se a lista está vazia e temos phone, tenta pesquisar
+      setFilters(prev => ({ ...prev, search: phone }));
     }
-  }, [searchParams, conversations]);
+  }, [searchParams, conversations, isLoadingConversations, setSearchParams, filters.search, setFilters]);
 
   // Handlers
   const handleSelectConversation = useCallback(

@@ -31,7 +31,7 @@ export function PipelineManagement() {
   useEffect(() => {
     const savedViewAllMode = localStorage.getItem('commercial_pipeline_view_all_mode');
     const savedSelectedUserIds = localStorage.getItem('commercial_pipeline_selected_user_ids');
-    
+
     if (savedViewAllMode) {
       setViewAllMode(JSON.parse(savedViewAllMode));
     }
@@ -44,18 +44,18 @@ export function PipelineManagement() {
     }
   }, []);
 
-  const { 
-    deals, 
+  const {
+    deals,
     isLoading,
     updateDeal,
     updateDealsPositions,
     deleteDeal,
     isDeletingDeal
   } = useCRM(viewAllMode && selectedUserIds.length > 0 ? selectedUserIds : undefined);
-  const { 
-    followUps, 
-    updateFollowUp, 
-    isLoading: isLoadingFollowUps 
+  const {
+    followUps,
+    updateFollowUp,
+    isLoading: isLoadingFollowUps
   } = useFollowUps();
   const { createAppointment } = useMedicalAppointments();
   const { toast } = useToast();
@@ -77,9 +77,9 @@ export function PipelineManagement() {
         id: dealId,
         position: index,
       }));
-      
+
       await updateDealsPositions(updates);
-      
+
       toast({
         title: "Ordem atualizada",
         description: "Os contatos foram reordenados com sucesso.",
@@ -105,13 +105,13 @@ export function PipelineManagement() {
       }
 
       const updateData: Partial<CRMDealWithContact> = { stage: newStage as any };
-      
+
       if (position !== undefined && position !== null) {
         updateData.position = position;
       }
 
-      await updateDeal({ 
-        dealId, 
+      await updateDeal({
+        dealId,
         data: updateData
       });
     } catch (error) {
@@ -129,8 +129,8 @@ export function PipelineManagement() {
     if (!wonDeal) return;
 
     try {
-      await updateDeal({ 
-        dealId: wonDeal.id, 
+      await updateDeal({
+        dealId: wonDeal.id,
         data: { stage: 'fechado_ganho' as any }
       });
 
@@ -140,9 +140,9 @@ export function PipelineManagement() {
         appointmentValue: data.appointmentValue.toString(),
         paidInAdvance: (data.paymentTiming === 'advance').toString(),
       });
-      
+
       navigate(`/calendar?${params.toString()}`);
-      
+
       setShowDealWonModal(false);
       setWonDeal(null);
     } catch (error) {
@@ -165,8 +165,8 @@ export function PipelineManagement() {
 
   const handleToggleFollowUp = async (dealId: string, needsFollowUp: boolean) => {
     try {
-      await updateDeal({ 
-        dealId, 
+      await updateDeal({
+        dealId,
         data: { needs_follow_up: needsFollowUp } as any
       });
       toast({
@@ -184,11 +184,11 @@ export function PipelineManagement() {
 
   const handleCompleteFollowUp = async (followUpId: string) => {
     try {
-      await updateFollowUp({ 
-        id: followUpId, 
-        data: { 
+      await updateFollowUp({
+        id: followUpId,
+        data: {
           status: 'concluido',
-          completed_notes: 'Concluído manualmente' 
+          completed_notes: 'Concluído manualmente'
         }
       });
       toast({
@@ -232,7 +232,7 @@ export function PipelineManagement() {
       });
       return;
     }
-    
+
     try {
       // O AppointmentForm já calcula end_time e formata os dados corretamente
       // Garantir que o contact_id está correto e vem do deal (não criar novo contato)
@@ -241,20 +241,20 @@ export function PipelineManagement() {
         contact_id: dealForAppointment.contact_id, // Usar sempre o contact_id do deal existente
         user_id: user.id,
       };
-      
+
       console.log('📅 Criando agendamento para deal existente:', {
         dealId: dealForAppointment.id,
         contactId: dealForAppointment.contact_id,
         appointmentData
       });
-      
+
       await createAppointment.mutateAsync(appointmentData);
-      
+
       toast({
         title: "Agendamento criado",
         description: "O agendamento foi criado com sucesso.",
       });
-      
+
       setShowAppointmentForm(false);
       setDealForAppointment(null);
     } catch (error) {
@@ -298,13 +298,13 @@ export function PipelineManagement() {
 
   const handleContactAdded = (dealId: string) => {
     setHighlightedDealId(dealId);
-    
+
     setTimeout(() => {
       const dealElement = document.querySelector(`[data-deal-id="${dealId}"]`);
       if (dealElement) {
-        dealElement.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'center' 
+        dealElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
         });
       }
     }, 100);
@@ -336,7 +336,7 @@ export function PipelineManagement() {
       {/* Global Search and Filters */}
       <div className="flex items-center gap-4">
         <div className="flex-1">
-          <GlobalSearch 
+          <GlobalSearch
             onSelectDeal={(deal) => {
               console.log('Selected deal:', deal);
             }}
@@ -371,7 +371,7 @@ export function PipelineManagement() {
       />
 
       {/* Pipeline Board */}
-      <PipelineBoard 
+      <PipelineBoard
         deals={deals}
         followUps={followUps}
         onUpdateDeal={handleUpdateDealStage}
@@ -391,10 +391,16 @@ export function PipelineManagement() {
           console.log('Deal clicked:', deal);
         }}
         onCall={(deal) => {
-          toast({
-            title: "Ligação iniciada",
-            description: `Ligando para ${deal.contact?.full_name}...`,
-          });
+          if (deal.contact?.phone) {
+            const cleanPhone = deal.contact.phone.replace(/\D/g, '');
+            navigate(`/whatsapp?phone=${cleanPhone}`);
+          } else {
+            toast({
+              variant: "destructive",
+              title: "Telefone não disponível",
+              description: "Este contato não possui telefone cadastrado.",
+            });
+          }
         }}
         onEmail={(deal) => {
           if (deal.contact?.email) {
@@ -409,10 +415,8 @@ export function PipelineManagement() {
         }}
         onWhatsApp={(deal) => {
           if (deal.contact?.phone) {
-            const phone = deal.contact.phone.replace(/\D/g, '');
-            const contactName = deal.contact?.full_name || 'cliente';
-            const message = encodeURIComponent(`Olá ${contactName}, tudo bem? Gostaria de fazer um follow-up sobre ${deal.title}.`);
-            window.open(`https://wa.me/55${phone}?text=${message}`);
+            const cleanPhone = deal.contact.phone.replace(/\D/g, '');
+            navigate(`/whatsapp?phone=${cleanPhone}`);
           } else {
             toast({
               variant: "destructive",

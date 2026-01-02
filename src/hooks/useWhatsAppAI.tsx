@@ -37,7 +37,7 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
       if (!conversationId) return null;
 
       const { data, error } = await supabase
-        .from('whatsapp_conversation_analysis')
+        .from('whatsapp_conversation_analysis' as any)
         .select('*')
         .eq('conversation_id', conversationId)
         .maybeSingle();
@@ -62,7 +62,7 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
       if (!conversationId) return [];
 
       const { data, error } = await supabase
-        .from('whatsapp_ai_suggestions')
+        .from('whatsapp_ai_suggestions' as any)
         .select('*')
         .eq('conversation_id', conversationId)
         .eq('was_used', false)
@@ -226,12 +226,13 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
     queryFn: async () => {
       if (!user) return [];
 
-      const { data, error } = await supabase.rpc('get_hot_leads', {
+      const { data, error } = await supabase.rpc('get_hot_leads' as any, {
         p_user_id: user.id,
         p_limit: 5,
       });
 
       if (error) {
+        if ((error as any).code === 'PGRST202' || (error as any).message?.includes('404')) return [];
         console.error('[useWhatsAppAI] Error fetching hot leads:', error);
         return [];
       }
@@ -250,12 +251,13 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
     queryFn: async () => {
       if (!user) return [];
 
-      const { data, error } = await supabase.rpc('get_pending_followups', {
+      const { data, error } = await supabase.rpc('get_pending_followups' as any, {
         p_user_id: user.id,
         p_hours: 24,
       });
 
       if (error) {
+        if ((error as any).code === 'PGRST202' || (error as any).message?.includes('404')) return [];
         console.error('[useWhatsAppAI] Error fetching pending followups:', error);
         return [];
       }
@@ -274,11 +276,12 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
     queryFn: async () => {
       if (!user) return null;
 
-      const { data, error } = await supabase.rpc('get_ai_stats', {
+      const { data, error } = await supabase.rpc('get_ai_stats' as any, {
         p_user_id: user.id,
       });
 
       if (error) {
+        if ((error as any).code === 'PGRST202' || (error as any).message?.includes('404')) return null;
         console.error('[useWhatsAppAI] Error fetching AI stats:', error);
         return null;
       }

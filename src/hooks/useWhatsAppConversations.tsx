@@ -32,10 +32,10 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
   const { filters, limit = 50, enabled = true } = options;
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { linkedDoctorIds } = useSecretaryDoctors();
+  const { doctorIds } = useSecretaryDoctors();
 
   // IDs para filtrar (próprio usuário + médicos vinculados para secretária)
-  const userIds = user?.id ? [user.id, ...(linkedDoctorIds || [])] : [];
+  const userIds = user?.id ? [user.id, ...(doctorIds || [])] : [];
 
   // =========================================
   // Query: Lista de conversas

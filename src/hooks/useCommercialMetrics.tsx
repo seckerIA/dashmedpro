@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "./useAuth";
+import { useUserProfile } from "./useUserProfile";
+import { useSecretaryDoctors } from "./useSecretaryDoctors";
 import { supabase } from "@/integrations/supabase/client";
 import { supabaseQueryWithTimeout } from "@/utils/supabaseQuery";
 import {
@@ -76,11 +78,15 @@ function getPreviousPeriod(current: PeriodRange): PeriodRange {
 
 export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange?: PeriodRange) {
   const { user, loading } = useAuth();
+  const { isSecretaria } = useUserProfile();
+  const { doctorIds } = useSecretaryDoctors();
   const period = getPeriodRange(filter, customRange);
   const previousPeriod = getPreviousPeriod(period);
 
+  const targetUserIds = user?.id ? (isSecretaria && doctorIds.length > 0 ? [user.id, ...doctorIds] : [user.id]) : [];
+
   const queryResult = useQuery({
-    queryKey: ["commercial-metrics", user?.id, filter, period.start.toISOString(), period.end.toISOString()],
+    queryKey: ["commercial-metrics", user?.id, filter, period.start.toISOString(), period.end.toISOString(), targetUserIds],
     queryFn: async ({ signal }): Promise<CommercialMetrics> => {
       if (!user) throw new Error("User not authenticated");
 
@@ -91,7 +97,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
 
       // 1. Buscar consultas médicas com transações financeiras
       const appointmentsQuery = supabase
-        .from("medical_appointments")
+        .from("medical_appointments" as any)
         .select(`
           id,
           title,
@@ -106,12 +112,12 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
           contact_id,
           contact:crm_contacts!medical_appointments_contact_id_fkey(id, full_name)
         `)
-        .eq("user_id", user.id)
+        .in("user_id", targetUserIds)
         .gte("start_time", periodStartISO)
         .lte("start_time", periodEndISO);
 
       const appointmentsResult = await supabaseQueryWithTimeout(appointmentsQuery as any, 60000, signal);
-      const { data: appointments, error: appointmentsError } = appointmentsResult;
+      const { data: appointments, error: appointmentsError } = appointmentsResult as { data: any[], error: any };
 
       if (appointmentsError) throw appointmentsError;
 
@@ -122,7 +128,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
 
       // 2. Buscar transações financeiras do período
       const transactionsQuery = supabase
-        .from("financial_transactions")
+        .from("financial_transactions" as any)
         .select(`
           id,
           amount,
@@ -134,14 +140,14 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
           description,
           metadata
         `)
-        .eq("user_id", user.id)
+        .in("user_id", targetUserIds)
         .eq("type", "entrada")
         .eq("status", "concluida")
         .gte("transaction_date", format(period.start, "yyyy-MM-dd"))
         .lte("transaction_date", format(period.end, "yyyy-MM-dd"));
 
       const transactionsResult = await supabaseQueryWithTimeout(transactionsQuery as any, 60000, signal);
-      const { data: transactions, error: transactionsError } = transactionsResult;
+      const { data: transactions, error: transactionsError } = transactionsResult as { data: any[], error: any };
 
       if (transactionsError) throw transactionsError;
 
@@ -171,7 +177,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
           supabase
             .from("commercial_leads")
             .select("*")
-            .eq("user_id", user.id)
+            .in("user_id", targetUserIds)
             .gte("created_at", periodStartISO)
             .lte("created_at", periodEndISO) as any,
           30000,
@@ -183,7 +189,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
           supabase
             .from("commercial_campaigns")
             .select("*")
-            .eq("user_id", user.id) as any,
+            .in("user_id", targetUserIds) as any,
           30000,
           signal
         ),
@@ -219,7 +225,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
           supabase
             .from("commercial_sales")
             .select("*")
-            .eq("user_id", user.id)
+            .in("user_id", targetUserIds)
             .gte("sale_date", format(period.start, "yyyy-MM-dd"))
             .lte("sale_date", format(period.end, "yyyy-MM-dd")) as any,
           30000,
@@ -239,7 +245,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
               closed_at,
               contact_id
             `)
-            .eq("user_id", user.id)
+            .in("user_id", targetUserIds)
             .gte("created_at", periodStartISO)
             .lte("created_at", periodEndISO) as any,
           30000,
@@ -251,7 +257,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
           supabase
             .from("financial_transactions")
             .select("amount, type, total_costs")
-            .eq("user_id", user.id)
+            .in("user_id", targetUserIds)
             .eq("type", "entrada")
             .eq("status", "concluida")
             .gte("transaction_date", format(previousPeriod.start, "yyyy-MM-dd"))
@@ -265,7 +271,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
           supabase
             .from("medical_appointments")
             .select("id")
-            .eq("user_id", user.id)
+            .in("user_id", targetUserIds)
             .gte("start_time", prevStartISO)
             .lte("start_time", prevEndISO) as any,
           30000,
@@ -273,10 +279,10 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         ),
       ]);
 
-      const { data: sales, error: salesError } = salesResult;
-      const { data: deals, error: dealsError } = dealsResult;
-      const { data: prevTransactions } = prevTransactionsResult;
-      const { data: prevAppointments } = prevAppointmentsResult;
+      const { data: sales, error: salesError } = salesResult as { data: any[], error: any };
+      const { data: deals, error: dealsError } = dealsResult as { data: any[], error: any };
+      const { data: prevTransactions } = prevTransactionsResult as { data: any[], error: any };
+      const { data: prevAppointments } = prevAppointmentsResult as { data: any[], error: any };
 
       if (salesError) throw salesError;
       if (dealsError) throw dealsError;

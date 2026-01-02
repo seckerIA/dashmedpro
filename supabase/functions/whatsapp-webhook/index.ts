@@ -201,22 +201,45 @@ const handler = async (req: Request): Promise<Response> => {
 
         console.log(`[Webhook] Found ${configs.length} configs for phone ${phoneNumberId}`);
 
-        // Iterar sobre cada configuração encontrada (usuário) e processar a mensagem
-        for (const config of configs) {
-          const userId = config.user_id;
+        // DEDUP: Se houver múltiplas configs para o mesmo número, processar apenas uma.
+        // Geralmente ocorre quando secretária e médico ativam o mesmo número.
+        // Vamos priorizar usuários que NÃO são secretárias (ex: médicos/admins) ou apenas o primeiro.
+        let targetUserId = configs[0].user_id;
 
-          // Processar mensagens recebidas
-          if (value.messages && value.messages.length > 0) {
-            for (const message of value.messages) {
-              await processIncomingMessage(supabaseAdmin, userId, message, value.contacts);
-            }
+        if (configs.length > 1) {
+          console.log('[Webhook] Multiple configs found, checking roles for prioritization');
+          const configUserIds = configs.map((c: any) => c.user_id);
+
+          const { data: profiles } = await supabaseAdmin
+            .from('profiles')
+            .select('id, role')
+            .in('id', configUserIds);
+
+          if (profiles && profiles.length > 0) {
+            // Priorizar: dono > admin > vendedor > secretaria
+            const rolePriority: Record<string, number> = { 'dono': 1, 'admin': 1, 'vendedor': 2, 'secretaria': 3 };
+            const sortedProfiles = profiles.sort((a: any, b: any) => {
+              const pA = rolePriority[a.role as string] || 99;
+              const pB = rolePriority[b.role as string] || 99;
+              return pA - pB;
+            });
+            targetUserId = sortedProfiles[0].id;
           }
+        }
 
-          // Processar status updates
-          if (value.statuses && value.statuses.length > 0) {
-            for (const status of value.statuses) {
-              await processStatusUpdate(supabaseAdmin, status);
-            }
+        console.log(`[Webhook] Delivering message to primary owner: ${targetUserId}`);
+
+        // Processar mensagens recebidas
+        if (value.messages && value.messages.length > 0) {
+          for (const message of value.messages) {
+            await processIncomingMessage(supabaseAdmin, targetUserId, message, value.contacts);
+          }
+        }
+
+        // Processar status updates
+        if (value.statuses && value.statuses.length > 0) {
+          for (const status of value.statuses) {
+            await processStatusUpdate(supabaseAdmin, status);
           }
         }
       }

@@ -39,7 +39,8 @@ export function LeadCard({ lead }: LeadCardProps) {
 
   const handleCall = () => {
     if (lead.phone) {
-      window.open(`tel:${lead.phone}`, '_blank');
+      const cleanPhone = lead.phone.replace(/\D/g, '');
+      navigate(`/whatsapp?phone=${cleanPhone}`);
     }
   };
 
@@ -51,8 +52,8 @@ export function LeadCard({ lead }: LeadCardProps) {
 
   const handleWhatsApp = () => {
     if (lead.phone) {
-      const phone = lead.phone.replace(/\D/g, '');
-      window.open(`https://wa.me/55${phone}`, '_blank');
+      const cleanPhone = lead.phone.replace(/\D/g, '');
+      navigate(`/whatsapp?phone=${cleanPhone}`);
     }
   };
 
@@ -92,7 +93,7 @@ export function LeadCard({ lead }: LeadCardProps) {
         params.set('appointmentValue', lead.estimated_value.toString());
       }
       params.set('paidInAdvance', 'false');
-      
+
       navigate(`/calendar?${params.toString()}`);
     } catch (error) {
       console.error('Erro ao agendar consulta:', error);
@@ -120,23 +121,28 @@ export function LeadCard({ lead }: LeadCardProps) {
                 <Badge variant="outline" className="text-xs">
                   {COMMERCIAL_LEAD_ORIGIN_LABELS[lead.origin]}
                 </Badge>
+                {(lead as any).doctor?.full_name && (
+                  <Badge variant="secondary" className="text-xs bg-blue-500/10 text-blue-400 border-blue-500/20">
+                    Dr(a). {(lead as any).doctor.full_name}
+                  </Badge>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {(lead as any).conversion_score !== undefined && 
-               (lead as any).conversion_score !== null && 
-               getScoreLevel((lead as any).conversion_score) === 'high' && (
-                <Button
-                  size="sm"
-                  variant="default"
-                  onClick={handleScheduleAppointment}
-                  disabled={isScheduling}
-                  className="h-8 px-3 text-xs bg-green-600 hover:bg-green-700 text-white"
-                >
-                  <Calendar className="h-4 w-4 mr-1.5" />
-                  {isScheduling ? 'Abrindo...' : 'Responder Agora'}
-                </Button>
-              )}
+              {(lead as any).conversion_score !== undefined &&
+                (lead as any).conversion_score !== null &&
+                getScoreLevel((lead as any).conversion_score) === 'high' && (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={handleScheduleAppointment}
+                    disabled={isScheduling}
+                    className="h-8 px-3 text-xs bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <Calendar className="h-4 w-4 mr-1.5" />
+                    {isScheduling ? 'Abrindo...' : 'Responder Agora'}
+                  </Button>
+                )}
               <Button
                 size="sm"
                 variant="default"

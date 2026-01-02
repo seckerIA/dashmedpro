@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
@@ -91,6 +92,7 @@ interface DealFormProps {
 
 export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFormProps) {
   const { isSecretaria } = useUserProfile();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(!!deal);
   const [tagInput, setTagInput] = useState("");
   const [showSidebar, setShowSidebar] = useState(false);
@@ -103,11 +105,11 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
     service: '',
     service_value: ''
   });
-  const { 
-    createDeal, 
-    updateDeal, 
-    contacts, 
-    isCreatingDeal, 
+  const {
+    createDeal,
+    updateDeal,
+    contacts,
+    isCreatingDeal,
     isUpdatingDeal,
     updateContact
   } = useCRM();
@@ -196,19 +198,19 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
 
   const handleSaveContact = async () => {
     if (!selectedContact) return;
-    
+
     try {
       // Converter service_value de string para number
       const dataToUpdate = {
         ...contactFormData,
-        service_value: contactFormData.service_value 
+        service_value: contactFormData.service_value
           ? parseFloat(contactFormData.service_value.replace(/[^\d,.-]/g, "").replace(",", "."))
           : undefined
       };
 
-      await updateContact({ 
-        contactId: selectedContact.id, 
-        data: dataToUpdate 
+      await updateContact({
+        contactId: selectedContact.id,
+        data: dataToUpdate
       });
       toast({
         title: "Contato atualizado",
@@ -231,7 +233,9 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
     switch (action) {
       case 'call':
         if (selectedContact.phone) {
-          window.open(`tel:${selectedContact.phone}`, '_self');
+          const cleanPhone = selectedContact.phone.replace(/\D/g, '');
+          navigate(`/whatsapp?phone=${cleanPhone}`);
+          handleClose();
         } else {
           toast({
             variant: "destructive",
@@ -243,7 +247,8 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
       case 'whatsapp':
         if (selectedContact.phone) {
           const cleanPhone = selectedContact.phone.replace(/\D/g, '');
-          window.open(`https://wa.me/55${cleanPhone}`, '_blank');
+          navigate(`/whatsapp?phone=${cleanPhone}`);
+          handleClose();
         } else {
           toast({
             variant: "destructive",
@@ -297,7 +302,7 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
           description: "O contrato foi criado com sucesso.",
         });
       }
-      
+
       setOpen(false);
       form.reset();
       onSuccess?.();
@@ -377,7 +382,7 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
                     Arquivar
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     onClick={handleDeleteDeal}
                     className="text-destructive focus:text-destructive"
                   >
@@ -389,13 +394,13 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
             )}
           </div>
           <DialogDescription>
-            {deal 
-              ? "Atualize as informações do contrato existente." 
+            {deal
+              ? "Atualize as informações do contrato existente."
               : "Preencha as informações para criar um novo contrato no CRM."
             }
           </DialogDescription>
         </DialogHeader>
-        
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pb-4">
             <FormField
@@ -419,10 +424,10 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
                 <FormItem>
                   <FormLabel>Descrição</FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Textarea
                       placeholder="Descreva os detalhes do contrato..."
                       className="min-h-[80px]"
-                      {...field} 
+                      {...field}
                     />
                   </FormControl>
                   <FormMessage />
@@ -791,7 +796,7 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
               Opções avançadas e configurações adicionais para este contrato.
             </SheetDescription>
           </SheetHeader>
-          
+
           <div className="mt-6 space-y-6">
             {/* Edição de Contato */}
             {selectedContact && (
@@ -915,24 +920,24 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
               <div className="space-y-3">
                 <h4 className="text-sm font-semibold text-foreground">⚡ Ações Rápidas</h4>
                 <div className="grid grid-cols-2 gap-2">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => handleContactAction('call')}
                     className="justify-start"
                   >
                     📞 Ligar
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => handleContactAction('whatsapp')}
                     className="justify-start"
                   >
                     💬 WhatsApp
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => handleContactAction('email')}
                     className="justify-start"

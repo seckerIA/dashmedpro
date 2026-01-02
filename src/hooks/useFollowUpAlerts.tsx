@@ -6,8 +6,10 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import { useSecretaryDoctors } from '@/hooks/useSecretaryDoctors';
 import { useNavigate } from 'react-router-dom';
 import type { HotLead, PendingFollowup, LeadStatus } from '@/types/whatsappAI';
 
@@ -25,6 +27,8 @@ export function useFollowUpAlerts(options: UseFollowUpAlertsOptions = {}) {
   } = options;
 
   const { user } = useAuth();
+  const { isSecretaria } = useUserProfile();
+  const { doctorIds } = useSecretaryDoctors();
   const { toast } = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -41,17 +45,21 @@ export function useFollowUpAlerts(options: UseFollowUpAlertsOptions = {}) {
     queryFn: async () => {
       if (!user) return [];
 
-      const { data, error } = await supabase.rpc('get_hot_leads', {
+      const { data, error } = await supabase.rpc('get_hot_leads' as any, {
         p_user_id: user.id,
         p_limit: 10,
       });
 
       if (error) {
+        // Ignorar erro 404 se a migração ainda não foi aplicada
+        if ((error as any).code === 'PGRST202' || (error as any).message?.includes('404')) {
+          return [];
+        }
         console.error('[useFollowUpAlerts] Error fetching hot leads:', error);
         return [];
       }
 
-      return data as HotLead[];
+      return (data as any) as HotLead[];
     },
     enabled: !!user,
     refetchInterval: checkIntervalMs,
@@ -66,17 +74,21 @@ export function useFollowUpAlerts(options: UseFollowUpAlertsOptions = {}) {
     queryFn: async () => {
       if (!user) return [];
 
-      const { data, error } = await supabase.rpc('get_pending_followups', {
+      const { data, error } = await supabase.rpc('get_pending_followups' as any, {
         p_user_id: user.id,
         p_hours: 24,
       });
 
       if (error) {
+        // Ignorar erro 404 se a migração ainda não foi aplicada
+        if ((error as any).code === 'PGRST202' || (error as any).message?.includes('404')) {
+          return [];
+        }
         console.error('[useFollowUpAlerts] Error fetching followups:', error);
         return [];
       }
 
-      return data as PendingFollowup[];
+      return (data as any) as PendingFollowup[];
     },
     enabled: !!user,
     refetchInterval: checkIntervalMs,
@@ -91,18 +103,21 @@ export function useFollowUpAlerts(options: UseFollowUpAlertsOptions = {}) {
     queryFn: async () => {
       if (!user) return 0;
 
+      const targetUserIds = isSecretaria ? [user.id, ...(doctorIds || [])] : [user.id];
+
       const { data, error } = await supabase
-        .from('whatsapp_conversations')
+        .from('whatsapp_conversations' as any)
         .select('unread_count')
-        .eq('user_id', user.id)
+        .in('user_id', targetUserIds)
         .gt('unread_count', 0);
 
-      if (error) {
+      if (error || !data) {
         console.error('[useFollowUpAlerts] Error fetching unread count:', error);
         return 0;
       }
 
-      return data.reduce((sum, conv) => sum + (conv.unread_count || 0), 0);
+      const conversations = data as any[];
+      return conversations.reduce((sum, conv) => sum + (conv.unread_count || 0), 0);
     },
     enabled: !!user,
     refetchInterval: checkIntervalMs,
@@ -212,7 +227,7 @@ export function useFollowUpAlerts(options: UseFollowUpAlertsOptions = {}) {
           event: 'UPDATE',
           schema: 'public',
           table: 'whatsapp_conversation_analysis',
-          filter: `user_id=eq.${user.id}`,
+          // Removido filtro fixo para permitir que secretárias recebam eventos dos médicos vinculados via RLS
         },
         (payload) => {
           const newStatus = payload.new?.lead_status as LeadStatus;

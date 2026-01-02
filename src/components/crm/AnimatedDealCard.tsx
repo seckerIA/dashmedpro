@@ -17,11 +17,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useState } from "react";
-import { getServiceConfig } from "@/constants/services";
 import { formatCurrency } from "@/lib/currency";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { getContactService } from "@/lib/crm";
+import { useNavigate } from "react-router-dom";
+import { MessageSquare } from "lucide-react";
 
 interface AnimatedDealCardProps {
   deal: CRMDealWithContact;
@@ -35,20 +35,21 @@ interface AnimatedDealCardProps {
   showOwnerBadge?: boolean;
 }
 
-export function AnimatedDealCard({ 
-  deal, 
-  onClick, 
-  onEdit, 
-  onDelete, 
+export function AnimatedDealCard({
+  deal,
+  onClick,
+  onEdit,
+  onDelete,
   onScheduleCall,
-  isDeleting, 
+  isDeleting,
   isHighlighted,
   onToggleFollowUp,
   showOwnerBadge
 }: AnimatedDealCardProps) {
   const { isSecretaria } = useUserProfile();
   const [isHovered, setIsHovered] = useState(false);
-  
+  const navigate = useNavigate();
+
   const getStageColor = (stage: string) => {
     const colors = {
       'lead_novo': 'from-slate-500/10 to-slate-600/5 border-slate-500/20',
@@ -61,7 +62,7 @@ export function AnimatedDealCard({
     };
     return colors[stage as keyof typeof colors] || 'from-gray-500/10 to-gray-600/5 border-gray-500/20';
   };
-  
+
   const cardClasses = `
     relative overflow-hidden transition-all duration-200 ease-out cursor-pointer
     ${isHovered ? 'shadow-glow scale-[1.02] -translate-y-1' : 'shadow-card hover:shadow-lg'}
@@ -75,7 +76,7 @@ export function AnimatedDealCard({
   const contactServiceValue = (deal.contact as any)?.service_value;
   const displayedServiceValue = contactServiceValue ?? deal.value ?? null;
   const hasDifferentValue = deal.value != null && deal.value !== displayedServiceValue;
-  
+
   const ownerName = deal.owner_profile?.full_name || deal.owner_profile?.email?.split('@')[0] || 'Desconhecido';
   const ownerInitials = ownerName
     .split(' ')
@@ -90,7 +91,7 @@ export function AnimatedDealCard({
   const serviceConfig = contactService ? getServiceConfig(contactService) : null;
 
   return (
-    <Card 
+    <Card
       className={cardClasses}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -105,7 +106,7 @@ export function AnimatedDealCard({
       }}
     >
       {/* Animated background gradient */}
-      <div 
+      <div
         className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent transform -skew-x-12 -z-10"
         style={{
           transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -113,13 +114,13 @@ export function AnimatedDealCard({
           willChange: 'transform',
         }}
       />
-      
+
       {/* Glass effect overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-transparent to-primary/5 -z-10" />
-      
+
       {/* Card Content */}
       <div className="relative p-3 space-y-3" style={{ width: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
-        
+
         {/* Header: Title and Actions */}
         <div className="flex items-start justify-between gap-2 min-w-0">
           <div className="flex-1 min-w-0">
@@ -127,7 +128,7 @@ export function AnimatedDealCard({
               {deal.title || 'Sem título'}
             </h4>
           </div>
-          
+
           <div className="flex items-center gap-1 flex-shrink-0">
             {/* Edit Button */}
             {onEdit && (
@@ -143,7 +144,7 @@ export function AnimatedDealCard({
                 <Edit className="w-3 h-3" />
               </Button>
             )}
-            
+
             {/* Delete Button */}
             {onDelete && (
               <AlertDialog>
@@ -162,7 +163,7 @@ export function AnimatedDealCard({
                   <AlertDialogHeader>
                     <AlertDialogTitle>Excluir Contrato</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Tem certeza que deseja excluir o contrato "{deal.title}"? 
+                      Tem certeza que deseja excluir o contrato "{deal.title}"?
                       Esta ação não pode ser desfeita.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
@@ -243,17 +244,47 @@ export function AnimatedDealCard({
 
             {/* Phone */}
             {deal.contact.phone && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Phone className="w-3.5 h-3.5 flex-shrink-0" />
-                <span className="truncate">{deal.contact.phone}</span>
+              <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                <div className="flex items-center gap-2 truncate">
+                  <Phone className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="truncate">{deal.contact.phone}</span>
+                </div>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 hover:bg-primary/20 hover:text-primary"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const cleanPhone = deal.contact!.phone!.replace(/\D/g, '');
+                      navigate(`/whatsapp?phone=${cleanPhone}`);
+                    }}
+                  >
+                    <Phone className="w-3 h-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 hover:bg-green-500/20 hover:text-green-600"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const cleanPhone = deal.contact!.phone!.replace(/\D/g, '');
+                      navigate(`/whatsapp?phone=${cleanPhone}`);
+                    }}
+                  >
+                    <MessageSquare className="w-3 h-3" />
+                  </Button>
+                </div>
               </div>
             )}
 
             {/* Service Badge */}
             {serviceConfig && (
               <div className="flex items-center gap-2">
-                <Badge 
-                  variant="secondary" 
+                <Badge
+                  variant="secondary"
                   className={`text-xs px-2 py-0.5 ${serviceConfig.bgColor} ${serviceConfig.textColor} border-0 font-medium`}
                 >
                   {serviceConfig.label}
@@ -292,7 +323,7 @@ export function AnimatedDealCard({
 
         {/* Follow-up Action */}
         {onToggleFollowUp && (
-          <div 
+          <div
             className="pt-2 border-t border-border/50"
             onPointerDown={(e) => e.stopPropagation()}
           >
@@ -318,9 +349,9 @@ export function AnimatedDealCard({
           </div>
         )}
       </div>
-      
+
       {/* Subtle border glow on hover */}
-      <div 
+      <div
         className="absolute inset-0 rounded-lg border border-transparent transition-all duration-150 pointer-events-none"
         style={{
           borderColor: isHovered ? 'rgba(var(--primary), 0.4)' : 'transparent',

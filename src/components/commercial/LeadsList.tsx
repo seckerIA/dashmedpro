@@ -8,12 +8,19 @@ import { Loader2, ArrowUpDown } from "lucide-react";
 import { COMMERCIAL_LEAD_STATUS_LABELS, COMMERCIAL_LEAD_ORIGIN_LABELS } from "@/types/commercial";
 import { getScoreLevel } from "@/types/leadScoring";
 import { Button } from "@/components/ui/button";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { useSecretaryDoctors } from "@/hooks/useSecretaryDoctors";
+import { useAuth } from "@/hooks/useAuth";
 
 interface LeadsListProps {
   searchTerm: string;
 }
 
 export function LeadsList({ searchTerm }: LeadsListProps) {
+  const { user } = useAuth();
+  const { isSecretaria } = useUserProfile();
+  const { doctorIds } = useSecretaryDoctors();
+
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [originFilter, setOriginFilter] = useState<string>("all");
   const [scoreFilter, setScoreFilter] = useState<string>("all");
@@ -24,15 +31,23 @@ export function LeadsList({ searchTerm }: LeadsListProps) {
     origin: originFilter !== "all" ? originFilter : undefined,
   };
 
-  const { leads, isLoading } = useCommercialLeads(filters);
+  const { leads, isLoading, error } = useCommercialLeads(filters);
+
+  console.log('🔍 LeadsList Render:', {
+    userId: user?.id,
+    isSecretaria,
+    doctorIds,
+    leadsCount: leads?.length || 0,
+    isLoading
+  });
 
   const filteredAndSortedLeads = useMemo(() => {
     let filtered = leads.filter(lead => {
-      const matchesSearch = !searchTerm || 
+      const matchesSearch = !searchTerm ||
         lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         lead.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         lead.phone?.includes(searchTerm);
-      
+
       if (!matchesSearch) return false;
 
       // Filtro por score
@@ -43,7 +58,7 @@ export function LeadsList({ searchTerm }: LeadsListProps) {
         if (scoreFilter === "medium" && level !== "medium") return false;
         if (scoreFilter === "low" && level !== "low") return false;
       }
-      
+
       return true;
     });
 
@@ -119,21 +134,30 @@ export function LeadsList({ searchTerm }: LeadsListProps) {
         </Button>
       </div>
 
+      {/* Debug Info (Only in dev/test) */}
+      <div className="text-[10px] text-muted-foreground bg-muted/30 p-2 rounded border border-dashed">
+        DEBUG: User {user?.id} | Role: {isSecretaria ? 'Secretária' : 'Outro'} |
+        Docs: {doctorIds?.length || 0} ({doctorIds?.join(', ') || 'Nenhum'}) |
+        Leads: {leads?.length || 0}
+      </div>
+
       {/* Leads Grid */}
-      {filteredAndSortedLeads.length === 0 ? (
-        <Card className="bg-gradient-card shadow-card border-border">
-          <CardContent className="p-8 text-center">
-            <p className="text-muted-foreground">Nenhum lead encontrado.</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredAndSortedLeads.map(lead => (
-            <LeadCard key={lead.id} lead={lead} />
-          ))}
-        </div>
-      )}
-    </div>
+      {
+        filteredAndSortedLeads.length === 0 ? (
+          <Card className="bg-gradient-card shadow-card border-border">
+            <CardContent className="p-8 text-center">
+              <p className="text-muted-foreground">Nenhum lead encontrado.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredAndSortedLeads.map(lead => (
+              <LeadCard key={lead.id} lead={lead} />
+            ))}
+          </div>
+        )
+      }
+    </div >
   );
 }
 

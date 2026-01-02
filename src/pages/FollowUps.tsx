@@ -8,12 +8,12 @@ import { useFollowUps } from '@/hooks/useFollowUps';
 import { useCRM } from '@/hooks/useCRM';
 import { FollowUpScheduleModal } from '@/components/crm/FollowUpScheduleModal';
 import { FollowUp } from '@/types/followUp';
-import { 
-  Calendar, 
-  Clock, 
-  CheckCircle2, 
-  XCircle, 
-  Plus, 
+import {
+  Calendar,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Plus,
   Search,
   Phone,
   Mail,
@@ -54,18 +54,18 @@ export default function FollowUps() {
     if (searchTerm) {
       const deal = deals.find(d => d.id === followUp.deal_id);
       const searchLower = searchTerm.toLowerCase();
-      const matchesSearch = 
+      const matchesSearch =
         deal?.title?.toLowerCase().includes(searchLower) ||
         deal?.contact?.full_name?.toLowerCase().includes(searchLower) ||
         followUp.description?.toLowerCase().includes(searchLower);
-      
+
       if (!matchesSearch) return false;
     }
 
     // Filtro por status/tab
     const scheduledDate = parseISO(followUp.scheduled_date);
     const isOverdue = isPast(scheduledDate) && followUp.status !== 'concluido' && followUp.status !== 'cancelado';
-    
+
     switch (selectedTab) {
       case 'pending':
         return followUp.status === 'pendente' && !isOverdue;
@@ -82,7 +82,7 @@ export default function FollowUps() {
   const groupedFollowUps = filteredFollowUps.reduce((acc, followUp) => {
     const date = parseISO(followUp.scheduled_date);
     const dateKey = format(date, 'yyyy-MM-dd');
-    
+
     if (!acc[dateKey]) {
       acc[dateKey] = [];
     }
@@ -304,7 +304,7 @@ export default function FollowUps() {
               {sortedDates.map((dateKey) => {
                 const date = parseISO(dateKey);
                 const followUpsForDate = groupedFollowUps[dateKey];
-                
+
                 return (
                   <div key={dateKey} className="space-y-3">
                     <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -328,7 +328,7 @@ export default function FollowUps() {
                                       <span className="capitalize">Ligação</span>
                                     </div>
                                   </div>
-                                  
+
                                   <div>
                                     <h4 className="font-semibold">
                                       {deal?.title || 'Negócio não encontrado'}
@@ -360,6 +360,34 @@ export default function FollowUps() {
                                 </div>
 
                                 <div className="flex items-center gap-2">
+                                  {deal?.contact?.phone && (
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          const cleanPhone = deal.contact!.phone!.replace(/\D/g, '');
+                                          navigate(`/whatsapp?phone=${cleanPhone}`);
+                                        }}
+                                        className="h-8 w-8 p-0"
+                                        title="Ligar"
+                                      >
+                                        <Phone className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          const cleanPhone = deal.contact!.phone!.replace(/\D/g, '');
+                                          navigate(`/whatsapp?phone=${cleanPhone}`);
+                                        }}
+                                        className="h-8 w-8 p-0"
+                                        title="WhatsApp"
+                                      >
+                                        <MessageSquare className="h-4 w-4" />
+                                      </Button>
+                                    </>
+                                  )}
                                   {followUp.status === 'pendente' && (
                                     <>
                                       <Button

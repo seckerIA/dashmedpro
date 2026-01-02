@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -11,6 +12,7 @@ import { ContactForm } from './ContactForm';
 
 export function WhatsAppLeadsTab() {
   const { leads, isLoading } = useWhatsAppLeads();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLead, setSelectedLead] = useState<WhatsAppLead | null>(null);
   const [showContactForm, setShowContactForm] = useState(false);
@@ -33,7 +35,7 @@ export function WhatsAppLeadsTab() {
 
   const handleOpenWhatsApp = (number: string) => {
     const cleanNumber = number.replace(/\D/g, '');
-    window.open(`https://wa.me/55${cleanNumber}`, '_blank');
+    navigate(`/whatsapp?phone=${cleanNumber}`);
   };
 
   const getStatusBadge = (lead: WhatsAppLead) => {

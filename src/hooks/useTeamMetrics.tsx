@@ -113,7 +113,7 @@ const fetchSecretaryMetrics = async (
   const appointmentsTodayQuery = supabase
     .from('medical_appointments')
     .select('id', { count: 'exact', head: true })
-    .eq('created_by', userId)
+    .eq('user_id', userId)
     .gte('created_at', todayStart)
     .lte('created_at', todayEnd);
 
@@ -121,7 +121,7 @@ const fetchSecretaryMetrics = async (
   const appointmentsMonthQuery = supabase
     .from('medical_appointments')
     .select('id', { count: 'exact', head: true })
-    .eq('created_by', userId)
+    .eq('user_id', userId)
     .gte('created_at', monthStart)
     .lte('created_at', monthEnd);
 
