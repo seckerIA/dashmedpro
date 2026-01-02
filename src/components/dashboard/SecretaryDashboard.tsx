@@ -2,6 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MetricCard, QuickActionCard } from "@/components/dashboard/MetricCard";
+import { HotLeadsCard } from "@/components/dashboard/HotLeadsCard";
 import { AnimatedWrapper } from "@/components/shared/AnimatedWrapper";
 import { useSecretaryMetrics } from "@/hooks/useSecretaryMetrics";
 import { useSecretarySinalMetrics } from "@/hooks/useSecretarySinalMetrics";
@@ -285,8 +286,13 @@ const SecretaryDashboard = () => {
         </Card>
       </AnimatedWrapper>
 
-      {/* Grid com Médicos e Contatos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+      {/* Grid com Leads Quentes, Médicos e Contatos */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+
+        {/* Leads Quentes - WhatsApp AI */}
+        <AnimatedWrapper animationType="slideUp" delay={0.25}>
+          <HotLeadsCard className="h-full" maxItems={4} />
+        </AnimatedWrapper>
 
         {/* Lista de Médicos */}
         <AnimatedWrapper animationType="slideUp" delay={0.3}>
@@ -367,13 +373,36 @@ const SecretaryDashboard = () => {
                 </div>
               </div>
 
-              {/* Placeholder para futuras métricas de WhatsApp */}
-              <div className="p-4 rounded-lg border border-dashed border-border bg-muted/20">
-                <div className="flex items-center gap-3 text-muted-foreground">
-                  <MessageSquare className="h-8 w-8 opacity-50" />
-                  <div>
-                    <p className="font-medium">Integração WhatsApp</p>
-                    <p className="text-sm">Em breve: métricas de conversas e leads</p>
+              {/* Card WhatsApp Interativo */}
+              <div
+                onClick={() => navigate('/whatsapp')}
+                className="group relative p-4 rounded-xl bg-gradient-to-br from-green-500/10 via-green-400/5 to-emerald-500/10 border border-green-500/20 hover:border-green-500/40 cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-green-500/10 overflow-hidden"
+              >
+                {/* Background decorativo */}
+                <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                <div className="relative flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-green-500/20 group-hover:bg-green-500/30 transition-colors duration-300">
+                      <MessageSquare className="h-6 w-6 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-foreground group-hover:text-green-600 transition-colors duration-300">
+                        WhatsApp Business
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Gerencie conversas e atendimentos
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-green-500/20 text-green-600 border-green-500/30 group-hover:bg-green-500/30 transition-colors">
+                      Ativo
+                    </Badge>
+                    <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center group-hover:bg-green-500/20 transition-all duration-300 group-hover:translate-x-1">
+                      <TrendingUp className="h-4 w-4 text-green-600 rotate-45" />
+                    </div>
                   </div>
                 </div>
               </div>

@@ -548,11 +548,11 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
     mutationFn: (dealId: string) => deleteDeal(dealId, user?.id),
     onSuccess: (_, dealId) => {
       // Invalidar todas as queries de deals para garantir atualização imediata
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ['crm-deals'],
-        exact: false 
+        exact: false
       });
-      
+
       // Também atualizar cache otimisticamente se possível
       if (user?.id) {
         const queryKey = ['crm-deals', user.id, viewAsUserIds?.join(',')];
@@ -566,6 +566,130 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
       console.error('Erro na mutation de deletar deal:', error);
     },
   });
+
+  // =====================================================
+  // Converter lead do WhatsApp para Deal no Pipeline
+  // =====================================================
+  const convertWhatsAppToDeal = async ({
+    conversationId,
+    contactName,
+    phoneNumber,
+    leadStatus,
+    detectedProcedure,
+    value,
+  }: {
+    conversationId: string;
+    contactName: string | null;
+    phoneNumber: string;
+    leadStatus: 'quente' | 'convertido';
+    detectedProcedure?: string | null;
+    value?: number | null;
+  }): Promise<{ contact: CRMContact; deal: CRMDeal }> => {
+    if (!user?.id) throw new Error('Usuário não autenticado');
+
+    // 1. Verificar se contato já existe pelo telefone
+    const normalizedPhone = phoneNumber.replace(/\D/g, '');
+    let contact: CRMContact | null = null;
+
+    const { data: existingContacts } = await supabase
+      .from('crm_contacts')
+      .select('*')
+      .or(`phone.ilike.%${normalizedPhone}%,phone.ilike.%${phoneNumber}%`)
+      .eq('user_id', user.id)
+      .limit(1);
+
+    if (existingContacts && existingContacts.length > 0) {
+      contact = existingContacts[0] as CRMContact;
+    } else {
+      // 2. Criar novo contato
+      const { data: newContact, error: contactError } = await supabase
+        .from('crm_contacts')
+        .insert({
+          user_id: user.id,
+          full_name: contactName || `WhatsApp ${phoneNumber}`,
+          phone: phoneNumber,
+          custom_fields: {
+            whatsapp_conversation_id: conversationId,
+            source: 'whatsapp',
+          },
+        })
+        .select()
+        .single();
+
+      if (contactError) throw new Error(`Erro ao criar contato: ${contactError.message}`);
+      contact = newContact as CRMContact;
+    }
+
+    // 3. Verificar se já existe deal ativo para este contato
+    const { data: existingDeals } = await supabase
+      .from('crm_deals')
+      .select('id, stage')
+      .eq('contact_id', contact.id)
+      .not('stage', 'in', '("fechado_ganho","fechado_perdido")')
+      .limit(1);
+
+    let deal: CRMDeal;
+
+    if (existingDeals && existingDeals.length > 0) {
+      // 4a. Atualizar deal existente
+      const targetStage = leadStatus === 'convertido' ? 'agendado' : 'lead_novo';
+
+      const { data: updatedDeal, error: updateError } = await supabase
+        .from('crm_deals')
+        .update({
+          stage: targetStage,
+          value: value || undefined,
+          description: detectedProcedure
+            ? `Procedimento de interesse: ${detectedProcedure}`
+            : undefined,
+        })
+        .eq('id', existingDeals[0].id)
+        .select()
+        .single();
+
+      if (updateError) throw new Error(`Erro ao atualizar deal: ${updateError.message}`);
+      deal = updatedDeal as CRMDeal;
+    } else {
+      // 4b. Criar novo deal
+      const targetStage = leadStatus === 'convertido' ? 'agendado' : 'lead_novo';
+
+      const { data: newDeal, error: dealError } = await supabase
+        .from('crm_deals')
+        .insert({
+          user_id: user.id,
+          contact_id: contact.id,
+          title: contactName || `Lead WhatsApp ${phoneNumber}`,
+          stage: targetStage,
+          value: value || null,
+          description: detectedProcedure
+            ? `Procedimento de interesse: ${detectedProcedure}`
+            : 'Lead capturado via WhatsApp',
+        })
+        .select()
+        .single();
+
+      if (dealError) throw new Error(`Erro ao criar deal: ${dealError.message}`);
+      deal = newDeal as CRMDeal;
+    }
+
+    // 5. Atualizar análise do WhatsApp com referência ao deal/contato
+    await supabase
+      .from('whatsapp_conversation_analysis')
+      .update({
+        deal_created: true,
+        deal_id: deal.id,
+        contact_created: true,
+        contact_id: contact.id,
+      })
+      .eq('conversation_id', conversationId);
+
+    // 6. Invalidar queries
+    queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
+    queryClient.invalidateQueries({ queryKey: ['crm-contacts'] });
+    queryClient.invalidateQueries({ queryKey: ['whatsapp-analysis', conversationId] });
+
+    return { contact, deal };
+  };
 
   return {
     contacts,
@@ -591,5 +715,7 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
     isUpdatingContact: updateContactMutation.isPending,
     isDeletingContact: deleteContactMutation.isPending,
     isDeletingDeal: deleteDealMutation.isPending,
+    // WhatsApp integration
+    convertWhatsAppToDeal,
   };
 }
