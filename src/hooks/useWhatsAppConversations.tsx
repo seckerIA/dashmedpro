@@ -16,6 +16,7 @@ import type {
   WhatsAppConversationStatus,
   WhatsAppInboxStats,
 } from '@/types/whatsapp';
+import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
 
 // Query keys
 export const WHATSAPP_CONVERSATIONS_KEY = 'whatsapp-conversations';
@@ -76,7 +77,7 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
         query = query.or(`contact_name.ilike.%${filters.search}%,phone_number.ilike.%${filters.search}%,last_message_preview.ilike.%${filters.search}%`);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await supabaseQueryWithTimeout(query as any, 60000);
 
       if (error) {
         console.error('[useWhatsAppConversations] Error:', error);
@@ -116,7 +117,7 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
     enabled: enabled && !!user?.id && userIds.length > 0,
     staleTime: 30 * 1000, // 30 segundos
     gcTime: 5 * 60 * 1000,
-    refetchInterval: 1000, // Atualiza a lista a cada 1s para refletir últimas mensagens
+    refetchInterval: 3000, // Atualiza a lista a cada 1s para refletir últimas mensagens
   });
 
   // =========================================
@@ -137,8 +138,10 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
       }
 
       // Tentar usar função RPC
-      const { data: rpcData, error: rpcError } = await supabase
-        .rpc('get_whatsapp_inbox_stats', { p_user_id: user.id });
+      const { data: rpcData, error: rpcError } = await supabaseQueryWithTimeout(
+        supabase.rpc('get_whatsapp_inbox_stats', { p_user_id: user.id }) as any,
+        30000
+      );
 
       if (!rpcError && rpcData) {
         return rpcData as WhatsAppInboxStats;

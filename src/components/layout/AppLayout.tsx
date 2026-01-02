@@ -13,7 +13,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
-import { LivePerformanceCard } from "@/components/prospecting/LivePerformanceCard"
+import { VirtualAssistantButton } from "@/components/ai/VirtualAssistantButton"
+
+
 import { useOverdueAppointments } from "@/hooks/useOverdueAppointments"
 import { AlertTriangle } from "lucide-react"
 import { GlobalSearch } from "@/components/crm/GlobalSearch"
@@ -48,13 +50,13 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <TooltipProvider>
-        <ResizablePanelGroup 
-            direction="horizontal" 
-            className="h-screen w-full overflow-hidden font-sans"
-            onLayout={(sizes: number[]) => {
-                document.cookie = `react-resizable-panels:layout=${JSON.stringify(sizes)}`
-            }}
-        >
+      <ResizablePanelGroup
+        direction="horizontal"
+        className="h-screen w-full overflow-hidden font-sans"
+        onLayout={(sizes: number[]) => {
+          document.cookie = `react-resizable-panels:layout=${JSON.stringify(sizes)}`
+        }}
+      >
         <ResizablePanel
           ref={sidebarRef}
           defaultSize={20}
@@ -74,9 +76,9 @@ export function AppLayout({ children }: AppLayoutProps) {
         >
           <AppSidebar isCollapsed={isCollapsed} />
         </ResizablePanel>
-        
+
         <ResizableHandle withHandle />
-        
+
         <ResizablePanel defaultSize={80}>
           <div className="flex-1 flex flex-col h-full bg-background">
             {/* Header - estilo Dabang */}
@@ -115,9 +117,9 @@ export function AppLayout({ children }: AppLayoutProps) {
 
               <div className="flex items-center gap-4">
                 <div className="hidden md:flex items-center gap-6 text-sm">
-                  <a 
-                    href="https://wa.me/5524999409021" 
-                    target="_blank" 
+                  <a
+                    href="https://wa.me/5524999409021"
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="text-primary font-medium border-b border-primary/60 hover:border-primary transition-colors cursor-pointer"
                   >
@@ -172,10 +174,11 @@ export function AppLayout({ children }: AppLayoutProps) {
             </main>
           </div>
         </ResizablePanel>
-        </ResizablePanelGroup>
-        
-        {/* Card de Performance Global - aparece em todas as páginas quando há expediente ativo */}
-        <LivePerformanceCard />
+      </ResizablePanelGroup>
+
+      {/* Card de Performance Global - aparece em todas as páginas quando há expediente ativo */}
+      {/* Botão da Secretária Virtual AI */}
+      <VirtualAssistantButton />
     </TooltipProvider>
   )
 }

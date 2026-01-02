@@ -158,9 +158,9 @@ const StuckQueryDetector = () => {
           if (fetchStartTime) {
             const timeSinceStart = now - fetchStartTime;
 
-            // AUMENTADO: Timeout de 45s para 90s
+            // AUMENTADO: Timeout de 45s para 90s -> 100s para dar margem aos timeouts de 60s
             // Deve ser maior que o timeout do cliente HTTP (60s) para evitar cancelar queries que estão apenas lentas
-            const stuckThreshold = 90000;
+            const stuckThreshold = 100000;
 
             if (timeSinceStart > stuckThreshold) {
               stuckQueries.push(query);

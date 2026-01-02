@@ -2,12 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "./useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { supabaseQueryWithTimeout } from "@/utils/supabaseQuery";
-import { 
-  startOfDay, 
-  endOfDay, 
-  startOfWeek, 
+import {
+  startOfDay,
+  endOfDay,
+  startOfWeek,
   endOfWeek,
-  startOfMonth, 
+  startOfMonth,
   endOfMonth,
   startOfQuarter,
   endOfQuarter,
@@ -25,7 +25,7 @@ import { CommercialMetrics, PeriodFilter, PeriodRange } from "@/types/metrics";
 // Função para calcular o período baseado no filtro
 function getPeriodRange(filter: PeriodFilter, customRange?: PeriodRange): PeriodRange {
   const now = new Date();
-  
+
   switch (filter) {
     case 'today':
       return {
@@ -110,7 +110,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .gte("start_time", periodStartISO)
         .lte("start_time", periodEndISO);
 
-      const appointmentsResult = await supabaseQueryWithTimeout(appointmentsQuery as any, 30000, signal);
+      const appointmentsResult = await supabaseQueryWithTimeout(appointmentsQuery as any, 60000, signal);
       const { data: appointments, error: appointmentsError } = appointmentsResult;
 
       if (appointmentsError) throw appointmentsError;
@@ -140,14 +140,14 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .gte("transaction_date", format(period.start, "yyyy-MM-dd"))
         .lte("transaction_date", format(period.end, "yyyy-MM-dd"));
 
-      const transactionsResult = await supabaseQueryWithTimeout(transactionsQuery as any, 30000, signal);
+      const transactionsResult = await supabaseQueryWithTimeout(transactionsQuery as any, 60000, signal);
       const { data: transactions, error: transactionsError } = transactionsResult;
 
       if (transactionsError) throw transactionsError;
 
       // Atualizar transactionIds com as transações encontradas
       const allTransactionIds = transactions?.map(t => t.id) || [];
-      
+
       // 3-5. Executar queries em paralelo (que não dependem de transactionIds)
       const [
         costsResult,
@@ -157,15 +157,15 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         // 3. Buscar custos detalhados das transações
         allTransactionIds.length > 0
           ? supabaseQueryWithTimeout(
-              supabase
-                .from("transaction_costs")
-                .select("*")
-                .in("transaction_id", allTransactionIds) as any,
-              30000,
-              signal
-            )
+            supabase
+              .from("transaction_costs")
+              .select("*")
+              .in("transaction_id", allTransactionIds) as any,
+            30000,
+            signal
+          )
           : Promise.resolve({ data: [], error: null }),
-        
+
         // 4. Buscar leads comerciais
         supabaseQueryWithTimeout(
           supabase
@@ -177,7 +177,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
           30000,
           signal
         ),
-        
+
         // 5. Buscar campanhas
         supabaseQueryWithTimeout(
           supabase
@@ -225,7 +225,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
           30000,
           signal
         ),
-        
+
         // 7. Buscar deals do CRM
         supabaseQueryWithTimeout(
           supabase
@@ -245,7 +245,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
           30000,
           signal
         ),
-        
+
         // 8a. Buscar transações do período anterior
         supabaseQueryWithTimeout(
           supabase
@@ -259,7 +259,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
           30000,
           signal
         ),
-        
+
         // 8b. Buscar appointments do período anterior
         supabaseQueryWithTimeout(
           supabase
@@ -295,7 +295,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       });
 
       // Custo por consulta - incluir TODAS as consultas completadas (com ou sem transação financeira)
-      const completedAppointments = appointments?.filter(a => 
+      const completedAppointments = appointments?.filter(a =>
         a.status === 'completed'
       ) || [];
 
@@ -319,36 +319,36 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       });
 
       const totalCosts = appointmentCosts.reduce((sum, a) => sum + a.costs, 0);
-      
+
       // Receita de consultas completadas - usar estimated_value se não houver transação
       const appointmentsRevenue = appointmentCosts.reduce((sum, a) => sum + a.revenue, 0);
-      
+
       // Também incluir consultas agendadas/confirmadas que ainda não foram completadas mas têm valor estimado
-      const pendingAppointments = appointments?.filter(a => 
+      const pendingAppointments = appointments?.filter(a =>
         (a.status === 'scheduled' || a.status === 'confirmed') && a.estimated_value
       ) || [];
       const pendingRevenue = pendingAppointments.reduce((sum, apt) => sum + Number(apt.estimated_value || 0), 0);
-      
+
       // Receita de vendas comerciais
       const salesRevenue = sales?.reduce((sum, s) => sum + Number(s.value || 0), 0) || 0;
-      
+
       // Receita total (consultas completadas + consultas agendadas com valor estimado + vendas)
       const totalRevenue = appointmentsRevenue + pendingRevenue + salesRevenue;
-      const avgCostPerAppointment = completedAppointments.length > 0 
-        ? totalCosts / completedAppointments.length 
+      const avgCostPerAppointment = completedAppointments.length > 0
+        ? totalCosts / completedAppointments.length
         : 0;
 
       // ROI
-      const totalROI = totalCosts > 0 
-        ? ((totalRevenue - totalCosts) / totalCosts) * 100 
+      const totalROI = totalCosts > 0
+        ? ((totalRevenue - totalCosts) / totalCosts) * 100
         : 0;
 
       // ROI por campanha
       const campaignROI = campaigns?.map(campaign => {
-        const campaignLeads = leads?.filter(l => 
+        const campaignLeads = leads?.filter(l =>
           l.origin === campaign.name || l.notes?.includes(campaign.id)
         ) || [];
-        const campaignSales = sales?.filter(s => 
+        const campaignSales = sales?.filter(s =>
           s.campaign_id === campaign.id
         ) || [];
         const campaignRevenue = campaignSales.reduce((sum, s) => sum + (s.value || 0), 0);
@@ -365,8 +365,8 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       }) || [];
 
       // Margem de lucro
-      const grossMargin = totalRevenue > 0 
-        ? ((totalRevenue - totalCosts) / totalRevenue) * 100 
+      const grossMargin = totalRevenue > 0
+        ? ((totalRevenue - totalCosts) / totalRevenue) * 100
         : 0;
 
       // Calcular despesas gerais (saídas) do período
@@ -378,13 +378,13 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .eq("status", "concluida")
         .gte("transaction_date", format(period.start, "yyyy-MM-dd"))
         .lte("transaction_date", format(period.end, "yyyy-MM-dd"));
-      
-      const expensesResult = await supabaseQueryWithTimeout(expensesQuery as any, 30000, signal);
+
+      const expensesResult = await supabaseQueryWithTimeout(expensesQuery as any, 60000, signal);
       const { data: expenses } = expensesResult;
 
       const totalExpenses = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
-      const netMargin = totalRevenue > 0 
-        ? ((totalRevenue - totalCosts - totalExpenses) / totalRevenue) * 100 
+      const netMargin = totalRevenue > 0
+        ? ((totalRevenue - totalCosts - totalExpenses) / totalRevenue) * 100
         : 0;
 
       // Receita por hora
@@ -424,14 +424,14 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         const transaction = transactionMap.get(apt.financial_transaction_id!);
         const revenue = transaction?.amount || apt.estimated_value || 0;
         const costs = transaction?.total_costs || costsMap.get(apt.financial_transaction_id!) || 0;
-        
+
         const current = patientRevenueMap.get(apt.contact_id) || {
           revenue: 0,
           costs: 0,
           appointments: 0,
           name: (apt.contact as any)?.full_name || 'Desconhecido',
         };
-        
+
         patientRevenueMap.set(apt.contact_id, {
           revenue: current.revenue + Number(revenue),
           costs: current.costs + Number(costs),
@@ -460,8 +460,8 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
 
       // Taxa de conversão
       const totalLeads = leads?.length || 0;
-      const leadsToAppointments = totalLeads > 0 
-        ? (completedAppointments.length / totalLeads) * 100 
+      const leadsToAppointments = totalLeads > 0
+        ? (completedAppointments.length / totalLeads) * 100
         : 0;
       const appointmentsToSales = completedAppointments.length > 0
         ? ((sales?.length || 0) / completedAppointments.length) * 100
@@ -476,8 +476,8 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .select("id")
         .eq("user_id", user.id)
         .eq("is_active", true);
-      
-      const proceduresResult = await supabaseQueryWithTimeout(proceduresQuery as any, 30000, signal);
+
+      const proceduresResult = await supabaseQueryWithTimeout(proceduresQuery as any, 60000, signal);
       const { data: procedures, error: proceduresError } = proceduresResult;
 
       if (proceduresError) {
@@ -516,10 +516,10 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       const closedDeals = deals?.filter(d => d.closed_at) || [];
       const avgSalesCycle = closedDeals.length > 0
         ? closedDeals.reduce((sum, deal) => {
-            const created = parseISO(deal.created_at);
-            const closed = parseISO(deal.closed_at!);
-            return sum + differenceInDays(closed, created);
-          }, 0) / closedDeals.length
+          const created = parseISO(deal.created_at);
+          const closed = parseISO(deal.closed_at!);
+          return sum + differenceInDays(closed, created);
+        }, 0) / closedDeals.length
         : 0;
 
       // Eficiência por procedimento
@@ -528,7 +528,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         const transaction = transactionMap.get(apt.financial_transaction_id!);
         const revenue = transaction?.amount || apt.estimated_value || 0;
         const type = apt.appointment_type || 'other';
-        
+
         const current = procedureMap.get(type) || { revenue: 0, minutes: 0, count: 0 };
         procedureMap.set(type, {
           revenue: current.revenue + Number(revenue),
@@ -551,8 +551,8 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       const prevProfit = prevRevenue - prevCosts;
       const prevAppointmentsCount = prevAppointments?.length || 0;
 
-      const revenueChange = prevRevenue > 0 
-        ? ((totalRevenue - prevRevenue) / prevRevenue) * 100 
+      const revenueChange = prevRevenue > 0
+        ? ((totalRevenue - prevRevenue) / prevRevenue) * 100
         : 0;
       const costsChange = prevCosts > 0
         ? ((totalCosts - prevCosts) / prevCosts) * 100
@@ -571,8 +571,8 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .eq("user_id", user.id)
         .gte("created_at", periodStartISO)
         .lte("created_at", periodEndISO);
-      
-      const newContactsResult = await supabaseQueryWithTimeout(newContactsQuery as any, 30000, signal);
+
+      const newContactsResult = await supabaseQueryWithTimeout(newContactsQuery as any, 60000, signal);
       const { data: newContacts } = newContactsResult;
 
       const newPatients = newContacts?.length || 0;
@@ -597,12 +597,12 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         monthDate.setMonth(monthDate.getMonth() - i);
         const monthStart = startOfMonth(monthDate);
         const monthEnd = endOfMonth(monthDate);
-        
+
         const monthLeads = leads?.filter(l => {
           const leadDate = parseISO(l.created_at);
           return leadDate >= monthStart && leadDate <= monthEnd;
         }).length || 0;
-        
+
         leadsTrend.push({
           name: format(monthStart, 'MMM', { locale: ptBR }),
           value: monthLeads,
@@ -651,15 +651,15 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
             gross: grossMargin,
             net: netMargin,
             byAppointment: procedureEfficiency.map(p => {
-              const avgCostsPerAppointment = completedAppointments.length > 0 
-                ? totalCosts / completedAppointments.length 
+              const avgCostsPerAppointment = completedAppointments.length > 0
+                ? totalCosts / completedAppointments.length
                 : 0;
               const avgExpensesPerAppointment = completedAppointments.length > 0
                 ? totalExpenses / completedAppointments.length
                 : 0;
               return {
                 appointmentType: p.procedureType,
-                grossMargin: p.averageRevenue > 0 
+                grossMargin: p.averageRevenue > 0
                   ? ((p.averageRevenue - avgCostsPerAppointment) / p.averageRevenue) * 100
                   : 0,
                 netMargin: p.averageRevenue > 0
@@ -677,7 +677,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
           },
           averageTicket: {
             perAppointment: avgTicketPerAppointment,
-            perProcedure: sales?.length > 0 
+            perProcedure: sales?.length > 0
               ? sales.reduce((sum, s) => sum + (s.value || 0), 0) / sales.length
               : 0,
             byType: procedureEfficiency.map(p => ({
@@ -786,7 +786,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
           },
         },
       };
-      
+
       console.log('✅ useCommercialMetrics - Retornando resultado:', {
         totalLeads: result.totalLeads,
         totalRevenue: result.totalRevenue,
@@ -795,7 +795,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         conversionRate: result.conversionRate,
         averageRevenue: result.averageRevenue,
       });
-      
+
       try {
         // Verificar se todas as propriedades obrigatórias estão presentes
         if (!result.financial || !result.customer || !result.operational || !result.marketing || !result.comparisons) {
@@ -808,7 +808,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
           });
           throw new Error('Propriedades obrigatórias faltando no resultado');
         }
-        
+
         return result;
       } catch (error) {
         console.error('❌ useCommercialMetrics - Erro ao retornar resultado:', error);

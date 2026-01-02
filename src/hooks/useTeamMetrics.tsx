@@ -165,13 +165,13 @@ const fetchSecretaryMetrics = async (
     confirmationsTodayResult,
     pendingConfirmationsResult
   ] = await Promise.all([
-    supabaseQueryWithTimeout(profileQuery, 10000, signal),
-    supabaseQueryWithTimeout(appointmentsTodayQuery, 10000, signal),
-    supabaseQueryWithTimeout(appointmentsMonthQuery, 10000, signal),
-    supabaseQueryWithTimeout(contactsTodayQuery, 10000, signal),
-    supabaseQueryWithTimeout(contactsMonthQuery, 10000, signal),
-    supabaseQueryWithTimeout(confirmationsTodayQuery, 10000, signal),
-    supabaseQueryWithTimeout(pendingConfirmationsQuery, 10000, signal),
+    supabaseQueryWithTimeout(profileQuery, 30000, signal),
+    supabaseQueryWithTimeout(appointmentsTodayQuery, 30000, signal),
+    supabaseQueryWithTimeout(appointmentsMonthQuery, 30000, signal),
+    supabaseQueryWithTimeout(contactsTodayQuery, 30000, signal),
+    supabaseQueryWithTimeout(contactsMonthQuery, 30000, signal),
+    supabaseQueryWithTimeout(confirmationsTodayQuery, 30000, signal),
+    supabaseQueryWithTimeout(pendingConfirmationsQuery, 30000, signal),
   ]);
 
   return {
@@ -216,10 +216,10 @@ const fetchTeamMetrics = async (
       .eq('id', userId);
 
     const [dealsResult, contactsResult, leadsResult, profilesResult] = await Promise.all([
-      supabaseQueryWithTimeout(dealsQuery, 30000, signal),
-      supabaseQueryWithTimeout(contactsQuery, 30000, signal),
-      supabaseQueryWithTimeout(leadsQuery, 30000, signal),
-      supabaseQueryWithTimeout(profilesQuery, 30000, signal),
+      supabaseQueryWithTimeout(dealsQuery, 60000, signal),
+      supabaseQueryWithTimeout(contactsQuery, 60000, signal),
+      supabaseQueryWithTimeout(leadsQuery, 60000, signal),
+      supabaseQueryWithTimeout(profilesQuery, 60000, signal),
     ]);
 
     if (dealsResult.error) throw new Error(`Erro ao buscar deals: ${dealsResult.error.message}`);
@@ -253,7 +253,7 @@ const fetchTeamMetrics = async (
       .eq('is_active', true)
       .limit(50); // Reduzido de 100 para 50 para melhor performance
 
-    const { data: profiles, error } = await supabaseQueryWithTimeout(profilesQuery, 30000, signal);
+    const { data: profiles, error } = await supabaseQueryWithTimeout(profilesQuery, 60000, signal);
     if (!error && profiles && profiles.length > 0) {
       targetUserIds = profiles.map(p => p.id);
     }
@@ -287,10 +287,10 @@ const fetchTeamMetrics = async (
     .in('id', targetUserIds);
 
   const [dealsResult, contactsResult, leadsResult, profilesResult] = await Promise.all([
-    supabaseQueryWithTimeout(dealsQuery, 30000, signal),
-    supabaseQueryWithTimeout(contactsQuery, 30000, signal),
-    supabaseQueryWithTimeout(leadsQuery, 30000, signal),
-    supabaseQueryWithTimeout(profilesQuery, 30000, signal),
+    supabaseQueryWithTimeout(dealsQuery, 60000, signal),
+    supabaseQueryWithTimeout(contactsQuery, 60000, signal),
+    supabaseQueryWithTimeout(leadsQuery, 60000, signal),
+    supabaseQueryWithTimeout(profilesQuery, 60000, signal),
   ]);
 
   if (dealsResult.error) throw new Error(`Erro ao buscar deals: ${dealsResult.error.message}`);
