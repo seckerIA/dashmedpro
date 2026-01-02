@@ -116,6 +116,7 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
     enabled: enabled && !!user?.id && userIds.length > 0,
     staleTime: 30 * 1000, // 30 segundos
     gcTime: 5 * 60 * 1000,
+    refetchInterval: 1000, // Atualiza a lista a cada 1s para refletir últimas mensagens
   });
 
   // =========================================

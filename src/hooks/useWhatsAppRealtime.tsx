@@ -3,7 +3,7 @@
  * @module hooks/useWhatsAppRealtime
  */
 
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -15,6 +15,7 @@ import { WHATSAPP_MESSAGES_KEY } from '@/hooks/useWhatsAppMessages';
 interface UseWhatsAppRealtimeOptions {
   enabled?: boolean;
   conversationId?: string;
+  ignoreConversationId?: string; // ID da conversa atual para não notificar
   onNewMessage?: (message: any) => void;
   onStatusUpdate?: (update: any) => void;
 }
@@ -23,112 +24,120 @@ export function useWhatsAppRealtime(options: UseWhatsAppRealtimeOptions = {}) {
   const {
     enabled = true,
     conversationId,
+    ignoreConversationId,
     onNewMessage,
     onStatusUpdate,
   } = options;
 
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { linkedDoctorIds } = useSecretaryDoctors();
+  const { doctorIds } = useSecretaryDoctors();
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  // IDs para filtrar (próprio usuário + médicos vinculados para secretária)
-  const userIds = user?.id ? [user.id, ...(linkedDoctorIds || [])] : [];
+  // Refs para callbacks estáveis (evita reiniciar effect se o pai recriar a função)
+  const onNewMessageRef = useRef(onNewMessage);
+  const onStatusUpdateRef = useRef(onStatusUpdate);
+
+  useEffect(() => {
+    onNewMessageRef.current = onNewMessage;
+    onStatusUpdateRef.current = onStatusUpdate;
+  }, [onNewMessage, onStatusUpdate]);
+
+  // Canal Único por instância do hook para evitar conflitos de binding
+  const channelName = useMemo(() => {
+    if (!user?.id) return 'whatsapp-rt-anon';
+    const suffix = conversationId ? `chat-${conversationId}` : `global-${user.id}`;
+    return `whatsapp-rt-${suffix}`;
+  }, [conversationId, user?.id]);
 
   // =========================================
-  // Subscription para novas mensagens
+  // Subscription start
   // =========================================
   useEffect(() => {
-    if (!enabled || !user?.id || userIds.length === 0) return;
+    // 1. Validação básica (Primitive checks only)
+    if (!enabled || !user?.id) return;
 
-    // Criar canal
-    const channel = supabase.channel('whatsapp-realtime', {
-      config: { presence: { key: user.id } },
-    });
+    // 2. Parse dos IDs (Deep check via string)
+    const currentDoctorIds = doctorIds || [];
+    const allUserIds = [user.id, ...currentDoctorIds];
+    const userIdsStr = allUserIds.sort().join(','); // Sort garante consistência
 
-    // Subscription para mensagens
+    console.log(`[WhatsApp Realtime] Connecting to: ${channelName} | UserIdsHash: ${userIdsStr}`);
+
+    // Criar canal único
+    const channel = supabase.channel(channelName);
+
+    // Listener para mensagens
     channel.on(
       'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'whatsapp_messages',
-        filter: conversationId
-          ? `conversation_id=eq.${conversationId}`
-          : undefined,
-      },
+      { event: 'INSERT', schema: 'public', table: 'whatsapp_messages' },
       (payload) => {
-        console.log('[WhatsApp Realtime] New message:', payload.new);
-
-        // Verificar se a mensagem pertence a um dos usuários monitorados
         const message = payload.new as any;
-        if (!userIds.includes(message.user_id)) return;
+        const monitoredIds = userIdsStr.split(',');
 
-        // Callback customizado
-        if (onNewMessage) {
-          onNewMessage(message);
+        console.log('[DEBUG-REALTIME] Msg received:', message.id, 'User:', message.user_id, 'Conv:', message.conversation_id);
+
+        // 1. Prioridade: Se é a conversa ATUAL, atualiza SEMPRE (bypass user filter)
+        if (conversationId && message.conversation_id === conversationId) {
+          console.log('[DEBUG-REALTIME] Updating current chat:', conversationId);
+
+          // Invalidação imediata
+          queryClient.invalidateQueries({
+            queryKey: [WHATSAPP_MESSAGES_KEY, message.conversation_id],
+            refetchType: 'active',
+          });
+
+          if (onNewMessageRef.current) onNewMessageRef.current(message);
+
+          // Se atualizamos o chat, não precisamos checar user_id para notificação, 
+          // mas ainda precisamos invalidar sidebar para reordenar
         }
 
-        // Invalidar queries
-        queryClient.invalidateQueries({ queryKey: [WHATSAPP_MESSAGES_KEY, message.conversation_id] });
+        // 2. Filtro de Segurança/Global para outras conversas
+        else if (monitoredIds.includes(message.user_id)) {
+          // Notificação apenas se for relevante para o usuário
+          if (message.direction === 'inbound' && message.conversation_id !== ignoreConversationId) {
+            toast({
+              title: 'Nova mensagem',
+              description: message.content?.substring(0, 50) || 'Anexo recebido',
+            });
+          }
+        }
+
+        // Sidebar e Inbox stats sempre invalidam para garantir consistência
         queryClient.invalidateQueries({ queryKey: [WHATSAPP_CONVERSATIONS_KEY] });
         queryClient.invalidateQueries({ queryKey: [WHATSAPP_INBOX_STATS_KEY] });
-
-        // Notificação para mensagens recebidas
-        if (message.direction === 'inbound') {
-          // Buscar info da conversa para o toast
-          const conversations = queryClient.getQueryData<any[]>([WHATSAPP_CONVERSATIONS_KEY]) || [];
-          const conversation = conversations.find((c: any) => c.id === message.conversation_id);
-          const contactName = conversation?.contact_name || message.phone_number || 'Novo contato';
-
-          toast({
-            title: contactName,
-            description: message.content?.substring(0, 50) || 'Nova mensagem',
-          });
-        }
       }
     );
 
-    // Subscription para status updates (delivered, read)
+    // Listener para status updates
     channel.on(
       'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'whatsapp_messages',
-        filter: conversationId
-          ? `conversation_id=eq.${conversationId}`
-          : undefined,
-      },
+      { event: 'UPDATE', schema: 'public', table: 'whatsapp_messages' },
       (payload) => {
-        console.log('[WhatsApp Realtime] Status update:', payload.new);
-
         const message = payload.new as any;
-        if (!userIds.includes(message.user_id)) return;
+        const monitoredIds = userIdsStr.split(',');
 
-        // Callback customizado
-        if (onStatusUpdate) {
-          onStatusUpdate(message);
-        }
+        if (!monitoredIds.includes(message.user_id)) return;
 
-        // Invalidar apenas mensagens
-        queryClient.invalidateQueries({ queryKey: [WHATSAPP_MESSAGES_KEY, message.conversation_id] });
+        queryClient.invalidateQueries({
+          queryKey: [WHATSAPP_MESSAGES_KEY, message.conversation_id],
+          refetchType: 'active',
+        });
+
+        if (onStatusUpdateRef.current) onStatusUpdateRef.current(message);
       }
     );
 
-    // Subscription para conversas (novos contatos, mudanças de status)
+    // Listener para conversas
     channel.on(
       'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'whatsapp_conversations',
-      },
+      { event: '*', schema: 'public', table: 'whatsapp_conversations' },
       (payload) => {
-        console.log('[WhatsApp Realtime] Conversation change:', payload);
+        const conv = (payload.new || payload.old) as any;
+        const monitoredIds = userIdsStr.split(',');
 
-        const conversation = (payload.new || payload.old) as any;
-        if (!userIds.includes(conversation?.user_id)) return;
+        if (!monitoredIds.includes(conv?.user_id)) return;
 
         queryClient.invalidateQueries({ queryKey: [WHATSAPP_CONVERSATIONS_KEY] });
         queryClient.invalidateQueries({ queryKey: [WHATSAPP_INBOX_STATS_KEY] });
@@ -136,25 +145,30 @@ export function useWhatsAppRealtime(options: UseWhatsAppRealtimeOptions = {}) {
     );
 
     // Iniciar subscription
-    channel.subscribe((status) => {
-      console.log('[WhatsApp Realtime] Subscription status:', status);
+    channel.subscribe((status, err) => {
+      console.log(`[WhatsApp Realtime] ${channelName} Status:`, status, err || '');
     });
 
     channelRef.current = channel;
 
     // Cleanup
     return () => {
-      console.log('[WhatsApp Realtime] Unsubscribing...');
+      console.log(`[WhatsApp Realtime] Cleaning up channel: ${channelName}`);
       channel.unsubscribe();
       channelRef.current = null;
     };
-  }, [enabled, user?.id, userIds.join(','), conversationId, queryClient, onNewMessage, onStatusUpdate]);
+    // DEPENDENCIES: 
+    // - channelName: Stable if conversationId and user.id are stable.
+    // - userIdsStr: Stable if ID list content doesn't change (string comparison).
+    // - enabled: boolean primitive.
+    // NO FUNCTIONS (refs used), NO ARRAYS (string used).
+  }, [enabled, user?.id, channelName, conversationId, ignoreConversationId, queryClient, doctorIds.length > 0 ? doctorIds.join(',') : '', user.id]);
 
   // =========================================
   // Broadcast de "digitando..."
   // =========================================
   const sendTypingIndicator = useCallback(
-    async (conversationId: string, isTyping: boolean) => {
+    async (targetConversationId: string, isTyping: boolean) => {
       if (!channelRef.current || !user?.id) return;
 
       try {
@@ -162,7 +176,7 @@ export function useWhatsAppRealtime(options: UseWhatsAppRealtimeOptions = {}) {
           type: 'broadcast',
           event: 'typing',
           payload: {
-            conversationId,
+            conversationId: targetConversationId,
             userId: user.id,
             isTyping,
           },
@@ -179,14 +193,15 @@ export function useWhatsAppRealtime(options: UseWhatsAppRealtimeOptions = {}) {
   // =========================================
   const onTypingIndicator = useCallback(
     (callback: (data: { conversationId: string; userId: string; isTyping: boolean }) => void) => {
-      if (!channelRef.current) return () => {};
+      if (!channelRef.current) return () => { };
 
-      channelRef.current.on('broadcast', { event: 'typing' }, ({ payload }) => {
+      const channel = channelRef.current;
+      channel.on('broadcast', { event: 'typing' }, ({ payload }) => {
         callback(payload);
       });
 
       return () => {
-        // Cleanup handled by channel unsubscribe
+        // Cleanup handled by channel unsubscribe generally, but we could remove listener if supabase-js supported it easily
       };
     },
     []

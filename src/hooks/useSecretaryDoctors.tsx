@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useUserProfile } from './useUserProfile';
 
+const EMPTY_ARRAY: any[] = [];
+
 export interface LinkedDoctor {
   id: string;
   full_name: string | null;
@@ -76,8 +78,8 @@ export function useSecretaryDoctors() {
   });
 
   return {
-    doctorIds: data?.doctorIds || [],
-    doctors: data?.doctors || [],
+    doctorIds: data?.doctorIds || EMPTY_ARRAY,
+    doctors: data?.doctors || EMPTY_ARRAY,
     isLoading: isLoading || isLoadingProfile,
     error,
     refetch,

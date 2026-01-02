@@ -147,37 +147,62 @@ const handler = async (req: Request): Promise<Response> => {
   // =========================================
   // POST - Receber eventos
   // =========================================
+  // =========================================
+  // POST - Receber eventos
+  // =========================================
   if (req.method === 'POST') {
     try {
-      const payload: MetaWebhookPayload = await req.json();
+      const payload = await req.json();
+      console.log('[Webhook] Received payload:', JSON.stringify(payload));
 
-      // Validar formato
-      if (payload.object !== 'whatsapp_business_account') {
-        console.log('[Webhook] Ignoring non-WhatsApp event');
+      let events: any[] = [];
+
+      // Deteção de Formato
+      if (Array.isArray(payload)) {
+        // Formato Simplificado (n8n ou custom): Array direto de eventos
+        console.log('[Webhook] Processing simplified array format');
+        events = payload;
+      } else if (payload.messaging_product === 'whatsapp') {
+        // Formato Simplificado (Objeto Único): Um evento direto
+        console.log('[Webhook] Processing simplified object format');
+        events = [payload];
+      } else if (payload.object === 'whatsapp_business_account' && Array.isArray(payload.entry)) {
+        // Formato Padrão Meta: Objeto embrulhado
+        console.log('[Webhook] Processing standard Meta format');
+        // Extrair todos os 'values' de todas as 'changes' de todas as 'entries'
+        events = payload.entry.flatMap((entry: any) =>
+          entry.changes ? entry.changes.map((change: any) => change.value) : []
+        );
+      } else {
+        console.log('[Webhook] Unknown payload format, ignoring');
         return new Response('OK', { status: 200 });
       }
 
-      // Processar cada entry
-      for (const entry of payload.entry) {
-        for (const change of entry.changes) {
-          if (change.field !== 'messages') continue;
+      // Processar lista unificada de eventos
+      for (const value of events) {
+        if (!value.metadata || !value.metadata.phone_number_id) {
+          console.warn('[Webhook] Event missing metadata/phone_number_id, skipping');
+          continue;
+        }
 
-          const value = change.value;
-          const phoneNumberId = value.metadata.phone_number_id;
+        const phoneNumberId = value.metadata.phone_number_id;
 
-          // Buscar config pelo phone_number_id
-          const { data: config } = await supabaseAdmin
-            .from('whatsapp_config')
-            .select('id, user_id')
-            .eq('phone_number_id', phoneNumberId)
-            .eq('is_active', true)
-            .single();
+        // Buscar TODAS as configs ativas com este phone_number_id (pode haver múltiplas contas compartilhando o número)
+        const { data: configs } = await supabaseAdmin
+          .from('whatsapp_config')
+          .select('id, user_id')
+          .eq('phone_number_id', phoneNumberId)
+          .eq('is_active', true);
 
-          if (!config) {
-            console.error('[Webhook] No config found for phone_number_id:', phoneNumberId);
-            continue;
-          }
+        if (!configs || configs.length === 0) {
+          console.error('[Webhook] No config found for phone_number_id:', phoneNumberId);
+          continue;
+        }
 
+        console.log(`[Webhook] Found ${configs.length} configs for phone ${phoneNumberId}`);
+
+        // Iterar sobre cada configuração encontrada (usuário) e processar a mensagem
+        for (const config of configs) {
           const userId = config.user_id;
 
           // Processar mensagens recebidas
@@ -283,29 +308,11 @@ async function processIncomingMessage(
       last_message_at: new Date().toISOString(),
       last_message_preview: content.substring(0, 100),
       last_message_direction: 'inbound',
-      unread_count: supabase.rpc('increment_unread', { conv_id: conversationId }),
       contact_name: contactName || undefined,
       updated_at: new Date().toISOString(),
+      unread_count: supabase.rpc('increment_unread', { conv_id: conversationId }),
     })
     .eq('id', conversationId);
-
-  // Incrementar unread_count manualmente (fallback se rpc não existir)
-  await supabase.rpc('increment_conversation_unread', { p_conversation_id: conversationId }).catch(() => {
-    // Fallback: update direto
-    supabase
-      .from('whatsapp_conversations')
-      .select('unread_count')
-      .eq('id', conversationId)
-      .single()
-      .then(({ data }: any) => {
-        if (data) {
-          supabase
-            .from('whatsapp_conversations')
-            .update({ unread_count: (data.unread_count || 0) + 1 })
-            .eq('id', conversationId);
-        }
-      });
-  });
 
   console.log('[Webhook] Message saved:', savedMessage.id);
 }
@@ -363,7 +370,7 @@ async function getOrCreateConversation(
   // Buscar contato CRM pelo telefone
   const { data: contact } = await supabase
     .from('crm_contacts')
-    .select('id, name')
+    .select('id, full_name') // CORRIGIDO: nome da coluna é full_name
     .or(`phone.eq.${phoneNumber},phone.eq.+${phoneNumber}`)
     .limit(1)
     .single();
@@ -375,7 +382,7 @@ async function getOrCreateConversation(
       user_id: userId,
       phone_number: phoneNumber,
       contact_id: contact?.id || null,
-      contact_name: contactName || contact?.name || phoneNumber,
+      contact_name: contactName || contact?.full_name || phoneNumber, // CORRIGIDO: usando full_name
       status: 'open',
       priority: 'normal',
       unread_count: 0,

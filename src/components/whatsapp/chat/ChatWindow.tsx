@@ -32,6 +32,7 @@ import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
 import { useWhatsAppMessages } from '@/hooks/useWhatsAppMessages';
 import { useWhatsAppConversations } from '@/hooks/useWhatsAppConversations';
+import { useWhatsAppRealtime } from '@/hooks/useWhatsAppRealtime';
 import { CONVERSATION_STATUS_CONFIG } from '@/types/whatsapp';
 import type {
   WhatsAppConversationWithRelations,
@@ -55,6 +56,12 @@ export function ChatWindow({
   const [replyTo, setReplyTo] = useState<WhatsAppMessageWithRelations | null>(
     null
   );
+
+  // Realtime subscription for this specific chat
+  useWhatsAppRealtime({
+    conversationId: conversation.id,
+    enabled: true,
+  });
 
   // Messages
   const {
@@ -265,7 +272,7 @@ export function ChatWindow({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-hidden bg-muted/20">
+      <div className="flex-1 flex flex-col overflow-hidden bg-muted/20">
         <MessageList
           messages={messages}
           isLoading={isLoadingMessages}

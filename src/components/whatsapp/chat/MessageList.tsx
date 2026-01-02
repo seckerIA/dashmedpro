@@ -2,7 +2,7 @@
  * Lista de mensagens do chat com scroll infinito
  */
 
-import { useRef, useEffect, useCallback, Fragment } from 'react';
+import { useRef, useEffect, useCallback, Fragment, useState } from 'react';
 import { format, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Loader2, ArrowDown } from 'lucide-react';
@@ -33,6 +33,9 @@ export function MessageList({
   const isAtBottom = useRef(true);
   const lastMessageCount = useRef(messages.length);
 
+  // State for scroll button visibility
+  const [showScrollButton, setShowScrollButton] = useState(false);
+
   // Scroll to bottom quando novas mensagens chegam
   useEffect(() => {
     if (messages.length > lastMessageCount.current && isAtBottom.current) {
@@ -48,6 +51,7 @@ export function MessageList({
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setShowScrollButton(false);
   }, []);
 
   const handleScroll = useCallback(() => {
@@ -56,7 +60,10 @@ export function MessageList({
 
     // Check if at bottom
     const { scrollTop, scrollHeight, clientHeight } = container;
-    isAtBottom.current = scrollHeight - scrollTop - clientHeight < 50;
+    const isBottom = scrollHeight - scrollTop - clientHeight < 100;
+
+    isAtBottom.current = isBottom;
+    setShowScrollButton(!isBottom);
 
     // Load more when scrolled to top
     if (scrollTop < 100 && hasMore && !isFetchingMore) {
@@ -104,7 +111,7 @@ export function MessageList({
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-y-auto"
+      className="flex-1 overflow-y-auto relative scrollbar-thin scrollbar-thumb-primary/10 hover:scrollbar-thumb-primary/20"
       onScroll={handleScroll}
     >
       {/* Load more indicator */}
@@ -143,8 +150,8 @@ export function MessageList({
               (message.sent_at &&
                 prevMessage.sent_at &&
                 new Date(message.sent_at).getTime() -
-                  new Date(prevMessage.sent_at).getTime() >
-                  5 * 60 * 1000); // 5 minutos
+                new Date(prevMessage.sent_at).getTime() >
+                5 * 60 * 1000); // 5 minutos
 
             return (
               <MessageItem
@@ -163,11 +170,11 @@ export function MessageList({
       <div ref={bottomRef} className="h-1" />
 
       {/* Scroll to bottom button (quando não está no bottom) */}
-      {!isAtBottom.current && (
+      {showScrollButton && (
         <Button
           variant="secondary"
           size="icon"
-          className="fixed bottom-24 right-8 rounded-full shadow-lg"
+          className="absolute bottom-4 right-4 rounded-full shadow-lg z-10 opacity-90 hover:opacity-100 transition-opacity"
           onClick={scrollToBottom}
         >
           <ArrowDown className="h-4 w-4" />

@@ -156,6 +156,7 @@ serve(async (req: Request) => {
       display_phone_number: businessProfile.display_phone_number,
       verified_name: businessProfile.verified_name,
       webhook_verify_token: webhookVerifyToken,
+      access_token: access_token, // Salvar token diretamente na tabela
       is_active: true,
       last_synced_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -218,16 +219,16 @@ serve(async (req: Request) => {
     // =========================================
     const nextSteps = webhookConfigured
       ? [
-          '✓ Webhook configurado automaticamente!',
-          '✓ Sistema pronto para receber mensagens',
-          'Envie uma mensagem de teste para o seu WhatsApp Business',
-        ]
+        '✓ Webhook configurado automaticamente!',
+        '✓ Sistema pronto para receber mensagens',
+        'Envie uma mensagem de teste para o seu WhatsApp Business',
+      ]
       : [
-          `⚠ Configure o webhook manualmente no Meta Business`,
-          `Webhook URL: ${webhookUrl}`,
-          `Verify Token: ${webhookVerifyToken}`,
-          `Reason: ${webhookError || 'Automatic configuration not available'}`,
-        ];
+        `⚠ Configure o webhook manualmente no Meta Business`,
+        `Webhook URL: ${webhookUrl}`,
+        `Verify Token: ${webhookVerifyToken}`,
+        `Reason: ${webhookError || 'Automatic configuration not available'}`,
+      ];
 
     return new Response(
       JSON.stringify({

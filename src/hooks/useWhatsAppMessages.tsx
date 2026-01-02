@@ -63,7 +63,8 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
     },
     initialPageParam: 0,
     enabled: enabled && !!conversationId,
-    staleTime: 10 * 1000, // 10 segundos
+    staleTime: 0, // Mensagens sempre consideradas obsoletas para garantir refetch instantâneo via Realtime
+    refetchInterval: 1000, // Polling a cada 1s para sensação de tempo real
   });
 
   // Flatten all pages into single array

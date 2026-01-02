@@ -33,16 +33,16 @@ const handler = async (req: Request): Promise<Response> => {
 
     const { data: config } = await supabaseAdmin
       .from('whatsapp_config')
-      .select('phone_number_id')
+      .select('phone_number_id, access_token') // Seleciona token da coluna
       .eq('user_id', user.id)
       .eq('is_active', true)
       .single();
 
     if (!config) throw new Error('WhatsApp not configured');
 
-    const { data: token } = await supabaseAdmin.rpc('read_secret', {
-      secret_id: `whatsapp_token_${user.id}`,
-    });
+    const token = config.access_token; // Usa token da coluna
+
+    if (!token) throw new Error('Access token not found in configuration');
 
     const payload: any = {
       messaging_product: 'whatsapp',

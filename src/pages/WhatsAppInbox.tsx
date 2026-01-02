@@ -3,7 +3,7 @@
  * Layout estilo Chatwoot com lista de conversas + chat + sidebar
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Settings, MessageCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import { ChatWindow } from '@/components/whatsapp/chat/ChatWindow';
 import { ConversationSidebar } from '@/components/whatsapp/sidebar/ConversationSidebar';
 import { useWhatsAppConfig } from '@/hooks/useWhatsAppConfig';
 import { useWhatsAppConversations } from '@/hooks/useWhatsAppConversations';
+import { useWhatsAppRealtime } from '@/hooks/useWhatsAppRealtime';
 import type {
   WhatsAppConversationWithRelations,
   WhatsAppConversationFilters,
@@ -31,6 +32,11 @@ export default function WhatsAppInbox() {
     useState<WhatsAppConversationWithRelations | null>(null);
   const [filters, setFilters] = useState<WhatsAppConversationFilters>({});
   const [showSidebar, setShowSidebar] = useState(false);
+
+  // Realtime subscription (global)
+  useWhatsAppRealtime({
+    ignoreConversationId: selectedConversation?.id,
+  });
 
   // Conversations query
   const {
