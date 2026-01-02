@@ -41,7 +41,7 @@ type SupabaseQueryBuilder<T> = Promise<SupabaseQueryResult<T>> & {
  */
 export async function supabaseQueryWithTimeout<T>(
   queryBuilder: SupabaseQueryBuilder<T> | Promise<SupabaseQueryResult<T>>,
-  timeoutMs: number = 30000,
+  timeoutMs: number = 60000,
   signal?: AbortSignal
 ): Promise<SupabaseQueryResult<T>> {
   // Verificar se já foi cancelado externamente

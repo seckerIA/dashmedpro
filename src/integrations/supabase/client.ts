@@ -21,9 +21,9 @@ if (typeof window !== 'undefined') {
       }
     }
   }
-  
+
   keysToRemove.forEach(key => localStorage.removeItem(key));
-  
+
   // Também limpar sessionStorage de outros projetos
   const sessionKeysToRemove: string[] = [];
   for (let i = 0; i < sessionStorage.length; i++) {
@@ -33,7 +33,7 @@ if (typeof window !== 'undefined') {
     }
   }
   sessionKeysToRemove.forEach(key => sessionStorage.removeItem(key));
-  
+
   console.log('✅ Cliente Supabase inicializado para projeto: adzaqkduxnpckbcuqpmg');
   console.log('✅ URL:', SUPABASE_URL);
 }
@@ -59,7 +59,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
         controller.abort();
-      }, 30000);
+      }, 60000);
 
       // Combinar signals se ambos existirem
       const combinedSignal = options.signal || controller.signal;
@@ -193,7 +193,7 @@ if (typeof window !== 'undefined') {
   console.log('   URL:', SUPABASE_URL);
   console.log('   Project Ref:', CURRENT_PROJECT_REF);
   console.log('   Storage Key:', `sb-${CURRENT_PROJECT_REF}-auth-token`);
-  
+
   // Verificar se há sessão armazenada
   const storedSession = localStorage.getItem(`sb-${CURRENT_PROJECT_REF}-auth-token`);
   if (storedSession) {

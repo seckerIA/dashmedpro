@@ -34,13 +34,13 @@ import Marketing from "./pages/Marketing";
 import MedicalRecords from "./pages/MedicalRecords";
 import WhatsAppInbox from "./pages/WhatsAppInbox";
 import WhatsAppSettings from "./pages/WhatsAppSettings";
-import { 
-  TrendingUp, 
-  Target, 
-  PieChart, 
-  Users, 
-  Mail, 
-  FileText, 
+import {
+  TrendingUp,
+  Target,
+  PieChart,
+  Users,
+  Mail,
+  FileText,
   BarChart3,
   Settings as SettingsIcon
 } from "lucide-react";
@@ -53,12 +53,12 @@ const queryClient = new QueryClient({
         if (failureCount >= 3) {
           return false;
         }
-        
+
         // Retry mais agressivo para erros de timeout (retry imediato)
         if (error?.message?.includes('timeout') || error?.message?.includes('Query timeout')) {
           return failureCount < 2; // Retry até 2 vezes para timeouts
         }
-        
+
         // Para outros erros, retry padrão
         return failureCount < 2;
       },
@@ -67,7 +67,7 @@ const queryClient = new QueryClient({
         if (error?.message?.includes('timeout') || error?.message?.includes('Query timeout')) {
           return 500; // 500ms para timeouts (retry rápido)
         }
-        
+
         // Delay padrão para outros erros
         return Math.min(1000 * 2 ** attemptIndex, 5000); // 1s, 2s, max 5s
       },
@@ -81,7 +81,7 @@ const queryClient = new QueryClient({
       onError: (error: any, query) => {
         if (error?.message?.includes('timeout')) {
           console.error(`❌ Query timeout: ${query.queryKey.join('/')}`);
-          
+
           // Se a query falhou múltiplas vezes, remover do cache
           const state = query.state;
           if (state.failureCount >= 3) {
@@ -105,20 +105,22 @@ const queryClient = new QueryClient({
 
 // Componente para detectar e cancelar queries travadas
 // REFATORADO: Agora renova a sessão ANTES de refazer queries (evita loop infinito)
+// Componente para detectar e cancelar queries travadas
+// CORRIGIDO: Timeout aumentado e lógica de refresh menos agressiva
 const StuckQueryDetector = () => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
     const fetchStartTimes = new Map<string, number>();
     let stuckCount = 0;
-    let lastSessionRefresh = 0; // Timestamp do último refresh
-    let isRefreshing = false; // Flag para evitar refresh simultâneo
 
+    // Monitorar queries
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
       if (event?.type === 'updated') {
         const query = event.query;
         const state = query.state;
 
+        // Quando começa a buscar
         if (state.fetchStatus === 'fetching') {
           const queryKey = query.queryKey.join('/');
           if (!fetchStartTimes.has(queryKey)) {
@@ -126,22 +128,25 @@ const StuckQueryDetector = () => {
           }
         }
 
+        // Quando termina (sucesso, erro ou pausa)
         if (state.fetchStatus === 'idle' || state.fetchStatus === 'paused') {
           const queryKey = query.queryKey.join('/');
           fetchStartTimes.delete(queryKey);
-          // Query funcionou, decrementar contador gradualmente
-          if (stuckCount > 0) stuckCount--;
+
+          // Se a query completou com sucesso, reseta contador de problemas
+          if (state.status === 'success') {
+            stuckCount = 0;
+          }
         }
       }
     });
 
+    // Verificação periódica
     const checkInterval = setInterval(async () => {
-      // Se estamos no meio de um refresh, pular verificação
-      if (isRefreshing) return;
-
       const queryCache = queryClient.getQueryCache();
       const allQueries = queryCache.getAll();
       const stuckQueries: any[] = [];
+      const now = Date.now();
 
       for (const query of allQueries) {
         const state = query.state;
@@ -151,71 +156,42 @@ const StuckQueryDetector = () => {
           const fetchStartTime = fetchStartTimes.get(queryKey);
 
           if (fetchStartTime) {
-            const timeSinceStart = Date.now() - fetchStartTime;
-            const stuckThreshold = 15000; // 15 segundos
+            const timeSinceStart = now - fetchStartTime;
+
+            // AUMENTADO: Timeout de 45s para 90s
+            // Deve ser maior que o timeout do cliente HTTP (60s) para evitar cancelar queries que estão apenas lentas
+            const stuckThreshold = 90000;
 
             if (timeSinceStart > stuckThreshold) {
               stuckQueries.push(query);
-              console.warn(`⚠️ Query travada: ${queryKey} (${Math.round(timeSinceStart / 1000)}s)`);
+              console.warn(`⚠️ Query considerada travada: ${queryKey} (${Math.round(timeSinceStart / 1000)}s)`);
 
-              // Apenas cancelar, NÃO resetar ainda
+              // Apenas cancelar a query específica
               queryClient.cancelQueries({ queryKey: query.queryKey });
               fetchStartTimes.delete(queryKey);
             }
           } else {
-            fetchStartTimes.set(queryKey, Date.now());
+            // Se estava fetching mas não tinha start time, marca agora
+            fetchStartTimes.set(queryKey, now);
           }
         } else {
+          // Limpeza preventiva
           fetchStartTimes.delete(queryKey);
         }
       }
 
-      // Se encontrou queries travadas
+      // Lógica de mitigação de problemas sistêmicos
       if (stuckQueries.length > 0) {
         stuckCount += stuckQueries.length;
 
-        // Se 2+ queries travaram, provavelmente é problema de sessão
-        if (stuckCount >= 2) {
-          const now = Date.now();
-          const timeSinceLastRefresh = now - lastSessionRefresh;
+        // Se detecar MUITAS queries travando consecutivamente (>5), sugere problema de conexão/sessão
+        if (stuckCount >= 5) {
+          console.warn('⚠️ Múltiplas queries travando. Tentando recuperar estado...');
 
-          // Só fazer refresh se passaram pelo menos 30 segundos desde o último
-          if (timeSinceLastRefresh > 30000) {
-            isRefreshing = true;
-            console.warn('⚠️ Detectado problema de sessão. Renovando...');
-
-            try {
-              const { supabase } = await import('@/integrations/supabase/client');
-              const { error } = await supabase.auth.refreshSession();
-
-              if (error) {
-                console.error('❌ Erro ao renovar sessão:', error.message);
-                // Se falhou, pode ser que o usuário precisa relogar
-                // Limpar cache e recarregar página
-                queryClient.clear();
-                window.location.reload();
-              } else {
-                console.log('✅ Sessão renovada! Refazendo queries...');
-                lastSessionRefresh = now;
-                stuckCount = 0;
-
-                // Aguardar 1 segundo para sessão propagar
-                await new Promise(resolve => setTimeout(resolve, 1000));
-
-                // Agora sim, invalidar todas as queries
-                queryClient.invalidateQueries();
-              }
-            } catch (err) {
-              console.error('❌ Erro crítico ao verificar sessão:', err);
-              window.location.reload();
-            } finally {
-              isRefreshing = false;
-            }
-          }
+          // Apenas invalidar queries, não forçar logout/refresh agressivo que causa loop de reload
+          queryClient.cancelQueries();
+          stuckCount = 0;
         }
-      } else {
-        // Nenhuma query travada, resetar contador
-        if (stuckCount > 0) stuckCount = 0;
       }
     }, 5000);
 
@@ -231,7 +207,7 @@ const StuckQueryDetector = () => {
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -239,25 +215,25 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
       </div>
     );
   }
-  
+
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-  
+
   return <>{children}</>;
 };
 
 // Role Protected Route Component - verifica permissões baseadas em roles
-const RoleProtectedRoute = ({ 
-  children, 
-  allowedRoles 
-}: { 
-  children: React.ReactNode; 
-  allowedRoles: string[] 
+const RoleProtectedRoute = ({
+  children,
+  allowedRoles
+}: {
+  children: React.ReactNode;
+  allowedRoles: string[]
 }) => {
   const { user, loading: authLoading } = useAuth();
   const { profile, isLoading: profileLoading } = useUserProfile();
-  
+
   if (authLoading || profileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -265,23 +241,23 @@ const RoleProtectedRoute = ({
       </div>
     );
   }
-  
+
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-  
+
   // Se o usuário não tem permissão, redireciona para o dashboard
   if (!profile || !allowedRoles.includes(profile.role)) {
     return <Navigate to="/" replace />;
   }
-  
+
   return <>{children}</>;
 };
 
 // App Routes Component
 const AppRoutes = () => {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -309,47 +285,47 @@ const AppRoutes = () => {
         <Route path="/calculadora" element={<CalculadoraSelection />} />
         <Route path="/calculadora-precificacao" element={<Calculadora />} />
         <Route path="/calculadora-roi" element={<CalculadoraROI />} />
-        <Route 
-          path="/equipe" 
+        <Route
+          path="/equipe"
           element={
             <RoleProtectedRoute allowedRoles={['admin', 'dono']}>
               <TeamManagement />
             </RoleProtectedRoute>
-          } 
+          }
         />
         <Route path="/tarefas" element={<Tasks />} />
-        <Route 
-          path="/marketing" 
+        <Route
+          path="/marketing"
           element={
             <RoleProtectedRoute allowedRoles={['admin', 'dono', 'vendedor', 'gestor_trafego', 'medico']}>
               <Marketing />
             </RoleProtectedRoute>
-          } 
+          }
         />
         <Route path="/comercial" element={<Commercial />} />
-        <Route 
-          path="/financeiro" 
+        <Route
+          path="/financeiro"
           element={
             <RoleProtectedRoute allowedRoles={['admin', 'dono', 'vendedor', 'gestor_trafego', 'medico']}>
               <Financial />
             </RoleProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/financeiro/transacoes" 
+        <Route
+          path="/financeiro/transacoes"
           element={
             <RoleProtectedRoute allowedRoles={['admin', 'dono', 'vendedor', 'gestor_trafego', 'medico']}>
               <FinancialTransactions />
             </RoleProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/financeiro/nova-transacao" 
+        <Route
+          path="/financeiro/nova-transacao"
           element={
             <RoleProtectedRoute allowedRoles={['admin', 'dono', 'vendedor', 'gestor_trafego', 'medico']}>
               <TransactionForm />
             </RoleProtectedRoute>
-          } 
+          }
         />
         <Route
           path="/financeiro/editar-transacao/:id"
@@ -403,51 +379,51 @@ const AppRoutes = () => {
           }
         />
         <Route path="/comercial/guia-prospeccao" element={<ProspectingGuide />} />
-        <Route 
-          path="/email-marketing" 
+        <Route
+          path="/email-marketing"
           element={
-            <PlaceholderPage 
-              title="E-mail Marketing" 
+            <PlaceholderPage
+              title="E-mail Marketing"
               description="Campanhas de e-mail marketing e automação"
               icon={Mail}
             />
-          } 
+          }
         />
-        <Route 
-          path="/funil-vendas" 
+        <Route
+          path="/funil-vendas"
           element={
-            <PlaceholderPage 
-              title="Funil de Vendas" 
+            <PlaceholderPage
+              title="Funil de Vendas"
               description="Gestão e otimização do funil de vendas"
               icon={BarChart3}
             />
-          } 
+          }
         />
-        <Route 
-          path="/landing-pages" 
+        <Route
+          path="/landing-pages"
           element={
-            <PlaceholderPage 
-              title="Landing Pages" 
+            <PlaceholderPage
+              title="Landing Pages"
               description="Criação e gestão de landing pages"
               icon={FileText}
             />
-          } 
+          }
         />
-        <Route 
-          path="/relatorios" 
+        <Route
+          path="/relatorios"
           element={
             <RoleProtectedRoute allowedRoles={['admin', 'dono']}>
-              <PlaceholderPage 
-                title="Relatórios" 
+              <PlaceholderPage
+                title="Relatórios"
                 description="Relatórios e análises de performance"
                 icon={BarChart3}
               />
             </RoleProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/configuracoes" 
-          element={<Settings />} 
+        <Route
+          path="/configuracoes"
+          element={<Settings />}
         />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
