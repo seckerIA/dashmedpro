@@ -42,33 +42,40 @@ export function useSecretaryDoctors() {
     queryFn: async () => {
       if (!user?.id) return { doctorIds: [], doctors: [] };
 
-      // Buscar vinculos da secretaria com os dados do medico
-      const { data: links, error } = await supabase
+      // 1. Buscar apenas os IDs dos vínculos (mais seguro que join automático)
+      const { data: links, error: linkError } = await supabase
         .from('secretary_doctor_links')
-        .select(`
-          id,
-          secretary_id,
-          doctor_id,
-          created_at,
-          doctor:profiles!secretary_doctor_links_doctor_id_fkey (
-            id,
-            full_name,
-            email
-          )
-        `)
+        .select('doctor_id')
         .eq('secretary_id', user.id);
 
-      if (error) {
-        console.error('Erro ao buscar medicos vinculados:', error);
-        throw error;
+      if (linkError) {
+        console.error('Erro ao buscar vinculos (links):', linkError);
+        // Não lançar erro para não quebrar a UI, retornar vazio
+        return { doctorIds: [], doctors: [] };
       }
 
-      const doctorIds = links?.map(link => link.doctor_id) || [];
-      const doctors: LinkedDoctor[] = links?.map(link => ({
-        id: link.doctor_id,
-        full_name: (link.doctor as any)?.full_name || null,
-        email: (link.doctor as any)?.email || '',
-      })).filter(d => d.id) || [];
+      if (!links || links.length === 0) {
+        return { doctorIds: [], doctors: [] };
+      }
+
+      const doctorIds = links.map(l => l.doctor_id);
+
+      // 2. Buscar detalhes dos perfis desses médicos
+      const { data: doctorsData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', doctorIds);
+
+      if (profileError) {
+        console.error('Erro ao buscar perfis dos médicos vinculados:', profileError);
+        return { doctorIds, doctors: [] };
+      }
+
+      const doctors: LinkedDoctor[] = doctorsData?.map(doc => ({
+        id: doc.id,
+        full_name: doc.full_name,
+        email: doc.email,
+      })) || [];
 
       return { doctorIds, doctors };
     },

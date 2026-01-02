@@ -14,6 +14,7 @@ import {
   Video,
   CornerUpLeft,
   Loader2,
+  Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -38,6 +39,8 @@ interface MessageInputProps {
   onCancelReply?: () => void;
   disabled?: boolean;
   isSending?: boolean;
+  onSmartReply?: () => void;
+  initialText?: string;
 }
 
 // Emojis comuns para acesso rápido
@@ -50,11 +53,22 @@ export function MessageInput({
   onCancelReply,
   disabled,
   isSending,
+  onSmartReply,
+  initialText,
 }: MessageInputProps) {
   const [text, setText] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Update text when initialText prop changes
+  useEffect(() => {
+    if (initialText) {
+      setText(initialText);
+      textareaRef.current?.focus();
+    }
+  }, [initialText]);
 
   // Focus no input quando muda replyTo
   useEffect(() => {
@@ -135,6 +149,37 @@ export function MessageInput({
     input.click();
   }, []);
 
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+
+    // Tentar pegar texto (procedimentos arrastados)
+    const droppedText = e.dataTransfer.getData('text/plain');
+    if (droppedText) {
+      setText(prev => (prev ? prev + '\n' + droppedText : droppedText));
+      textareaRef.current?.focus();
+      return;
+    }
+
+    // Tentar pegar arquivos arrastados
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      if (file && onSendMedia) {
+        onSendMedia(file);
+      }
+    }
+  }, [onSendMedia]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  }, []);
+
   return (
     <div className="border-t bg-background">
       {/* Reply preview */}
@@ -157,7 +202,30 @@ export function MessageInput({
       )}
 
       {/* Input area */}
-      <div className="flex items-end gap-2 p-3">
+      <div
+        className={cn(
+          "flex items-end gap-2 p-3 transition-colors",
+          isDragging && "bg-primary/5 border-primary border-dashed border-2 rounded-t-lg"
+        )}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+      >
+
+        {/* Smart Reply Button */}
+        {onSmartReply && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-10 w-10 flex-shrink-0 text-purple-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+            onClick={onSmartReply}
+            title="Sugestão de IA"
+            disabled={disabled}
+          >
+            <Sparkles className="h-5 w-5" />
+          </Button>
+        )}
+
         {/* Emoji picker */}
         <Popover open={showEmoji} onOpenChange={setShowEmoji}>
           <PopoverTrigger asChild>
@@ -232,11 +300,12 @@ export function MessageInput({
             value={text}
             onChange={e => setText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Digite uma mensagem..."
+            placeholder={isDragging ? "Solte aqui..." : "Digite uma mensagem..."}
             className={cn(
               'min-h-[40px] max-h-[150px] py-2.5 px-4 resize-none',
               'rounded-2xl border-muted-foreground/20',
-              'focus-visible:ring-green-500/50'
+              'focus-visible:ring-green-500/50',
+              isDragging && 'pointer-events-none'
             )}
             disabled={disabled || isSending}
             rows={1}
