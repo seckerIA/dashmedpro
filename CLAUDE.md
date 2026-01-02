@@ -107,6 +107,8 @@ npm run lint          # ESLint check
 - `checkAndMoveToAguardandoRetorno`: move paciente após 1 consulta completa paga sem retorno
 - `updateDealToTreatment`: marca `is_in_treatment=true` ao criar prontuário
 - Query invalidation: `crm-deals` e `crm-pipeline` após mutations de appointments
+- **CRM Insights**: Módulo avançado de análise de vendas com detecção automática de gargalos (`BottleneckInsightCard`) e concentração de receita (`RevenueConcentrationCard`).
+- **UI Premium**: Upgrade visual nos `MetricCard` e gráficos com paleta modernizada e glassmorphism.
 
 ### Decisões Arquiteturais
 - **Pipeline automático**: Consultas agendadas → deal `agendado`; sinal não pago → `inadimplente`; concluída paga → `aguardando_retorno` ou `follow_up`

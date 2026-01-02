@@ -5,6 +5,22 @@ import { useAuth } from './useAuth';
 import { useUserProfile } from './useUserProfile';
 import { startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
 
+export interface BottleneckMetric {
+  stage: string;
+  previousStageCount: number;
+  currentStageCount: number;
+  dropOffRate: number; // Percentual de perda
+  isCritical: boolean; // Se perda > 40%
+}
+
+export interface ConcentrationMetric {
+  isHighRisk: boolean; // Se > 80% da receita vem de < 20% das fontes
+  topSource: string;
+  topSourceValue: number;
+  topSourcePercentage: number;
+  totalRevenue: number;
+}
+
 export interface TeamMetrics {
   userId: string;
   userName: string;
@@ -20,6 +36,9 @@ export interface TeamMetrics {
   dealsByStage: Record<string, { count: number; value: number }>;
   averageDealValue: number;
   averageTimeInPipeline: number;
+  // Novos Insights
+  bottleneck?: BottleneckMetric;
+  revenueConcentration?: ConcentrationMetric;
 }
 
 export interface ConsolidatedTeamMetrics {
@@ -32,6 +51,9 @@ export interface ConsolidatedTeamMetrics {
   totalContacts: number;
   totalLeads: number;
   teamMetrics: TeamMetrics[];
+  // Insights Consolidados
+  globalBottleneck?: BottleneckMetric;
+  globalConcentration?: ConcentrationMetric;
 }
 
 const emptyMetrics: ConsolidatedTeamMetrics = {
@@ -322,6 +344,8 @@ function calculateUserMetrics(
     totalLostDeals: metrics.lostDeals,
     averageConversionRate: metrics.conversionRate,
     teamMetrics: [],
+    globalBottleneck: metrics.bottleneck,
+    globalConcentration: metrics.revenueConcentration,
   };
 }
 
@@ -332,14 +356,16 @@ function calculateUserMetricsFromData(
   userLeads: any[],
   profile: any
 ): TeamMetrics {
-  const totalPipeline = userDeals.reduce((sum, deal) => {
+  const activeDealsList = userDeals.filter(d => !d.stage.includes('fechado'));
+  const wonDeals = userDeals.filter(d => d.stage === 'fechado_ganho');
+  const lostDeals = userDeals.filter(d => d.stage === 'fechado_perdido');
+
+  const totalPipeline = activeDealsList.reduce((sum, deal) => {
     const value = typeof deal.value === 'string' ? parseFloat(deal.value) : deal.value;
     return sum + (value || 0);
   }, 0);
 
-  const wonDeals = userDeals.filter(d => d.stage === 'fechado_ganho');
-  const lostDeals = userDeals.filter(d => d.stage === 'fechado_perdido');
-  const activeDeals = userDeals.filter(d => !d.stage.includes('fechado'));
+  const activeDeals = activeDealsList.length;
 
   const totalRevenue = wonDeals.reduce((sum, deal) => {
     const value = typeof deal.value === 'string' ? parseFloat(deal.value) : deal.value;
@@ -351,25 +377,99 @@ function calculateUserMetricsFromData(
     : 0;
 
   const dealsByStage: Record<string, { count: number; value: number }> = {};
+  const stageCounts: Record<string, number> = {};
+
   userDeals.forEach(deal => {
     const stage = deal.stage;
     if (!dealsByStage[stage]) {
       dealsByStage[stage] = { count: 0, value: 0 };
+      stageCounts[stage] = 0;
     }
     dealsByStage[stage].count++;
     const value = typeof deal.value === 'string' ? parseFloat(deal.value) : deal.value;
     dealsByStage[stage].value += value || 0;
+    stageCounts[stage]++;
   });
 
   const averageDealValue = userDeals.length > 0 ? totalPipeline / userDeals.length : 0;
 
   const averageTimeInPipeline = userDeals.length > 0
     ? userDeals.reduce((sum, deal) => {
-        const created = new Date(deal.created_at).getTime();
-        const updated = new Date(deal.updated_at).getTime();
-        return sum + (updated - created);
-      }, 0) / userDeals.length / (1000 * 60 * 60 * 24)
+      const created = new Date(deal.created_at).getTime();
+      const updated = new Date(deal.updated_at).getTime();
+      return sum + (updated - created);
+    }, 0) / userDeals.length / (1000 * 60 * 60 * 24)
     : 0;
+
+  // --- CÁLCULO DE GARGALOS (Bottleneck) ---
+  // Ordem assumida: lead -> qualificado -> proposta -> negociacao -> fechado_ganho
+  // Simplificacao: vamos detectar o estágio com maior % de "não conversão" para o próximo
+  // Para um MVP, vamos pegar apenas stages ativos e ordená-los por volume (suposição de funil)
+  // Em produção, isso deveria vir de uma configuração de Pipeline
+  let bottleneck: BottleneckMetric | undefined;
+  const stages = Object.keys(dealsByStage).filter(s => !s.includes('fechado')); // Ignora finalizados
+
+  // Se tivermos pelo menos 2 estágios para comparar
+  if (stages.length >= 2) {
+    // Ordenar por volume (assumindo funil decrescente)
+    const sortedStages = stages.sort((a, b) => dealsByStage[b].count - dealsByStage[a].count);
+
+    let maxDropOff = 0;
+
+    for (let i = 0; i < sortedStages.length - 1; i++) {
+      const current = sortedStages[i];
+      const next = sortedStages[i + 1];
+      const currentCount = dealsByStage[current].count;
+      const nextCount = dealsByStage[next].count;
+
+      if (currentCount > 0) {
+        const dropOff = ((currentCount - nextCount) / currentCount) * 100;
+        if (dropOff > maxDropOff) {
+          maxDropOff = dropOff;
+          bottleneck = {
+            stage: current,
+            previousStageCount: currentCount,
+            currentStageCount: nextCount,
+            dropOffRate: dropOff,
+            isCritical: dropOff > 50 // Se perder mais de 50% é crítico
+          };
+        }
+      }
+    }
+  }
+
+  // --- CÁLCULO DE CONCENTRAÇÃO (Revenue Concentration) ---
+  // Tenta agrupar por "Produto" (usando prefixo do título) ou fallback para "Produto Único"
+  // Ex: "Consulta - Maria" -> "Consulta"
+  const revenueBySource: Record<string, number> = {};
+  if (wonDeals.length > 0) {
+    wonDeals.forEach(d => {
+      // Tenta pegar a primeira palavra como "Produto/Serviço"
+      const source = d.title ? d.title.split(' ')[0] : 'Outros';
+      revenueBySource[source] = (revenueBySource[source] || 0) + (parseFloat(d.value) || 0);
+    });
+
+    // Achar top source
+    const sortedSources = Object.entries(revenueBySource).sort((a, b) => b[1] - a[1]);
+    if (sortedSources.length > 0) {
+      const [topSource, topValue] = sortedSources[0];
+      const percentage = totalRevenue > 0 ? (topValue / totalRevenue) * 100 : 0;
+
+      // Risco se > 80% concentrado em 1 tipo
+      if (percentage > 80) {
+        // revenueConcentration = { ... } (atribuído abaixo)
+      }
+
+      // Retorna metrica mesmo se não for risco alto, para ter dados
+      var calculatedConcentration: ConcentrationMetric = {
+        isHighRisk: percentage > 80,
+        topSource: topSource,
+        topSourceValue: topValue,
+        topSourcePercentage: percentage,
+        totalRevenue
+      };
+    }
+  }
 
   return {
     userId,
@@ -386,6 +486,8 @@ function calculateUserMetricsFromData(
     dealsByStage,
     averageDealValue,
     averageTimeInPipeline,
+    bottleneck,
+    revenueConcentration: typeof calculatedConcentration !== 'undefined' ? calculatedConcentration : undefined
   };
 }
 
@@ -407,9 +509,9 @@ export function useTeamMetrics(selectedUserIds?: string[]) {
       } catch (error: any) {
         // Ignorar erros de cancelamento/timeout para evitar logs desnecessários
         if (error?.message?.includes('cancelada') ||
-            error?.message?.includes('timeout') ||
-            error?.message?.includes('aborted') ||
-            error?.name === 'AbortError') {
+          error?.message?.includes('timeout') ||
+          error?.message?.includes('aborted') ||
+          error?.name === 'AbortError') {
           console.log('Query cancelada, retornando métricas vazias');
           return emptyMetrics;
         }
@@ -444,9 +546,9 @@ export function useTeamMetrics(selectedUserIds?: string[]) {
         return await fetchSecretaryMetrics(user.id, signal);
       } catch (error: any) {
         if (error?.message?.includes('cancelada') ||
-            error?.message?.includes('timeout') ||
-            error?.message?.includes('aborted') ||
-            error?.name === 'AbortError') {
+          error?.message?.includes('timeout') ||
+          error?.message?.includes('aborted') ||
+          error?.name === 'AbortError') {
           console.log('Query secretaria cancelada');
           return emptySecretaryMetrics;
         }

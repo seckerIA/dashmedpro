@@ -3,6 +3,8 @@ import { MetricCard } from "@/components/commercial/MetricCard";
 import { ConsolidatedTeamMetrics } from "@/hooks/useTeamMetrics";
 import { formatCurrency } from "@/lib/currency";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { BottleneckInsightCard } from "./BottleneckInsightCard";
+import { RevenueConcentrationCard } from "./RevenueConcentrationCard";
 
 interface TeamOverviewDashboardProps {
   metrics: ConsolidatedTeamMetrics;
@@ -12,8 +14,22 @@ interface TeamOverviewDashboardProps {
 export function TeamOverviewDashboard({ metrics, isLoading }: TeamOverviewDashboardProps) {
   const { isSecretaria } = useUserProfile();
 
+  const showInsights = (metrics.globalBottleneck || metrics.globalConcentration) && !isLoading && !isSecretaria;
+
   return (
     <div className="space-y-6">
+      {/* Seção de Insights Avançados */}
+      {showInsights && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
+          {metrics.globalBottleneck && (
+            <BottleneckInsightCard bottleneck={metrics.globalBottleneck} isLoading={isLoading} />
+          )}
+          {metrics.globalConcentration && (
+            <RevenueConcentrationCard concentration={metrics.globalConcentration} isLoading={isLoading} />
+          )}
+        </div>
+      )}
+
       {/* Métricas Consolidadas */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Pipeline Total - oculto para secretária */}
