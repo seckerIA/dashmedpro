@@ -84,9 +84,19 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
         throw error;
       }
 
+      // DEDUP: Se a secretária e o médico tiverem a mesma conversa, mantém apenas a mais recente
+      const uniqueMap = new Map<string, any>();
+      (data || []).forEach(conv => {
+        const existing = uniqueMap.get(conv.phone_number);
+        if (!existing || new Date(conv.last_message_at || 0) > new Date(existing.last_message_at || 0)) {
+          uniqueMap.set(conv.phone_number, conv);
+        }
+      });
+      const dedupedData = Array.from(uniqueMap.values());
+
       // Buscar labels para cada conversa
-      if (data && data.length > 0) {
-        const conversationIds = data.map(c => c.id);
+      if (dedupedData.length > 0) {
+        const conversationIds = dedupedData.map(c => c.id);
         const { data: labelAssignments } = await supabase
           .from('whatsapp_conversation_label_assignments')
           .select(`
@@ -106,13 +116,13 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
           }
         });
 
-        return data.map(conv => ({
+        return dedupedData.map(conv => ({
           ...conv,
           labels: labelsMap.get(conv.id) || [],
         })) as WhatsAppConversationWithRelations[];
       }
 
-      return data as WhatsAppConversationWithRelations[];
+      return dedupedData as WhatsAppConversationWithRelations[];
     },
     enabled: enabled && !!user?.id && userIds.length > 0,
     staleTime: 30 * 1000, // 30 segundos

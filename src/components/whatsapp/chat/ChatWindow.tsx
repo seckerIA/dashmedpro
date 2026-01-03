@@ -19,6 +19,7 @@ import {
   Stethoscope,
   Sparkles,
   RefreshCw,
+  Bot,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -40,7 +41,7 @@ import { useWhatsAppRealtime } from '@/hooks/useWhatsAppRealtime';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhatsAppAI } from '@/hooks/useWhatsAppAI';
 import { CONVERSATION_STATUS_CONFIG } from '@/types/whatsapp';
-import { AISuggestionsPanel, ConversationInsights, LeadScoreBadge } from '@/components/whatsapp/ai';
+import { AISuggestionsPanel, ConversationInsights, LeadScoreBadge, AISettingsDialog } from '@/components/whatsapp/ai';
 import type {
   WhatsAppConversationWithRelations,
   WhatsAppMessageWithRelations,
@@ -76,9 +77,11 @@ export function ChatWindow({
     isAnalyzing,
     analyzeConversation,
     markSuggestionUsed,
-  } = useWhatsAppAI({ conversationId: conversation.id });
+    aiConfig,
+  } = useWhatsAppAI({ conversationId: conversation.id }); // Hook centralizado para IA
 
   const [showAIPanel, setShowAIPanel] = useState(false);
+  const [showAISettings, setShowAISettings] = useState(false);
 
   // Realtime subscription for this specific chat
   useWhatsAppRealtime({
@@ -107,7 +110,7 @@ export function ChatWindow({
 
   const displayName =
     conversation.contact_name ||
-    conversation.contact?.name ||
+    (conversation.contact as any)?.full_name ||
     conversation.phone_number;
   const initials = displayName
     .split(' ')
@@ -200,7 +203,7 @@ export function ChatWindow({
               <AvatarImage
                 src={
                   conversation.contact_profile_picture ||
-                  conversation.contact?.avatar_url ||
+                  (conversation.contact as any)?.avatar_url ||
                   undefined
                 }
               />
@@ -249,14 +252,25 @@ export function ChatWindow({
               />
             )}
 
-            {/* AI Button */}
+            {/* AI Config Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hidden md:flex text-muted-foreground hover:text-primary"
+              onClick={() => setShowAISettings(true)}
+              title="Configurar IA"
+            >
+              <Bot className="h-5 w-5" />
+            </Button>
+
+            {/* AI Action Button */}
             <Button
               variant={showAIPanel ? "secondary" : "ghost"}
               size="icon"
               className={cn(
                 "hidden md:flex",
-                showAIPanel && "bg-purple-100 text-purple-600",
-                isAnalyzing && "animate-pulse"
+                showAIPanel && "bg-primary/10 text-primary border-primary/20",
+                isAnalyzing && "animate-pulse font-bold"
               )}
               onClick={() => setShowAIPanel(!showAIPanel)}
               title="Análise IA"
@@ -272,7 +286,7 @@ export function ChatWindow({
               <Button
                 variant={showProcedures ? "secondary" : "ghost"}
                 size="icon"
-                className={cn("hidden md:flex", showProcedures && "bg-purple-100 text-purple-600")}
+                className={cn("hidden md:flex", showProcedures && "bg-emerald-50 text-emerald-600 border-emerald-200")}
                 onClick={() => setShowProcedures(!showProcedures)}
                 title="Procedimentos"
               >
@@ -392,13 +406,14 @@ export function ChatWindow({
 
       {/* Sidebar de AI */}
       {showAIPanel && (
-        <div className="w-80 h-full border-l bg-background hidden md:block animate-in slide-in-from-right duration-300 overflow-y-auto">
+        <div className="w-[350px] h-full border-l bg-background hidden md:block animate-in slide-in-from-right duration-300 overflow-y-auto shadow-2xl">
           <div className="p-4 space-y-4">
             <ConversationInsights
               analysis={analysis}
               isLoading={isLoadingAnalysis}
               isAnalyzing={isAnalyzing}
               onAnalyze={handleAnalyzeConversation}
+              aiConfig={aiConfig}
             />
             {suggestions.length > 0 && (
               <AISuggestionsPanel
@@ -418,6 +433,12 @@ export function ChatWindow({
           <ProceduresList />
         </div>
       )}
+
+      {/* Dialogs */}
+      <AISettingsDialog
+        open={showAISettings}
+        onOpenChange={setShowAISettings}
+      />
     </div>
   );
 }

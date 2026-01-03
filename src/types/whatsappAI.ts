@@ -96,6 +96,12 @@ export interface AIConfig {
   suggestion_tone: 'professional' | 'friendly' | 'formal';
   include_emojis: boolean;
 
+  // Personalização Avançada
+  knowledge_base?: string;
+  already_known_info?: string;
+  custom_prompt_instructions?: string;
+  auto_reply_enabled: boolean;
+
   created_at: string;
   updated_at: string;
 }

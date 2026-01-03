@@ -10,6 +10,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 // Tipos
@@ -37,7 +38,7 @@ interface AIResponse {
 const handler = async (req: Request): Promise<Response> => {
   // Handle CORS
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   try {
@@ -132,6 +133,47 @@ const handler = async (req: Request): Promise<Response> => {
       .eq('is_active', true)
       .limit(20);
 
+    // Buscar configuração personalizada de IA
+    const { data: aiConfig } = await supabaseAdmin
+      .from('whatsapp_ai_config')
+      .select('knowledge_base, already_known_info, custom_prompt_instructions, auto_reply_enabled')
+      .eq('user_id', conversation.user_id)
+      .maybeSingle();
+
+    // --- NOVO: BUSCAR AGENDA DO MÉDICO ---
+    const now = new Date();
+    const next5Days = new Date();
+    next5Days.setDate(now.getDate() + 5);
+
+    const { data: appointments } = await supabaseAdmin
+      .from('medical_appointments')
+      .select('start_time, end_time, status')
+      .eq('doctor_id', conversation.user_id)
+      .gte('start_time', now.toISOString())
+      .lte('start_time', next5Days.toISOString())
+      .neq('status', 'cancelled')
+      .order('start_time', { ascending: true });
+
+    // Helper para formatar a agenda simplificada para o prompt
+    const formatAgenda = () => {
+      if (!appointments || appointments.length === 0) return "Agenda totalmente livre para os próximos 5 dias.";
+
+      const agendaByDay: Record<string, string[]> = {};
+      appointments.forEach(appt => {
+        const date = new Date(appt.start_time).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' });
+        const time = new Date(appt.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        if (!agendaByDay[date]) agendaByDay[date] = [];
+        agendaByDay[date].push(time);
+      });
+
+      return Object.entries(agendaByDay)
+        .map(([day, times]) => `${day}: Ocupado em ${times.join(', ')}`)
+        .join('\n');
+    };
+
+    const agendaContext = `HORÁRIOS OCUPADOS (PRÓXIMOS 5 DIAS):\n${formatAgenda()}\n(A clínica funciona de Seg-Sex, das 08h às 18h. Se o horário não estiver na lista de ocupados acima, ele está disponível.)`;
+
+
     // Montar contexto para a IA
     const messagesContext = messages
       .reverse()
@@ -151,47 +193,66 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('OpenAI API key not configured. Set OPENAI_API_KEY in Supabase secrets.');
     }
 
-    const systemPrompt = `Você é um assistente de qualificação de leads para uma clínica médica brasileira.
-Analise a conversa do WhatsApp e retorne APENAS um JSON válido (sem markdown, sem explicações) com a seguinte estrutura:
+    const systemPrompt = `Você é um Especialista em Vendas e Conversão de Pacientes para clínicas médicas de alto padrão no Brasil.
+Seu objetivo é analisar as conversas de WhatsApp e fornecer insights profundos para que a secretária consiga FECHAR agendamentos e procedimentos.
 
+${aiConfig?.knowledge_base ? `BASE DE CONHECIMENTO DA CLÍNICA:\n${aiConfig.knowledge_base}\n` : ''}
+${aiConfig?.already_known_info ? `INFORMAÇÕES QUE JÁ TEMOS (NÃO PERGUNTE): ${aiConfig.already_known_info}` : 'Já temos o telefone e nome básico do paciente.'}
+${aiConfig?.custom_prompt_instructions ? `INSTRUÇÕES PERSONALIZADAS:\n${aiConfig.custom_prompt_instructions}\n` : ''}
+
+${agendaContext}
+
+Analise a conversa e retorne APENAS um JSON válido (sem markdown, sem explicações) com a estrutura abaixo.
+
+ESTRUTURA DO JSON:
 {
   "lead_status": "novo" | "frio" | "morno" | "quente" | "convertido" | "perdido",
   "conversion_probability": 0-100,
-  "detected_intent": "string descrevendo a intenção principal do paciente",
-  "detected_procedure": "nome do procedimento se mencionado ou null",
+  "detected_intent": "Intenção clara do paciente",
+  "detected_procedure": "Procedimento alvo",
   "detected_urgency": "baixa" | "media" | "alta" | "urgente",
   "sentiment": "positivo" | "neutro" | "negativo",
-  "suggested_next_action": "ação recomendada para a secretária",
+  "suggested_next_action": "Ação imediata para conversão (Ex: Pedir o convênio, oferecer 2 horários específicos)",
   "suggestions": [
     {
       "type": "quick_reply" | "full_message" | "procedure_info" | "scheduling" | "follow_up",
-      "content": "texto da mensagem sugerida em português",
+      "content": "Texto persuasivo seguindo tom de voz da clínica",
       "confidence": 0.0-1.0,
-      "reasoning": "motivo da sugestão"
+      "reasoning": "Por que esta mensagem vai ajudar a converter?"
     }
   ]
 }
 
-Critérios de qualificação:
-- NOVO: < 2 mensagens, sem contexto suficiente
-- FRIO: Respostas curtas, demora > 24h, sem perguntas, desinteresse claro
-- MORNO: Faz perguntas gerais, responde em < 24h, interesse moderado
-- QUENTE: Pergunta preços, disponibilidade, quer agendar, interesse alto
-- CONVERTIDO: Confirmou agendamento, fechou procedimento
-- PERDIDO: Disse "não", sem resposta > 7 dias, cancelou
+DIRETRIZES DE CONVERSÃO (PSICOLOGIA DE VENDAS):
+1. Rapport e Empatia: Use o nome do paciente e valide suas dúvidas/dores.
+2. Autoridade: Mencione sutilmente a expertise do doutor ou qualidade da tecnologia se houver no contexto.
+3. Escassez/Urgência: Sempre sugira oferecer opções limitadas de horários (Ex: "Tenho apenas quinta às 14h ou sexta às 10h").
+4. Call to Action (CTA): Toda sugestão de resposta deve terminar com uma pergunta clara que leve ao agendamento.
+5. Objeções: Se o paciente perguntar preço, ensine a secretária a valorizar o procedimento antes de dar o valor bruto, ou oferecer condições de parcelamento.
 
-Gere exatamente 3 sugestões de resposta, variando os tipos.
-Todas as respostas devem ser em português brasileiro, profissionais mas acolhedoras.`;
+CRITÉRIOS DE STATUS:
+- NOVO: Contato inicial, fase de descoberta.
+- FRIO: Parou de responder ou mostra desinteresse total.
+- MORNO: Tem dúvidas mas ainda não pediu horários.
+- QUENTE: Pediu preço, horários ou falou de sintomas específicos que precisam de tratamento rápido.
+- CONVERTIDO: Agendamento marcado ou pagamento realizado.
 
-    const userPrompt = `PROCEDIMENTOS DISPONÍVEIS:
+Gere exatamente 3 sugestões de resposta altamente persuasivas.`;
+
+    const userPrompt = `
+DADOS DA CLÍNICA/MÉDICO:
+ID do Médico: ${conversation.user_id}
+Procedimentos Cadastrados:
 ${proceduresContext}
 
-CONVERSA (mais recente por último):
+DADOS DO PACIENTE:
+Nome: ${conversation.contact_name || 'Não identificado'}
+Telefone: ${conversation.phone_number}
+
+HISTÓRICO DA CONVERSA (Últimas 20 mensagens):
 ${messagesContext}
 
-Nome do paciente: ${conversation.contact_name || 'Não identificado'}
-
-Analise e retorne o JSON de qualificação:`;
+Analise agora com foco em conversão máxima:`;
 
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -200,13 +261,14 @@ Analise e retorne o JSON de qualificação:`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
         temperature: 0.7,
-        max_tokens: 1000,
+        max_tokens: 1200,
+        response_format: { "type": "json_object" }
       }),
     });
 
@@ -268,7 +330,7 @@ Analise e retorne o JSON de qualificação:`;
       suggested_next_action: aiResponse.suggested_next_action,
       last_analyzed_at: new Date().toISOString(),
       message_count_analyzed: messages.length,
-      ai_model_used: 'gpt-3.5-turbo',
+      ai_model_used: 'gpt-4o-mini',
     };
 
     let savedAnalysis;
@@ -320,6 +382,40 @@ Analise e retorne o JSON de qualificação:`;
 
     if (suggestionsError) {
       console.error('[AI] Error saving suggestions:', suggestionsError);
+    }
+
+    // Verificação de Auto-Resposta (se configurado)
+    if (aiConfig?.auto_reply_enabled) {
+      const bestSuggestion = (aiResponse.suggestions || [])
+        .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))[0];
+
+      // Só envia se for uma resposta completa e tiver confiança alta
+      if (bestSuggestion && bestSuggestion.confidence >= 0.85 && bestSuggestion.type === 'full_message') {
+        console.log('[AI] Auto-reply triggered with confidence:', bestSuggestion.confidence);
+
+        try {
+          // Invocar whatsapp-send-message
+          await supabaseAdmin.functions.invoke('whatsapp-send-message', {
+            body: {
+              conversation_id,
+              content: bestSuggestion.content
+            }
+          });
+
+          // Marcar essa sugestão como usada
+          if (savedSuggestions && savedSuggestions.length > 0) {
+            const suggestId = savedSuggestions.find(s => s.content === bestSuggestion.content)?.id;
+            if (suggestId) {
+              await supabaseAdmin
+                .from('whatsapp_ai_suggestions')
+                .update({ was_used: true, used_at: new Date().toISOString() })
+                .eq('id', suggestId);
+            }
+          }
+        } catch (sendError) {
+          console.error('[AI] Auto-reply failed:', sendError);
+        }
+      }
     }
 
     // Verificar se deve criar deal automaticamente (lead quente)

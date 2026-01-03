@@ -15,6 +15,7 @@ import type {
   PendingFollowup,
   AIStats,
   AnalyzeConversationResponse,
+  AIConfig,
 } from '@/types/whatsappAI';
 
 interface UseWhatsAppAIOptions {
@@ -92,24 +93,20 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
 
       if (!accessToken) throw new Error('Not authenticated');
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL || 'https://adzaqkduxnpckbcuqpmg.supabase.co'}/functions/v1/whatsapp-ai-analyze`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            conversation_id: conversationId,
-            force_reanalyze: forceReanalyze,
-          }),
-        }
-      );
+      const { data, error: functionError } = await supabase.functions.invoke('whatsapp-ai-analyze', {
+        body: {
+          conversation_id: conversationId,
+          force_reanalyze: forceReanalyze,
+        },
+      });
 
-      const result = await response.json();
+      if (functionError) {
+        throw new Error(functionError.message || 'Failed to analyze conversation');
+      }
 
-      if (!response.ok || !result.success) {
+      const result = data;
+
+      if (!result.success) {
         throw new Error(result.error || 'Failed to analyze conversation');
       }
 
@@ -156,23 +153,23 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
       if (existingAnalysis) {
         // Atualizar existente
         const { error } = await supabase
-          .from('whatsapp_conversation_analysis')
+          .from('whatsapp_conversation_analysis' as any)
           .update({
             lead_status: status,
             updated_at: new Date().toISOString(),
-          })
-          .eq('id', existingAnalysis.id);
+          } as any)
+          .eq('id', (existingAnalysis as any).id);
 
         if (error) throw error;
       } else {
         // Criar nova análise
         const { error } = await supabase
-          .from('whatsapp_conversation_analysis')
+          .from('whatsapp_conversation_analysis' as any)
           .insert({
             conversation_id: conversationId,
             user_id: user.id,
             lead_status: status,
-          });
+          } as any);
 
         if (error) throw error;
       }
@@ -203,12 +200,12 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
   const markSuggestionUsedMutation = useMutation({
     mutationFn: async ({ suggestionId, wasModified = false }: { suggestionId: string; wasModified?: boolean }) => {
       const { error } = await supabase
-        .from('whatsapp_ai_suggestions')
+        .from('whatsapp_ai_suggestions' as any)
         .update({
           was_used: true,
           was_modified: wasModified,
           used_at: new Date().toISOString(),
-        })
+        } as any)
         .eq('id', suggestionId);
 
       if (error) throw error;
@@ -293,17 +290,89 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
   });
 
   // =====================================================
+  // Query: Configuração de IA do usuário
+  // =====================================================
+  const configQuery = useQuery({
+    queryKey: ['whatsapp-ai-config', user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+
+      const { data, error } = await supabase
+        .from('whatsapp_ai_config')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error('[useWhatsAppAI] Error fetching config:', error);
+        return null;
+      }
+
+      return data as AIConfig | null;
+    },
+    enabled: !!user,
+  });
+
+  // =====================================================
+  // Mutation: Atualizar configuração de IA
+  // =====================================================
+  const updateConfigMutation = useMutation({
+    mutationFn: async (updates: Partial<AIConfig>) => {
+      if (!user) throw new Error('Not authenticated');
+
+      const { data: existing } = await supabase
+        .from('whatsapp_ai_config')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (existing) {
+        const { error } = await supabase
+          .from('whatsapp_ai_config' as any)
+          .update({
+            ...updates,
+            updated_at: new Date().toISOString(),
+          } as any)
+          .eq('id', (existing as any).id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('whatsapp_ai_config' as any)
+          .insert({
+            ...updates,
+            user_id: user.id,
+          } as any);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-ai-config', user?.id] });
+      toast({
+        title: 'Configuração salva',
+        description: 'As preferências da IA foram atualizadas com sucesso.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Erro ao salvar configuração',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // =====================================================
   // Helpers
   // =====================================================
-  const analyzeConversation = (forceReanalyze = false) => {
+  const analyzeConversation = async (forceReanalyze = false) => {
     return analyzeMutation.mutateAsync(forceReanalyze);
   };
 
-  const updateLeadStatus = (status: LeadStatus, triggerPipeline = true) => {
+  const updateLeadStatus = async (status: LeadStatus, triggerPipeline = true) => {
     return updateStatusMutation.mutateAsync({ status, triggerPipeline });
   };
 
-  const markSuggestionUsed = (suggestionId: string, wasModified = false) => {
+  const markSuggestionUsed = async (suggestionId: string, wasModified = false) => {
     return markSuggestionUsedMutation.mutateAsync({ suggestionId, wasModified });
   };
 
@@ -337,11 +406,18 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
     isLoadingHotLeads: hotLeadsQuery.isLoading,
     isLoadingFollowups: pendingFollowupsQuery.isLoading,
 
+    // Configuração
+    aiConfig: configQuery.data,
+    updateAIConfig: updateConfigMutation.mutateAsync,
+    isUpdatingConfig: updateConfigMutation.isPending,
+    isLoadingConfig: configQuery.isLoading,
+
     // Refetch
     refetchAnalysis: analysisQuery.refetch,
     refetchSuggestions: suggestionsQuery.refetch,
     refetchHotLeads: hotLeadsQuery.refetch,
     refetchFollowups: pendingFollowupsQuery.refetch,
+    refetchConfig: configQuery.refetch,
   };
 }
 
@@ -356,7 +432,7 @@ export function useWhatsAppAIDashboard() {
 // Hook com auto-análise ao receber mensagem
 // =====================================================
 export function useWhatsAppAIWithAutoAnalyze(conversationId: string | undefined) {
-  const ai = useWhatsAppAI({ conversationId, autoAnalyze: true });
+  const ai = useWhatsAppAI({ conversationId });
 
   // Auto-analisar quando conversa muda e não tem análise recente
   // (implementação do trigger real-time será feita no ChatWindow)

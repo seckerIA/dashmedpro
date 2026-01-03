@@ -45,6 +45,7 @@ interface ConversationInsightsProps {
   onUpdateStatus?: (status: LeadStatus) => void;
   className?: string;
   compact?: boolean;
+  aiConfig?: any;
 }
 
 export function ConversationInsights({
@@ -56,6 +57,7 @@ export function ConversationInsights({
   onUpdateStatus,
   className,
   compact = false,
+  aiConfig,
 }: ConversationInsightsProps) {
   // Se não tem análise e não está carregando, mostrar prompt para analisar
   if (!analysis && !isLoading) {
@@ -114,9 +116,9 @@ export function ConversationInsights({
   const sentimentConfig = SENTIMENT_CONFIG[analysis.sentiment];
   const lastAnalyzed = analysis.last_analyzed_at
     ? formatDistanceToNow(new Date(analysis.last_analyzed_at), {
-        addSuffix: true,
-        locale: ptBR,
-      })
+      addSuffix: true,
+      locale: ptBR,
+    })
     : null;
 
   // Versão compacta
@@ -189,18 +191,22 @@ export function ConversationInsights({
   return (
     <Card
       className={cn(
-        'bg-gradient-to-br from-purple-500/5 via-background to-purple-500/5',
-        'border-purple-500/20',
+        'bg-background border-primary/20 shadow-sm transition-all duration-200 ring-1 ring-primary/5',
         className
       )}
     >
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-purple-500" />
-            <CardTitle className="text-sm font-medium">
-              Análise da Conversa
+            <Sparkles className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm font-bold tracking-tight">
+              Estratégia de Vendas (IA)
             </CardTitle>
+            {aiConfig?.auto_reply_enabled && (
+              <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] h-5 py-0 px-1.5 animate-pulse">
+                AUTO
+              </Badge>
+            )}
           </div>
           {lastAnalyzed && (
             <CardDescription className="text-xs">
@@ -216,7 +222,7 @@ export function ConversationInsights({
           <LeadScoreBadge
             status={analysis.lead_status}
             showLabel
-            onClick={onUpdateStatus ? () => {} : undefined}
+            onClick={onUpdateStatus ? () => { } : undefined}
           />
 
           <div className="flex items-center gap-2">
@@ -272,24 +278,17 @@ export function ConversationInsights({
         )}
 
         {/* Ações */}
-        <div className="flex items-center gap-2 pt-2 border-t">
+        <div className="flex flex-col gap-2 pt-3 border-t">
           {!analysis.deal_created && analysis.lead_status !== 'perdido' && (
             <Button
               variant="default"
               size="sm"
               onClick={onConvertToDeal}
-              className="gap-2"
+              className="gap-2 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-all active:scale-[0.98]"
             >
               <UserPlus className="h-4 w-4" />
               Converter para Pipeline
             </Button>
-          )}
-
-          {analysis.deal_created && (
-            <Badge variant="secondary" className="gap-1">
-              <AlertCircle className="h-3 w-3" />
-              Já no Pipeline
-            </Badge>
           )}
 
           <Button
@@ -297,12 +296,12 @@ export function ConversationInsights({
             size="sm"
             onClick={onAnalyze}
             disabled={isAnalyzing}
-            className="gap-2 ml-auto"
+            className="gap-2 w-full border-primary/20 hover:bg-primary/5 text-primary-foreground font-medium"
           >
             <RefreshCw
               className={cn('h-4 w-4', isAnalyzing && 'animate-spin')}
             />
-            {isAnalyzing ? 'Analisando...' : 'Reanalisar'}
+            {isAnalyzing ? 'Recalculando Estratégia...' : 'Reanalisar Conversa'}
           </Button>
         </div>
       </CardContent>

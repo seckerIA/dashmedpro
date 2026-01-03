@@ -102,32 +102,32 @@ export function AISuggestionsPanel({
   return (
     <Card
       className={cn(
-        'bg-gradient-to-br from-purple-500/5 via-background to-purple-500/5',
-        'border-purple-500/20',
+        'bg-background border-primary/20 shadow-sm transition-all duration-200',
         className
       )}
     >
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-purple-500" />
-            <CardTitle className="text-sm font-medium">Sugestões da IA</CardTitle>
+            <Sparkles className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm font-medium">Sugestões Turbo</CardTitle>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
             {onRegenerateSuggestions && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-2 text-xs gap-1.5"
                       onClick={onRegenerateSuggestions}
                       disabled={isLoading}
                     >
                       <RefreshCw
                         className={cn('h-3.5 w-3.5', isLoading && 'animate-spin')}
                       />
+                      <span>Atualizar</span>
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Gerar novas sugestões (Ctrl+R)</TooltipContent>
@@ -138,16 +138,16 @@ export function AISuggestionsPanel({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
                 onClick={() => setIsExpanded(false)}
               >
-                <ChevronUp className="h-3.5 w-3.5" />
+                <ChevronUp className="h-4 w-4" />
               </Button>
             )}
           </div>
         </div>
-        <CardDescription className="text-xs">
-          Clique para inserir ou pressione Ctrl+1/2/3
+        <CardDescription className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground/70">
+          Sugerido pela IA de Conversão
         </CardDescription>
       </CardHeader>
 
@@ -208,7 +208,7 @@ function SuggestionCard({
       onClick={onSelect}
     >
       {/* Atalho de teclado */}
-      <div className="absolute -left-1 -top-1 flex items-center justify-center w-5 h-5 rounded-full bg-purple-500 text-white text-xs font-bold">
+      <div className="absolute -left-1.5 -top-1.5 flex items-center justify-center w-5 h-5 rounded-full bg-primary text-white text-[10px] font-bold shadow-md ring-2 ring-background">
         {index + 1}
       </div>
 
@@ -217,7 +217,7 @@ function SuggestionCard({
         <div
           className={cn(
             'flex-shrink-0 p-1.5 rounded-md',
-            'bg-purple-500/10 text-purple-600'
+            'bg-primary/10 text-primary'
           )}
         >
           <IconComponent className="h-4 w-4" />
@@ -318,11 +318,11 @@ export function AISuggestionsInline({
               <TooltipTrigger asChild>
                 <button
                   className={cn(
-                    'flex items-center gap-1.5 px-2 py-1 rounded-full text-xs',
-                    'bg-purple-500/10 hover:bg-purple-500/20',
-                    'text-purple-600 hover:text-purple-700',
-                    'border border-purple-500/20 hover:border-purple-500/40',
-                    'transition-colors whitespace-nowrap'
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs',
+                    'bg-primary/5 hover:bg-primary/10',
+                    'text-primary-foreground font-medium',
+                    'border border-primary/20 hover:border-primary/40',
+                    'transition-all whitespace-nowrap'
                   )}
                   onClick={() => onSelect(suggestion)}
                 >
