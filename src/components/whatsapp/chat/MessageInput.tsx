@@ -14,7 +14,6 @@ import {
   Video,
   CornerUpLeft,
   Loader2,
-  Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -39,7 +38,6 @@ interface MessageInputProps {
   onCancelReply?: () => void;
   disabled?: boolean;
   isSending?: boolean;
-  onSmartReply?: () => void;
   initialText?: string;
 }
 
@@ -53,7 +51,6 @@ export function MessageInput({
   onCancelReply,
   disabled,
   isSending,
-  onSmartReply,
   initialText,
 }: MessageInputProps) {
   const [text, setText] = useState('');
@@ -211,21 +208,6 @@ export function MessageInput({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
       >
-
-        {/* Smart Reply Button */}
-        {onSmartReply && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-10 w-10 flex-shrink-0 text-purple-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20"
-            onClick={onSmartReply}
-            title="Sugestão de IA"
-            disabled={disabled}
-          >
-            <Sparkles className="h-5 w-5" />
-          </Button>
-        )}
-
         {/* Emoji picker */}
         <Popover open={showEmoji} onOpenChange={setShowEmoji}>
           <PopoverTrigger asChild>

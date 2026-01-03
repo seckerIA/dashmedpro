@@ -118,17 +118,18 @@ npm run build         # Production build
 npm run lint          # ESLint check
 ```
 
-## Contexto Atual (2026-01-02)
+## Contexto Atual (2026-01-03)
 
 ### Última Sessão
-- **Integração WhatsApp Business API** completa com:
-  - Edge Functions: `whatsapp-webhook` (recebe mensagens) e `whatsapp-send-message` (envia via Graph API)
-  - Inbox com lista de conversas, filtros e busca
-  - ChatWindow com envio de texto, mídia e respostas rápidas
-  - Automações de secretária: lista de procedimentos drag-and-drop, smart replies
-  - Configuração de tokens e webhook na UI
-- **Virtual Assistant UI**: Melhorias de performance e interface
-- **CRM Insights**: Detecção automática de gargalos e concentração de receita
+- **Sistema de IA para WhatsApp** implementado:
+  - Tabelas: `whatsapp_conversation_analysis`, `whatsapp_ai_suggestions`, `whatsapp_ai_config`
+  - Tipos ENUM: `whatsapp_lead_status`, `whatsapp_urgency_level`, `whatsapp_sentiment`, `whatsapp_suggestion_type`
+  - Funções RPC: `get_hot_leads()`, `get_pending_followups()`, `get_ai_stats()`
+  - Hook `useWhatsAppAI` para análise de conversas via GPT-3.5
+  - Componentes: `LeadScoreBadge`, `AISuggestionsPanel`, `ConversationInsights`
+  - Integração no ChatWindow: botão IA no header, badge de status, sugestões inline
+  - Edge Function `whatsapp-ai-analyze` (pendente deploy + OPENAI_API_KEY)
+- **Remoção de código duplicado**: SmartReplyDialog removido, fluxo unificado via IA
 
 ### Decisões Arquiteturais
 - **Pipeline automático**: Consultas agendadas → deal `agendado`; sinal não pago → `inadimplente`; concluída paga → `aguardando_retorno`
@@ -137,14 +138,20 @@ npm run lint          # ESLint check
 - **WhatsApp Token Storage**: `access_token` armazenado em `whatsapp_config` (não Vault, pois não há `read_secret`)
 - **Webhook JWT**: Desabilitado (`verify_jwt = false` em config.toml) pois Meta não envia JWT
 - **Dual doctor support**: `doctor_id` (FK explícito) OR `user_id` (fallback) em appointments
+- **IA no WhatsApp**: Análise via GPT-3.5, qualificação de leads (novo/frio/morno/quente/convertido/perdido)
 
 ### Edge Functions WhatsApp
 ```
 supabase/functions/
-├── whatsapp-webhook/       # Recebe mensagens do Meta (verify_jwt: false)
-├── whatsapp-send-message/  # Envia mensagens via Graph API v18.0
-└── whatsapp-config-validate/ # Valida tokens e configura webhook
+├── whatsapp-webhook/        # Recebe mensagens do Meta (verify_jwt: false)
+├── whatsapp-send-message/   # Envia mensagens via Graph API v18.0
+├── whatsapp-config-validate/ # Valida tokens e configura webhook
+└── whatsapp-ai-analyze/     # Análise de conversas com GPT-3.5 (pendente deploy)
 ```
+
+### Pendências de Deploy
+1. **Edge Function whatsapp-ai-analyze**: Fazer deploy via Supabase Dashboard ou CLI autenticado
+2. **OPENAI_API_KEY**: Configurar no Supabase Secrets (`npx supabase secrets set OPENAI_API_KEY=sk-...`)
 
 ### Known Issues
 - **403 em crm_deals**: Pipeline automation funciona mas RLS pode bloquear INSERT/UPDATE
@@ -153,4 +160,4 @@ supabase/functions/
 - **Webhook Meta**: Configurar callback URL no Meta Business Manager após deploy
 
 ---
-**Version:** 0.1.0 | 2026-01-02 | https://github.com/seckerIA/dashmedpro
+**Version:** 0.2.0 | 2026-01-03 | https://github.com/seckerIA/dashmedpro

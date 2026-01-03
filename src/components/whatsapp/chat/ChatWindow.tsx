@@ -2,7 +2,7 @@
  * Janela principal do chat WhatsApp
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   MoreVertical,
   Phone,
@@ -17,6 +17,8 @@ import {
   Volume2,
   ArrowLeft,
   Stethoscope,
+  Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -32,12 +34,13 @@ import {
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
 import { ProceduresList } from './ProceduresList';
-import { SmartReplyDialog } from './SmartReplyDialog';
 import { useWhatsAppMessages } from '@/hooks/useWhatsAppMessages';
 import { useWhatsAppConversations } from '@/hooks/useWhatsAppConversations';
 import { useWhatsAppRealtime } from '@/hooks/useWhatsAppRealtime';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { useWhatsAppAI } from '@/hooks/useWhatsAppAI';
 import { CONVERSATION_STATUS_CONFIG } from '@/types/whatsapp';
+import { AISuggestionsPanel, ConversationInsights, LeadScoreBadge } from '@/components/whatsapp/ai';
 import type {
   WhatsAppConversationWithRelations,
   WhatsAppMessageWithRelations,
@@ -61,10 +64,21 @@ export function ChatWindow({
     null
   );
   const [showProcedures, setShowProcedures] = useState(false);
-  const [showSmartReply, setShowSmartReply] = useState(false);
 
   const { canScheduleForOthers, isMedico } = useUserProfile();
   const canViewProcedures = canScheduleForOthers || isMedico;
+
+  // AI Analysis
+  const {
+    analysis,
+    suggestions,
+    isLoadingAnalysis,
+    isAnalyzing,
+    analyzeConversation,
+    markSuggestionUsed,
+  } = useWhatsAppAI({ conversationId: conversation.id });
+
+  const [showAIPanel, setShowAIPanel] = useState(false);
 
   // Realtime subscription for this specific chat
   useWhatsAppRealtime({
@@ -142,30 +156,23 @@ export function ChatWindow({
     });
   }, [toggleMute, conversation.id, conversation.is_muted]);
 
-  const handleSmartReplySelect = useCallback((text: string) => {
-    // Apenas preenche o input (mas como o input controla seu próprio estado,
-    // precisaremos de uma forma de passar isso.
-    // O Hook handleSendText envia direto. O ideal é o SmartReplyDialog
-    // retornar o texto para o MessageInput.
-    // Como o MessageInput tem estado local 'text', vou fazer o seguinte:
-    // Vou injetar o texto via uma ref ou callback se possível,
-    // mas por simplicidade, o MessageInput vai ter que expor um jeito de setar texto
-    // OU ele mesmo gerencia o Dialog.
-    // SIMPLIFICAÇÃO: O SmartReplyDialog passa o texto para um handler que chama handleSendText direto?
-    // O usuário pode querer editar.
-    // Então o MessageInput é quem deve controlar o Dialog ou receber o texto.
-    // Vou refatorar levemente o MessageInput para aceitar 'initialText' ou expor 'setText'.
-    // MELHOR AINDA: O MessageInput controla o Dialog internamente ou via composition.
-    // Mas o Dialog está aqui fora.
-
-    // Vou mudar a estratégia: Passar o texto para uma prop `suggestedText` no MessageInput
-    // que quando muda, atualiza o estado interno.
-  }, []);
-
-  // Como não quero mudar muito o MessageInput agora, vou usar uma solução direta:
-  // O Dialog vai ficar PERTO do input, talvez dentro dele? Não, melhor aqui fora.
-  // Vou criar um estado `inputTextOverride` e passar para MessageInput.
+  // Estado para passar texto sugerido para o input
   const [inputTextOverride, setInputTextOverride] = useState<string | undefined>(undefined);
+
+  // Handler para usar sugestão da IA
+  const handleAISuggestionSelect = useCallback(
+    async (suggestion: { id: string; content: string }) => {
+      setInputTextOverride(suggestion.content);
+      await markSuggestionUsed(suggestion.id, false);
+    },
+    [markSuggestionUsed]
+  );
+
+  // Handler para analisar conversa
+  const handleAnalyzeConversation = useCallback(
+    () => analyzeConversation(false),
+    [analyzeConversation]
+  );
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -231,6 +238,36 @@ export function ChatWindow({
 
           {/* Actions */}
           <div className="flex items-center gap-1">
+            {/* AI Analysis Badge */}
+            {analysis && (
+              <LeadScoreBadge
+                status={analysis.lead_status}
+                probability={analysis.conversion_probability}
+                size="sm"
+                showProbability
+                className="hidden md:flex mr-2"
+              />
+            )}
+
+            {/* AI Button */}
+            <Button
+              variant={showAIPanel ? "secondary" : "ghost"}
+              size="icon"
+              className={cn(
+                "hidden md:flex",
+                showAIPanel && "bg-purple-100 text-purple-600",
+                isAnalyzing && "animate-pulse"
+              )}
+              onClick={() => setShowAIPanel(!showAIPanel)}
+              title="Análise IA"
+            >
+              {isAnalyzing ? (
+                <RefreshCw className="h-5 w-5 animate-spin" />
+              ) : (
+                <Sparkles className="h-5 w-5" />
+              )}
+            </Button>
+
             {canViewProcedures && (
               <Button
                 variant={showProcedures ? "secondary" : "ghost"}
@@ -330,37 +367,57 @@ export function ChatWindow({
           />
         </div>
 
+        {/* AI Suggestions Inline (above input) */}
+        {suggestions.length > 0 && (
+          <div className="px-4 py-2 border-t bg-background/80">
+            <AISuggestionsPanel
+              suggestions={suggestions}
+              isLoading={isAnalyzing}
+              onSelectSuggestion={handleAISuggestionSelect}
+              onRegenerateSuggestions={() => analyzeConversation(true)}
+              compact
+            />
+          </div>
+        )}
+
         {/* Input */}
         <MessageInput
           onSendText={handleSendText}
           replyTo={replyTo}
           onCancelReply={handleCancelReply}
           isSending={isSending}
-          onSmartReply={canViewProcedures ? () => setShowSmartReply(true) : undefined}
           initialText={inputTextOverride}
-        // Passamos o texto sugerido via key para forçar re-render se mudar?
-        // Não é ideal. O correto é MessageInput observar uma prop.
-        // Vou alterar MessageInput rapidamente após isso.
         />
       </div>
 
+      {/* Sidebar de AI */}
+      {showAIPanel && (
+        <div className="w-80 h-full border-l bg-background hidden md:block animate-in slide-in-from-right duration-300 overflow-y-auto">
+          <div className="p-4 space-y-4">
+            <ConversationInsights
+              analysis={analysis}
+              isLoading={isLoadingAnalysis}
+              isAnalyzing={isAnalyzing}
+              onAnalyze={handleAnalyzeConversation}
+            />
+            {suggestions.length > 0 && (
+              <AISuggestionsPanel
+                suggestions={suggestions}
+                isLoading={isAnalyzing}
+                onSelectSuggestion={handleAISuggestionSelect}
+                onRegenerateSuggestions={() => analyzeConversation(true)}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Sidebar de Procedimentos */}
-      {showProcedures && canViewProcedures && (
+      {showProcedures && canViewProcedures && !showAIPanel && (
         <div className="w-80 h-full border-l bg-background hidden md:block animate-in slide-in-from-right duration-300">
           <ProceduresList />
         </div>
       )}
-
-      <SmartReplyDialog
-        open={showSmartReply}
-        onOpenChange={setShowSmartReply}
-        onSelectReply={(text) => {
-          setInputTextOverride(text);
-          // Precisamos de um jeito de passar isso para o MessageInput.
-          // Vou atualizar o MessageInput para lidar com isso.
-        }}
-        customerName={displayName}
-      />
     </div>
   );
 }
