@@ -109,12 +109,12 @@ Após o deploy do `whatsapp-webhook`:
             "contacts": [
               {
                 "profile": { "name": "Teste" },
-                "wa_id": "5524999409021"
+                "wa_id": "5511999998888"
               }
             ],
             "messages": [
               {
-                "from": "5524999409021",
+                "from": "5511999998888",
                 "id": "wamid.TEST123",
                 "timestamp": "1767302934",
                 "text": { "body": "Olá!" },
@@ -204,7 +204,7 @@ https://adzaqkduxnpckbcuqpmg.supabase.co/functions/v1/whatsapp-webhook?hub.mode=
 
 **Verificar:**
 ```sql
-SELECT * FROM whatsapp_conversations WHERE phone_number = '5524999409021';
+SELECT * FROM whatsapp_conversations WHERE phone_number = '5511999998888';
 SELECT * FROM whatsapp_messages WHERE conversation_id = 'xxx';
 ```
 
@@ -232,7 +232,7 @@ https://supabase.com/dashboard/project/adzaqkduxnpckbcuqpmg/functions/whatsapp-s
 - Verify Token: `bc9906a9-504c-4a8e-9fcf-539cf01301fd`
 
 **Conversa Teste:**
-- Telefone: `5524999409021`
+- Telefone: `5511999998888`
 - Nome: `Gustavo Santos`
 
 ---

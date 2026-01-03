@@ -15,14 +15,14 @@
             "contacts": [
               {
                 "profile": {
-                  "name": "Gustavo Santos"
+                  "name": "Cliente Exemplo"
                 },
-                "wa_id": "5524999409021"
+                "wa_id": "5511999998888"
               }
             ],
             "messages": [
               {
-                "from": "5524999409021",
+                "from": "5511999998888",
                 "id": "wamid.TEST_LOCAL_123456789",
                 "timestamp": "1767302934",
                 "text": {

@@ -12,7 +12,7 @@
 ```sql
 -- Conversa criada:
 id: 472f4916-1468-4eee-a567-705c8742d42d
-phone_number: 5524999409021
+phone_number: 5511999998888
 contact_name: Gustavo Santos
 
 -- Mensagem salva:
@@ -113,7 +113,7 @@ Ou via Dashboard: desabilitar "Require JWT" manualmente
 // Input
 {
   message_id: "uuid",
-  phone_number: "5524999409021",
+  phone_number: "5511999998888",
   content: "Olá!",
   reply_to_wa_id?: "wamid.xxx"
 }
@@ -122,7 +122,7 @@ Ou via Dashboard: desabilitar "Require JWT" manualmente
 POST https://graph.facebook.com/v18.0/{phone_number_id}/messages
 {
   "messaging_product": "whatsapp",
-  "to": "5524999409021",
+  "to": "5511999998888",
   "type": "text",
   "text": { "body": "Olá!" }
 }
@@ -210,7 +210,7 @@ Esta função é BLOQUEADORA para:
 
 **Conversa Teste:**
 - ID: `472f4916-1468-4eee-a567-705c8742d42d`
-- Telefone: `5524999409021`
+- Telefone: `5511999998888`
 - Contato: `Gustavo Santos`
 
 **Mensagem Teste Recebida:**
