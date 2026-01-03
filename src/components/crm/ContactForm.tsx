@@ -600,8 +600,8 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
                       Telefone
                     </FormLabel>
                     <FormControl>
-                      <Input 
-                        placeholder="(21) 99940-9021" 
+                      <Input
+                        placeholder="(11) 99999-8888"
                         {...field}
                         value={field.value || ""}
                         onChange={(e) => {
