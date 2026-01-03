@@ -89,6 +89,8 @@ export interface WhatsAppConversation {
   unread_count: number;
   is_muted: boolean;
   metadata: Record<string, unknown>;
+  lead_status?: 'quente' | 'morno' | 'frio';
+  lead_status_color?: string;
   created_at: string;
   updated_at: string;
 }
@@ -364,6 +366,7 @@ export interface WhatsAppConversationFilters {
   labelIds?: string[];
   search?: string;
   priority?: WhatsAppPriority | 'all';
+  leadStatus?: 'quente' | 'morno' | 'frio' | 'all';
   dateRange?: {
     start: string;
     end: string;

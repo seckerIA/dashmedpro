@@ -44,14 +44,28 @@ export function MessageList({
     lastMessageCount.current = messages.length;
   }, [messages.length]);
 
-  // Initial scroll to bottom
+  // Scroll to bottom on initial load or when conversation changes
   useEffect(() => {
-    scrollToBottom();
-  }, []);
+    if (!isLoading && messages.length > 0) {
+      // Usamos requestAnimationFrame para garantir que o layout foi calculado
+      const frame = requestAnimationFrame(() => {
+        if (containerRef.current) {
+          containerRef.current.scrollTop = containerRef.current.scrollHeight;
+        }
+      });
+      return () => cancelAnimationFrame(frame);
+    }
+  }, [isLoading, messages.length]);
 
-  const scrollToBottom = useCallback(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    if (containerRef.current) {
+      containerRef.current.scrollTo({
+        top: containerRef.current.scrollHeight,
+        behavior
+      });
+    }
     setShowScrollButton(false);
+    isAtBottom.current = true;
   }, []);
 
   const handleScroll = useCallback(() => {
@@ -175,7 +189,7 @@ export function MessageList({
           variant="secondary"
           size="icon"
           className="absolute bottom-4 right-4 rounded-full shadow-lg z-10 opacity-90 hover:opacity-100 transition-opacity"
-          onClick={scrollToBottom}
+          onClick={() => scrollToBottom()}
         >
           <ArrowDown className="h-4 w-4" />
         </Button>

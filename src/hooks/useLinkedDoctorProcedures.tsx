@@ -9,6 +9,7 @@ export interface LinkedProcedure {
     name: string;
     price: number;
     category: string;
+    description?: string | null;
     duration_minutes: number;
     user_id: string;
     doctor_name?: string;
@@ -33,7 +34,7 @@ export function useLinkedDoctorProcedures() {
             const { data, error } = await supabaseQueryWithTimeout(
                 (supabase
                     .from('commercial_procedures' as any)
-                    .select('id, name, price, category, duration_minutes, user_id')
+                    .select('id, name, price, category, description, duration_minutes, user_id')
                     .in('user_id', targetUserIds)
                     .eq('is_active', true)
                     .order('name')) as any,

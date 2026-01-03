@@ -3,6 +3,7 @@
  * @module hooks/useWhatsAppConversations
  */
 
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -35,7 +36,9 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
   const { doctorIds } = useSecretaryDoctors();
 
   // IDs para filtrar (próprio usuário + médicos vinculados para secretária)
-  const userIds = user?.id ? [user.id, ...(doctorIds || [])] : [];
+  const userIds = useMemo(() =>
+    user?.id ? [user.id, ...(doctorIds || [])] : []
+    , [user?.id, doctorIds]);
 
   // =========================================
   // Query: Lista de conversas
@@ -50,7 +53,8 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
         .select(`
           *,
           contact:crm_contacts(id, full_name, email, phone),
-          assigned_to_profile:profiles!whatsapp_conversations_assigned_to_profiles_fkey(id, full_name, email, avatar_url)
+          assigned_to_profile:profiles!whatsapp_conversations_assigned_to_profiles_fkey(id, full_name, email, avatar_url),
+          analysis:whatsapp_conversation_analysis${filters?.leadStatus && filters.leadStatus !== 'all' ? '!inner' : ''}(lead_status)
         `)
         .in('user_id', userIds)
         .order('last_message_at', { ascending: false, nullsFirst: false })
@@ -69,8 +73,8 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
         }
       }
 
-      if (filters?.priority && filters.priority !== 'all') {
-        query = query.eq('priority', filters.priority);
+      if (filters?.leadStatus && filters.leadStatus !== 'all') {
+        query = query.eq('analysis.lead_status', filters.leadStatus);
       }
 
       if (filters?.search) {
@@ -85,14 +89,26 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
       }
 
       // DEDUP: Se a secretária e o médico tiverem a mesma conversa, mantém apenas a mais recente
-      const uniqueMap = new Map<string, any>();
-      (data || []).forEach(conv => {
+      const uniqueMap = new Map<string, WhatsAppConversationWithRelations>();
+      (data || []).forEach((conv: any) => {
         const existing = uniqueMap.get(conv.phone_number);
         if (!existing || new Date(conv.last_message_at || 0) > new Date(existing.last_message_at || 0)) {
-          uniqueMap.set(conv.phone_number, conv);
+          uniqueMap.set(conv.phone_number, conv as WhatsAppConversationWithRelations);
         }
       });
-      const dedupedData = Array.from(uniqueMap.values());
+      const dedupedData = Array.from(uniqueMap.values()).map(conv => {
+        const leadStatus = (conv as any).analysis?.lead_status;
+        let leadStatusColor = '';
+        if (leadStatus === 'quente') leadStatusColor = 'bg-red-500';
+        else if (leadStatus === 'morno') leadStatusColor = 'bg-orange-500';
+        else if (leadStatus === 'frio') leadStatusColor = 'bg-blue-500';
+
+        return {
+          ...conv,
+          lead_status: leadStatus,
+          lead_status_color: leadStatusColor
+        };
+      }) as WhatsAppConversationWithRelations[];
 
       // Buscar labels para cada conversa
       if (dedupedData.length > 0) {
@@ -103,7 +119,7 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
             conversation_id,
             label:whatsapp_conversation_labels(id, name, color, description)
           `)
-          .in('conversation_id', conversationIds);
+          .in('conversation_id', conversationIds) as { data: any[] | null };
 
         // Mapear labels para conversas
         const labelsMap = new Map<string, any[]>();
@@ -125,9 +141,9 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
       return dedupedData as WhatsAppConversationWithRelations[];
     },
     enabled: enabled && !!user?.id && userIds.length > 0,
-    staleTime: 30 * 1000, // 30 segundos
     gcTime: 5 * 60 * 1000,
-    refetchInterval: 3000, // Atualiza a lista a cada 1s para refletir últimas mensagens
+    // Removido refetchInterval para evitar "shaking" na lista e loops com markAsRead
+    // O Realtime já cuida de atualizar a lista quando chegam novas mensagens
   });
 
   // =========================================
@@ -298,9 +314,61 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
           .is('read_at', null);
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [WHATSAPP_CONVERSATIONS_KEY] });
-      queryClient.invalidateQueries({ queryKey: [WHATSAPP_INBOX_STATS_KEY] });
+    onMutate: async (conversationId: string) => {
+      // Cancelar refetches em andamento
+      await queryClient.cancelQueries({ queryKey: [WHATSAPP_CONVERSATIONS_KEY] });
+      await queryClient.cancelQueries({ queryKey: [WHATSAPP_INBOX_STATS_KEY] });
+
+      // Tirar snapshot do estado atual
+      const previousConversations = queryClient.getQueryData<WhatsAppConversationWithRelations[]>([WHATSAPP_CONVERSATIONS_KEY]);
+      const previousStats = queryClient.getQueryData<WhatsAppInboxStats>([WHATSAPP_INBOX_STATS_KEY]);
+
+      // Atualizar cache otimisticamente para TODAS as queries de conversas
+      queryClient.setQueriesData({ queryKey: [WHATSAPP_CONVERSATIONS_KEY] }, (old: WhatsAppConversationWithRelations[] | undefined) => {
+        if (!old) return old;
+        return old.map(c =>
+          c.id === conversationId ? { ...c, unread_count: 0 } : c
+        );
+      });
+
+      // Também atualizar a query de stats
+      if (previousStats) {
+        // Tentar encontrar a conversa em qualquer uma das queries de lista para saber quanto subtrair
+        const allConversations = queryClient.getQueriesData<WhatsAppConversationWithRelations[]>({ queryKey: [WHATSAPP_CONVERSATIONS_KEY] });
+        let unreadToRemove = 0;
+
+        for (const [_, data] of allConversations) {
+          const found = data?.find(c => c.id === conversationId);
+          if (found) {
+            unreadToRemove = found.unread_count || 0;
+            break;
+          }
+        }
+
+        queryClient.setQueryData([WHATSAPP_INBOX_STATS_KEY, userIds], (old: WhatsAppInboxStats | undefined) => {
+          if (!old) return old;
+          return {
+            ...old,
+            unread_messages: Math.max(0, (old.unread_messages || 0) - unreadToRemove)
+          };
+        });
+      }
+
+      return { previousConversations, previousStats };
+    },
+    onError: (err, conversationId, context) => {
+      // Rollback em caso de erro
+      if (context?.previousConversations) {
+        queryClient.setQueryData([WHATSAPP_CONVERSATIONS_KEY], context.previousConversations);
+      }
+      if (context?.previousStats) {
+        queryClient.setQueryData([WHATSAPP_INBOX_STATS_KEY], context.previousStats);
+      }
+      console.error('[Mutation] markAsRead error:', err);
+    },
+    onSettled: () => {
+      // Deixamos o Realtime ou futuras navegações cuidarem da sincronização final.
+      // Invalidação imediata aqui costuma causar "flicker" se o servidor/view demorar ms a mais.
     },
   });
 

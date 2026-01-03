@@ -206,7 +206,7 @@ Analise a conversa e retorne APENAS um JSON válido (sem markdown, sem explicaç
 
 ESTRUTURA DO JSON:
 {
-  "lead_status": "novo" | "frio" | "morno" | "quente" | "convertido" | "perdido",
+  "lead_status": "frio" | "morno" | "quente",
   "conversion_probability": 0-100,
   "detected_intent": "Intenção clara do paciente",
   "detected_procedure": "Procedimento alvo",
@@ -231,11 +231,9 @@ DIRETRIZES DE CONVERSÃO (PSICOLOGIA DE VENDAS):
 5. Objeções: Se o paciente perguntar preço, ensine a secretária a valorizar o procedimento antes de dar o valor bruto, ou oferecer condições de parcelamento.
 
 CRITÉRIOS DE STATUS:
-- NOVO: Contato inicial, fase de descoberta.
-- FRIO: Parou de responder ou mostra desinteresse total.
-- MORNO: Tem dúvidas mas ainda não pediu horários.
-- QUENTE: Pediu preço, horários ou falou de sintomas específicos que precisam de tratamento rápido.
-- CONVERTIDO: Agendamento marcado ou pagamento realizado.
+- FRIO: Parou de responder, mostra desinteresse total ou apenas tirou uma dúvida rápida sem intenção de agendar.
+- MORNO: Tem dúvidas, responde mas ainda não pediu horários ou mostrou urgência.
+- QUENTE: Pediu preço, horários, localização ou falou de sintomas específicos que precisam de tratamento rápido.
 
 Gere exatamente 3 sugestões de resposta altamente persuasivas.`;
 

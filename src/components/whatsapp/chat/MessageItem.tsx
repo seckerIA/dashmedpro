@@ -72,7 +72,7 @@ export const MessageItem = memo(function MessageItem({
         className={cn(
           'relative max-w-[70%] rounded-2xl px-3 py-2',
           isOutbound
-            ? 'bg-green-500 text-white rounded-br-md'
+            ? 'bg-emerald-600 text-white rounded-br-md shadow-sm'
             : 'bg-muted rounded-bl-md'
         )}
       >
@@ -82,8 +82,8 @@ export const MessageItem = memo(function MessageItem({
             className={cn(
               'mb-2 px-2 py-1 rounded text-xs border-l-2',
               isOutbound
-                ? 'bg-green-600/50 border-white/50 text-white/90'
-                : 'bg-background border-green-500 text-muted-foreground'
+                ? 'bg-emerald-700/50 border-white/30 text-white/90'
+                : 'bg-background border-emerald-500 text-muted-foreground'
             )}
           >
             <p className="truncate">{message.reply_to.content}</p>
@@ -165,7 +165,7 @@ function MessageContent({
             <div
               className={cn(
                 'flex items-center justify-center w-48 h-32 rounded-lg',
-                isOutbound ? 'bg-green-600/50' : 'bg-background'
+                isOutbound ? 'bg-emerald-700/50' : 'bg-background'
               )}
             >
               <ImageIcon className="h-8 w-8 opacity-50" />
@@ -186,7 +186,7 @@ function MessageContent({
             className={cn(
               'h-10 w-10 rounded-full flex-shrink-0',
               isOutbound
-                ? 'bg-green-600 hover:bg-green-700 text-white'
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
                 : 'bg-background'
             )}
           >
@@ -202,7 +202,7 @@ function MessageContent({
               <div
                 className={cn(
                   'h-full w-0 rounded-full',
-                  isOutbound ? 'bg-white' : 'bg-green-500'
+                  isOutbound ? 'bg-white' : 'bg-emerald-500'
                 )}
               />
             </div>
@@ -220,7 +220,7 @@ function MessageContent({
           <div
             className={cn(
               'relative flex items-center justify-center w-48 h-32 rounded-lg',
-              isOutbound ? 'bg-green-600/50' : 'bg-background'
+              isOutbound ? 'bg-emerald-700/50' : 'bg-background'
             )}
           >
             <Video className="h-8 w-8 opacity-50" />
@@ -247,13 +247,13 @@ function MessageContent({
         <div
           className={cn(
             'flex items-center gap-3 p-2 rounded-lg min-w-[200px]',
-            isOutbound ? 'bg-green-600/50' : 'bg-background'
+            isOutbound ? 'bg-emerald-700/50' : 'bg-background'
           )}
         >
           <div
             className={cn(
               'p-2 rounded',
-              isOutbound ? 'bg-green-700' : 'bg-muted'
+              isOutbound ? 'bg-emerald-800/50' : 'bg-muted'
             )}
           >
             <FileText className="h-5 w-5" />
@@ -271,7 +271,7 @@ function MessageContent({
             size="icon"
             className={cn(
               'h-8 w-8 flex-shrink-0',
-              isOutbound && 'hover:bg-green-600'
+              isOutbound && 'hover:bg-emerald-700/50'
             )}
           >
             <Download className="h-4 w-4" />

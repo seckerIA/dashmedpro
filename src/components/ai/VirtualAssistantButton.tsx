@@ -23,16 +23,27 @@ export function VirtualAssistantButton() {
     return (
         <>
             <motion.button
+                drag
+                dragMomentum={false}
+                dragElastic={0.02}
+                dragConstraints={{
+                    top: -window.innerHeight + 180,
+                    bottom: 20,
+                    left: -window.innerWidth + 100,
+                    right: 20,
+                }}
                 onClick={() => setIsOpen(true)}
                 className={cn(
-                    "fixed right-8 z-50 flex h-14 w-14 items-center justify-center rounded-full shadow-lg hover:shadow-xl transition-all duration-300 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer group",
+                    "fixed right-8 z-50 flex h-14 w-14 items-center justify-center rounded-full shadow-lg hover:shadow-xl bg-primary text-primary-foreground hover:bg-primary/90 cursor-grab active:cursor-grabbing group",
                     isChatPage ? "bottom-24" : "bottom-8"
                 )}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
             >
+                <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping group-hover:hidden" />
                 <Mic className="h-6 w-6 relative z-10" />
             </motion.button>
 

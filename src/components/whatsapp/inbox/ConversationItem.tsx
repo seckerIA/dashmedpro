@@ -51,6 +51,8 @@ export function ConversationItem({
     is_muted,
     labels,
     contact,
+    lead_status,
+    lead_status_color,
   } = conversation;
 
   const displayName = contact_name || contact?.name || phone_number;
@@ -63,9 +65,9 @@ export function ConversationItem({
 
   const timeAgo = last_message_at
     ? formatDistanceToNow(new Date(last_message_at), {
-        addSuffix: true,
-        locale: ptBR,
-      })
+      addSuffix: true,
+      locale: ptBR,
+    })
     : '';
 
   const statusConfig = CONVERSATION_STATUS_CONFIG[status];
@@ -141,15 +143,28 @@ export function ConversationItem({
             </span>
           </div>
 
-          {/* Badge de não lidas */}
-          {unread_count > 0 && (
-            <Badge
-              variant="default"
-              className="bg-green-500 hover:bg-green-500 text-white h-5 min-w-5 flex items-center justify-center px-1.5"
-            >
-              {unread_count > 99 ? '99+' : unread_count}
-            </Badge>
-          )}
+          {/* Badge de não lidas e Lead Status */}
+          <div className="flex flex-col items-end gap-1.5">
+            {unread_count > 0 && (
+              <Badge
+                variant="default"
+                className="bg-green-500 hover:bg-green-500 text-white h-5 min-w-5 flex items-center justify-center px-1.5"
+              >
+                {unread_count > 99 ? '99+' : unread_count}
+              </Badge>
+            )}
+            {lead_status && (
+              <Badge
+                variant="secondary"
+                className={cn(
+                  "text-[9px] h-4 px-1.5 uppercase tracking-tighter font-bold border-none text-white",
+                  lead_status_color
+                )}
+              >
+                {lead_status}
+              </Badge>
+            )}
+          </div>
         </div>
 
         {/* Linha 3: Labels */}

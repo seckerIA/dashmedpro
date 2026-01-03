@@ -13,9 +13,11 @@ import { useCommercialProcedures } from "@/hooks/useCommercialProcedures";
 import { CommercialProcedure, CommercialProcedureInsert } from "@/types/commercial";
 import { COMMERCIAL_PROCEDURE_CATEGORY_LABELS } from "@/types/commercial";
 import { formatCurrencyInput, parseCurrencyToNumber } from "@/lib/currency";
-import { Loader2, Stethoscope, Clock, DollarSign, FileText, Tag, User } from "lucide-react";
+import { Loader2, Stethoscope, Clock, DollarSign, FileText, Tag, User, Sparkles, Undo } from "lucide-react";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useDoctors } from "@/hooks/useDoctors";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const procedureSchema = z.object({
   name: z.string().min(3, "Nome deve ter pelo menos 3 caracteres"),
@@ -26,7 +28,16 @@ const procedureSchema = z.object({
   is_active: z.boolean(),
 });
 
-type ProcedureFormData = z.infer<typeof procedureSchema>;
+interface ProcedureFormInput {
+  name: string;
+  category: 'consultation' | 'procedure' | 'exam' | 'surgery' | 'other';
+  description: string;
+  price: string;
+  duration_minutes: number;
+  is_active: boolean;
+}
+
+type ProcedureFormOutput = z.infer<typeof procedureSchema>;
 
 interface ProcedureFormProps {
   open: boolean;
@@ -41,6 +52,9 @@ export function ProcedureForm({ open, onOpenChange, procedure, required = false,
   const { isSecretaria } = useUserProfile();
   const { doctors } = useDoctors();
   const { createProcedure, updateProcedure } = useCommercialProcedures();
+  const { toast } = useToast();
+  const [isEnhancing, setIsEnhancing] = useState(false);
+  const [previousDescription, setPreviousDescription] = useState<string | null>(null);
   const isEditing = !!procedure;
 
   // Estado para médico selecionado (usado apenas por secretária)
@@ -58,7 +72,7 @@ export function ProcedureForm({ open, onOpenChange, procedure, required = false,
     watch,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<ProcedureFormData>({
+  } = useForm<ProcedureFormInput>({
     resolver: zodResolver(procedureSchema),
     defaultValues: {
       name: "",
@@ -95,24 +109,44 @@ export function ProcedureForm({ open, onOpenChange, procedure, required = false,
       });
       setSelectedDoctorId("");
     }
-  }, [procedure, open, reset, isSecretaria]);
+  }, [procedure, open, reset, isSecretaria, initialData]);
 
-  const onSubmit = async (data: ProcedureFormData) => {
+  const onSubmit = async (data: any) => {
+    // Cast data because zodResolver returns the transformed output type (ProcedureFormOutput)
+    const validatedData = data as ProcedureFormOutput;
+
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const currentUserId = sessionData.session?.user?.id;
+
+      if (!currentUserId) {
+        toast({
+          title: "Erro de autenticação",
+          description: "Sessão expirada. Por favor, faça login novamente.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Se secretária, validar que um médico foi selecionado
       if (isSecretaria && !selectedDoctorId && !isEditing) {
+        toast({
+          title: "Médico não selecionado",
+          description: "Por favor, selecione para qual médico deseja cadastrar este procedimento.",
+          variant: "destructive",
+        });
         return;
       }
 
       const procedureData: CommercialProcedureInsert = {
-        name: data.name,
-        category: data.category,
-        description: data.description || null,
-        price: data.price,
-        duration_minutes: data.duration_minutes,
-        is_active: data.is_active,
-        // Se secretária, usar o médico selecionado como user_id
-        ...(isSecretaria && selectedDoctorId ? { user_id: selectedDoctorId } : {}),
+        name: validatedData.name,
+        category: validatedData.category,
+        description: validatedData.description || null,
+        price: validatedData.price,
+        duration_minutes: validatedData.duration_minutes,
+        is_active: validatedData.is_active,
+        // user_id é obrigatório. Se for médico, usa o seu próprio. Se secretaria, o selecionado.
+        user_id: isSecretaria ? selectedDoctorId : currentUserId,
       };
 
       let newProcedure: CommercialProcedure | null = null;
@@ -125,7 +159,7 @@ export function ProcedureForm({ open, onOpenChange, procedure, required = false,
 
       // Chamar callback de sucesso antes de fechar
       onSuccess?.(newProcedure);
-      
+
       onOpenChange(false);
       reset();
       setSelectedDoctorId("");
@@ -145,6 +179,75 @@ export function ProcedureForm({ open, onOpenChange, procedure, required = false,
       return;
     }
     onOpenChange(newOpen);
+  };
+
+  const handleAIEnhance = async () => {
+    const name = watch("name");
+    const category = watch("category");
+    const currentDescription = watch("description");
+
+    setPreviousDescription(currentDescription || "");
+
+    if (!name) {
+      toast({
+        title: "Nome necessário",
+        description: "Por favor, digite o nome do procedimento para que a IA possa analisá-lo.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsEnhancing(true);
+
+    // Configurar timeout de 10 segundos para não travar o usuário
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    try {
+      // O SDK do Supabase pode não suportar 'signal' em todas as versões.
+      // Vamos usar o timeout apenas para destravar o estado da UI.
+      const { data, error } = await supabase.functions.invoke('ai-enhance-procedure', {
+        body: { name, category, currentDescription }
+      });
+
+      clearTimeout(timeoutId);
+
+      if (error) throw error;
+
+      if (data?.enhancedDescription) {
+        setValue("description", data.enhancedDescription, { shouldValidate: true });
+        toast({
+          title: "Descrição Aprimorada!",
+          description: "A IA gerou uma explicação profissional para este procedimento.",
+        });
+      }
+    } catch (err: any) {
+      console.error("Error enhancing description:", err);
+
+      const isTimeout = err.name === 'AbortError' || err.message === 'timeout' || err.name === 'TimeoutError';
+
+      toast({
+        title: isTimeout ? "Tempo Excedido" : "Erro na IA",
+        description: isTimeout
+          ? "A IA demorou mais de 10s para responder. Tente novamente."
+          : "Não foi possível aprimorar a descrição agora.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsEnhancing(false);
+      clearTimeout(timeoutId);
+    }
+  };
+
+  const handleUndoAI = () => {
+    if (previousDescription !== null) {
+      setValue("description", previousDescription, { shouldValidate: true });
+      setPreviousDescription(null);
+      toast({
+        title: "Alteração desfeita",
+        description: "A descrição voltou ao que era antes da análise.",
+      });
+    }
   };
 
   return (
@@ -285,16 +388,55 @@ export function ProcedureForm({ open, onOpenChange, procedure, required = false,
 
           {/* Descrição */}
           <div className="space-y-2">
-            <Label htmlFor="description" className="text-sm font-medium">
-              Descrição (opcional)
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="description" className="text-sm font-medium">
+                Descrição (opcional)
+              </Label>
+              <div className="flex items-center gap-2">
+                {previousDescription !== null && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-[10px] gap-1.5 text-muted-foreground hover:text-foreground font-bold px-2 rounded-full border border-border"
+                    onClick={handleUndoAI}
+                  >
+                    <Undo className="h-3 w-3" />
+                    Desfazer
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-[10px] gap-1.5 text-primary hover:text-primary hover:bg-primary/10 font-bold px-2 rounded-full border border-primary/20"
+                  onClick={handleAIEnhance}
+                  disabled={isEnhancing}
+                >
+                  {isEnhancing ? (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Analisando...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3 w-3" />
+                      Aprimorar com IA
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
             <Textarea
               id="description"
               {...register("description")}
               placeholder="Descrição detalhada do procedimento..."
-              rows={3}
-              className="bg-background resize-none"
+              rows={4}
+              className="bg-background resize-none border-border/60 focus:border-primary/50"
             />
+            <p className="text-[10px] text-muted-foreground">
+              Dica: Digite o nome do procedimento e clique em "Aprimorar com IA" para gerar uma explicação perfeita.
+            </p>
           </div>
 
           {/* Botões */}

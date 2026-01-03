@@ -77,11 +77,14 @@ export function useWhatsAppRealtime(options: UseWhatsAppRealtimeOptions = {}) {
 
         console.log('[DEBUG-REALTIME] Msg received:', message.id, 'User:', message.user_id, 'Conv:', message.conversation_id);
 
+        // Invalidação imediata de estatísticas e conversas
+        queryClient.invalidateQueries({ queryKey: [WHATSAPP_CONVERSATIONS_KEY] });
+        queryClient.invalidateQueries({ queryKey: [WHATSAPP_INBOX_STATS_KEY] });
+
         // 1. Prioridade: Se é a conversa ATUAL, atualiza SEMPRE (bypass user filter)
         if (conversationId && message.conversation_id === conversationId) {
           console.log('[DEBUG-REALTIME] Updating current chat:', conversationId);
 
-          // Invalidação imediata
           queryClient.invalidateQueries({
             queryKey: [WHATSAPP_MESSAGES_KEY, message.conversation_id],
             refetchType: 'active',
@@ -89,8 +92,23 @@ export function useWhatsAppRealtime(options: UseWhatsAppRealtimeOptions = {}) {
 
           if (onNewMessageRef.current) onNewMessageRef.current(message);
 
-          // Se atualizamos o chat, não precisamos checar user_id para notificação, 
-          // mas ainda precisamos invalidar sidebar para reordenar
+          // AUTO-ANALYZE: Se for uma nova mensagem do paciente, dispara a análise de IA
+          // Isso ativa a funcionalidade de Auto-Resposta caso esteja configurada na Edge Function
+          if (message.direction === 'inbound') {
+            console.log('[DEBUG-REALTIME] Triggering auto-analyze for new inbound message');
+            queryClient.fetchQuery({
+              queryKey: ['whatsapp-ai-analyze-trigger', message.conversation_id],
+              queryFn: async () => {
+                const { data: session } = await supabase.auth.getSession();
+                if (!session?.session?.access_token) return;
+
+                return supabase.functions.invoke('whatsapp-ai-analyze', {
+                  body: { conversation_id: message.conversation_id }
+                });
+              },
+              staleTime: 0
+            });
+          }
         }
 
         // 2. Filtro de Segurança/Global para outras conversas
@@ -101,12 +119,14 @@ export function useWhatsAppRealtime(options: UseWhatsAppRealtimeOptions = {}) {
               title: 'Nova mensagem',
               description: message.content?.substring(0, 50) || 'Anexo recebido',
             });
+
+            // Disparar análise mesmo em background para auto-resposta funcionar globalmente
+            console.log('[DEBUG-REALTIME] Triggering background auto-analyze');
+            supabase.functions.invoke('whatsapp-ai-analyze', {
+              body: { conversation_id: message.conversation_id }
+            });
           }
         }
-
-        // Sidebar e Inbox stats sempre invalidam para garantir consistência
-        queryClient.invalidateQueries({ queryKey: [WHATSAPP_CONVERSATIONS_KEY] });
-        queryClient.invalidateQueries({ queryKey: [WHATSAPP_INBOX_STATS_KEY] });
       }
     );
 

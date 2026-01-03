@@ -3,7 +3,7 @@
  * Layout estilo Chatwoot com lista de conversas + chat + sidebar
  */
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Settings, MessageCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -27,16 +27,8 @@ export default function WhatsAppInbox() {
   // Config check
   const { isConfigured, isActive, isLoading: isLoadingConfig } = useWhatsAppConfig();
 
-  // State
-  const [selectedConversation, setSelectedConversation] =
-    useState<WhatsAppConversationWithRelations | null>(null);
+  // Filters state
   const [filters, setFilters] = useState<WhatsAppConversationFilters>({});
-  const [showSidebar, setShowSidebar] = useState(false);
-
-  // Realtime subscription (global)
-  useWhatsAppRealtime({
-    ignoreConversationId: selectedConversation?.id,
-  });
 
   // Conversations query
   const {
@@ -46,7 +38,20 @@ export default function WhatsAppInbox() {
     isLoadingStats,
     refetch,
     markAsRead,
+    isMarkingAsRead,
   } = useWhatsAppConversations({ filters });
+
+  // State
+  const [selectedId, setSelectedId] = useState<string | null>(searchParams.get('conversation'));
+  const selectedConversation = useMemo(() =>
+    conversations.find(c => c.id === selectedId) || null
+    , [conversations, selectedId]);
+  const [showSidebar, setShowSidebar] = useState(false);
+
+  // Realtime subscription (global)
+  useWhatsAppRealtime({
+    ignoreConversationId: selectedConversation?.id,
+  });
 
   // Load conversation from URL
   useEffect(() => {
@@ -69,7 +74,7 @@ export default function WhatsAppInbox() {
       }
 
       if (found) {
-        setSelectedConversation(found);
+        setSelectedId(found.id);
         // Se encontramos por telefone, atualizamos a URL para o ID da conversa e removemos o phone
         if (phone || (conversationId && conversationId !== found.id)) {
           setSearchParams({ conversation: found.id }, { replace: true });
@@ -89,7 +94,7 @@ export default function WhatsAppInbox() {
   // Handlers
   const handleSelectConversation = useCallback(
     async (conversation: WhatsAppConversationWithRelations) => {
-      setSelectedConversation(conversation);
+      setSelectedId(conversation.id);
       setSearchParams({ conversation: conversation.id });
 
       // Marcar como lida
@@ -114,6 +119,23 @@ export default function WhatsAppInbox() {
   const toggleSidebar = useCallback(() => {
     setShowSidebar(prev => !prev);
   }, []);
+
+  // Marcar como lida automaticamente se a conversa selecionada tiver mensagens não lidas
+  const lastMarkedRead = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    if (selectedConversation && selectedConversation.unread_count > 0 && !isMarkingAsRead) {
+      const convId = selectedConversation.id;
+      const now = Date.now();
+      const lastTime = lastMarkedRead.current[convId] || 0;
+
+      // Debounce: evita loop se o servidor demorar para refletir o "lido" (janela de 5s)
+      if (now - lastTime > 5000) {
+        lastMarkedRead.current[convId] = now;
+        markAsRead(convId);
+      }
+    }
+  }, [selectedConversation?.id, selectedConversation?.unread_count, markAsRead, isMarkingAsRead]);
 
   // Loading state
   if (isLoadingConfig) {
@@ -197,7 +219,7 @@ export default function WhatsAppInbox() {
     <ChatWindow
       conversation={selectedConversation}
       onBack={() => {
-        setSelectedConversation(null);
+        setSelectedId(null);
         setSearchParams({});
       }}
       onToggleSidebar={toggleSidebar}
@@ -218,13 +240,9 @@ export default function WhatsAppInbox() {
       inbox={inboxContent}
       chat={chatContent}
       sidebar={sidebarContent}
-      selectedConversation={selectedConversation}
+      selectedConversationId={selectedId || undefined}
       showSidebar={showSidebar}
       onToggleSidebar={toggleSidebar}
-      onBackToList={() => {
-        setSelectedConversation(null);
-        setSearchParams({});
-      }}
     />
   );
 }

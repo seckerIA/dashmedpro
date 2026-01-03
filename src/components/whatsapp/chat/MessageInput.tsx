@@ -1,8 +1,4 @@
-/**
- * Input de mensagem do chat WhatsApp
- */
-
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useImperativeHandle, forwardRef } from 'react';
 import {
   Send,
   Paperclip,
@@ -31,6 +27,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { WhatsAppMessageWithRelations } from '@/types/whatsapp';
 
+export interface MessageInputHandle {
+  appendText: (text: string) => void;
+  focus: () => void;
+}
+
 interface MessageInputProps {
   onSendText: (text: string) => Promise<void>;
   onSendMedia?: (file: File, caption?: string) => Promise<void>;
@@ -39,12 +40,13 @@ interface MessageInputProps {
   disabled?: boolean;
   isSending?: boolean;
   initialText?: string;
+  droppedFile?: File | null; // Novo prop para arquivos dropados externamente
 }
 
 // Emojis comuns para acesso rápido
 const QUICK_EMOJIS = ['👍', '❤️', '😊', '😂', '🙏', '👏', '🎉', '✅', '👋', '💪'];
 
-export function MessageInput({
+export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   onSendText,
   onSendMedia,
   replyTo,
@@ -52,12 +54,31 @@ export function MessageInput({
   disabled,
   isSending,
   initialText,
-}: MessageInputProps) {
+  droppedFile,
+}, ref) => {
   const [text, setText] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Expor métodos via ref
+  useImperativeHandle(ref, () => ({
+    appendText: (newText: string) => {
+      setText(prev => (prev ? prev + '\n' + newText : newText));
+      textareaRef.current?.focus();
+    },
+    focus: () => {
+      textareaRef.current?.focus();
+    }
+  }));
+
+  // Handle external file dropped
+  useEffect(() => {
+    if (droppedFile && onSendMedia) {
+      onSendMedia(droppedFile);
+    }
+  }, [droppedFile, onSendMedia]);
 
   // Update text when initialText prop changes
   useEffect(() => {
@@ -201,13 +222,23 @@ export function MessageInput({
       {/* Input area */}
       <div
         className={cn(
-          "flex items-end gap-2 p-3 transition-colors",
-          isDragging && "bg-primary/5 border-primary border-dashed border-2 rounded-t-lg"
+          "flex items-end gap-2 p-3 transition-all relative",
+          isDragging && "bg-primary/5"
         )}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
       >
+        {/* Drop Overlay - Cobre toda a área do input para não haver "dead spots" */}
+        {isDragging && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-[2px] border-2 border-dashed border-primary rounded-t-lg animate-in fade-in duration-200">
+            <div className="flex items-center gap-3 text-primary font-bold">
+              <Paperclip className="h-6 w-6 animate-bounce" />
+              <span>Solte para adicionar ao chat</span>
+            </div>
+          </div>
+        )}
+
         {/* Emoji picker */}
         <Popover open={showEmoji} onOpenChange={setShowEmoji}>
           <PopoverTrigger asChild>
@@ -282,12 +313,11 @@ export function MessageInput({
             value={text}
             onChange={e => setText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={isDragging ? "Solte aqui..." : "Digite uma mensagem..."}
+            placeholder="Digite uma mensagem..."
             className={cn(
               'min-h-[40px] max-h-[150px] py-2.5 px-4 resize-none',
               'rounded-2xl border-muted-foreground/20',
-              'focus-visible:ring-green-500/50',
-              isDragging && 'pointer-events-none'
+              'focus-visible:ring-green-500/50'
             )}
             disabled={disabled || isSending}
             rows={1}
@@ -313,4 +343,6 @@ export function MessageInput({
       </div>
     </div>
   );
-}
+});
+
+MessageInput.displayName = 'MessageInput';

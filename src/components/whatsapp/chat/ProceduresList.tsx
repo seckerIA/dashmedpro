@@ -21,7 +21,8 @@ export function ProceduresList() {
     );
 
     const handleDragStart = (e: React.DragEvent, procedure: typeof procedures[0]) => {
-        e.dataTransfer.setData('text/plain', `*${procedure.name}*\nValor: R$ ${procedure.price.toFixed(2)}`);
+        const text = `Procedimento: *${procedure.name}*\nValor: R$ ${procedure.price.toFixed(2)}${procedure.description ? `\n${procedure.description}` : ''}`;
+        e.dataTransfer.setData('text/plain', text);
         e.dataTransfer.effectAllowed = 'copy';
     };
 

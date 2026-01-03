@@ -1,8 +1,4 @@
-/**
- * Janela principal do chat WhatsApp
- */
-
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   MoreVertical,
   Phone,
@@ -20,6 +16,8 @@ import {
   Sparkles,
   RefreshCw,
   Bot,
+  ArrowUpCircle,
+  Paperclip as PaperclipIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -33,7 +31,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { MessageList } from './MessageList';
-import { MessageInput } from './MessageInput';
+import { MessageInput, type MessageInputHandle } from './MessageInput';
 import { ProceduresList } from './ProceduresList';
 import { useWhatsAppMessages } from '@/hooks/useWhatsAppMessages';
 import { useWhatsAppConversations } from '@/hooks/useWhatsAppConversations';
@@ -65,6 +63,9 @@ export function ChatWindow({
     null
   );
   const [showProcedures, setShowProcedures] = useState(false);
+  const messageInputRef = useRef<MessageInputHandle>(null);
+  const [isDraggingGlobal, setIsDraggingGlobal] = useState(false);
+  const dragCounter = useRef(0);
 
   const { canScheduleForOthers, isMedico } = useUserProfile();
   const canViewProcedures = canScheduleForOthers || isMedico;
@@ -97,6 +98,7 @@ export function ChatWindow({
     hasNextPage,
     fetchNextPage,
     sendText,
+    sendMedia,
     isSending,
   } = useWhatsAppMessages({ conversationId: conversation.id });
 
@@ -134,8 +136,19 @@ export function ChatWindow({
     [sendText, replyTo, conversation.id]
   );
 
+  const handleSendMedia = useCallback(
+    async (file: File, caption?: string) => {
+      // Simplificado: idealmente enviaria para storage e pegaria URL
+      // Por agora, assumimos que o hook cuida disso ou apenas simula
+      console.log('Sending media from ChatWindow drop:', file.name);
+      // Aqui integraria com o upload real
+    },
+    []
+  );
+
   const handleReply = useCallback((message: WhatsAppMessageWithRelations) => {
     setReplyTo(message);
+    messageInputRef.current?.focus();
   }, []);
 
   const handleCancelReply = useCallback(() => {
@@ -167,6 +180,7 @@ export function ChatWindow({
     async (suggestion: { id: string; content: string }) => {
       setInputTextOverride(suggestion.content);
       await markSuggestionUsed(suggestion.id, false);
+      messageInputRef.current?.focus();
     },
     [markSuggestionUsed]
   );
@@ -177,9 +191,69 @@ export function ChatWindow({
     [analyzeConversation]
   );
 
+  // Drag and Drop Global
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounter.current++;
+    setIsDraggingGlobal(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounter.current--;
+    if (dragCounter.current === 0) {
+      setIsDraggingGlobal(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingGlobal(false);
+    dragCounter.current = 0;
+
+    const text = e.dataTransfer.getData('text/plain');
+    if (text) {
+      messageInputRef.current?.appendText(text);
+      return;
+    }
+
+    // Arquivos
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      // Poderia passar para o MessageInput via ref ou prop
+      // Por agora apenas debug
+      console.log('Drop de arquivo detectado:', file.name);
+    }
+  }, []);
+
   return (
     <div className="flex h-full overflow-hidden">
-      <div className="flex-1 flex flex-col h-full min-w-0 border-r">
+      <div
+        className="flex-1 flex flex-col h-full min-w-0 border-r relative"
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+      >
+        {/* Global Drop Overlay */}
+        {isDraggingGlobal && (
+          <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-background/60 backdrop-blur-md animate-in fade-in duration-300">
+            <div className="p-8 rounded-3xl border-4 border-dashed border-primary bg-background/80 shadow-2xl flex flex-col items-center gap-4 scale-110 transition-transform">
+              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
+                <ArrowUpCircle className="h-10 w-10 text-primary animate-bounce" />
+              </div>
+              <div className="text-center">
+                <h3 className="text-xl font-bold text-foreground">Solte para enviar</h3>
+                <p className="text-muted-foreground text-sm">Documentos, imagens ou procedimentos</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b bg-background">
           <div className="flex items-center gap-3 min-w-0">
@@ -272,7 +346,10 @@ export function ChatWindow({
                 showAIPanel && "bg-primary/10 text-primary border-primary/20",
                 isAnalyzing && "animate-pulse font-bold"
               )}
-              onClick={() => setShowAIPanel(!showAIPanel)}
+              onClick={() => {
+                setShowAIPanel(!showAIPanel);
+                setShowProcedures(false);
+              }}
               title="Análise IA"
             >
               {isAnalyzing ? (
@@ -287,7 +364,10 @@ export function ChatWindow({
                 variant={showProcedures ? "secondary" : "ghost"}
                 size="icon"
                 className={cn("hidden md:flex", showProcedures && "bg-emerald-50 text-emerald-600 border-emerald-200")}
-                onClick={() => setShowProcedures(!showProcedures)}
+                onClick={() => {
+                  setShowProcedures(!showProcedures);
+                  setShowAIPanel(false);
+                }}
                 title="Procedimentos"
               >
                 <Stethoscope className="h-5 w-5" />
@@ -372,6 +452,7 @@ export function ChatWindow({
         {/* Messages */}
         <div className="flex-1 flex flex-col overflow-hidden bg-muted/20">
           <MessageList
+            key={conversation.id}
             messages={messages}
             isLoading={isLoadingMessages}
             isFetchingMore={isFetchingNextPage}
@@ -396,6 +477,7 @@ export function ChatWindow({
 
         {/* Input */}
         <MessageInput
+          ref={messageInputRef}
           onSendText={handleSendText}
           replyTo={replyTo}
           onCancelReply={handleCancelReply}
@@ -428,7 +510,7 @@ export function ChatWindow({
       )}
 
       {/* Sidebar de Procedimentos */}
-      {showProcedures && canViewProcedures && !showAIPanel && (
+      {showProcedures && canViewProcedures && (
         <div className="w-80 h-full border-l bg-background hidden md:block animate-in slide-in-from-right duration-300">
           <ProceduresList />
         </div>
