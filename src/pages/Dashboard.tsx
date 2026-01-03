@@ -9,10 +9,14 @@ import { LeadsChart } from "@/components/charts/LeadsChart"
 import { RevenueChart } from "@/components/charts/RevenueChart"
 import { ServicesChart } from "@/components/charts/ServicesChart"
 import { ConversionChart } from "@/components/charts/ConversionChart"
+import { TicketMedioChart } from "@/components/charts/TicketMedioChart"
+import { ReceitaDespesasChart } from "@/components/charts/ReceitaDespesasChart"
+import { TreatmentEvolutionChart } from "@/components/charts/TreatmentEvolutionChart"
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics"
 import { useFinancialMetrics } from "@/hooks/useFinancialMetrics"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { useBottleneckMetrics } from "@/hooks/useBottleneckMetrics"
+import { useEnhancedDashboardMetrics } from "@/hooks/useEnhancedDashboardMetrics"
 import { MetricCard, QuickActionCard } from "@/components/dashboard/MetricCard"
 import { PipelineFunnelCard } from "@/components/dashboard/PipelineFunnelCard"
 import { SalesChart } from "@/components/dashboard/SalesChart"
@@ -56,6 +60,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { isVendedor, isSecretaria } = useUserProfile();
   const { data: metrics, isLoading, error } = useDashboardMetrics();
+  const { data: enhancedMetrics } = useEnhancedDashboardMetrics();
   const { metrics: financialMetrics } = useFinancialMetrics();
   const { data: bottlenecks, isLoading: isLoadingBottlenecks } = useBottleneckMetrics();
 
@@ -207,6 +212,93 @@ const Dashboard = () => {
         />
       </div>
 
+      {/* Enhanced Metrics - Novas métricas adicionais */}
+      {enhancedMetrics && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6 animate-fade-in animation-delay-300">
+          <MetricCard
+            title="Ticket Médio"
+            value={formatCurrency(enhancedMetrics.averageDealValue || 0)}
+            variant="purple"
+            icon={Coins}
+            trend={{
+              value: 0,
+              label: "valor médio por negócio"
+            }}
+          />
+
+          <MetricCard
+            title="Tempo Médio no Pipeline"
+            value={`${Math.round(enhancedMetrics.averagePipelineTime || 0)} dias`}
+            variant="cyan"
+            icon={RefreshCw}
+            trend={{
+              value: 0,
+              label: "da criação ao fechamento"
+            }}
+          />
+
+          <MetricCard
+            title="Pacientes em Tratamento"
+            value={enhancedMetrics.activeTreatments || 0}
+            variant="green"
+            icon={Activity}
+            trend={{
+              value: 0,
+              label: "em tratamento ativo"
+            }}
+          />
+
+          <MetricCard
+            title="Taxa de Inadimplência"
+            value={`${(enhancedMetrics.defaultRate || 0).toFixed(1)}%`}
+            variant="red"
+            icon={AlertTriangle}
+            trend={{
+              value: 0,
+              label: "negócios inadimplentes"
+            }}
+          />
+        </div>
+      )}
+
+      {/* Consultas do Mês */}
+      {enhancedMetrics && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6 animate-fade-in animation-delay-400">
+          <MetricCard
+            title="Consultas Agendadas"
+            value={enhancedMetrics.appointmentsThisMonth || 0}
+            variant="cyan"
+            icon={Calendar}
+            trend={{
+              value: 0,
+              label: "neste mês"
+            }}
+          />
+
+          <MetricCard
+            title="Consultas Realizadas"
+            value={enhancedMetrics.completedAppointmentsThisMonth || 0}
+            variant="green"
+            icon={Activity}
+            trend={{
+              value: enhancedMetrics.appointmentCompletionRate || 0,
+              label: `${(enhancedMetrics.appointmentCompletionRate || 0).toFixed(1)}% de conclusão`
+            }}
+          />
+
+          <MetricCard
+            title="Follow-ups Pendentes"
+            value={enhancedMetrics.pendingFollowUps || 0}
+            variant="yellow"
+            icon={Bell}
+            trend={{
+              value: 0,
+              label: "ações necessárias"
+            }}
+          />
+        </div>
+      )}
+
       {/* Funil Section */}
       <PipelineFunnelCard
         dealsByStage={metrics?.dealsByStage || {}}
@@ -223,13 +315,14 @@ const Dashboard = () => {
               name: m.month,
               current: m.closed / 1000, // k format
             })) || []}
-            title="Faturamento Fechado ao Longo do Tempo"
+            title="Receita Fechada - Últimos 12 Meses"
           />
 
           {/* Manter: LeadsChart */}
           <Card className="bg-card rounded-2xl border border-border">
             <CardHeader className="p-3 sm:p-4 lg:p-6">
-              <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Leads Gerados no Mês</CardTitle>
+              <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Novos Leads por Mês</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">Evolução de novos contatos cadastrados</CardDescription>
             </CardHeader>
             <CardContent className="p-3 sm:p-4 lg:p-6">
               <LeadsChart data={metrics?.monthlyLeads} />
@@ -251,11 +344,53 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* Novos Gráficos Financeiros e de Tratamento */}
+      {enhancedMetrics && (
+        <>
+          {/* Receita vs Despesas + Evolução de Pacientes */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
+            <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
+              <CardHeader className="p-3 sm:p-4 lg:p-6">
+                <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Receita vs Despesas</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Comparativo mensal de receitas e despesas</CardDescription>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-4 lg:p-6">
+                <ReceitaDespesasChart data={enhancedMetrics.receitaDespesas} />
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
+              <CardHeader className="p-3 sm:p-4 lg:p-6">
+                <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Evolução de Pacientes</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Acompanhamento de pacientes em tratamento, agendados e inadimplentes</CardDescription>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-4 lg:p-6">
+                <TreatmentEvolutionChart data={enhancedMetrics.treatmentEvolution} />
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Ticket Médio por Procedimento */}
+          {enhancedMetrics.averageTicketByProcedure.length > 0 && (
+            <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
+              <CardHeader className="p-3 sm:p-4 lg:p-6">
+                <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Ticket Médio por Procedimento</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Valor médio de fechamento por tipo de procedimento</CardDescription>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-4 lg:p-6">
+                <TicketMedioChart data={enhancedMetrics.averageTicketByProcedure} />
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+
       {/* Performance Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
         <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
           <CardHeader className="p-3 sm:p-4 lg:p-6">
-            <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Serviços de Interesse</CardTitle>
+            <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Distribuição de Pacientes por Procedimento</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Total de pacientes interessados em cada procedimento</CardDescription>
           </CardHeader>
           <CardContent className="p-3 sm:p-4 lg:p-6">
             <ServicesChart data={metrics?.servicesInterest} />
@@ -264,7 +399,8 @@ const Dashboard = () => {
 
         <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
           <CardHeader className="p-3 sm:p-4 lg:p-6">
-            <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Taxa de Conversão por Etapa</CardTitle>
+            <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Conversão Entre Etapas do Funil</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Percentual de conversão de uma etapa para a próxima</CardDescription>
           </CardHeader>
           <CardContent className="p-3 sm:p-4 lg:p-6">
             <ConversionChart data={metrics?.conversionByStage} />
@@ -307,6 +443,7 @@ const Dashboard = () => {
 const VendedorDashboard = () => {
   const navigate = useNavigate();
   const { data: metrics, isLoading } = useDashboardMetrics();
+  const { data: enhancedMetrics } = useEnhancedDashboardMetrics();
 
   if (isLoading) {
     return (
@@ -319,57 +456,91 @@ const VendedorDashboard = () => {
   return (
     <div className="min-h-screen space-y-4 sm:space-y-6 lg:space-y-8 bg-background font-sans px-3 sm:px-4 lg:px-6">
 
-      {/* Métricas do Vendedor - MELHORAR com MetricCard colorido */}
+      {/* Métricas Principais do Vendedor */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6 animate-fade-in">
         <MetricCard
-          title="Meu Pipeline"
+          title="Pipeline Ativo"
           value={`${metrics?.activeDeals || 0} negócios`}
           variant="red"
           icon={Target}
-          trend={{ value: 0, label: "ativos" }}
+          trend={{
+            value: formatCurrency(metrics?.totalPipelineValue || 0),
+            label: "valor total em pipeline"
+          }}
         />
         <MetricCard
-          title="Negócios Fechados"
+          title="Contratos Fechados"
           value={metrics?.wonDeals || 0}
           variant="green"
           icon={TrendingUp}
-          trend={{ value: 0, label: "este mês" }}
+          trend={{
+            value: formatCurrency(metrics?.totalClosedValue || 0),
+            label: "valor total fechado"
+          }}
         />
         <MetricCard
           title="Taxa de Conversão"
-          value={`${(metrics?.conversionRate ?? 0).toFixed(2)}%`}
+          value={`${(metrics?.conversionRate ?? 0).toFixed(1)}%`}
           variant="cyan"
           icon={BarChart3}
-          trend={{ value: 0, label: "desempenho" }}
+          trend={{ value: 0, label: "de leads para fechamento" }}
         />
       </div>
 
-      {/* Pipeline por Etapa - MELHORAR com MetricCard colorido */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6 animate-fade-in animation-delay-200">
-        <MetricCard
-          title="Meus Contatos"
-          value={metrics?.totalContacts || 0}
-          variant="yellow"
-          icon={Users}
-        />
-        <MetricCard
-          title="Lead Novo"
-          value={metrics?.dealsByStage.lead_novo?.count || 0}
-          variant="red"
-          icon={Users}
-        />
-        <MetricCard
-          title="Qualificado"
-          value={metrics?.dealsByStage.qualificado?.count || 0}
-          variant="cyan"
-          icon={Target}
-        />
-        <MetricCard
-          title="Apresentação"
-          value={metrics?.dealsByStage.apresentacao?.count || 0}
-          variant="yellow"
-          icon={BarChart3}
-        />
+      {/* Métricas de Performance */}
+      {enhancedMetrics && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6 animate-fade-in animation-delay-100">
+          <MetricCard
+            title="Ticket Médio"
+            value={formatCurrency(enhancedMetrics.averageDealValue || 0)}
+            variant="purple"
+            icon={Coins}
+            trend={{ value: 0, label: "valor médio por negócio" }}
+          />
+          <MetricCard
+            title="Tempo Médio no Pipeline"
+            value={`${Math.round(enhancedMetrics.averagePipelineTime || 0)} dias`}
+            variant="cyan"
+            icon={RefreshCw}
+            trend={{ value: 0, label: "da criação ao fechamento" }}
+          />
+          <MetricCard
+            title="Follow-ups Pendentes"
+            value={enhancedMetrics.pendingFollowUps || 0}
+            variant="yellow"
+            icon={Bell}
+            trend={{ value: 0, label: "ações necessárias" }}
+          />
+        </div>
+      )}
+
+      {/* Pipeline por Etapa */}
+      <PipelineFunnelCard
+        dealsByStage={metrics?.dealsByStage || {}}
+        formatCurrency={formatCurrency}
+      />
+
+      {/* Gráficos de Performance */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
+        <Card className="bg-card rounded-2xl border border-border">
+          <CardHeader className="p-3 sm:p-4 lg:p-6">
+            <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Meus Leads por Mês</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Evolução dos meus contatos cadastrados</CardDescription>
+          </CardHeader>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <LeadsChart data={metrics?.monthlyLeads} />
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
+          <CardHeader className="p-3 sm:p-4 lg:p-6">
+            <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Conversão Entre Etapas</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Minha taxa de conversão por etapa do funil</CardDescription>
+          </CardHeader>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <ConversionChart data={metrics?.conversionByStage} />
+          </CardContent>
+        </Card>
       </div>
 
       {/* Minhas Tarefas e Compromissos */}

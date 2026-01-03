@@ -28,13 +28,13 @@ export function useBottleneckMetrics() {
         if (conversionRate < 10) {
           bottlenecks.push({
             id: "low-conversion",
-            title: "Taxa de Conversão Baixa",
+            title: "Taxa de Conversão Abaixo da Meta",
             severity: conversionRate < 5 ? "high" : "medium",
-            metric: "Taxa de Conversão",
+            metric: "Taxa de Conversão Atual",
             currentValue: `${conversionRate.toFixed(1)}%`,
-            threshold: "10%",
-            impact: `Apenas ${conversionRate.toFixed(1)}% dos leads estão sendo convertidos em vendas.`,
-            suggestion: "Revise o processo de qualificação de leads e melhore o acompanhamento pós-contato.",
+            threshold: "Meta: 10%",
+            impact: `Apenas ${conversionRate.toFixed(1)}% dos leads estão sendo convertidos em contratos fechados.`,
+            suggestion: "Revise o processo de qualificação e melhore o acompanhamento dos leads.",
           });
         }
 

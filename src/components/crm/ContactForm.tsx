@@ -62,13 +62,12 @@ const contactSchema = z.object({
     .refine(
       (val) => {
         const numValue = parseCurrencyToNumber(val);
-        return numValue > 0;
+        return numValue !== null && numValue > 0;
       },
       {
         message: "Valor da consulta deve ser maior que zero",
       }
-    )
-    .transform((val) => parseCurrencyToNumber(val)),
+    ),
   tags: z.array(z.string()).default([]),
   create_deal: z.boolean().default(true),
 });
@@ -222,20 +221,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
         return;
       }
 
-      // Validação: verificar se service_value está preenchido e válido
-      const serviceValueNum = parseCurrencyToNumber(data.service_value || "");
-      if (!contact && (!data.service_value || serviceValueNum <= 0)) {
-        toast({
-          variant: "destructive",
-          title: "Valor da consulta obrigatório",
-          description: "Por favor, preencha o valor estimado da 1ª consulta.",
-        });
-        form.setError("service_value", {
-          type: "manual",
-          message: "Valor da consulta é obrigatório",
-        });
-        return;
-      }
+      // Validação já é feita pelo schema Zod, não precisa duplicar aqui
 
       // Para novos contatos, sempre criar deal
       const create_deal = !contact ? true : data.create_deal;
@@ -243,7 +229,8 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
       
       // Buscar o procedimento selecionado para obter o valor
       const selectedProcedure = procedures?.find(p => p.id === contactData.service);
-      const serviceValue = contactData.service_value || (selectedProcedure ? Number(selectedProcedure.price) : null);
+      const parsedServiceValue = contactData.service_value ? parseCurrencyToNumber(contactData.service_value) : null;
+      const serviceValue = parsedServiceValue || (selectedProcedure ? Number(selectedProcedure.price) : null);
       
       // Preparar custom_fields com procedure_id se houver procedimento selecionado
       console.log('🔍 ContactForm - Preparando custom_fields:', {

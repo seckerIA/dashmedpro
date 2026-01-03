@@ -81,23 +81,24 @@ function SortableDealCard({
   };
 
   return (
-    <div 
-      ref={setNodeRef} 
+    <div
+      ref={setNodeRef}
       style={{
         ...style,
         width: '100%',
         maxWidth: '100%',
         boxSizing: 'border-box',
-        overflow: 'hidden',
+        overflow: 'visible',
         touchAction: 'none', // Melhor suporte mobile para drag
         margin: 0,
         position: 'relative',
-      }} 
+        padding: '2px',
+      }}
       {...attributes}
       {...listeners}
     >
-      <AnimatedDealCard 
-        deal={deal} 
+      <AnimatedDealCard
+        deal={deal}
         onClick={onClick}
         onEdit={onEdit}
         onDelete={onDelete}
@@ -383,10 +384,10 @@ export function PipelineBoard({
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className="p-2 pt-0" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
+            <CardContent className="p-2 pt-0" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'visible' }}>
               <ScrollArea className="h-[calc(100vh-300px)] w-full" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
                 <SortableContext items={stageDeals.map(deal => deal.id)} strategy={verticalListSortingStrategy}>
-                  <div className="space-y-2 w-full" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
+                  <div className="space-y-3 w-full px-1" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'visible' }}>
                     {stageDeals.map((deal) => (
                       <SortableDealCard
                         key={`${deal.id}-${deal.contact?.service_value || 0}-${deal.contact?.updated_at || ''}`}

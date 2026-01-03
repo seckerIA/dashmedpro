@@ -71,13 +71,13 @@ export function SalesChart({ data, title, className }: SalesChartProps) {
                       </p>
                       {payload.map((entry, index) => (
                         <div key={index} className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
-                          <div 
-                            className="w-2 h-2 sm:w-3 sm:h-3 rounded-full" 
+                          <div
+                            className="w-2 h-2 sm:w-3 sm:h-3 rounded-full"
                             style={{ backgroundColor: entry.color }}
                           />
                           <span className="text-muted-foreground">{entry.name}:</span>
                           <span className="font-semibold text-foreground">
-                            ${entry.value}k
+                            R$ {(Number(entry.value) * 1000).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </span>
                         </div>
                       ))}

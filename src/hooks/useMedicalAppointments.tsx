@@ -639,6 +639,8 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
       // Invalidar queries do CRM/pipeline para refletir mudanças
       queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
       queryClient.invalidateQueries({ queryKey: ['crm-pipeline'] });
+      // Invalidar métricas de sinais para secretárias
+      queryClient.invalidateQueries({ queryKey: ['secretary-sinal-metrics'] });
     },
   });
 

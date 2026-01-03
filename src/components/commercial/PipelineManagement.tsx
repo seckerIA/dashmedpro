@@ -164,22 +164,12 @@ export function PipelineManagement() {
   };
 
   const handleToggleFollowUp = async (dealId: string, needsFollowUp: boolean) => {
-    try {
-      await updateDeal({
-        dealId,
-        data: { needs_follow_up: needsFollowUp } as any
-      });
-      toast({
-        title: "Status de Follow-up Atualizado",
-        description: `O contato foi ${needsFollowUp ? 'marcado para' : 'removido do'} acompanhamento.`,
-      });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Erro",
-        description: "Não foi possível atualizar o status de follow-up.",
-      });
-    }
+    // Função removida - o sistema de follow-up agora usa a tabela crm_follow_ups
+    // através do componente FollowUpScheduleModal
+    toast({
+      title: "Use o botão 'Agendar Follow-up'",
+      description: "Para configurar um follow-up, use o botão específico que abrirá o modal de agendamento.",
+    });
   };
 
   const handleCompleteFollowUp = async (followUpId: string) => {

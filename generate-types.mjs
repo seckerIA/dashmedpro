@@ -1,4 +1,36 @@
-export type Json =
+import pg from 'pg';
+import fs from 'fs';
+const { Client } = pg;
+
+const DB_PASSWORD = "Dashmedpro2026@";
+const connectionString = `postgresql://postgres:${encodeURIComponent(DB_PASSWORD)}@db.adzaqkduxnpckbcuqpmg.supabase.co:5432/postgres`;
+
+async function generateTypes() {
+  const client = new Client({
+    connectionString,
+    ssl: { rejectUnauthorized: false }
+  });
+
+  try {
+    await client.connect();
+    console.log('Conectado ao banco!\n');
+
+    // Buscar valores do enum crm_pipeline_stage
+    const pipelineStages = await client.query(`
+      SELECT enumlabel
+      FROM pg_enum
+      WHERE enumtypid = 'crm_pipeline_stage'::regtype
+      ORDER BY enumsortorder
+    `);
+
+    const stages = pipelineStages.rows.map(r => `'${r.enumlabel}'`).join(' | ');
+
+    console.log('Pipeline stages encontrados:');
+    console.log(stages);
+    console.log('');
+
+    // Gerar conteúdo do arquivo types.ts
+    const typesContent = `export type Json =
   | string
   | number
   | boolean
@@ -188,8 +220,23 @@ export interface Database {
       }
     }
     Enums: {
-      crm_pipeline_stage: 'lead_novo' | 'qualificado' | 'apresentacao' | 'proposta' | 'negociacao' | 'fechado_ganho' | 'fechado_perdido' | 'agendado' | 'em_tratamento' | 'inadimplente' | 'follow_up' | 'aguardando_retorno'
+      crm_pipeline_stage: ${stages}
       crm_activity_type: 'call' | 'email' | 'meeting' | 'task' | 'note' | 'whatsapp'
     }
   }
 }
+`;
+
+    // Escrever no arquivo
+    fs.writeFileSync('src/integrations/supabase/types.ts', typesContent);
+    console.log('✅ Arquivo types.ts gerado com sucesso!');
+    console.log('Localização: src/integrations/supabase/types.ts');
+
+  } catch (error) {
+    console.error('❌ Erro:', error.message);
+  } finally {
+    await client.end();
+  }
+}
+
+generateTypes();

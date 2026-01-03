@@ -27,7 +27,7 @@ export function StatsPanel({
       <div className="bg-card rounded-2xl p-3 sm:p-4 lg:p-6 border border-border">
         <div className="flex items-center justify-between mb-2 sm:mb-3 lg:mb-4">
           <h3 className="text-xs sm:text-sm font-semibold text-foreground">
-            Distribuição de Vendas
+            Distribuição por Procedimento
           </h3>
           <div className="flex items-center gap-1 sm:gap-2">
             <div className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-green-500 animate-pulse" />
@@ -88,41 +88,6 @@ export function StatsPanel({
               </div>
             </div>
           ))}
-        </div>
-      </div>
-
-      {/* Online/Offline Visitors */}
-      <div className="bg-card rounded-2xl p-3 sm:p-4 lg:p-6 border border-border space-y-2 sm:space-y-3 lg:space-y-4">
-        <h3 className="text-xs sm:text-sm font-semibold text-foreground mb-2 sm:mb-3 lg:mb-4">
-          Visitantes
-        </h3>
-
-        {/* Online */}
-        <div>
-          <div className="flex items-center justify-between mb-1 sm:mb-2">
-            <span className="text-xs sm:text-sm text-muted-foreground">Online</span>
-            <span className="text-xs sm:text-sm font-semibold text-foreground">20k</span>
-          </div>
-          <div className="h-1.5 sm:h-2 bg-muted/20 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full transition-all duration-500"
-              style={{ width: '75%' }}
-            />
-          </div>
-        </div>
-
-        {/* Offline */}
-        <div>
-          <div className="flex items-center justify-between mb-1 sm:mb-2">
-            <span className="text-xs sm:text-sm text-muted-foreground">Offline</span>
-            <span className="text-xs sm:text-sm font-semibold text-foreground">7k</span>
-          </div>
-          <div className="h-1.5 sm:h-2 bg-muted/20 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-gradient-to-r from-gray-500 to-gray-400 rounded-full transition-all duration-500"
-              style={{ width: '35%' }}
-            />
-          </div>
         </div>
       </div>
     </div>

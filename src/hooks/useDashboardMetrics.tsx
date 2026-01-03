@@ -174,17 +174,32 @@ const fetchDashboardMetrics = async (
     });
   }
 
-  // Calcular interesse por serviços
+  // Calcular interesse por serviços - com labels traduzidos
   const servicesInterest: Array<{ service: string; count: number }> = [];
   const serviceCounts: Record<string, number> = {};
-  
+
+  // Mapeamento de nomes técnicos para labels amigáveis
+  const serviceLabels: Record<string, string> = {
+    'procedure': 'Procedimentos',
+    'first_visit': 'Primeira Consulta',
+    'return': 'Retorno',
+    'gestao_trafego': 'Gestão de Tráfego',
+    'branding_completo': 'Branding Completo',
+    'desenvolvimento_web': 'Desenvolvimento Web',
+    'social_media': 'Social Media',
+    'consultoria_seo': 'Consultoria SEO',
+    'branding_midia': 'Branding e Mídia',
+    'automacao_ia': 'Automação IA'
+  };
+
   contactsData.forEach(contact => {
     const contactService = getContactService(contact);
     if (contactService) {
-      serviceCounts[contactService] = (serviceCounts[contactService] || 0) + 1;
+      const label = serviceLabels[contactService] || contactService;
+      serviceCounts[label] = (serviceCounts[label] || 0) + 1;
     }
   });
-  
+
   Object.entries(serviceCounts).forEach(([service, count]) => {
     servicesInterest.push({ service, count });
   });
