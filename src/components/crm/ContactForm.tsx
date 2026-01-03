@@ -595,10 +595,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      <Phone className="w-4 h-4 text-blue-500" />
-                      Telefone
-                    </FormLabel>
+                    <FormLabel>Telefone</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="(11) 99999-8888"
@@ -608,7 +605,6 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
                           const formatted = formatPhoneInput(e.target.value);
                           field.onChange(formatted);
                         }}
-                        className="border-blue-200 focus:border-blue-500"
                       />
                     </FormControl>
                     <FormMessage />
