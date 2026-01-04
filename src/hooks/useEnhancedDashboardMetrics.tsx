@@ -38,107 +38,111 @@ const fetchEnhancedMetrics = async (
   signal?: AbortSignal,
   doctorIds?: string[]
 ): Promise<EnhancedMetrics> => {
-  // Buscar deals
-  let dealsQuery = supabase
-    .from('crm_deals')
-    .select('*');
+  // IDs para filtro
+  const targetIds = (doctorIds && doctorIds.length > 0) ? doctorIds : [userId];
+  const idsString = `(${targetIds.join(',')})`;
 
-  if (!isAdminOrDono) {
-    if (doctorIds && doctorIds.length > 0) {
-      const orConditions = doctorIds
-        .map(id => `user_id.eq.${id},assigned_to.eq.${id}`)
-        .join(',');
-      dealsQuery = dealsQuery.or(orConditions);
-    } else {
-      dealsQuery = dealsQuery.or(`user_id.eq.${userId},assigned_to.eq.${userId}`);
+  // 1. Buscar deals com tratamento defensivo
+  let dealsData: any[] = [];
+  try {
+    // Removido 'service' e 'service_value' do select pois estão causando erro 400
+    const dealsQuery = supabase
+      .from('crm_deals')
+      .select('*, contact:crm_contacts(id, full_name, email, phone)');
+
+    let filteredDealsQuery = dealsQuery;
+
+    if (!isAdminOrDono) {
+      const orCondition = `user_id.in.${idsString},assigned_to.in.${idsString}`;
+      filteredDealsQuery = (dealsQuery as any).or(orCondition);
     }
+
+    const dealsResult = await supabaseQueryWithTimeout(filteredDealsQuery as any, 30000, signal);
+    dealsData = (dealsResult.data || []) as any[];
+  } catch (err) {
+    console.error('⚠️ Erro ao buscar deals no dashboard:', err);
+    const fallbackQuery = supabase.from('crm_deals').select('*');
+    if (!isAdminOrDono) (fallbackQuery as any).or(`user_id.in.${idsString},assigned_to.in.${idsString}`);
+    const fallbackResult = await supabaseQueryWithTimeout(fallbackQuery as any, 30000, signal);
+    dealsData = (fallbackResult.data || []) as any[];
   }
 
-  const dealsResult = await supabaseQueryWithTimeout(dealsQuery as any, 30000, signal);
-  const { data: deals } = dealsResult;
-  const dealsData = deals || [];
-
   // Calcular valor médio de negócio
-  const totalDealsValue = dealsData.reduce((sum, deal) => {
+  const totalDealsValue = dealsData.reduce((sum: number, deal: any) => {
     const value = typeof deal.value === 'string' ? parseFloat(deal.value) : deal.value;
     return sum + (value || 0);
   }, 0);
   const averageDealValue = dealsData.length > 0 ? totalDealsValue / dealsData.length : 0;
 
   // Calcular tempo médio no pipeline
-  const closedDeals = dealsData.filter(d => d.stage === 'fechado_ganho' || d.stage === 'fechado_perdido');
+  const closedDeals = dealsData.filter((d: any) => d.stage === 'fechado_ganho' || d.stage === 'fechado_perdido');
   const pipelineTimes = closedDeals
-    .filter(d => d.created_at && d.updated_at)
-    .map(d => {
+    .filter((d: any) => d.created_at && d.updated_at)
+    .map((d: any) => {
       const created = new Date(d.created_at);
       const updated = new Date(d.updated_at);
       return Math.floor((updated.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
     });
   const averagePipelineTime = pipelineTimes.length > 0
-    ? pipelineTimes.reduce((sum, time) => sum + time, 0) / pipelineTimes.length
+    ? pipelineTimes.reduce((sum: number, time: number) => sum + time, 0) / pipelineTimes.length
     : 0;
 
   // Taxa de inadimplência
-  const defaultingDeals = dealsData.filter(d => d.is_defaulting === true).length;
-  const activeDeals = dealsData.filter(d => !d.stage.includes('fechado')).length;
+  const defaultingDeals = dealsData.filter((d: any) => d.is_defaulting === true || d.stage === 'inadimplente').length;
+  const activeDeals = dealsData.filter((d: any) => !d.stage.includes('fechado')).length;
   const defaultRate = activeDeals > 0 ? (defaultingDeals / activeDeals) * 100 : 0;
 
   // Pacientes em tratamento ativo
-  const activeTreatments = dealsData.filter(d => d.is_in_treatment === true).length;
+  const activeTreatments = dealsData.filter((d: any) => d.is_in_treatment === true || d.stage === 'em_tratamento').length;
 
-  // Follow-ups pendentes
-  let followUpsQuery = supabase
-    .from('crm_activities')
-    .select('id')
-    .eq('completed', false)
-    .eq('type', 'call');
+  // 2. Follow-ups pendentes (Ajustado para usar somente 'activity_type' que é o correto no banco)
+  let pendingFollowUps = 0;
+  try {
+    const followUpsQuery = supabase
+      .from('crm_activities')
+      .select('id')
+      .eq('completed', false)
+      .eq('activity_type' as any, 'call');
 
-  if (!isAdminOrDono) {
-    if (doctorIds && doctorIds.length > 0) {
-      followUpsQuery = followUpsQuery.in('user_id', doctorIds);
-    } else {
-      followUpsQuery = followUpsQuery.eq('user_id', userId);
+    if (!isAdminOrDono) {
+      (followUpsQuery as any).in('user_id', targetIds);
     }
+
+    const followUpsResult = await supabaseQueryWithTimeout(followUpsQuery as any, 30000, signal);
+    pendingFollowUps = ((followUpsResult.data || []) as any[]).length;
+  } catch (err) {
+    console.error('⚠️ Erro ao buscar follow-ups:', err);
   }
 
-  const followUpsResult = await supabaseQueryWithTimeout(followUpsQuery as any, 30000, signal);
-  const { data: followUps } = followUpsResult;
-  const pendingFollowUps = (followUps || []).length;
-
-  // Consultas do mês
+  // 3. Consultas do mês
   const currentMonth = new Date();
   currentMonth.setDate(1);
   currentMonth.setHours(0, 0, 0, 0);
 
-  let appointmentsQuery = supabase
+  const appointmentsQuery = supabase
     .from('medical_appointments')
     .select('id, status')
     .gte('start_time', currentMonth.toISOString());
 
   if (!isAdminOrDono) {
-    if (doctorIds && doctorIds.length > 0) {
-      appointmentsQuery = appointmentsQuery.in('doctor_id', doctorIds);
-    } else {
-      appointmentsQuery = appointmentsQuery.eq('doctor_id', userId);
-    }
+    (appointmentsQuery as any).in('doctor_id', targetIds);
   }
 
   const appointmentsResult = await supabaseQueryWithTimeout(appointmentsQuery as any, 30000, signal);
-  const { data: appointments } = appointmentsResult;
-  const appointmentsData = appointments || [];
+  const appointmentsData = (appointmentsResult.data || []) as any[];
 
   const appointmentsThisMonth = appointmentsData.length;
-  const completedAppointmentsThisMonth = appointmentsData.filter(a => a.status === 'completed').length;
+  const completedAppointmentsThisMonth = appointmentsData.filter((a: any) => a.status === 'completed').length;
   const appointmentCompletionRate = appointmentsThisMonth > 0
     ? (completedAppointmentsThisMonth / appointmentsThisMonth) * 100
     : 0;
 
-  // Ticket médio por procedimento
+  // Ticket médio por procedimento (usando title ou service provider se service falhar)
   const procedureTickets: Record<string, { total: number; count: number }> = {};
 
-  dealsData.forEach(deal => {
-    if (deal.stage === 'fechado_ganho' && deal.value && deal.contact?.service) {
-      const service = deal.contact.service;
+  dealsData.forEach((deal: any) => {
+    if ((deal.stage === 'fechado_ganho' || deal.stage === 'agendado') && deal.value) {
+      const service = deal.service || deal.title || 'Outros';
       const value = typeof deal.value === 'string' ? parseFloat(deal.value) : deal.value;
 
       if (!procedureTickets[service]) {
@@ -156,7 +160,7 @@ const fetchEnhancedMetrics = async (
     count: data.count
   })).sort((a, b) => b.avgTicket - a.avgTicket);
 
-  // Evolução de pacientes em tratamento (últimos 12 meses)
+  // Evolução de pacientes (últimos 12 meses)
   const treatmentEvolution: TreatmentEvolutionData[] = [];
   const currentDate = new Date();
 
@@ -166,39 +170,33 @@ const fetchEnhancedMetrics = async (
     const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
     const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
 
-    const monthDeals = dealsData.filter(deal => {
+    const monthDeals = dealsData.filter((deal: any) => {
       const dealDate = new Date(deal.updated_at);
       return dealDate >= monthStart && dealDate <= monthEnd;
     });
 
     treatmentEvolution.push({
       month: monthName,
-      emTratamento: monthDeals.filter(d => d.is_in_treatment === true).length,
-      inadimplentes: monthDeals.filter(d => d.is_defaulting === true).length,
-      agendados: monthDeals.filter(d => d.stage === 'agendado').length
+      emTratamento: monthDeals.filter((d: any) => d.is_in_treatment === true || d.stage === 'em_tratamento').length,
+      inadimplentes: monthDeals.filter((d: any) => d.is_defaulting === true || d.stage === 'inadimplente').length,
+      agendados: monthDeals.filter((d: any) => d.stage === 'agendado').length
     });
   }
 
-  // Receita vs Despesas (últimos 12 meses) - buscar dados financeiros
+  // 4. Receita vs Despesas
   const receitaDespesas: ReceitaDespesasData[] = [];
 
   try {
-    // Buscar transações financeiras
-    let transactionsQuery = supabase
-      .from('financial_transactions')
-      .select('amount, type, transaction_date');
+    const transactionsQuery = supabase
+      .from('financial_transactions' as any)
+      .select('amount, type, status, transaction_date');
 
     if (!isAdminOrDono) {
-      if (doctorIds && doctorIds.length > 0) {
-        transactionsQuery = transactionsQuery.in('user_id', doctorIds);
-      } else {
-        transactionsQuery = transactionsQuery.eq('user_id', userId);
-      }
+      (transactionsQuery as any).in('user_id', targetIds);
     }
 
     const transactionsResult = await supabaseQueryWithTimeout(transactionsQuery as any, 30000, signal);
-    const { data: transactions } = transactionsResult;
-    const transactionsData = transactions || [];
+    const transactionsData = (transactionsResult.data || []) as any[];
 
     for (let i = 11; i >= 0; i--) {
       const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
@@ -206,18 +204,18 @@ const fetchEnhancedMetrics = async (
       const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
       const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
 
-      const monthTransactions = transactionsData.filter(t => {
-        const tDate = new Date(t.transaction_date);
+      const monthTransactions = transactionsData.filter((t: any) => {
+        const tDate = new Date(t.transaction_date || t.created_at);
         return tDate >= monthStart && tDate <= monthEnd;
       });
 
       const receita = monthTransactions
-        .filter(t => t.type === 'receita')
-        .reduce((sum, t) => sum + (typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount), 0);
+        .filter((t: any) => (t.type === 'entrada' || t.type === 'receita') && t.status !== 'cancelada')
+        .reduce((sum: number, t: any) => sum + (typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount), 0);
 
       const despesas = monthTransactions
-        .filter(t => t.type === 'despesa')
-        .reduce((sum, t) => sum + (typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount), 0);
+        .filter((t: any) => (t.type === 'saida' || t.type === 'despesa') && t.status !== 'cancelada')
+        .reduce((sum: number, t: any) => sum + (typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount), 0);
 
       receitaDespesas.push({
         month: monthName,
@@ -226,8 +224,7 @@ const fetchEnhancedMetrics = async (
       });
     }
   } catch (error) {
-    console.error('Erro ao buscar dados financeiros:', error);
-    // Se falhar, retornar array vazio
+    console.error('⚠️ Erro ao buscar dados financeiros no dashboard:', error);
   }
 
   return {
@@ -263,12 +260,11 @@ export function useEnhancedDashboardMetrics() {
         user.id,
         isAdminOrDono,
         signal,
-        doctorIdsToUse.length > 0 ? doctorIdsToUse : undefined
+        doctorIdsToUse
       );
     },
     enabled: !!user?.id && !!profile && !authLoading && !isLoadingProfile && (!isSecretaria || !isLoadingDoctors),
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 2 * 60 * 1000,
     retry: 1,
   });
 }

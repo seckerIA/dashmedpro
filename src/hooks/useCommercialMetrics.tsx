@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { useAuth } from "./useAuth";
 import { useUserProfile } from "./useUserProfile";
 import { useSecretaryDoctors } from "./useSecretaryDoctors";
@@ -83,10 +84,22 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
   const period = getPeriodRange(filter, customRange);
   const previousPeriod = getPreviousPeriod(period);
 
-  const targetUserIds = user?.id ? (isSecretaria && doctorIds.length > 0 ? [user.id, ...doctorIds] : [user.id]) : [];
+  const targetUserIds = useMemo(() => {
+    if (!user?.id) return [];
+    return isSecretaria && doctorIds.length > 0
+      ? [user.id, ...doctorIds]
+      : [user.id];
+  }, [user?.id, isSecretaria, doctorIds]);
 
   const queryResult = useQuery({
-    queryKey: ["commercial-metrics", user?.id, filter, period.start.toISOString(), period.end.toISOString(), targetUserIds],
+    queryKey: [
+      "commercial-metrics",
+      user?.id,
+      filter,
+      period.start.toDateString(),
+      period.end.toDateString(),
+      targetUserIds
+    ],
     queryFn: async ({ signal }): Promise<CommercialMetrics> => {
       if (!user) throw new Error("User not authenticated");
 
@@ -116,10 +129,15 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .gte("start_time", periodStartISO)
         .lte("start_time", periodEndISO);
 
-      const appointmentsResult = await supabaseQueryWithTimeout(appointmentsQuery as any, 60000, signal);
+      console.log('📡 [useCommercialMetrics] Buscando appointments...');
+      const appointmentsResult = await supabaseQueryWithTimeout(appointmentsQuery as any, 90000, signal);
       const { data: appointments, error: appointmentsError } = appointmentsResult as { data: any[], error: any };
 
-      if (appointmentsError) throw appointmentsError;
+      if (appointmentsError) {
+        console.error('❌ [useCommercialMetrics] Erro appointments:', appointmentsError);
+        throw appointmentsError;
+      }
+      console.log(`✅ [useCommercialMetrics] ${appointments?.length || 0} appointments encontrados.`);
 
       // Preparar IDs de transações para busca paralela
       const transactionIds = appointments
@@ -128,7 +146,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
 
       // 2. Buscar transações financeiras do período
       const transactionsQuery = supabase
-        .from("financial_transactions" as any)
+        .from("financial_transactions")
         .select(`
           id,
           amount,
@@ -146,10 +164,15 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .gte("transaction_date", format(period.start, "yyyy-MM-dd"))
         .lte("transaction_date", format(period.end, "yyyy-MM-dd"));
 
-      const transactionsResult = await supabaseQueryWithTimeout(transactionsQuery as any, 60000, signal);
+      console.log('📡 [useCommercialMetrics] Buscando transactions...');
+      const transactionsResult = await supabaseQueryWithTimeout(transactionsQuery as any, 90000, signal);
       const { data: transactions, error: transactionsError } = transactionsResult as { data: any[], error: any };
 
-      if (transactionsError) throw transactionsError;
+      if (transactionsError) {
+        console.error('❌ [useCommercialMetrics] Erro transactions:', transactionsError);
+        throw transactionsError;
+      }
+      console.log(`✅ [useCommercialMetrics] ${transactions?.length || 0} transactions encontradas.`);
 
       // Atualizar transactionIds com as transações encontradas
       const allTransactionIds = transactions?.map(t => t.id) || [];
@@ -172,7 +195,6 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
           )
           : Promise.resolve({ data: [], error: null }),
 
-        // 4. Buscar leads comerciais
         supabaseQueryWithTimeout(
           supabase
             .from("commercial_leads")
@@ -195,9 +217,9 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         ),
       ]);
 
-      const { data: costs, error: costsError } = costsResult;
-      const { data: leads, error: leadsError } = leadsResult;
-      const { data: campaigns, error: campaignsError } = campaignsResult;
+      const { data: costs, error: costsError } = costsResult as { data: any[], error: any };
+      const { data: leads, error: leadsError } = leadsResult as { data: any[], error: any };
+      const { data: campaigns, error: campaignsError } = campaignsResult as { data: any[], error: any };
 
       if (costsError) throw costsError;
       if (leadsError) {
@@ -386,9 +408,9 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .lte("transaction_date", format(period.end, "yyyy-MM-dd"));
 
       const expensesResult = await supabaseQueryWithTimeout(expensesQuery as any, 60000, signal);
-      const { data: expenses } = expensesResult;
+      const { data: expenses } = expensesResult as { data: any[], error: any };
 
-      const totalExpenses = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+      const totalExpenses = (expenses as any[])?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
       const netMargin = totalRevenue > 0
         ? ((totalRevenue - totalCosts - totalExpenses) / totalRevenue) * 100
         : 0;
@@ -435,7 +457,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
           revenue: 0,
           costs: 0,
           appointments: 0,
-          name: (apt.contact as any)?.full_name || 'Desconhecido',
+          name: apt.contact?.full_name || 'Desconhecido',
         };
 
         patientRevenueMap.set(apt.contact_id, {
@@ -484,14 +506,10 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .eq("is_active", true);
 
       const proceduresResult = await supabaseQueryWithTimeout(proceduresQuery as any, 60000, signal);
-      const { data: procedures, error: proceduresError } = proceduresResult;
-
-      if (proceduresError) {
-        console.error('❌ Erro ao buscar procedimentos:', proceduresError);
-      }
+      const { data: procedures, error: proceduresError } = proceduresResult as { data: any[], error: any };
 
       // Contar procedimentos ativos no catálogo
-      const scheduledProcedures = procedures?.length || 0;
+      const scheduledProcedures = (procedures as any[])?.length || 0;
 
       console.log('📊 useCommercialMetrics - Métricas calculadas:', {
         totalLeads,
@@ -579,9 +597,9 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .lte("created_at", periodEndISO);
 
       const newContactsResult = await supabaseQueryWithTimeout(newContactsQuery as any, 60000, signal);
-      const { data: newContacts } = newContactsResult;
+      const { data: newContacts } = newContactsResult as { data: any[], error: any };
 
-      const newPatients = newContacts?.length || 0;
+      const newPatients = (newContacts as any[])?.length || 0;
 
       // Preparar dados do funil
       const funnelData = [
@@ -604,14 +622,12 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         const monthStart = startOfMonth(monthDate);
         const monthEnd = endOfMonth(monthDate);
 
-        const monthLeads = leads?.filter(l => {
-          const leadDate = parseISO(l.created_at);
-          return leadDate >= monthStart && leadDate <= monthEnd;
-        }).length || 0;
-
         leadsTrend.push({
           name: format(monthStart, 'MMM', { locale: ptBR }),
-          value: monthLeads,
+          value: (leads as any[])?.filter(l => {
+            const leadDate = parseISO(l.created_at);
+            return leadDate >= monthStart && leadDate <= monthEnd;
+          }).length || 0,
         });
       }
 
@@ -822,8 +838,8 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       }
     },
     enabled: !!user?.id && !loading, // Aguardar auth terminar de carregar
-    staleTime: 2 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 10 * 60 * 1000, // Aumentado para 10 minutos para evitar picos de recarregamento
+    gcTime: 15 * 60 * 1000,
     refetchOnWindowFocus: false,
     retry: 2,
   });

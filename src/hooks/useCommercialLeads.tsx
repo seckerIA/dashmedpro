@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { useAuth } from "./useAuth";
 import { useUserProfile } from "./useUserProfile";
 import { useSecretaryDoctors } from "./useSecretaryDoctors";
@@ -14,33 +15,35 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const targetUserIds = useMemo(() => {
+    if (!user?.id) return [];
+    return isSecretaria && doctorIds?.length > 0
+      ? [user.id, ...doctorIds]
+      : [user.id];
+  }, [user?.id, isSecretaria, doctorIds]);
+
   // Fetch leads
   const { data: leads, isLoading, error } = useQuery({
-    queryKey: ["commercial-leads", user?.id, filters, doctorIds],
+    queryKey: ["commercial-leads", user?.id, filters, targetUserIds],
     queryFn: async ({ signal }) => {
       if (!user) throw new Error("User not authenticated");
-
-      const targetUserIds = isSecretaria
-        ? [user.id, ...(doctorIds || [])]
-        : [user.id];
 
       console.log('🔍 useCommercialLeads - Fetching leads for:', {
         isSecretaria,
         targetUserIds,
-        userId: user.id,
-        doctorIdsCount: doctorIds?.length || 0
+        userId: user.id
       });
 
       let queryPromise;
 
-      if (isSecretaria && (doctorIds || []).length > 0) {
+      if (isSecretaria && (targetUserIds || []).length > 1) {
         queryPromise = supabase
           .from("commercial_leads" as any)
           .select(`
             *,
             doctor:profiles!commercial_leads_user_id_profiles_fk (full_name, email)
           `)
-          .in("user_id", [user.id, ...(doctorIds || [])])
+          .in("user_id", targetUserIds)
           .order("created_at", { ascending: false });
       } else {
         queryPromise = supabase
@@ -61,19 +64,38 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
         queryPromise = (queryPromise as any).eq("origin", filters.origin);
       }
 
-      const { data, error } = await supabaseQueryWithTimeout(queryPromise, 30000, signal);
+      let data, error;
+
+      try {
+        const result = await supabaseQueryWithTimeout(queryPromise as any, 90000, signal);
+        data = result.data;
+        error = result.error;
+      } catch (err: any) {
+        console.warn('⚠️ useCommercialLeads - Timeout ou erro na query principal, tentando fallback sem join...');
+
+        // Fallback sem o join com profiles para ser mais rápido
+        const fallbackQuery = supabase
+          .from("commercial_leads" as any)
+          .select("*")
+          .in("user_id", targetUserIds)
+          .order("created_at", { ascending: false });
+
+        const result = await supabaseQueryWithTimeout(fallbackQuery as any, 30000, signal);
+        data = result.data;
+        error = result.error;
+      }
 
       if (error) {
         console.error('❌ useCommercialLeads - Error:', error);
         throw error;
       }
 
-      console.log(`✅ useCommercialLeads - Found ${data?.length || 0} leads`);
+      console.log(`✅ useCommercialLeads - Found ${data?.length || 0} leads para IDs:`, targetUserIds);
       return data as CommercialLead[];
     },
     enabled: !!user && (!isSecretaria || !isLoadingDoctors),
-    staleTime: 2 * 60 * 1000,
-    gcTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
@@ -86,9 +108,9 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
     mutationFn: async (lead: CommercialLeadInsert) => {
       if (!user) throw new Error("User not authenticated");
 
-      const { data, error } = await supabase
-        .from("commercial_leads")
-        .insert({ ...lead, user_id: user.id })
+      const { data, error } = await (supabase
+        .from("commercial_leads" as any) as any)
+        .insert({ ...lead, user_id: user.id } as any)
         .select()
         .single();
 
@@ -115,9 +137,9 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
   // Update lead
   const updateLead = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: CommercialLeadUpdate }) => {
-      const { data, error } = await supabase
-        .from("commercial_leads")
-        .update(updates)
+      const { data, error } = await (supabase
+        .from("commercial_leads" as any) as any)
+        .update(updates as any)
         .eq("id", id)
         .select()
         .single();
@@ -172,13 +194,13 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
   // Convert lead to contact
   const convertLead = useMutation({
     mutationFn: async ({ leadId, contactId }: { leadId: string; contactId: string }) => {
-      const { data, error } = await supabase
-        .from("commercial_leads")
+      const { data, error } = await (supabase
+        .from("commercial_leads" as any) as any)
         .update({
           status: "converted",
           contact_id: contactId,
           converted_at: new Date().toISOString(),
-        })
+        } as any)
         .eq("id", leadId)
         .select()
         .single();

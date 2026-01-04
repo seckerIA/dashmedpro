@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient, QueryCache, MutationCache } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AppLayout } from "./components/layout/AppLayout";
@@ -45,68 +45,61 @@ import {
   Settings as SettingsIcon
 } from "lucide-react";
 
+// Configuração do QueryClient com tratamento global de timeouts e retries resilientes
 const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (error: any, query) => {
+      // Log global de erros de query
+      if (error?.message?.includes('timeout') || error?.message?.includes('Query timeout')) {
+        console.error(`❌ Query timeout: ${query.queryKey.join('/')}`);
+
+        // Se a query falhou múltiplas vezes, removemos do cache para evitar estados inconsistentes
+        const failureCount = (query.state as any).failureCount || 0;
+        if (failureCount >= 2) {
+          queryClient.removeQueries({ queryKey: query.queryKey });
+        }
+      }
+    },
+  }),
+  mutationCache: new MutationCache({
+    onError: (error: any) => {
+      if (error?.message?.includes('timeout') || error?.message?.includes('Query timeout')) {
+        console.error('❌ Mutation timeout:', error);
+      }
+    },
+  }),
   defaultOptions: {
     queries: {
       retry: (failureCount, error: any) => {
-        // Limitar número máximo de retries para evitar loops infinitos
-        if (failureCount >= 3) {
-          return false;
-        }
+        // Máximo de 2 tentativas (original + 1 retry) para evitar sobrecarga
+        if (failureCount >= 2) return false;
 
-        // Retry mais agressivo para erros de timeout (retry imediato)
+        // Se for timeout, tentamos apenas uma vez com delay longo
         if (error?.message?.includes('timeout') || error?.message?.includes('Query timeout')) {
-          return failureCount < 2; // Retry até 2 vezes para timeouts
+          return failureCount < 1;
         }
 
-        // Para outros erros, retry padrão
-        return failureCount < 2;
+        return failureCount < 1;
       },
-      retryDelay: (attemptIndex, error: any) => {
-        // Retry imediato para timeouts (não esperar delay exponencial)
-        if (error?.message?.includes('timeout') || error?.message?.includes('Query timeout')) {
-          return 500; // 500ms para timeouts (retry rápido)
-        }
-
-        // Delay padrão para outros erros
-        return Math.min(1000 * 2 ** attemptIndex, 5000); // 1s, 2s, max 5s
+      retryDelay: (attemptIndex) => {
+        // Backoff exponencial para dar tempo ao servidor/banco de se recuperar
+        return Math.min(1000 * 2 ** attemptIndex, 10000);
       },
-      staleTime: 2 * 60 * 1000, // 2 minutos
-      gcTime: 5 * 60 * 1000, // 5 minutos (anteriormente cacheTime)
-      refetchOnWindowFocus: false, // Evitar refetch automático ao focar na janela
-      refetchOnMount: false, // Evitar refetch automático ao montar
-      refetchOnReconnect: true, // Refetch ao reconectar
+      staleTime: 2 * 60 * 1000,
+      gcTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      refetchOnReconnect: true,
       networkMode: 'online',
-      // Invalidar cache de queries que falharam múltiplas vezes
-      onError: (error: any, query) => {
-        if (error?.message?.includes('timeout')) {
-          console.error(`❌ Query timeout: ${query.queryKey.join('/')}`);
-
-          // Se a query falhou múltiplas vezes, remover do cache
-          const state = query.state;
-          if (state.failureCount >= 3) {
-            queryClient.removeQueries({ queryKey: query.queryKey });
-          }
-        }
-      },
     },
     mutations: {
       retry: 1,
       retryDelay: 1000,
-      onError: (error: any) => {
-        // Log global de erros de mutação
-        if (error?.message?.includes('timeout')) {
-          console.error('❌ Mutation timeout:', error);
-        }
-      },
     },
   },
 });
 
 // Componente para detectar e cancelar queries travadas
-// REFATORADO: Agora renova a sessão ANTES de refazer queries (evita loop infinito)
-// Componente para detectar e cancelar queries travadas
-// CORRIGIDO: Timeout aumentado e lógica de refresh menos agressiva
 const StuckQueryDetector = () => {
   const queryClient = useQueryClient();
 
@@ -114,13 +107,11 @@ const StuckQueryDetector = () => {
     const fetchStartTimes = new Map<string, number>();
     let stuckCount = 0;
 
-    // Monitorar queries
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
       if (event?.type === 'updated') {
         const query = event.query;
         const state = query.state;
 
-        // Quando começa a buscar
         if (state.fetchStatus === 'fetching') {
           const queryKey = query.queryKey.join('/');
           if (!fetchStartTimes.has(queryKey)) {
@@ -128,12 +119,10 @@ const StuckQueryDetector = () => {
           }
         }
 
-        // Quando termina (sucesso, erro ou pausa)
         if (state.fetchStatus === 'idle' || state.fetchStatus === 'paused') {
           const queryKey = query.queryKey.join('/');
           fetchStartTimes.delete(queryKey);
 
-          // Se a query completou com sucesso, reseta contador de problemas
           if (state.status === 'success') {
             stuckCount = 0;
           }
@@ -141,7 +130,6 @@ const StuckQueryDetector = () => {
       }
     });
 
-    // Verificação periódica
     const checkInterval = setInterval(async () => {
       const queryCache = queryClient.getQueryCache();
       const allQueries = queryCache.getAll();
@@ -157,38 +145,28 @@ const StuckQueryDetector = () => {
 
           if (fetchStartTime) {
             const timeSinceStart = now - fetchStartTime;
-
-            // AUMENTADO: Timeout de 45s para 90s -> 100s para dar margem aos timeouts de 60s
-            // Deve ser maior que o timeout do cliente HTTP (60s) para evitar cancelar queries que estão apenas lentas
-            const stuckThreshold = 100000;
+            // Timeout de detecção aumentado para 180s (deve ser maior que o timeout de 60s/90s do fetch)
+            const stuckThreshold = 180000;
 
             if (timeSinceStart > stuckThreshold) {
               stuckQueries.push(query);
-              console.warn(`⚠️ Query considerada travada: ${queryKey} (${Math.round(timeSinceStart / 1000)}s)`);
-
-              // Apenas cancelar a query específica
+              const queryKeyStr = query.queryKey.join('/');
+              console.warn(`⚠️ [StuckQueryDetector] Cancelando query travada: ${queryKeyStr} (${Math.round(timeSinceStart / 1000)}s)`);
               queryClient.cancelQueries({ queryKey: query.queryKey });
-              fetchStartTimes.delete(queryKey);
+              fetchStartTimes.delete(queryKeyStr);
             }
           } else {
-            // Se estava fetching mas não tinha start time, marca agora
             fetchStartTimes.set(queryKey, now);
           }
         } else {
-          // Limpeza preventiva
           fetchStartTimes.delete(queryKey);
         }
       }
 
-      // Lógica de mitigação de problemas sistêmicos
       if (stuckQueries.length > 0) {
         stuckCount += stuckQueries.length;
-
-        // Se detecar MUITAS queries travando consecutivamente (>5), sugere problema de conexão/sessão
         if (stuckCount >= 5) {
           console.warn('⚠️ Múltiplas queries travando. Tentando recuperar estado...');
-
-          // Apenas invalidar queries, não forçar logout/refresh agressivo que causa loop de reload
           queryClient.cancelQueries();
           stuckCount = 0;
         }
@@ -211,7 +189,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">Carregando...</div>
+        <div className="text-center text-muted-foreground animate-pulse">Carregando...</div>
       </div>
     );
   }
@@ -223,7 +201,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Role Protected Route Component - verifica permissões baseadas em roles
+// Role Protected Route Component
 const RoleProtectedRoute = ({
   children,
   allowedRoles
@@ -237,7 +215,7 @@ const RoleProtectedRoute = ({
   if (authLoading || profileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">Verificando permissões...</div>
+        <div className="text-center text-muted-foreground animate-pulse">Verificando permissões...</div>
       </div>
     );
   }
@@ -246,7 +224,6 @@ const RoleProtectedRoute = ({
     return <Navigate to="/login" replace />;
   }
 
-  // Se o usuário não tem permissão, redireciona para o dashboard
   if (!profile || !allowedRoles.includes(profile.role)) {
     return <Navigate to="/" replace />;
   }
@@ -254,14 +231,13 @@ const RoleProtectedRoute = ({
   return <>{children}</>;
 };
 
-// App Routes Component
 const AppRoutes = () => {
   const { user, loading } = useAuth();
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">Carregando...</div>
+        <div className="text-center text-muted-foreground animate-pulse">Carregando aplicação...</div>
       </div>
     );
   }
@@ -425,7 +401,6 @@ const AppRoutes = () => {
           path="/configuracoes"
           element={<Settings />}
         />
-        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>
