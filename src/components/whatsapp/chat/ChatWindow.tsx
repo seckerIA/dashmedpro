@@ -83,12 +83,7 @@ export function ChatWindow({
 
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [showAISettings, setShowAISettings] = useState(false);
-
-  // Realtime subscription for this specific chat
-  useWhatsAppRealtime({
-    conversationId: conversation.id,
-    enabled: true,
-  });
+  const [isAIProcessing, setIsAIProcessing] = useState(false);
 
   // Messages
   const {
@@ -101,6 +96,41 @@ export function ChatWindow({
     sendMedia,
     isSending,
   } = useWhatsAppMessages({ conversationId: conversation.id });
+
+  // Lógica para detectar se a IA está processando (buffer de 45s)
+  useEffect(() => {
+    if (!messages || messages.length === 0 || !aiConfig?.auto_reply_enabled) {
+      setIsAIProcessing(false);
+      return;
+    }
+
+    // Assumindo que messages[0] é a mais recente (ordem decrescente do backend/hook)
+    // Se a mensagem for INBOUND (cliente), a IA pode estar processando
+    const latestMsg = messages[0];
+
+    if (latestMsg.direction !== 'inbound') {
+      setIsAIProcessing(false);
+      return;
+    }
+
+    const checkProcessing = () => {
+      const msgTime = new Date(latestMsg.created_at).getTime();
+      const now = Date.now();
+      const diff = (now - msgTime) / 1000;
+
+      // Se faz menos de 45s que a mensagem chegou, mostramos o indicador
+      if (diff < 45) {
+        setIsAIProcessing(true);
+      } else {
+        setIsAIProcessing(false);
+      }
+    };
+
+    checkProcessing(); // Check imediato
+    const interval = setInterval(checkProcessing, 1000); // Check a cada segundo
+
+    return () => clearInterval(interval);
+  }, [messages, aiConfig]);
 
   // Conversation actions
   const {
@@ -461,6 +491,16 @@ export function ChatWindow({
             onReply={handleReply}
           />
         </div>
+
+        {/* AI Typing Indicator */}
+        {isAIProcessing && (
+          <div className="px-4 py-2 bg-muted/30 border-t flex items-center gap-2 animate-in fade-in duration-300">
+            <Bot className="h-4 w-4 text-emerald-500 twitter-spin animate-pulse" />
+            <span className="text-xs text-muted-foreground font-medium animate-pulse">
+              IA está analisando para responder...
+            </span>
+          </div>
+        )}
 
         {/* AI Suggestions Inline (above input) */}
         {suggestions.length > 0 && (

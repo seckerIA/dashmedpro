@@ -18,7 +18,7 @@ export async function supabaseQueryWithTimeout<T>(
 ): Promise<SupabaseQueryResult<T>> {
 
   const queryDesc = (queryBuilder as any)?.url || 'Query';
-  console.log(`🔍 [TimeoutWrapper] Iniciando: ${queryDesc}`);
+  // console.log(`🔍 [TimeoutWrapper] Iniciando: ${queryDesc}`);
 
   if (signal?.aborted) {
     console.warn(`🛑 [TimeoutWrapper] Query abortada antes de começar: ${queryDesc}`);
@@ -41,7 +41,7 @@ export async function supabaseQueryWithTimeout<T>(
   // Listener para abort externo
   if (signal) {
     signal.addEventListener('abort', () => {
-      console.log(`🛑 [TimeoutWrapper] Abortado externamente: ${queryDesc}`);
+      // console.log(`🛑 [TimeoutWrapper] Abortado externamente: ${queryDesc}`);
       clearTimeout(timeoutId);
       timeoutController.abort();
     }, { once: true });
@@ -65,7 +65,7 @@ export async function supabaseQueryWithTimeout<T>(
     ]);
 
     clearTimeout(timeoutId);
-    console.log(`✨ [TimeoutWrapper] Finalizado com sucesso: ${queryDesc}`);
+    // console.log(`✨ [TimeoutWrapper] Finalizado com sucesso: ${queryDesc}`);
     return result as SupabaseQueryResult<T>;
 
   } catch (error: any) {

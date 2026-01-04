@@ -33,6 +33,20 @@ export function useWhatsAppRealtime(options: UseWhatsAppRealtimeOptions = {}) {
   const { user } = useAuth();
   const { doctorIds } = useSecretaryDoctors();
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Som de notificação (base64 para garantir que sempre funcione)
+  const playNotificationSound = useCallback(() => {
+    try {
+      if (!audioRef.current) {
+        audioRef.current = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleX98hYuAe3Z7gH1+gYSAe3t7fX9/fn9/gYGBgYGAgYGAgH9/f4CAgICAgICAgH+AgICAgICA');
+      }
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(err => console.debug('[Realtime] Audio play blocked:', err));
+    } catch (error) {
+      console.error('[Realtime] Error playing sound:', error);
+    }
+  }, []);
 
   // Refs para callbacks estáveis (evita reiniciar effect se o pai recriar a função)
   const onNewMessageRef = useRef(onNewMessage);
@@ -62,7 +76,13 @@ export function useWhatsAppRealtime(options: UseWhatsAppRealtimeOptions = {}) {
     const allUserIds = [user.id, ...currentDoctorIds];
     const userIdsStr = allUserIds.sort().join(','); // Sort garante consistência
 
-    console.log(`[WhatsApp Realtime] Connecting to: ${channelName} | UserIdsHash: ${userIdsStr}`);
+    console.log(`[WhatsApp Realtime] Connecting:`, {
+      channelName,
+      userId: user.id,
+      doctorIds: currentDoctorIds,
+      allUserIds,
+      conversationId: conversationId || 'global'
+    });
 
     // Criar canal único
     const channel = supabase.channel(channelName);
@@ -75,7 +95,13 @@ export function useWhatsAppRealtime(options: UseWhatsAppRealtimeOptions = {}) {
         const message = payload.new as any;
         const monitoredIds = userIdsStr.split(',');
 
-        console.log('[DEBUG-REALTIME] Msg received:', message.id, 'User:', message.user_id, 'Conv:', message.conversation_id);
+        console.log('[REALTIME] Message received:', {
+          id: message.id,
+          direction: message.direction,
+          conversation_id: message.conversation_id,
+          currentConversationId: conversationId,
+          isMatch: message.conversation_id === conversationId
+        });
 
         // Invalidação imediata de estatísticas e conversas
         queryClient.invalidateQueries({ queryKey: [WHATSAPP_CONVERSATIONS_KEY] });
@@ -83,45 +109,56 @@ export function useWhatsAppRealtime(options: UseWhatsAppRealtimeOptions = {}) {
 
         // 1. Prioridade: Se é a conversa ATUAL, atualiza SEMPRE (bypass user filter)
         if (conversationId && message.conversation_id === conversationId) {
-          console.log('[DEBUG-REALTIME] Updating current chat:', conversationId);
+          console.log('[REALTIME] Refreshing current chat messages');
 
-          queryClient.invalidateQueries({
+          // Forçar refetch das mensagens imediatamente
+          queryClient.refetchQueries({
             queryKey: [WHATSAPP_MESSAGES_KEY, message.conversation_id],
-            refetchType: 'active',
+            type: 'active',
           });
 
           if (onNewMessageRef.current) onNewMessageRef.current(message);
 
+          // Tocar som para mensagens na conversa ativa
+          if (message.direction === 'inbound') {
+            playNotificationSound();
+          }
+
           // AUTO-ANALYZE: Se for uma nova mensagem do paciente, dispara a análise de IA
           // Isso ativa a funcionalidade de Auto-Resposta caso esteja configurada na Edge Function
           if (message.direction === 'inbound') {
-            console.log('[DEBUG-REALTIME] Triggering auto-analyze for new inbound message');
-            queryClient.fetchQuery({
-              queryKey: ['whatsapp-ai-analyze-trigger', message.conversation_id],
-              queryFn: async () => {
-                const { data: session } = await supabase.auth.getSession();
-                if (!session?.session?.access_token) return;
-
-                return supabase.functions.invoke('whatsapp-ai-analyze', {
-                  body: { conversation_id: message.conversation_id }
-                });
-              },
-              staleTime: 0
+            // Chamar diretamente sem usar cache do React Query
+            console.log('[AI-TRIGGER] Triggering auto-analyze for inbound message:', message.conversation_id);
+            supabase.functions.invoke('whatsapp-ai-analyze', {
+              body: { conversation_id: message.conversation_id }
+            }).then(result => {
+              if (result.error) {
+                console.error('[AI-TRIGGER] Auto-analyze error:', result.error);
+              } else {
+                console.log('[AI-TRIGGER] Auto-analyze FULL RESULT:', JSON.stringify(result.data, null, 2));
+                console.log('[AI-TRIGGER] Auto-analyze completed:', result.data?.analysis?.lead_status);
+                // Invalidar queries de análise para atualizar UI
+                queryClient.invalidateQueries({ queryKey: ['whatsapp-analysis', message.conversation_id] });
+                queryClient.invalidateQueries({ queryKey: ['whatsapp-suggestions', message.conversation_id] });
+              }
+            }).catch(err => {
+              console.error('[AI-TRIGGER] Auto-analyze exception:', err);
             });
           }
         }
 
-        // 2. Filtro de Segurança/Global para outras conversas
-        else if (monitoredIds.includes(message.user_id)) {
+        // 2. Filtro de Segurança/Global para outras conversas (Apenas se não for um hook de conversa específica)
+        else if (!conversationId && monitoredIds.includes(message.user_id)) {
           // Notificação apenas se for relevante para o usuário
           if (message.direction === 'inbound' && message.conversation_id !== ignoreConversationId) {
             toast({
               title: 'Nova mensagem',
               description: message.content?.substring(0, 50) || 'Anexo recebido',
             });
+            playNotificationSound();
 
             // Disparar análise mesmo em background para auto-resposta funcionar globalmente
-            console.log('[DEBUG-REALTIME] Triggering background auto-analyze');
+            // console.log('[DEBUG-REALTIME] Triggering background auto-analyze');
             supabase.functions.invoke('whatsapp-ai-analyze', {
               body: { conversation_id: message.conversation_id }
             });
@@ -173,7 +210,7 @@ export function useWhatsAppRealtime(options: UseWhatsAppRealtimeOptions = {}) {
 
     // Cleanup
     return () => {
-      console.log(`[WhatsApp Realtime] Cleaning up channel: ${channelName}`);
+      // console.log(`[WhatsApp Realtime] Cleaning up channel: ${channelName}`);
       channel.unsubscribe();
       channelRef.current = null;
     };

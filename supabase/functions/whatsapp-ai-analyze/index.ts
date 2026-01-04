@@ -55,11 +55,37 @@ const handler = async (req: Request): Promise<Response> => {
     });
     const supabaseAdmin = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-    // Verificar usuário
+    // Verificar usuário ou Service Role
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error('Not authenticated');
+
+    // --- CORREÇÃO DE AUTH (JWT ROLE CHECK) ---
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || 'never-matches';
+    const xServiceKey = req.headers.get('x-service-key');
+
+    let isServiceRole = false;
+
+    // 1. Tentar match exato (x-service-key)
+    if (xServiceKey === serviceRoleKey) isServiceRole = true;
+
+    // 2. Decodificar JWT e checar role (para Webhook com Verify JWT ativo)
+    if (!isServiceRole && authHeader) {
+      try {
+        const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payloadStr = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
+          const payload = JSON.parse(payloadStr);
+          if (payload.role === 'service_role') isServiceRole = true;
+        }
+      } catch (_) { /* ignore */ }
     }
+
+    if (!user && !isServiceRole) {
+      console.warn('[AI] Auth Rejected: Invalid Credentials');
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+    }
+
+    const currentUserId = user?.id || 'system';
 
     // Obter parâmetros
     const { conversation_id, force_reanalyze = false } = await req.json();
@@ -68,8 +94,9 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('conversation_id is required');
     }
 
-    // Verificar se a conversa existe e pertence ao usuário
-    const { data: conversation, error: convError } = await supabase
+    // Verificar se a conversa existe (USANDO ADMIN PARA EVITAR RLS ERROR)
+    // O webhook pode criar a conversa, e se usarmos client anon sem user, não achamos.
+    const { data: conversation, error: convError } = await supabaseAdmin
       .from('whatsapp_conversations')
       .select('id, contact_name, phone_number, user_id, status')
       .eq('id', conversation_id)
@@ -79,41 +106,40 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Conversation not found');
     }
 
-    // Verificar análise existente e cooldown
-    const { data: existingAnalysis } = await supabaseAdmin
-      .from('whatsapp_conversation_analysis')
-      .select('*')
-      .eq('conversation_id', conversation_id)
-      .single();
+    // ==========================================
+    // DEBOUNCE / BUFFER STEP
+    // ==========================================
+    if (!force_reanalyze) {
+      const BUFFER_SECONDS = 30; // Espera 30s
+      const checkTime = new Date().toISOString();
 
-    if (existingAnalysis && !force_reanalyze) {
-      const lastAnalyzed = new Date(existingAnalysis.last_analyzed_at);
-      const cooldownMinutes = 5; // Tempo mínimo entre análises
-      const cooldownMs = cooldownMinutes * 60 * 1000;
+      console.log(`[AI-DEBOUNCE] Waiting ${BUFFER_SECONDS}s buffer...`);
+      // Simples delay
+      await new Promise(resolve => setTimeout(resolve, BUFFER_SECONDS * 1000));
 
-      if (Date.now() - lastAnalyzed.getTime() < cooldownMs) {
-        // Retornar análise existente se dentro do cooldown
-        const { data: existingSuggestions } = await supabaseAdmin
-          .from('whatsapp_ai_suggestions')
-          .select('*')
-          .eq('conversation_id', conversation_id)
-          .eq('was_used', false)
-          .order('display_order', { ascending: true })
-          .limit(3);
+      // Verificar se chegaram novas mensagens INBOUND
+      const { count } = await supabaseAdmin
+        .from('whatsapp_messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('conversation_id', conversation_id)
+        .eq('direction', 'inbound')
+        .gt('created_at', checkTime);
 
-        return new Response(
-          JSON.stringify({
-            success: true,
-            analysis: existingAnalysis,
-            suggestions: existingSuggestions || [],
-            cached: true,
-          }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      if (count && count > 0) {
+        console.log('[AI-DEBOUNCE] New messages detected. Aborting.');
+        return new Response(JSON.stringify({
+          success: true,
+          status: 'debounced',
+          message: 'Execution aborted because newer messages arrived.'
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
+      console.log('[AI-DEBOUNCE] No new messages. Proceeding.');
     }
 
-    // Buscar últimas mensagens da conversa
+    // Buscar mensagens
     const { data: messages, error: msgError } = await supabaseAdmin
       .from('whatsapp_messages')
       .select('direction, content, message_type, sent_at')
@@ -125,7 +151,7 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('No messages found in conversation');
     }
 
-    // Buscar procedimentos disponíveis (para contexto)
+    // Buscar procedimentos
     const { data: procedures } = await supabaseAdmin
       .from('commercial_procedures')
       .select('id, name, category, price')
@@ -133,14 +159,19 @@ const handler = async (req: Request): Promise<Response> => {
       .eq('is_active', true)
       .limit(20);
 
-    // Buscar configuração personalizada de IA
+    // Buscar configuração IA
     const { data: aiConfig } = await supabaseAdmin
       .from('whatsapp_ai_config')
       .select('knowledge_base, already_known_info, custom_prompt_instructions, auto_reply_enabled')
       .eq('user_id', conversation.user_id)
       .maybeSingle();
 
-    // --- NOVO: BUSCAR AGENDA DO MÉDICO ---
+    console.log('[AI] Config for user', conversation.user_id, ':', {
+      exists: !!aiConfig,
+      auto_reply_enabled: aiConfig?.auto_reply_enabled
+    });
+
+    // --- AGENDA DO MÉDICO ---
     const now = new Date();
     const next5Days = new Date();
     next5Days.setDate(now.getDate() + 5);
@@ -154,10 +185,8 @@ const handler = async (req: Request): Promise<Response> => {
       .neq('status', 'cancelled')
       .order('start_time', { ascending: true });
 
-    // Helper para formatar a agenda simplificada para o prompt
     const formatAgenda = () => {
       if (!appointments || appointments.length === 0) return "Agenda totalmente livre para os próximos 5 dias.";
-
       const agendaByDay: Record<string, string[]> = {};
       appointments.forEach(appt => {
         const date = new Date(appt.start_time).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' });
@@ -165,7 +194,6 @@ const handler = async (req: Request): Promise<Response> => {
         if (!agendaByDay[date]) agendaByDay[date] = [];
         agendaByDay[date].push(time);
       });
-
       return Object.entries(agendaByDay)
         .map(([day, times]) => `${day}: Ocupado em ${times.join(', ')}`)
         .join('\n');
@@ -173,8 +201,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     const agendaContext = `HORÁRIOS OCUPADOS (PRÓXIMOS 5 DIAS):\n${formatAgenda()}\n(A clínica funciona de Seg-Sex, das 08h às 18h. Se o horário não estiver na lista de ocupados acima, ele está disponível.)`;
 
-
-    // Montar contexto para a IA
+    // Montar contexto
     const messagesContext = messages
       .reverse()
       .map(m => {
@@ -187,70 +214,64 @@ const handler = async (req: Request): Promise<Response> => {
       ? procedures.map(p => `- ${p.name} (${p.category || 'geral'}): R$ ${p.price || 'consultar'}`).join('\n')
       : 'Nenhum procedimento cadastrado';
 
-    // Chamar OpenAI API
+    // Calling OpenAI
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openaiApiKey) {
-      throw new Error('OpenAI API key not configured. Set OPENAI_API_KEY in Supabase secrets.');
-    }
+    if (!openaiApiKey) throw new Error('OpenAI API key missing');
 
-    const systemPrompt = `Você é um Especialista em Vendas e Conversão de Pacientes para clínicas médicas de alto padrão no Brasil.
-Seu objetivo é analisar as conversas de WhatsApp e fornecer insights profundos para que a secretária consiga FECHAR agendamentos e procedimentos.
+    const systemPrompt = `Você é uma SECRETÁRIA VIRTUAL experiente de uma clínica médica. Seu trabalho é atender pacientes via WhatsApp de forma natural, simpática e EFICIENTE.
 
-${aiConfig?.knowledge_base ? `BASE DE CONHECIMENTO DA CLÍNICA:\n${aiConfig.knowledge_base}\n` : ''}
-${aiConfig?.already_known_info ? `INFORMAÇÕES QUE JÁ TEMOS (NÃO PERGUNTE): ${aiConfig.already_known_info}` : 'Já temos o telefone e nome básico do paciente.'}
-${aiConfig?.custom_prompt_instructions ? `INSTRUÇÕES PERSONALIZADAS:\n${aiConfig.custom_prompt_instructions}\n` : ''}
+REGRAS FUNDAMENTAIS:
+1. RESPONDA DIRETAMENTE às perguntas. Se perguntaram sobre procedimentos, LISTE os procedimentos. Se perguntaram preço, DIGA o preço.
+2. Seja NATURAL e HUMANA - evite frases genéricas. Fale como uma pessoa real.
+3. Seja OBJETIVA - não enrole.
+4. Use EMOJIS com moderação (máximo 1-2).
+5. Sempre termine com algo que FACILITE a próxima ação (ex: "Qual horário prefere?").
+
+${aiConfig?.knowledge_base ? `SOBRE A CLÍNICA:\n${aiConfig.knowledge_base}\n` : ''}
+${aiConfig?.already_known_info ? `INFORMAÇÕES QUE JÁ TEMOS: ${aiConfig.already_known_info}\n` : ''}
+${aiConfig?.custom_prompt_instructions ? `INSTRUÇÕES ESPECIAIS:\n${aiConfig.custom_prompt_instructions}\n` : ''}
+
+PROCEDIMENTOS E PREÇOS:
+${proceduresContext}
 
 ${agendaContext}
 
-Analise a conversa e retorne APENAS um JSON válido (sem markdown, sem explicações) com a estrutura abaixo.
+COMO RESPONDER:
+- "Quais procedimentos?" → Liste principais
+- "Quanto custa X?" → Diga o preço
+- "Quais horários?" → Ofereça 2-3 horários livres
+- "Endereço?" → Endereço completo
+- Dúvidas técnicas → Explique breve e sugira avaliação
 
-ESTRUTURA DO JSON:
+FORMATO DE RESPOSTA (JSON):
 {
   "lead_status": "frio" | "morno" | "quente",
   "conversion_probability": 0-100,
-  "detected_intent": "Intenção clara do paciente",
-  "detected_procedure": "Procedimento alvo",
+  "detected_intent": "O que o paciente quer",
+  "detected_procedure": "Procedimento ou null",
   "detected_urgency": "baixa" | "media" | "alta" | "urgente",
   "sentiment": "positivo" | "neutro" | "negativo",
-  "suggested_next_action": "Ação imediata para conversão (Ex: Pedir o convênio, oferecer 2 horários específicos)",
+  "suggested_next_action": "O que fazer agora",
   "suggestions": [
     {
-      "type": "quick_reply" | "full_message" | "procedure_info" | "scheduling" | "follow_up",
-      "content": "Texto persuasivo seguindo tom de voz da clínica",
+      "type": "full_message",
+      "content": "RESPOSTA COMPLETA",
       "confidence": 0.0-1.0,
-      "reasoning": "Por que esta mensagem vai ajudar a converter?"
+      "reasoning": "Motivo"
     }
   ]
 }
 
-DIRETRIZES DE CONVERSÃO (PSICOLOGIA DE VENDAS):
-1. Rapport e Empatia: Use o nome do paciente e valide suas dúvidas/dores.
-2. Autoridade: Mencione sutilmente a expertise do doutor ou qualidade da tecnologia se houver no contexto.
-3. Escassez/Urgência: Sempre sugira oferecer opções limitadas de horários (Ex: "Tenho apenas quinta às 14h ou sexta às 10h").
-4. Call to Action (CTA): Toda sugestão de resposta deve terminar com uma pergunta clara que leve ao agendamento.
-5. Objeções: Se o paciente perguntar preço, ensine a secretária a valorizar o procedimento antes de dar o valor bruto, ou oferecer condições de parcelamento.
-
-CRITÉRIOS DE STATUS:
-- FRIO: Parou de responder, mostra desinteresse total ou apenas tirou uma dúvida rápida sem intenção de agendar.
-- MORNO: Tem dúvidas, responde mas ainda não pediu horários ou mostrou urgência.
-- QUENTE: Pediu preço, horários, localização ou falou de sintomas específicos que precisam de tratamento rápido.
-
-Gere exatamente 3 sugestões de resposta altamente persuasivas.`;
+IMPORTANTE: Gere EXATAMENTE 3 sugestões.`;
 
     const userPrompt = `
-DADOS DA CLÍNICA/MÉDICO:
-ID do Médico: ${conversation.user_id}
-Procedimentos Cadastrados:
-${proceduresContext}
-
-DADOS DO PACIENTE:
-Nome: ${conversation.contact_name || 'Não identificado'}
-Telefone: ${conversation.phone_number}
-
-HISTÓRICO DA CONVERSA (Últimas 20 mensagens):
+CONVERSA ATUAL:
 ${messagesContext}
 
-Analise agora com foco em conversão máxima:`;
+PACIENTE: ${conversation.contact_name || 'Nome não identificado'}
+TELEFONE: ${conversation.phone_number}
+
+Analise a conversa e gere respostas naturais. Responda diretamente.`;
 
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -272,50 +293,29 @@ Analise agora com foco em conversão máxima:`;
 
     if (!openaiResponse.ok) {
       const errorData = await openaiResponse.json();
-      console.error('[AI] OpenAI error:', errorData);
-      throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`);
+      throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown'}`);
     }
 
     const openaiData = await openaiResponse.json();
     const aiContent = openaiData.choices[0]?.message?.content;
+    if (!aiContent) throw new Error('Empty response from OpenAI');
 
-    if (!aiContent) {
-      throw new Error('Empty response from OpenAI');
-    }
-
-    // Parsear resposta da IA
+    // Parse
     let aiResponse: AIResponse;
     try {
-      // Remover possíveis caracteres de markdown
-      const cleanContent = aiContent
-        .replace(/```json\n?/g, '')
-        .replace(/```\n?/g, '')
-        .trim();
+      const cleanContent = aiContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       aiResponse = JSON.parse(cleanContent);
     } catch (parseError) {
-      console.error('[AI] Failed to parse response:', aiContent);
+      console.error('Parse error:', aiContent);
       throw new Error('Failed to parse AI response');
     }
 
-    // Validar e sanitizar resposta
+    // Validar
     const validStatuses: LeadStatus[] = ['novo', 'frio', 'morno', 'quente', 'convertido', 'perdido'];
-    if (!validStatuses.includes(aiResponse.lead_status)) {
-      aiResponse.lead_status = 'novo';
-    }
-
+    if (!validStatuses.includes(aiResponse.lead_status)) aiResponse.lead_status = 'novo';
     aiResponse.conversion_probability = Math.min(100, Math.max(0, aiResponse.conversion_probability || 0));
 
-    const validUrgencies: UrgencyLevel[] = ['baixa', 'media', 'alta', 'urgente'];
-    if (!validUrgencies.includes(aiResponse.detected_urgency)) {
-      aiResponse.detected_urgency = 'baixa';
-    }
-
-    const validSentiments: Sentiment[] = ['positivo', 'neutro', 'negativo'];
-    if (!validSentiments.includes(aiResponse.sentiment)) {
-      aiResponse.sentiment = 'neutro';
-    }
-
-    // Salvar/atualizar análise
+    // Salvar análise
     const analysisData = {
       conversation_id,
       user_id: conversation.user_id,
@@ -331,36 +331,22 @@ Analise agora com foco em conversão máxima:`;
       ai_model_used: 'gpt-4o-mini',
     };
 
-    let savedAnalysis;
-    if (existingAnalysis) {
-      const { data, error } = await supabaseAdmin
-        .from('whatsapp_conversation_analysis')
-        .update(analysisData)
-        .eq('id', existingAnalysis.id)
-        .select()
-        .single();
+    const { data: savedAnalysis, error: upsertError } = await supabaseAdmin
+      .from('whatsapp_conversation_analysis')
+      .upsert(analysisData, { onConflict: 'conversation_id' })
+      .select()
+      .single();
 
-      if (error) throw error;
-      savedAnalysis = data;
-    } else {
-      const { data, error } = await supabaseAdmin
-        .from('whatsapp_conversation_analysis')
-        .insert(analysisData)
-        .select()
-        .single();
+    if (upsertError) throw upsertError;
 
-      if (error) throw error;
-      savedAnalysis = data;
-    }
-
-    // Limpar sugestões antigas não usadas
+    // Limpar sugestões
     await supabaseAdmin
       .from('whatsapp_ai_suggestions')
       .delete()
       .eq('conversation_id', conversation_id)
       .eq('was_used', false);
 
-    // Salvar novas sugestões
+    // Salvar sugestões
     const suggestionsToInsert = (aiResponse.suggestions || []).slice(0, 3).map((s, idx) => ({
       conversation_id,
       user_id: conversation.user_id,
@@ -370,56 +356,97 @@ Analise agora com foco em conversão máxima:`;
       confidence: Math.min(1, Math.max(0, s.confidence || 0.5)),
       reasoning: s.reasoning,
       display_order: idx,
-      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24h
+      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     }));
 
-    const { data: savedSuggestions, error: suggestionsError } = await supabaseAdmin
-      .from('whatsapp_ai_suggestions')
-      .insert(suggestionsToInsert)
-      .select();
+    const { data: savedSuggestions } = await supabaseAdmin.from('whatsapp_ai_suggestions').insert(suggestionsToInsert).select();
 
-    if (suggestionsError) {
-      console.error('[AI] Error saving suggestions:', suggestionsError);
-    }
-
-    // Verificação de Auto-Resposta (se configurado)
+    // Auto-Reply
     if (aiConfig?.auto_reply_enabled) {
       const bestSuggestion = (aiResponse.suggestions || [])
         .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))[0];
 
-      // Só envia se for uma resposta completa e tiver confiança alta
-      if (bestSuggestion && bestSuggestion.confidence >= 0.85 && bestSuggestion.type === 'full_message') {
+      // AJUSTE DE CONFIDENCE: 0.7 para garantir respostas
+      if (bestSuggestion && bestSuggestion.confidence >= 0.7) {
         console.log('[AI] Auto-reply triggered with confidence:', bestSuggestion.confidence);
 
         try {
-          // Invocar whatsapp-send-message
-          await supabaseAdmin.functions.invoke('whatsapp-send-message', {
-            body: {
-              conversation_id,
-              content: bestSuggestion.content
-            }
-          });
+          const { data: newMessage, error: insertError } = await supabaseAdmin
+            .from('whatsapp_messages')
+            .insert({
+              user_id: conversation.user_id,
+              conversation_id: conversation_id,
+              phone_number: conversation.phone_number,
+              content: bestSuggestion.content,
+              direction: 'outbound', // ENVIADO PELA CLINICA
+              message_type: 'text',
+              status: 'sent',
+              sent_at: new Date().toISOString(),
+              metadata: { auto_reply: true, confidence: bestSuggestion.confidence }
+            })
+            .select('id')
+            .single();
 
-          // Marcar essa sugestão como usada
-          if (savedSuggestions && savedSuggestions.length > 0) {
-            const suggestId = savedSuggestions.find(s => s.content === bestSuggestion.content)?.id;
-            if (suggestId) {
-              await supabaseAdmin
-                .from('whatsapp_ai_suggestions')
-                .update({ was_used: true, used_at: new Date().toISOString() })
-                .eq('id', suggestId);
+          if (!insertError && newMessage) {
+            const { data: waConfig } = await supabaseAdmin
+              .from('whatsapp_config')
+              .select('phone_number_id, access_token')
+              .eq('user_id', conversation.user_id)
+              .eq('is_active', true)
+              .maybeSingle();
+
+            if (waConfig && waConfig.access_token) {
+              const waResponse = await fetch(
+                `https://graph.facebook.com/v18.0/${waConfig.phone_number_id}/messages`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${waConfig.access_token}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    messaging_product: 'whatsapp',
+                    to: conversation.phone_number,
+                    type: 'text',
+                    text: { body: bestSuggestion.content }
+                  }),
+                }
+              );
+
+              const waData = await waResponse.json();
+              if (waResponse.ok) {
+                const waMessageId = waData.messages?.[0]?.id;
+                console.log('[AI] Auto-reply sent! WA ID:', waMessageId);
+                await supabaseAdmin
+                  .from('whatsapp_messages')
+                  .update({ message_id: waMessageId, status: 'sent' })
+                  .eq('id', newMessage.id);
+
+                await supabaseAdmin.from('whatsapp_conversations').update({
+                  last_message_at: new Date().toISOString(),
+                  last_message_preview: bestSuggestion.content.substring(0, 100),
+                  last_message_direction: 'outbound',
+                  updated_at: new Date().toISOString()
+                }).eq('id', conversation_id);
+              } else {
+                console.error('[AI] WhatsApp API error:', waData.error);
+              }
+            }
+
+            // Marcar sugestão usada
+            if (savedSuggestions) {
+              const usedSugg = savedSuggestions.find(s => s.content === bestSuggestion.content);
+              if (usedSugg) await supabaseAdmin.from('whatsapp_ai_suggestions').update({ was_used: true }).eq('id', usedSugg.id);
             }
           }
-        } catch (sendError) {
-          console.error('[AI] Auto-reply failed:', sendError);
+        } catch (e) {
+          console.error('[AI] Auto-reply failed:', e);
         }
       }
     }
 
-    // Verificar se deve criar deal automaticamente (lead quente)
     if (aiResponse.lead_status === 'quente' && !savedAnalysis.deal_created) {
-      // Será tratado pelo frontend via convertWhatsAppToDeal
-      console.log('[AI] Lead marked as hot, deal creation pending');
+      // Logica de criar deal se necessario
     }
 
     return new Response(

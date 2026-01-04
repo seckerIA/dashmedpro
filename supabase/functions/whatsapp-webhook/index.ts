@@ -98,6 +98,7 @@ interface StatusUpdate {
 // =========================================
 
 const handler = async (req: Request): Promise<Response> => {
+  console.log('--- [WEBHOOK RECEBIDO] ---');
   // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -144,9 +145,6 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response('Missing parameters', { status: 400 });
   }
 
-  // =========================================
-  // POST - Receber eventos
-  // =========================================
   // =========================================
   // POST - Receber eventos
   // =========================================
@@ -216,8 +214,8 @@ const handler = async (req: Request): Promise<Response> => {
             .in('id', configUserIds);
 
           if (profiles && profiles.length > 0) {
-            // Priorizar: dono > admin > vendedor > secretaria
-            const rolePriority: Record<string, number> = { 'dono': 1, 'admin': 1, 'vendedor': 2, 'secretaria': 3 };
+            // Priorizar: secretaria > dono > admin > vendedor (IA configurada na secretaria)
+            const rolePriority: Record<string, number> = { 'secretaria': 1, 'dono': 2, 'admin': 2, 'vendedor': 3 };
             const sortedProfiles = profiles.sort((a: any, b: any) => {
               const pA = rolePriority[a.role as string] || 99;
               const pB = rolePriority[b.role as string] || 99;
@@ -232,7 +230,7 @@ const handler = async (req: Request): Promise<Response> => {
         // Processar mensagens recebidas
         if (value.messages && value.messages.length > 0) {
           for (const message of value.messages) {
-            await processIncomingMessage(supabaseAdmin, targetUserId, message, value.contacts);
+            await processIncomingMessage(supabaseAdmin, targetUserId, phoneNumberId, message, value.contacts);
           }
         }
 
@@ -263,18 +261,20 @@ const handler = async (req: Request): Promise<Response> => {
 async function processIncomingMessage(
   supabase: any,
   userId: string,
+  phoneNumberId: string,
   message: IncomingMessage,
   contacts?: Array<{ profile: { name: string }; wa_id: string }>
 ) {
   const phoneNumber = message.from;
   const contactName = contacts?.find(c => c.wa_id === phoneNumber)?.profile.name || null;
 
-  console.log('[Webhook] Processing message from:', phoneNumber, 'type:', message.type);
+  console.log('[Webhook] Processing message from:', phoneNumber, 'type:', message.type, 'phoneNumberId:', phoneNumberId);
 
-  // Buscar ou criar conversa
+  // Buscar ou criar conversa (agora por phone_number_id + phone_number)
   const conversationId = await getOrCreateConversation(
     supabase,
     userId,
+    phoneNumberId,
     phoneNumber,
     contactName
   );
@@ -287,6 +287,7 @@ async function processIncomingMessage(
     .from('whatsapp_messages')
     .insert({
       user_id: userId,
+      phone_number_id: phoneNumberId,
       conversation_id: conversationId,
       message_id: message.id,
       phone_number: phoneNumber,
@@ -338,6 +339,47 @@ async function processIncomingMessage(
     .eq('id', conversationId);
 
   console.log('[Webhook] Message saved:', savedMessage.id);
+
+  // --- DISPARO DA IA (CORRIGIDO FINAL - ESTRATEGIA HÍBRIDA) ---
+  console.log(`[DEBUG-WEBHOOK] Pre-fetch: conversation_id=${conversationId}`);
+
+  const aiUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/whatsapp-ai-analyze`;
+
+  // PEGANDO AS DUAS CHAVES
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
+  console.log(`[DEBUG-WEBHOOK] Keys configured? Anon:${!!anonKey} Service:${!!serviceKey}`);
+
+  // TENTATIVA 3: Service Key Pura (JWT de Admin)
+  // Se o Analyses está com Verify JWT ativado, ele precisa de um JWT válido.
+  // A Service Key É um JWT válido.
+
+  const tokenToSend = serviceKey;
+  console.log(`[DEBUG-WEBHOOK] Token starts with: ${tokenToSend.substring(0, 10)}...`);
+
+  try {
+    const aiRes = await fetch(aiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tokenToSend}`, // Para satisfazer o Gateway com JWT Válido
+        'x-service-key': serviceKey,              // Redundância para garantir que a função aceite
+      },
+      body: JSON.stringify({ conversation_id: conversationId }),
+    });
+
+    if (!aiRes.ok) {
+      const errText = await aiRes.text();
+      console.error(`[DEBUG-WEBHOOK] AI Error Body: ${errText}`);
+    }
+
+    console.log(`[DEBUG-WEBHOOK] AI Function response status: ${aiRes.status}`);
+  } catch (err: any) {
+    console.error('[DEBUG-WEBHOOK] Fatal AI Trigger Error:', err.message);
+  }
+
+  console.log(`[DEBUG-WEBHOOK] Finished process for message: ${savedMessage.id}`);
 }
 
 // =========================================
@@ -370,19 +412,21 @@ async function processStatusUpdate(supabase: any, status: StatusUpdate) {
 }
 
 // =========================================
-// Buscar ou criar conversa
+// Buscar ou criar conversa (por phone_number_id)
 // =========================================
 async function getOrCreateConversation(
   supabase: any,
   userId: string,
+  phoneNumberId: string,
   phoneNumber: string,
   contactName: string | null
 ): Promise<string> {
-  // Buscar conversa existente
+  // Buscar conversa existente por phone_number_id + phone_number
+  // Isso garante que todos os usuários com acesso ao mesmo número compartilhem a mesma conversa
   const { data: existing } = await supabase
     .from('whatsapp_conversations')
     .select('id')
-    .eq('user_id', userId)
+    .eq('phone_number_id', phoneNumberId)
     .eq('phone_number', phoneNumber)
     .single();
 
@@ -393,19 +437,20 @@ async function getOrCreateConversation(
   // Buscar contato CRM pelo telefone
   const { data: contact } = await supabase
     .from('crm_contacts')
-    .select('id, full_name') // CORRIGIDO: nome da coluna é full_name
+    .select('id, full_name')
     .or(`phone.eq.${phoneNumber},phone.eq.+${phoneNumber}`)
     .limit(1)
     .single();
 
-  // Criar nova conversa
+  // Criar nova conversa com phone_number_id
   const { data: newConversation, error } = await supabase
     .from('whatsapp_conversations')
     .insert({
       user_id: userId,
+      phone_number_id: phoneNumberId,
       phone_number: phoneNumber,
       contact_id: contact?.id || null,
-      contact_name: contactName || contact?.full_name || phoneNumber, // CORRIGIDO: usando full_name
+      contact_name: contactName || contact?.full_name || phoneNumber,
       status: 'open',
       priority: 'normal',
       unread_count: 0,
@@ -418,7 +463,7 @@ async function getOrCreateConversation(
     throw error;
   }
 
-  console.log('[Webhook] Created new conversation:', newConversation.id);
+  console.log('[Webhook] Created new conversation:', newConversation.id, 'for phone_number_id:', phoneNumberId);
   return newConversation.id;
 }
 

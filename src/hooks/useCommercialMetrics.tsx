@@ -129,7 +129,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .gte("start_time", periodStartISO)
         .lte("start_time", periodEndISO);
 
-      console.log('📡 [useCommercialMetrics] Buscando appointments...');
+      // console.log('📡 [useCommercialMetrics] Buscando appointments...');
       const appointmentsResult = await supabaseQueryWithTimeout(appointmentsQuery as any, 90000, signal);
       const { data: appointments, error: appointmentsError } = appointmentsResult as { data: any[], error: any };
 
@@ -137,7 +137,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         console.error('❌ [useCommercialMetrics] Erro appointments:', appointmentsError);
         throw appointmentsError;
       }
-      console.log(`✅ [useCommercialMetrics] ${appointments?.length || 0} appointments encontrados.`);
+      // console.log(`✅ [useCommercialMetrics] ${appointments?.length || 0} appointments encontrados.`);
 
       // Preparar IDs de transações para busca paralela
       const transactionIds = appointments
@@ -164,7 +164,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .gte("transaction_date", format(period.start, "yyyy-MM-dd"))
         .lte("transaction_date", format(period.end, "yyyy-MM-dd"));
 
-      console.log('📡 [useCommercialMetrics] Buscando transactions...');
+      // console.log('📡 [useCommercialMetrics] Buscando transactions...');
       const transactionsResult = await supabaseQueryWithTimeout(transactionsQuery as any, 90000, signal);
       const { data: transactions, error: transactionsError } = transactionsResult as { data: any[], error: any };
 
@@ -172,7 +172,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         console.error('❌ [useCommercialMetrics] Erro transactions:', transactionsError);
         throw transactionsError;
       }
-      console.log(`✅ [useCommercialMetrics] ${transactions?.length || 0} transactions encontradas.`);
+      // console.log(`✅ [useCommercialMetrics] ${transactions?.length || 0} transactions encontradas.`);
 
       // Atualizar transactionIds com as transações encontradas
       const allTransactionIds = transactions?.map(t => t.id) || [];
@@ -228,12 +228,12 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       }
       if (campaignsError) throw campaignsError;
 
-      console.log('📊 useCommercialMetrics - Leads encontrados:', {
-        total: leads?.length || 0,
-        periodStart: periodStartISO,
-        periodEnd: periodEndISO,
-        leads: leads?.slice(0, 3).map(l => ({ id: l.id, name: l.name, created_at: l.created_at })),
-      });
+      // console.log('📊 useCommercialMetrics - Leads encontrados:', {
+      //   total: leads?.length || 0,
+      //   periodStart: periodStartISO,
+      //   periodEnd: periodEndISO,
+      //   leads: leads?.slice(0, 3).map(l => ({ id: l.id, name: l.name, created_at: l.created_at })),
+      // });
 
       // 6-8. Executar queries restantes em paralelo
       const [
@@ -511,21 +511,21 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       // Contar procedimentos ativos no catálogo
       const scheduledProcedures = (procedures as any[])?.length || 0;
 
-      console.log('📊 useCommercialMetrics - Métricas calculadas:', {
-        totalLeads,
-        leadsData: leads?.slice(0, 3).map(l => ({ id: l.id, name: l.name, created_at: l.created_at })),
-        completedAppointments: completedAppointments.length,
-        appointmentsData: completedAppointments.slice(0, 3).map(a => ({ id: a.id, title: a.title, estimated_value: a.estimated_value, status: a.status })),
-        sales: sales?.length || 0,
-        overallConversion: overallConversion.toFixed(2),
-        totalRevenue,
-        appointmentsRevenue,
-        pendingRevenue,
-        salesRevenue,
-        avgTicketPerAppointment: avgTicketPerAppointment.toFixed(2),
-        scheduledProcedures,
-        proceduresCount: procedures?.length || 0,
-      });
+      // console.log('📊 useCommercialMetrics - Métricas calculadas:', {
+      //   totalLeads,
+      //   leadsData: leads?.slice(0, 3).map(l => ({ id: l.id, name: l.name, created_at: l.created_at })),
+      //   completedAppointments: completedAppointments.length,
+      //   appointmentsData: completedAppointments.slice(0, 3).map(a => ({ id: a.id, title: a.title, estimated_value: a.estimated_value, status: a.status })),
+      //   sales: sales?.length || 0,
+      //   overallConversion: overallConversion.toFixed(2),
+      //   totalRevenue,
+      //   appointmentsRevenue,
+      //   pendingRevenue,
+      //   salesRevenue,
+      //   avgTicketPerAppointment: avgTicketPerAppointment.toFixed(2),
+      //   scheduledProcedures,
+      //   proceduresCount: procedures?.length || 0,
+      // });
 
       // Taxa de ocupação
       const workDays = differenceInDays(period.end, period.start) + 1;

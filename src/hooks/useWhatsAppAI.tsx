@@ -21,13 +21,32 @@ import type {
 interface UseWhatsAppAIOptions {
   conversationId?: string;
   autoAnalyze?: boolean;
+  targetUserId?: string; // Opcional: ID explícito do dono
 }
 
 export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
-  const { conversationId, autoAnalyze = false } = options;
+  const { conversationId, autoAnalyze = false, targetUserId } = options;
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
+
+  // Buscar o user_id dono da conversa, se conversationId for fornecido
+  const { data: conversationData } = useQuery({
+    queryKey: ['conversation-owner', conversationId],
+    queryFn: async () => {
+      if (!conversationId) return null;
+      const { data } = await supabase
+        .from('whatsapp_conversations')
+        .select('user_id')
+        .eq('id', conversationId)
+        .single();
+      return data;
+    },
+    enabled: !!conversationId,
+  });
+
+  // Determinar quem é o dono da config
+  const configOwnerId = targetUserId || conversationData?.user_id || user?.id;
 
   // =====================================================
   // Query: Análise da conversa atual
@@ -290,17 +309,17 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
   });
 
   // =====================================================
-  // Query: Configuração de IA do usuário
+  // Query: Configuração de IA (do Dono)
   // =====================================================
-  const configQuery = useQuery({
-    queryKey: ['whatsapp-ai-config', user?.id],
+  const aiConfigQuery = useQuery({
+    queryKey: ['whatsapp-ai-config', configOwnerId],
     queryFn: async () => {
-      if (!user) return null;
+      if (!configOwnerId) return null;
 
       const { data, error } = await supabase
         .from('whatsapp_ai_config')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', configOwnerId)
         .maybeSingle();
 
       if (error) {
@@ -310,7 +329,7 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
 
       return data as AIConfig | null;
     },
-    enabled: !!user,
+    enabled: !!configOwnerId,
   });
 
   // =====================================================
@@ -318,12 +337,12 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
   // =====================================================
   const updateConfigMutation = useMutation({
     mutationFn: async (updates: Partial<AIConfig>) => {
-      if (!user) throw new Error('Not authenticated');
+      if (!user || !configOwnerId) throw new Error('Not authenticated or missing config owner');
 
       const { data: existing } = await supabase
         .from('whatsapp_ai_config')
         .select('id')
-        .eq('user_id', user.id)
+        .eq('user_id', configOwnerId)
         .maybeSingle();
 
       if (existing) {
@@ -340,13 +359,13 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
           .from('whatsapp_ai_config' as any)
           .insert({
             ...updates,
-            user_id: user.id,
+            user_id: configOwnerId, // Salva no ID do médico!
           } as any);
         if (error) throw error;
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-ai-config', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-ai-config', configOwnerId] });
       toast({
         title: 'Configuração salva',
         description: 'As preferências da IA foram atualizadas com sucesso.',
@@ -407,17 +426,17 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
     isLoadingFollowups: pendingFollowupsQuery.isLoading,
 
     // Configuração
-    aiConfig: configQuery.data,
+    aiConfig: aiConfigQuery.data,
     updateAIConfig: updateConfigMutation.mutateAsync,
     isUpdatingConfig: updateConfigMutation.isPending,
-    isLoadingConfig: configQuery.isLoading,
+    isLoadingConfig: aiConfigQuery.isLoading,
 
     // Refetch
     refetchAnalysis: analysisQuery.refetch,
     refetchSuggestions: suggestionsQuery.refetch,
     refetchHotLeads: hotLeadsQuery.refetch,
     refetchFollowups: pendingFollowupsQuery.refetch,
-    refetchConfig: configQuery.refetch,
+    refetchConfig: aiConfigQuery.refetch,
   };
 }
 

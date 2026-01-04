@@ -2,7 +2,7 @@
  * Lista de mensagens do chat com scroll infinito
  */
 
-import { useRef, useEffect, useCallback, Fragment, useState } from 'react';
+import { useRef, useEffect, useCallback, Fragment, useState, useMemo } from 'react';
 import { format, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Loader2, ArrowDown } from 'lucide-react';
@@ -30,56 +30,80 @@ export function MessageList({
 }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const isAtBottom = useRef(true);
-  const lastMessageCount = useRef(messages.length);
-
-  // State for scroll button visibility
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const prevLastMessageIdRef = useRef<string | null>(null);
+  const isInitialLoad = useRef(true);
 
-  // Scroll to bottom quando novas mensagens chegam
-  useEffect(() => {
-    if (messages.length > lastMessageCount.current && isAtBottom.current) {
-      scrollToBottom();
-    }
-    lastMessageCount.current = messages.length;
-  }, [messages.length]);
+  // Ordenar mensagens cronologicamente para pegar a ÚLTIMA mensagem real
+  const sortedMessages = useMemo(() => {
+    return [...messages].sort((a, b) => {
+      const dateA = a.sent_at ? new Date(a.sent_at).getTime() : 0;
+      const dateB = b.sent_at ? new Date(b.sent_at).getTime() : 0;
+      return dateA - dateB;
+    });
+  }, [messages]);
 
-  // Scroll to bottom on initial load or when conversation changes
-  useEffect(() => {
-    if (!isLoading && messages.length > 0) {
-      // Usamos requestAnimationFrame para garantir que o layout foi calculado
-      const frame = requestAnimationFrame(() => {
-        if (containerRef.current) {
-          containerRef.current.scrollTop = containerRef.current.scrollHeight;
-        }
-      });
-      return () => cancelAnimationFrame(frame);
-    }
-  }, [isLoading, messages.length]);
+  // ID da última mensagem (cronologicamente)
+  const lastMessageId = sortedMessages.length > 0
+    ? sortedMessages[sortedMessages.length - 1]?.id
+    : null;
 
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+  // Função para scrollar para o final
+  const scrollToBottom = useCallback(() => {
     if (containerRef.current) {
-      containerRef.current.scrollTo({
-        top: containerRef.current.scrollHeight,
-        behavior
-      });
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
     setShowScrollButton(false);
-    isAtBottom.current = true;
   }, []);
+
+  // Efeito para scroll quando nova mensagem chega
+  useEffect(() => {
+    if (lastMessageId && lastMessageId !== prevLastMessageIdRef.current) {
+      // Nova mensagem detectada - scroll para baixo
+      // Usar múltiplos timeouts para garantir que o DOM está completamente atualizado
+      const timeoutId = setTimeout(() => {
+        scrollToBottom();
+        // Segunda tentativa após mais um pouco de tempo
+        setTimeout(scrollToBottom, 100);
+      }, 50);
+
+      prevLastMessageIdRef.current = lastMessageId;
+      return () => clearTimeout(timeoutId);
+    }
+  }, [lastMessageId, scrollToBottom]);
+
+  // Reset isInitialLoad quando trocar de conversa
+  const currentConversationId = messages[0]?.conversation_id;
+  useEffect(() => {
+    isInitialLoad.current = true;
+    prevLastMessageIdRef.current = null;
+  }, [currentConversationId]);
+
+  // Scroll inicial quando termina o loading
+  useEffect(() => {
+    if (!isLoading && messages.length > 0 && isInitialLoad.current) {
+      isInitialLoad.current = false;
+      // Delay maior no load inicial para garantir renderização completa
+      setTimeout(() => {
+        scrollToBottom();
+        // Segunda tentativa
+        setTimeout(scrollToBottom, 150);
+        // Terceira tentativa para garantir
+        setTimeout(scrollToBottom, 300);
+      }, 100);
+    }
+  }, [isLoading, messages.length, scrollToBottom]);
 
   const handleScroll = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    // Check if at bottom
     const { scrollTop, scrollHeight, clientHeight } = container;
-    const isBottom = scrollHeight - scrollTop - clientHeight < 100;
+    // Margem de tolerância
+    const isBottom = scrollHeight - scrollTop - clientHeight < 150;
 
-    isAtBottom.current = isBottom;
     setShowScrollButton(!isBottom);
 
-    // Load more when scrolled to top
     if (scrollTop < 100 && hasMore && !isFetchingMore) {
       onLoadMore?.();
     }
@@ -180,8 +204,8 @@ export function MessageList({
         </Fragment>
       ))}
 
-      {/* Bottom anchor */}
-      <div ref={bottomRef} className="h-1" />
+      {/* Bottom anchor - IMPORTANTE: Mantém o scroll ancorado aqui */}
+      <div ref={bottomRef} className="h-4 w-full" />
 
       {/* Scroll to bottom button (quando não está no bottom) */}
       {showScrollButton && (

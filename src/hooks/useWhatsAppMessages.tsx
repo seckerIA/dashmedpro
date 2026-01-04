@@ -3,6 +3,7 @@
  * @module hooks/useWhatsAppMessages
  */
 
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -67,8 +68,25 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
     refetchInterval: 1000, // Polling a cada 1s para sensação de tempo real
   });
 
-  // Flatten all pages into single array
-  const allMessages = messagesQuery.data?.pages.flat() || [];
+  // Flatten all pages into single array in chronological order
+  // Pages are fetched newest first (Page 0 = most recent)
+  // To have chronological order [oldest -> newest], we reverse the pages array
+  // Also deduplicate messages by ID to prevent React key warnings
+  const allMessages = useMemo(() => {
+    if (!messagesQuery.data?.pages) return [];
+
+    const flattened = [...messagesQuery.data.pages].reverse().flat();
+
+    // Deduplicar por ID (mantém a primeira ocorrência)
+    const seen = new Set<string>();
+    return flattened.filter(msg => {
+      if (seen.has(msg.id)) {
+        return false;
+      }
+      seen.add(msg.id);
+      return true;
+    });
+  }, [messagesQuery.data?.pages]);
 
   // =========================================
   // Mutation: Enviar mensagem de texto
@@ -77,17 +95,17 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
     mutationFn: async (payload: SendTextMessagePayload): Promise<WhatsAppMessage> => {
       if (!user?.id) throw new Error('Usuário não autenticado');
 
-      console.log('[sendText] User ID:', user.id);
-      console.log('[sendText] Conversation ID:', payload.conversation_id);
+      // console.log('[sendText] User ID:', user.id);
+      // console.log('[sendText] Conversation ID:', payload.conversation_id);
 
       // Buscar dados da conversa
-      const { data: conversation, error: convError } = await supabase
-        .from('whatsapp_conversations')
+      const { data: conversation, error: convError } = await (supabase
+        .from('whatsapp_conversations' as any)
         .select('phone_number, user_id')
         .eq('id', payload.conversation_id)
-        .single();
+        .single() as any);
 
-      console.log('[sendText] Query result:', { conversation, error: convError });
+      // console.log('[sendText] Query result:', { conversation, error: convError });
 
       if (convError || !conversation) {
         console.error('[sendText] Conversation not found. Error:', convError);
@@ -107,11 +125,11 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
         reply_to_message_id: payload.reply_to_message_id || null,
       };
 
-      const { data: message, error: msgError } = await supabase
-        .from('whatsapp_messages')
-        .insert(messageData)
+      const { data: message, error: msgError } = await (supabase
+        .from('whatsapp_messages' as any)
+        .insert(messageData as any)
         .select()
-        .single();
+        .single() as any);
 
       if (msgError) throw msgError;
 
@@ -129,28 +147,28 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
 
       if (sendError) {
         // Atualizar status para failed
-        await supabase
-          .from('whatsapp_messages')
+        await (supabase
+          .from('whatsapp_messages' as any)
           .update({
             status: 'failed',
             error_message: sendError.message,
-          })
-          .eq('id', message.id);
+          } as any)
+          .eq('id', message.id) as any);
 
         throw sendError;
       }
 
       // Atualizar conversa
-      await supabase
-        .from('whatsapp_conversations')
+      await (supabase
+        .from('whatsapp_conversations' as any)
         .update({
           last_message_at: new Date().toISOString(),
           last_message_preview: payload.content.substring(0, 100),
           last_message_direction: 'outbound',
           unread_count: 0,
           updated_at: new Date().toISOString(),
-        })
-        .eq('id', payload.conversation_id);
+        } as any)
+        .eq('id', payload.conversation_id) as any);
 
       return message as WhatsAppMessage;
     },
@@ -175,19 +193,19 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
       if (!user?.id) throw new Error('Usuário não autenticado');
 
       // Buscar dados da conversa
-      const { data: conversation, error: convError } = await supabase
-        .from('whatsapp_conversations')
+      const { data: conversation, error: convError } = await (supabase
+        .from('whatsapp_conversations' as any)
         .select('phone_number, user_id')
         .eq('id', payload.conversation_id)
-        .single();
+        .single() as any);
 
       if (convError || !conversation) {
         throw new Error('Conversa não encontrada');
       }
 
       // Criar mensagem no banco
-      const { data: message, error: msgError } = await supabase
-        .from('whatsapp_messages')
+      const { data: message, error: msgError } = await (supabase
+        .from('whatsapp_messages' as any)
         .insert({
           user_id: conversation.user_id,
           conversation_id: payload.conversation_id,
@@ -198,19 +216,19 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
           status: 'sent',
           sent_at: new Date().toISOString(),
           reply_to_message_id: payload.reply_to_message_id || null,
-        })
+        } as any)
         .select()
-        .single();
+        .single() as any);
 
       if (msgError) throw msgError;
 
       // Salvar mídia
-      await supabase.from('whatsapp_media').insert({
+      await (supabase.from('whatsapp_media' as any).insert({
         message_id: message.id,
         media_type: payload.media_type,
         media_url: payload.media_url,
         file_name: payload.file_name || null,
-      });
+      } as any) as any);
 
       // Chamar Edge Function para enviar via WhatsApp API
       const { error: sendError } = await supabase.functions.invoke('whatsapp-send-message', {
@@ -224,28 +242,28 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
       });
 
       if (sendError) {
-        await supabase
-          .from('whatsapp_messages')
+        await (supabase
+          .from('whatsapp_messages' as any)
           .update({
             status: 'failed',
             error_message: sendError.message,
-          })
-          .eq('id', message.id);
+          } as any)
+          .eq('id', message.id) as any);
 
         throw sendError;
       }
 
       // Atualizar conversa
-      await supabase
-        .from('whatsapp_conversations')
+      await (supabase
+        .from('whatsapp_conversations' as any)
         .update({
           last_message_at: new Date().toISOString(),
           last_message_preview: payload.caption || `[${payload.media_type}]`,
           last_message_direction: 'outbound',
           unread_count: 0,
           updated_at: new Date().toISOString(),
-        })
-        .eq('id', payload.conversation_id);
+        } as any)
+        .eq('id', payload.conversation_id) as any);
 
       return message as WhatsAppMessage;
     },
@@ -272,15 +290,15 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
       // Buscar dados da conversa e template
       const [conversationResult, templateResult] = await Promise.all([
         supabase
-          .from('whatsapp_conversations')
+          .from('whatsapp_conversations' as any)
           .select('phone_number, user_id')
           .eq('id', payload.conversation_id)
-          .single(),
+          .single() as any,
         supabase
-          .from('whatsapp_templates')
+          .from('whatsapp_templates' as any)
           .select('*')
           .eq('id', payload.template_id)
-          .single(),
+          .single() as any,
       ]);
 
       if (conversationResult.error || !conversationResult.data) {
@@ -307,8 +325,8 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
       }
 
       // Criar mensagem no banco
-      const { data: message, error: msgError } = await supabase
-        .from('whatsapp_messages')
+      const { data: message, error: msgError } = await (supabase
+        .from('whatsapp_messages' as any)
         .insert({
           user_id: conversation.user_id,
           conversation_id: payload.conversation_id,
@@ -323,9 +341,9 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
             template_name: template.name,
             template_variables: payload.template_variables,
           },
-        })
+        } as any)
         .select()
-        .single();
+        .single() as any);
 
       if (msgError) throw msgError;
 
@@ -341,28 +359,28 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
       });
 
       if (sendError) {
-        await supabase
-          .from('whatsapp_messages')
+        await (supabase
+          .from('whatsapp_messages' as any)
           .update({
             status: 'failed',
             error_message: sendError.message,
-          })
-          .eq('id', message.id);
+          } as any)
+          .eq('id', message.id) as any);
 
         throw sendError;
       }
 
       // Atualizar conversa
-      await supabase
-        .from('whatsapp_conversations')
+      await (supabase
+        .from('whatsapp_conversations' as any)
         .update({
           last_message_at: new Date().toISOString(),
           last_message_preview: preview.substring(0, 100),
           last_message_direction: 'outbound',
           unread_count: 0,
           updated_at: new Date().toISOString(),
-        })
-        .eq('id', payload.conversation_id);
+        } as any)
+        .eq('id', payload.conversation_id) as any);
 
       return message as WhatsAppMessage;
     },
@@ -386,11 +404,11 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
   // Helper: Buscar wa_id de uma mensagem
   // =========================================
   async function getWhatsAppMessageId(messageId: string): Promise<string | undefined> {
-    const { data } = await supabase
-      .from('whatsapp_messages')
+    const { data } = await (supabase
+      .from('whatsapp_messages' as any)
       .select('message_id')
       .eq('id', messageId)
-      .single();
+      .single() as any);
 
     return data?.message_id || undefined;
   }

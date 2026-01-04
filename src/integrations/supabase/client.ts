@@ -5,7 +5,7 @@ export const CURRENT_PROJECT_REF = "adzaqkduxnpckbcuqpmg";
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-console.log('🚀 [Supabase] Inicializando cliente...');
+// console.log('🚀 [Supabase] Inicializando cliente...');
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
@@ -22,7 +22,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     },
     fetch: (url, options: any = {}) => {
       const urlStr = url.toString();
-      console.log(`📡 [Supabase Fetch] Iniciando: ${urlStr}`);
+      // console.log(`📡 [Supabase Fetch] Iniciando: ${urlStr}`);
 
       const timeoutController = new AbortController();
       const timeoutId = setTimeout(() => {
@@ -51,7 +51,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
       })
         .then((response) => {
           clearTimeout(timeoutId);
-          console.log(`✅ [Supabase Fetch] Sucesso (${response.status}): ${urlStr}`);
+          // console.log(`✅ [Supabase Fetch] Sucesso (${response.status}): ${urlStr}`);
           return response;
         })
         .catch((error) => {
@@ -74,7 +74,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 
 // Refresh proativo simplificado
 if (typeof window !== 'undefined') {
-  console.log('✅ [Supabase] Cliente pronto.');
+  // console.log('✅ [Supabase] Cliente pronto.');
 
   const checkToken = async () => {
     try {

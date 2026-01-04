@@ -30,7 +30,7 @@ export function useSecretaryDoctors() {
     queryFn: async ({ signal }) => {
       if (!user?.id) return { doctorIds: [], doctors: [] };
 
-      console.log('🔍 [useSecretaryDoctors] Buscando médicos vinculados para:', user.id);
+      // console.log('🔍 [useSecretaryDoctors] Buscando médicos vinculados para:', user.id);
 
       // 1. Buscar IDs dos vínculos com timeout
       const linksQuery = supabase
@@ -44,7 +44,7 @@ export function useSecretaryDoctors() {
         signal
       );
 
-      console.log(`🔍 [useSecretaryDoctors] ${(links as any[])?.length || 0} links brutos encontrados.`);
+      // console.log(`🔍 [useSecretaryDoctors] ${(links as any[])?.length || 0} links brutos encontrados.`);
 
       if (linkError) {
         console.error('❌ [useSecretaryDoctors] Erro links:', linkError);
@@ -81,9 +81,9 @@ export function useSecretaryDoctors() {
         email: doc.email,
       })) || [];
 
-      console.log(`✅ [useSecretaryDoctors] ${doctors.length} médicos encontrados.`);
-      console.log(`✅ [useSecretaryDoctors] IDs Resolvidos:`, doctorIds);
-      console.log(`✅ [useSecretaryDoctors] Perfis Detalhados:`, doctors.length);
+      // console.log(`✅ [useSecretaryDoctors] ${doctors.length} médicos encontrados.`);
+      // console.log(`✅ [useSecretaryDoctors] IDs Resolvidos:`, doctorIds);
+      // console.log(`✅ [useSecretaryDoctors] Perfis Detalhados:`, doctors.length);
       return { doctorIds, doctors };
     },
     enabled: !!user?.id && !isLoadingProfile && isSecretaria,

@@ -28,11 +28,7 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
     queryFn: async ({ signal }) => {
       if (!user) throw new Error("User not authenticated");
 
-      console.log('🔍 useCommercialLeads - Fetching leads for:', {
-        isSecretaria,
-        targetUserIds,
-        userId: user.id
-      });
+      // console.log('🔍 useCommercialLeads - Fetching leads for:', { isSecretaria, targetUserIds, userId: user.id });
 
       let queryPromise;
 
@@ -90,7 +86,7 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
         throw error;
       }
 
-      console.log(`✅ useCommercialLeads - Found ${data?.length || 0} leads para IDs:`, targetUserIds);
+      // console.log(`✅ useCommercialLeads - Found ${data?.length || 0} leads para IDs:`, targetUserIds);
       return data as CommercialLead[];
     },
     enabled: !!user && (!isSecretaria || !isLoadingDoctors),
