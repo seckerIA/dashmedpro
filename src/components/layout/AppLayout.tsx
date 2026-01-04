@@ -13,7 +13,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
-import { VirtualAssistantButton } from "@/components/ai/VirtualAssistantButton"
 
 
 import { useOverdueAppointments } from "@/hooks/useOverdueAppointments"
@@ -175,10 +174,6 @@ export function AppLayout({ children }: AppLayoutProps) {
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
-
-      {/* Card de Performance Global - aparece em todas as páginas quando há expediente ativo */}
-      {/* Botão da Secretária Virtual AI */}
-      <VirtualAssistantButton />
     </TooltipProvider>
   )
 }

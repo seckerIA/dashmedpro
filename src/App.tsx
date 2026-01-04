@@ -9,6 +9,7 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { useUserProfile } from "./hooks/useUserProfile";
 import { SupabaseProjectValidator } from "./components/SupabaseProjectValidator";
+import { CortanaProvider, CortanaButton, CortanaOverlay } from "./components/cortana";
 import Dashboard from "./pages/Dashboard";
 import Calculadora from "./pages/Calculadora";
 import CalculadoraSelection from "./pages/CalculadoraSelection";
@@ -253,11 +254,12 @@ const AppRoutes = () => {
   }
 
   return (
-    <AppLayout>
-      <Routes>
-        <Route path="/login" element={<Navigate to="/" replace />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/" element={<Dashboard />} />
+    <CortanaProvider>
+      <AppLayout>
+        <Routes>
+          <Route path="/login" element={<Navigate to="/" replace />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/" element={<Dashboard />} />
         <Route path="/calculadora" element={<CalculadoraSelection />} />
         <Route path="/calculadora-precificacao" element={<Calculadora />} />
         <Route path="/calculadora-roi" element={<CalculadoraROI />} />
@@ -402,8 +404,13 @@ const AppRoutes = () => {
           element={<Settings />}
         />
         <Route path="*" element={<NotFound />} />
-      </Routes>
-    </AppLayout>
+        </Routes>
+      </AppLayout>
+
+      {/* Cortana - Assistente de Voz IA */}
+      <CortanaButton />
+      <CortanaOverlay />
+    </CortanaProvider>
   );
 };
 
