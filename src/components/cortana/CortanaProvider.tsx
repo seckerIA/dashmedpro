@@ -8,7 +8,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useSecretaryDoctors } from '@/hooks/useSecretaryDoctors';
 import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 import { CORTANA_CONFIG, isCortanaConfigured } from '@/config/cortana';
+import { supabase } from '@/integrations/supabase/client';
 import { CortanaStatus, CortanaState, CortanaContext as CortanaUserContext } from '@/types/cortana';
 import { buildCortanaContext } from '@/services/cortana/contextBuilder';
 import { createClientTools, setActionCallback, PendingAction } from '@/services/cortana/clientTools';
@@ -70,19 +72,7 @@ export function CortanaProvider({ children }: { children: React.ReactNode }) {
     return createClientTools(userContext);
   }, [userContext]);
 
-  // Inicializar Action Executor
-  useEffect(() => {
-    initializeActionExecutor({
-      navigate,
-      toast,
-    });
-    injectHighlightStyles();
 
-    // Configurar callback para ações dos client tools
-    setActionCallback((action: PendingAction) => {
-      executeAction(action);
-    });
-  }, [navigate, toast]);
 
   // Hook do ElevenLabs
   const conversation = useConversation({
@@ -173,8 +163,38 @@ export function CortanaProvider({ children }: { children: React.ReactNode }) {
 
       console.log('[Cortana] Iniciando sessão com agentId:', CORTANA_CONFIG.agentId);
 
-      // Iniciar sessão com ElevenLabs - configuração mínima
-      // Overrides como firstMessage devem ser configurados no dashboard do ElevenLabs
+      // Verificar limite de uso diário (5 chamadas)
+      const { data: usageData, error: usageError } = await supabase.rpc('check_and_increment_cortana_usage', {
+        limit_count: 5
+      });
+
+      if (usageError) {
+        console.error('[Cortana] Erro ao verificar limite:', usageError);
+        // Em caso de erro técnico na verificação, optamos por permitir (fail open) ou bloquear?
+        // Vamos permitir mas logar erro, ou bloquear por segurança.
+        // Por segurança financeira, vamos bloquear temporariamente se der erro no RPC.
+        toast({
+          title: 'Erro de verificação',
+          description: 'Não foi possível verificar seu limite de uso diário. Tente novamente.',
+          variant: 'destructive',
+        });
+        setState(prev => ({ ...prev, status: 'idle', isConnected: false }));
+        setShowModal(false);
+        return;
+      }
+
+      if (usageData && !usageData.allowed) {
+        toast({
+          title: 'Limite Diário Atingido',
+          description: `Você atingiu o limite de 5 utilizações diárias da Cortana.`,
+          variant: 'destructive',
+        });
+        setState(prev => ({ ...prev, status: 'idle', isConnected: false }));
+        setShowModal(false);
+        return;
+      }
+
+      // Se passou, iniciar sessão
       await conversation.startSession({
         agentId: CORTANA_CONFIG.agentId,
         clientTools,
@@ -261,6 +281,35 @@ export function CortanaProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [state.isConnected, startConversation, stopConversation]);
+
+  // Refs para manter dependências estáveis sem recriar o executor
+  const stopConversationRef = useRef(stopConversation);
+
+  useEffect(() => {
+    stopConversationRef.current = stopConversation;
+  }, [stopConversation]);
+
+  // Inicializar Action Executor (apenas uma vez ou quando dependências críticas mudarem)
+  useEffect(() => {
+    console.log('[CortanaProvider] Inicializando ActionExecutor');
+
+    initializeActionExecutor({
+      navigate,
+      toast,
+      closeModal: () => stopConversationRef.current(),
+      createToastAction: (label, onClick) => (
+        <ToastAction altText={label} onClick={onClick}>
+          {label}
+        </ToastAction>
+      ),
+    });
+    injectHighlightStyles();
+
+    // Configurar callback para ações dos client tools
+    setActionCallback((action: PendingAction) => {
+      executeAction(action);
+    });
+  }, [navigate, toast]); // Removemos stopConversation das dependências diretas
 
   const value: CortanaContextValue = {
     state,

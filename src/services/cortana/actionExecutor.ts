@@ -1,7 +1,6 @@
-// Action Executor - Executa ações visuais no React
-// Navegação, modais, toasts, highlights
-
-import { CORTANA_CONFIG } from '@/config/cortana';
+// React Element type for ToastAction
+import { ReactElement } from 'react';
+import { ToastAction } from '@/components/ui/toast';
 
 export interface ActionPayload {
   navigate?: {
@@ -16,6 +15,10 @@ export interface ActionPayload {
     title: string;
     description?: string;
     variant?: 'default' | 'destructive';
+    action?: {
+      label: string;
+      path: string; // Caminho para navegar ao clicar
+    };
   };
   highlight?: {
     elementId: string;
@@ -28,7 +31,12 @@ export interface ActionPayload {
 }
 
 type NavigateFunction = (path: string) => void;
-type ToastFunction = (options: { title: string; description?: string; variant?: 'default' | 'destructive' }) => void;
+type ToastFunction = (options: {
+  title: string;
+  description?: string;
+  variant?: 'default' | 'destructive';
+  action?: ReactElement;
+}) => void;
 type ModalFunction = (type: string, data?: unknown) => void;
 
 interface ActionExecutorOptions {
@@ -36,6 +44,8 @@ interface ActionExecutorOptions {
   toast: ToastFunction;
   openModal?: ModalFunction;
   closeModal?: () => void;
+  // Função para criar o elemento JSX da ação (necessário pois class não pode usar JSX direto sem .tsx)
+  createToastAction?: (label: string, onClick: () => void) => ReactElement;
 }
 
 let executorInstance: ActionExecutor | null = null;
@@ -45,24 +55,32 @@ export class ActionExecutor {
   private toast: ToastFunction;
   private openModal?: ModalFunction;
   private closeModal?: () => void;
+  private createToastAction?: (label: string, onClick: () => void) => ReactElement;
 
   constructor(options: ActionExecutorOptions) {
     this.navigate = options.navigate;
     this.toast = options.toast;
     this.openModal = options.openModal;
     this.closeModal = options.closeModal;
+    this.createToastAction = options.createToastAction;
   }
 
   /**
    * Executa uma ação baseada no tipo
    */
   execute(action: { type: string; payload: unknown }): void {
+    console.log('[ActionExecutor] Executando:', action);
     switch (action.type) {
       case 'navigate':
         this.handleNavigate(action.payload as { path: string });
         break;
       case 'toast':
-        this.handleToast(action.payload as { title: string; description?: string; variant?: 'default' | 'destructive' });
+        this.handleToast(action.payload as {
+          title: string;
+          description?: string;
+          variant?: 'default' | 'destructive';
+          action?: { label: string; path: string };
+        });
         break;
       case 'openModal':
         this.handleOpenModal(action.payload as { type: string; data?: unknown });
@@ -87,12 +105,29 @@ export class ActionExecutor {
     this.navigate(path);
   }
 
-  private handleToast(payload: { title: string; description?: string; variant?: 'default' | 'destructive' }): void {
+  private handleToast(payload: {
+    title: string;
+    description?: string;
+    variant?: 'default' | 'destructive';
+    action?: { label: string; path: string };
+  }): void {
     console.log(`[ActionExecutor] Toast: ${payload.title}`);
+
+    let actionElement: ReactElement | undefined;
+
+    // Se tiver ação e função para criar elemento
+    if (payload.action && this.createToastAction) {
+      const { path } = payload.action;
+      actionElement = this.createToastAction(payload.action.label, () => {
+        this.navigate(path);
+      });
+    }
+
     this.toast({
       title: payload.title,
       description: payload.description,
       variant: payload.variant || 'default',
+      action: actionElement,
     });
   }
 
