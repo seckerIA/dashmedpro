@@ -58,30 +58,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Verificar usuário ou Service Role
     const { data: { user } } = await supabase.auth.getUser();
 
-    // --- CORREÇÃO DE AUTH (JWT ROLE CHECK) ---
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || 'never-matches';
-    const xServiceKey = req.headers.get('x-service-key');
-
-    let isServiceRole = false;
-
-    // 1. Tentar match exato (x-service-key)
-    if (xServiceKey === serviceRoleKey) isServiceRole = true;
-
-    // 2. Decodificar JWT e checar role (para Webhook com Verify JWT ativo)
-    if (!isServiceRole && authHeader) {
-      try {
-        const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const payloadStr = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
-          const payload = JSON.parse(payloadStr);
-          if (payload.role === 'service_role') isServiceRole = true;
-        }
-      } catch (_) { /* ignore */ }
-    }
-
-    if (!user && !isServiceRole) {
-      console.warn('[AI] Auth Rejected: Invalid Credentials');
+    if (!user && authHeader !== `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
     }
 
@@ -110,11 +87,11 @@ const handler = async (req: Request): Promise<Response> => {
     // DEBOUNCE / BUFFER STEP
     // ==========================================
     if (!force_reanalyze) {
-      const BUFFER_SECONDS = 30; // Espera 30s
+      const BUFFER_SECONDS = 15; // Espera 15s (reduzido para evitar timeout)
       const checkTime = new Date().toISOString();
 
       console.log(`[AI-DEBOUNCE] Waiting ${BUFFER_SECONDS}s buffer...`);
-      // Simples delay
+      // Delay para aguardar mais mensagens
       await new Promise(resolve => setTimeout(resolve, BUFFER_SECONDS * 1000));
 
       // Verificar se chegaram novas mensagens INBOUND
@@ -366,9 +343,10 @@ Analise a conversa e gere respostas naturais. Responda diretamente.`;
       const bestSuggestion = (aiResponse.suggestions || [])
         .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))[0];
 
-      // AJUSTE DE CONFIDENCE: 0.7 para garantir respostas
-      if (bestSuggestion && bestSuggestion.confidence >= 0.7) {
-        console.log('[AI] Auto-reply triggered with confidence:', bestSuggestion.confidence);
+      // Threshold de 85% conforme UI (AISettingsDialog)
+      const CONFIDENCE_THRESHOLD = 0.85;
+      if (bestSuggestion && bestSuggestion.confidence >= CONFIDENCE_THRESHOLD) {
+        console.log(`[AI] Auto-reply triggered with confidence: ${(bestSuggestion.confidence * 100).toFixed(0)}% (threshold: ${CONFIDENCE_THRESHOLD * 100}%)`);
 
         try {
           const { data: newMessage, error: insertError } = await supabaseAdmin
@@ -396,41 +374,66 @@ Analise a conversa e gere respostas naturais. Responda diretamente.`;
               .maybeSingle();
 
             if (waConfig && waConfig.access_token) {
-              const waResponse = await fetch(
-                `https://graph.facebook.com/v18.0/${waConfig.phone_number_id}/messages`,
-                {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `Bearer ${waConfig.access_token}`,
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    messaging_product: 'whatsapp',
-                    to: conversation.phone_number,
-                    type: 'text',
-                    text: { body: bestSuggestion.content }
-                  }),
-                }
-              );
+              // Retry logic para falhas de rede
+              let retries = 2;
+              let waResponse: Response | null = null;
+              let waData: any = null;
 
-              const waData = await waResponse.json();
-              if (waResponse.ok) {
+              while (retries >= 0) {
+                try {
+                  waResponse = await fetch(
+                    `https://graph.facebook.com/v18.0/${waConfig.phone_number_id}/messages`,
+                    {
+                      method: 'POST',
+                      headers: {
+                        'Authorization': `Bearer ${waConfig.access_token}`,
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        messaging_product: 'whatsapp',
+                        to: conversation.phone_number,
+                        type: 'text',
+                        text: { body: bestSuggestion.content }
+                      }),
+                    }
+                  );
+                  waData = await waResponse.json();
+                  break; // Success, exit retry loop
+                } catch (fetchError: any) {
+                  console.error(`[AI] WhatsApp API fetch error (retries left: ${retries}):`, fetchError.message);
+                  retries--;
+                  if (retries >= 0) await new Promise(r => setTimeout(r, 1000)); // Wait 1s before retry
+                }
+              }
+
+              if (waResponse?.ok && waData) {
                 const waMessageId = waData.messages?.[0]?.id;
-                console.log('[AI] Auto-reply sent! WA ID:', waMessageId);
+                console.log('[AI] ✅ Auto-reply sent! WA ID:', waMessageId);
                 await supabaseAdmin
                   .from('whatsapp_messages')
-                  .update({ message_id: waMessageId, status: 'sent' })
+                  .update({
+                    message_id: waMessageId,
+                    status: 'sent',
+                    metadata: { auto_reply: true, confidence: bestSuggestion.confidence, ai_generated: true }
+                  })
                   .eq('id', newMessage.id);
 
                 await supabaseAdmin.from('whatsapp_conversations').update({
                   last_message_at: new Date().toISOString(),
-                  last_message_preview: bestSuggestion.content.substring(0, 100),
+                  last_message_preview: `🤖 ${bestSuggestion.content.substring(0, 90)}`,
                   last_message_direction: 'outbound',
                   updated_at: new Date().toISOString()
                 }).eq('id', conversation_id);
-              } else {
-                console.error('[AI] WhatsApp API error:', waData.error);
+              } else if (waData?.error) {
+                console.error('[AI] ❌ WhatsApp API error:', waData.error);
+                // Mark message as failed
+                await supabaseAdmin
+                  .from('whatsapp_messages')
+                  .update({ status: 'failed', error_code: waData.error?.code?.toString() })
+                  .eq('id', newMessage.id);
               }
+            } else {
+              console.warn('[AI] WhatsApp config not found or inactive for user:', conversation.user_id);
             }
 
             // Marcar sugestão usada
@@ -461,6 +464,7 @@ Analise a conversa e gere respostas naturais. Responda diretamente.`;
 
   } catch (error: any) {
     console.error('[whatsapp-ai-analyze] Error:', error.message);
+
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

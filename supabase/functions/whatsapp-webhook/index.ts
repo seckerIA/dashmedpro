@@ -340,46 +340,24 @@ async function processIncomingMessage(
 
   console.log('[Webhook] Message saved:', savedMessage.id);
 
-  // --- DISPARO DA IA (CORRIGIDO FINAL - ESTRATEGIA HÍBRIDA) ---
-  console.log(`[DEBUG-WEBHOOK] Pre-fetch: conversation_id=${conversationId}`);
-
+  // --- DISPARO DA IA (FOLLOW-UP AUTOMÁTICO) ---
   const aiUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/whatsapp-ai-analyze`;
-
-  // PEGANDO AS DUAS CHAVES
-  const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
-  console.log(`[DEBUG-WEBHOOK] Keys configured? Anon:${!!anonKey} Service:${!!serviceKey}`);
-
-  // TENTATIVA 3: Service Key Pura (JWT de Admin)
-  // Se o Analyses está com Verify JWT ativado, ele precisa de um JWT válido.
-  // A Service Key É um JWT válido.
-
-  const tokenToSend = serviceKey;
-  console.log(`[DEBUG-WEBHOOK] Token starts with: ${tokenToSend.substring(0, 10)}...`);
-
   try {
-    const aiRes = await fetch(aiUrl, {
+    fetch(aiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${tokenToSend}`, // Para satisfazer o Gateway com JWT Válido
-        'x-service-key': serviceKey,              // Redundância para garantir que a função aceite
+        'Authorization': `Bearer ${serviceKey}`
       },
-      body: JSON.stringify({ conversation_id: conversationId }),
+      body: JSON.stringify({ conversation_id: conversationId })
     });
-
-    if (!aiRes.ok) {
-      const errText = await aiRes.text();
-      console.error(`[DEBUG-WEBHOOK] AI Error Body: ${errText}`);
-    }
-
-    console.log(`[DEBUG-WEBHOOK] AI Function response status: ${aiRes.status}`);
-  } catch (err: any) {
-    console.error('[DEBUG-WEBHOOK] Fatal AI Trigger Error:', err.message);
+  } catch (error) {
+    console.error('[Webhook] Error triggering AI:', error);
   }
 
-  console.log(`[DEBUG-WEBHOOK] Finished process for message: ${savedMessage.id}`);
+  console.log(`[Webhook] Finished process for message: ${savedMessage.id}`);
 }
 
 // =========================================

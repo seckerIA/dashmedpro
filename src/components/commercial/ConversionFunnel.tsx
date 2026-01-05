@@ -49,13 +49,15 @@ export function ConversionFunnel({ data }: ConversionFunnelProps) {
           const isBottleneck = bottlenecks.includes(index);
           const gradient = CHART_COLORS.funnel[index % CHART_COLORS.funnel.length];
           const prevStage = index > 0 ? data[index - 1] : null;
-          const conversionRate = prevStage 
+
+          // Fix: Prevent Infinity% by handling division by zero
+          const conversionRate = prevStage && prevStage.count > 0
             ? ((stage.count / prevStage.count) * 100).toFixed(1)
-            : '100.0';
-          const drop = prevStage 
-            ? (prevStage.percentage - stage.percentage).toFixed(1)
+            : (stage.count > 0 ? '100.0' : '0.0');
+          const drop = prevStage
+            ? Math.max(0, prevStage.percentage - stage.percentage).toFixed(1)
             : '0.0';
-          
+
           return (
             <Tooltip key={stage.stage}>
               <TooltipTrigger asChild>
@@ -104,7 +106,7 @@ export function ConversionFunnel({ data }: ConversionFunnelProps) {
                         "h-full transition-all duration-700 ease-out rounded-xl relative",
                         "shadow-lg"
                       )}
-                      style={{ 
+                      style={{
                         width: `${widthPercentage}%`,
                         background: `linear-gradient(90deg, ${gradient.start}, ${gradient.end})`
                       }}

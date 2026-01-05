@@ -2,3 +2,9 @@ project_id = "adzaqkduxnpckbcuqpmg"
 
 [functions.whatsapp-webhook]
 verify_jwt = false
+
+[functions.voip-webhook]
+verify_jwt = false
+
+[functions.whatsapp-voice-webhook]
+verify_jwt = false

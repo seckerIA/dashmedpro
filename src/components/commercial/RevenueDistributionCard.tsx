@@ -3,6 +3,7 @@ import { AlertTriangle, PieChart } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useCommercialMetrics } from "@/hooks/useCommercialMetrics";
 import { formatCurrency } from "@/lib/currency";
+import { translateAppointmentType } from "@/lib/translations";
 import { cn } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, CartesianGrid, Cell, LabelList } from "recharts";
 import { getGradient, CHART_COLORS } from "@/lib/chart-colors";
@@ -16,7 +17,7 @@ export function RevenueDistributionCard() {
   }
 
   const totalRevenue = metrics.revenueByProcedure.reduce(
-    (sum, p) => sum + Number(p.value || 0), 
+    (sum, p) => sum + Number(p.value || 0),
     0
   );
 
@@ -25,7 +26,7 @@ export function RevenueDistributionCard() {
   // Ordenar por valor
   const sortedProcedures = [...metrics.revenueByProcedure]
     .map(p => ({
-      name: p.name,
+      name: translateAppointmentType(p.name),
       value: Number(p.value || 0),
       percentage: (Number(p.value || 0) / totalRevenue) * 100,
     }))
@@ -68,7 +69,7 @@ export function RevenueDistributionCard() {
                 Distribuição de Receita
               </CardTitle>
               {hasAlert && (
-                <Badge 
+                <Badge
                   variant={severity === "high" ? "destructive" : "default"}
                   className="text-xs"
                 >
@@ -116,7 +117,7 @@ export function RevenueDistributionCard() {
                 <div className="relative h-6 bg-muted/50 rounded-lg overflow-hidden">
                   <div
                     className="h-full rounded-lg transition-all duration-500"
-                    style={{ 
+                    style={{
                       width: `${barWidth}%`,
                       background: `linear-gradient(90deg, ${gradient.start}, ${gradient.end})`
                     }}

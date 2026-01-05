@@ -33,6 +33,7 @@ export interface SecretaryMetrics {
     doctorName: string;
     startTime: string;
     status: string;
+    procedure?: string;
   }>;
 
   // Médicos disponíveis
@@ -40,6 +41,8 @@ export interface SecretaryMetrics {
     id: string;
     name: string;
     email: string;
+    specialty?: string;
+    appointmentsToday?: number;
   }>;
 }
 
@@ -68,8 +71,8 @@ export function useSecretaryMetrics() {
       if (!user?.id) return emptyMetrics;
 
       // Se secretária estiver vinculada a um médico, usar doctor_id para filtrar
-      const doctorIdFilter = profile?.role === 'secretaria' && profile?.doctor_id 
-        ? profile.doctor_id 
+      const doctorIdFilter = profile?.role === 'secretaria' && profile?.doctor_id
+        ? profile.doctor_id
         : null;
 
       const now = new Date();

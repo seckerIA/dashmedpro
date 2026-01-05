@@ -43,8 +43,13 @@ import {
   Mail,
   FileText,
   BarChart3,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  Phone
 } from "lucide-react";
+import { CallOverlay } from "@/components/voip/CallOverlay";
+import { IncomingCallModal } from "@/components/voip/IncomingCallModal";
+import CallsPage from "@/pages/Calls";
+import VOIPSettings from "@/pages/VOIPSettings";
 
 // Configuração do QueryClient com tratamento global de timeouts e retries resilientes
 const queryClient = new QueryClient({
@@ -260,156 +265,179 @@ const AppRoutes = () => {
           <Route path="/login" element={<Navigate to="/" replace />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/" element={<Dashboard />} />
-        <Route path="/calculadora" element={<CalculadoraSelection />} />
-        <Route path="/calculadora-precificacao" element={<Calculadora />} />
-        <Route path="/calculadora-roi" element={<CalculadoraROI />} />
-        <Route
-          path="/equipe"
-          element={
-            <RoleProtectedRoute allowedRoles={['admin', 'dono']}>
-              <TeamManagement />
-            </RoleProtectedRoute>
-          }
-        />
-        <Route path="/tarefas" element={<Tasks />} />
-        <Route
-          path="/marketing"
-          element={
-            <RoleProtectedRoute allowedRoles={['admin', 'dono', 'vendedor', 'gestor_trafego', 'medico']}>
-              <Marketing />
-            </RoleProtectedRoute>
-          }
-        />
-        <Route path="/comercial" element={<Commercial />} />
-        <Route
-          path="/financeiro"
-          element={
-            <RoleProtectedRoute allowedRoles={['admin', 'dono', 'vendedor', 'gestor_trafego', 'medico']}>
-              <Financial />
-            </RoleProtectedRoute>
-          }
-        />
-        <Route
-          path="/financeiro/transacoes"
-          element={
-            <RoleProtectedRoute allowedRoles={['admin', 'dono', 'vendedor', 'gestor_trafego', 'medico']}>
-              <FinancialTransactions />
-            </RoleProtectedRoute>
-          }
-        />
-        <Route
-          path="/financeiro/nova-transacao"
-          element={
-            <RoleProtectedRoute allowedRoles={['admin', 'dono', 'vendedor', 'gestor_trafego', 'medico']}>
-              <TransactionForm />
-            </RoleProtectedRoute>
-          }
-        />
-        <Route
-          path="/financeiro/editar-transacao/:id"
-          element={
-            <RoleProtectedRoute allowedRoles={['admin', 'dono', 'vendedor', 'gestor_trafego', 'medico']}>
-              <TransactionForm />
-            </RoleProtectedRoute>
-          }
-        />
-        <Route
-          path="/financeiro/sinais"
-          element={
-            <RoleProtectedRoute allowedRoles={['admin', 'dono', 'medico', 'secretaria']}>
-              <FinancialSinais />
-            </RoleProtectedRoute>
-          }
-        />
-        <Route
-          path="/secretaria/financeiro"
-          element={
-            <RoleProtectedRoute allowedRoles={['secretaria']}>
-              <SecretaryFinancial />
-            </RoleProtectedRoute>
-          }
-        />
-        <Route path="/crm" element={<CRM />} />
-        <Route
-          path="/whatsapp"
-          element={
-            <RoleProtectedRoute allowedRoles={['admin', 'dono', 'secretaria']}>
-              <WhatsAppInbox />
-            </RoleProtectedRoute>
-          }
-        />
-        <Route
-          path="/whatsapp/settings"
-          element={
-            <RoleProtectedRoute allowedRoles={['admin', 'dono', 'secretaria']}>
-              <WhatsAppSettings />
-            </RoleProtectedRoute>
-          }
-        />
-        <Route path="/calendar" element={<MedicalCalendar />} />
-        <Route path="/follow-ups" element={<FollowUps />} />
-        <Route
-          path="/prontuarios"
-          element={
-            <RoleProtectedRoute allowedRoles={['admin', 'dono', 'medico']}>
-              <MedicalRecords />
-            </RoleProtectedRoute>
-          }
-        />
-        <Route path="/comercial/guia-prospeccao" element={<ProspectingGuide />} />
-        <Route
-          path="/email-marketing"
-          element={
-            <PlaceholderPage
-              title="E-mail Marketing"
-              description="Campanhas de e-mail marketing e automação"
-              icon={Mail}
-            />
-          }
-        />
-        <Route
-          path="/funil-vendas"
-          element={
-            <PlaceholderPage
-              title="Funil de Vendas"
-              description="Gestão e otimização do funil de vendas"
-              icon={BarChart3}
-            />
-          }
-        />
-        <Route
-          path="/landing-pages"
-          element={
-            <PlaceholderPage
-              title="Landing Pages"
-              description="Criação e gestão de landing pages"
-              icon={FileText}
-            />
-          }
-        />
-        <Route
-          path="/relatorios"
-          element={
-            <RoleProtectedRoute allowedRoles={['admin', 'dono']}>
+          <Route path="/calculadora" element={<CalculadoraSelection />} />
+          <Route path="/calculadora-precificacao" element={<Calculadora />} />
+          <Route path="/calculadora-roi" element={<CalculadoraROI />} />
+          <Route
+            path="/equipe"
+            element={
+              <RoleProtectedRoute allowedRoles={['admin', 'dono']}>
+                <TeamManagement />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route path="/tarefas" element={<Tasks />} />
+          <Route
+            path="/marketing"
+            element={
+              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'vendedor', 'gestor_trafego', 'medico']}>
+                <Marketing />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route path="/comercial" element={<Commercial />} />
+          <Route
+            path="/financeiro"
+            element={
+              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'vendedor', 'gestor_trafego', 'medico']}>
+                <Financial />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="/financeiro/transacoes"
+            element={
+              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'vendedor', 'gestor_trafego', 'medico']}>
+                <FinancialTransactions />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="/financeiro/nova-transacao"
+            element={
+              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'vendedor', 'gestor_trafego', 'medico']}>
+                <TransactionForm />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="/financeiro/editar-transacao/:id"
+            element={
+              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'vendedor', 'gestor_trafego', 'medico']}>
+                <TransactionForm />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="/financeiro/sinais"
+            element={
+              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'medico', 'secretaria']}>
+                <FinancialSinais />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="/secretaria/financeiro"
+            element={
+              <RoleProtectedRoute allowedRoles={['secretaria']}>
+                <SecretaryFinancial />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route path="/crm" element={<CRM />} />
+          <Route
+            path="/whatsapp"
+            element={
+              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'secretaria']}>
+                <WhatsAppInbox />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="/whatsapp/settings"
+            element={
+              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'secretaria']}>
+                <WhatsAppSettings />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="/calls"
+            element={
+              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'secretaria', 'medico', 'vendedor']}>
+                <CallsPage />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="/voip/settings"
+            element={
+              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'secretaria', 'medico']}>
+                <VOIPSettings />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route path="/calendar" element={<MedicalCalendar />} />
+          <Route path="/follow-ups" element={<FollowUps />} />
+          <Route
+            path="/prontuarios"
+            element={
+              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'medico']}>
+                <MedicalRecords />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route path="/comercial/guia-prospeccao" element={<ProspectingGuide />} />
+          <Route
+            path="/email-marketing"
+            element={
               <PlaceholderPage
-                title="Relatórios"
-                description="Relatórios e análises de performance"
+                title="E-mail Marketing"
+                description="Campanhas de e-mail marketing e automação"
+                icon={Mail}
+              />
+            }
+          />
+          <Route
+            path="/funil-vendas"
+            element={
+              <PlaceholderPage
+                title="Funil de Vendas"
+                description="Gestão e otimização do funil de vendas"
                 icon={BarChart3}
               />
-            </RoleProtectedRoute>
-          }
-        />
-        <Route
-          path="/configuracoes"
-          element={<Settings />}
-        />
-        <Route path="*" element={<NotFound />} />
+            }
+          />
+          <Route
+            path="/landing-pages"
+            element={
+              <PlaceholderPage
+                title="Landing Pages"
+                description="Criação e gestão de landing pages"
+                icon={FileText}
+              />
+            }
+          />
+          <Route
+            path="/relatorios"
+            element={
+              <RoleProtectedRoute allowedRoles={['admin', 'dono']}>
+                <PlaceholderPage
+                  title="Relatórios"
+                  description="Relatórios e análises de performance"
+                  icon={BarChart3}
+                />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="/configuracoes"
+            element={<Settings />}
+          />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </AppLayout>
 
       {/* Cortana - Assistente de Voz IA */}
       <CortanaButton />
       <CortanaOverlay />
+      {/* Cortana - Assistente de Voz IA */}
+      <CortanaButton />
+      <CortanaOverlay />
+
+      {/* VOIP Components */}
+      <CallOverlay />
+      <IncomingCallModal />
     </CortanaProvider>
   );
 };

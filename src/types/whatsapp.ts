@@ -91,6 +91,8 @@ export interface WhatsAppConversation {
   metadata: Record<string, unknown>;
   lead_status?: 'quente' | 'morno' | 'frio';
   lead_status_color?: string;
+  ai_processing?: boolean;
+  ai_processing_started_at?: string | null;
   created_at: string;
   updated_at: string;
 }

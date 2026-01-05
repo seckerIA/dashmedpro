@@ -161,7 +161,8 @@ export function AISettingsDialog({ open, onOpenChange }: AISettingsDialogProps) 
                                     )}
                                 </Label>
                                 <p className="text-xs text-muted-foreground leading-relaxed">
-                                    A IA responderá automaticamente se a confiança for alta ({'>'}85%).
+                                    A IA responderá automaticamente quando tiver alta confiança (≥85%).
+                                    As mensagens automáticas terão um badge visual identificando que foram enviadas pela IA.
                                 </p>
                             </div>
                             <Switch

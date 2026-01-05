@@ -25,7 +25,8 @@ import {
   ShoppingCart,
   Megaphone,
   Receipt,
-  MessageCircle
+  MessageCircle,
+  Phone
 } from "lucide-react"
 import { NavLink, useLocation, useNavigate } from "react-router-dom"
 import {
@@ -64,63 +65,65 @@ const navigationGroups: Array<{
   label: string;
   items: NavigationItem[];
 }> = [
-  {
-    label: "Principal",
-    items: [
-      { title: "Dashboard", url: "/", icon: Home },
-      { title: "Tarefas", url: "/tarefas", icon: CheckSquare2 },
-    ]
-  },
-  {
-    label: "Vendas & Marketing",
-    items: [
-      { title: "Marketing", url: "/marketing", icon: TrendingUp },
-      {
-        title: "CRM",
-        url: "/comercial",
-        icon: Target,
-        subItems: [
-          { title: "Dashboard", url: "/comercial?tab=dashboard", icon: BarChart3 },
-          { title: "Pipeline", url: "/comercial?tab=pipeline", icon: Workflow },
-          { title: "Leads & Conversões", url: "/comercial?tab=leads", icon: TrendingUp },
-          { title: "Inteligência", url: "/comercial?tab=intelligence", icon: Brain },
-          { title: "Vendas & Procedimentos", url: "/comercial?tab=sales", icon: ShoppingCart },
-          { title: "Campanhas", url: "/comercial?tab=campaigns", icon: Megaphone },
-          { title: "Relatórios", url: "/comercial?tab=reports", icon: BarChart3 },
-        ]
-      },
-      { title: "Guia de Prospecção", url: "/comercial/guia-prospeccao", icon: Compass, badge: "Novo", variant: "new" as const },
-      { title: "Calculadora", url: "/calculadora", icon: Calculator, badge: "Novo", variant: "new" as const },
-      { title: "Métricas de Equipe", url: "/crm", icon: Users },
-      { title: "Calendário", url: "/calendar", icon: Calendar, badge: "Novo", variant: "new" as const },
-      // { title: "Follow-ups", url: "/follow-ups", icon: RotateCcw }, // Ocultado
-      // { title: "Funil de Vendas", url: "/funil-vendas", icon: BarChart3 }, // Ocultado - placeholder
-    ]
-  },
-  {
-    label: "Atendimento",
-    items: [
-      { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle, badge: "Novo", variant: "new" as const },
-      { title: "Prontuários", url: "/prontuarios", icon: ClipboardList, medicoOnly: true },
-      { title: "Meu Financeiro", url: "/secretaria/financeiro", icon: Receipt, secretariaOnly: true },
-    ]
-  },
-  {
-    label: "Ferramentas",
-    items: [
-      { title: "Financeiro", url: "/financeiro", icon: PieChart },
-      // { title: "E-mail Marketing", url: "/email-marketing", icon: Mail }, // Ocultado - placeholder
-      // { title: "Landing Pages", url: "/landing-pages", icon: FileText }, // Ocultado - placeholder
-      { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
-    ]
-  },
-  {
-    label: "Administração",
-    items: [
-      { title: "Gerenciar Equipe", url: "/equipe", icon: UserPlus, adminOnly: true },
-    ]
-  }
-]
+    {
+      label: "Principal",
+      items: [
+        { title: "Dashboard", url: "/", icon: Home },
+        { title: "Tarefas", url: "/tarefas", icon: CheckSquare2 },
+      ]
+    },
+    {
+      label: "Vendas & Marketing",
+      items: [
+        { title: "Marketing", url: "/marketing", icon: TrendingUp },
+        {
+          title: "CRM",
+          url: "/comercial",
+          icon: Target,
+          subItems: [
+            { title: "Dashboard", url: "/comercial?tab=dashboard", icon: BarChart3 },
+            { title: "Pipeline", url: "/comercial?tab=pipeline", icon: Workflow },
+            { title: "Leads & Conversões", url: "/comercial?tab=leads", icon: TrendingUp },
+            { title: "Inteligência", url: "/comercial?tab=intelligence", icon: Brain },
+            { title: "Vendas & Procedimentos", url: "/comercial?tab=sales", icon: ShoppingCart },
+            { title: "Campanhas", url: "/comercial?tab=campaigns", icon: Megaphone },
+            { title: "Relatórios", url: "/comercial?tab=reports", icon: BarChart3 },
+          ]
+        },
+        { title: "Guia de Prospecção", url: "/comercial/guia-prospeccao", icon: Compass, badge: "Novo", variant: "new" as const },
+        { title: "Calculadora", url: "/calculadora", icon: Calculator, badge: "Novo", variant: "new" as const },
+        { title: "Métricas de Equipe", url: "/crm", icon: Users },
+        { title: "Calendário", url: "/calendar", icon: Calendar, badge: "Novo", variant: "new" as const },
+        // { title: "Follow-ups", url: "/follow-ups", icon: RotateCcw }, // Ocultado
+        // { title: "Funil de Vendas", url: "/funil-vendas", icon: BarChart3 }, // Ocultado - placeholder
+      ]
+    },
+    {
+      label: "Atendimento",
+      items: [
+        { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle, badge: "Novo", variant: "new" as const },
+        { title: "Chamadas", url: "/calls", icon: Phone, badge: "Novo", variant: "new" as const },
+        { title: "Prontuários", url: "/prontuarios", icon: ClipboardList, medicoOnly: true },
+        { title: "Meu Financeiro", url: "/secretaria/financeiro", icon: Receipt, secretariaOnly: true },
+      ]
+    },
+    {
+      label: "Ferramentas",
+      items: [
+        { title: "Financeiro", url: "/financeiro", icon: PieChart },
+        // { title: "E-mail Marketing", url: "/email-marketing", icon: Mail }, // Ocultado - placeholder
+        // { title: "Landing Pages", url: "/landing-pages", icon: FileText }, // Ocultado - placeholder
+        { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
+      ]
+    },
+    {
+      label: "Administração",
+      items: [
+        { title: "Gerenciar Equipe", url: "/equipe", icon: UserPlus, adminOnly: true },
+        { title: "Configurar VoIP", url: "/voip/settings", icon: Phone, adminOnly: true },
+      ]
+    }
+  ]
 
 interface AppSidebarProps {
   isCollapsed: boolean;
@@ -165,18 +168,18 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
     if (!queryString) return currentPath === basePath && !currentSearch
     return currentSearch === `?${queryString}`
   }
-  
+
   // Debug: verificar permissões (remover em produção)
   React.useEffect(() => {
     if (profile) {
-      console.log('Sidebar Debug - Profile Loaded:', { 
+      console.log('Sidebar Debug - Profile Loaded:', {
         profileId: profile.id,
         email: profile.email,
         fullName: profile.full_name,
-        role: profile.role, 
+        role: profile.role,
         isActive: profile.is_active,
-        isAdmin, 
-        isVendedor, 
+        isAdmin,
+        isVendedor,
         isGestorTrafego,
         isLoadingProfile,
         userId: user?.id,
@@ -189,7 +192,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
       });
     }
   }, [profile, isAdmin, isVendedor, isGestorTrafego, isLoadingProfile, user?.id]);
-  
+
   const handleSignOut = async () => {
     try {
       await signOut();
@@ -226,9 +229,9 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                 transition-all duration-300
               `}
             >
-              <img 
-                src={dashmedLogo} 
-                alt="DashMed Pro Logo" 
+              <img
+                src={dashmedLogo}
+                alt="DashMed Pro Logo"
                 className={`${isCollapsed ? 'w-10 h-10' : 'w-12 h-12'} transition-smooth`}
               />
               {!isCollapsed && (
@@ -260,7 +263,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                   if (hiddenUrls.includes(item.url)) {
                     return false;
                   }
-                  
+
                   // Se o item tem adminOnly, só mostrar para admin/dono
                   if (item.adminOnly === true) {
                     // Se ainda está carregando o perfil, não mostrar ainda (evita flash)
@@ -309,7 +312,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                     // - Marketing completo
                     if (item.url === '/marketing') return false;
                   }
-                  
+
                   // Gestor de Tráfego NÃO pode ver:
                   if (isGestorTrafego) {
                     // - Página Financeiro
@@ -317,7 +320,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                     // - CRM
                     if (item.url === '/crm') return false;
                   }
-                  
+
                   // Secretaria NÃO pode ver:
                   if (isSecretaria) {
                     // - Marketing
@@ -325,13 +328,13 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                     // - Página Financeiro
                     if (item.url === '/financeiro') return false;
                   }
-                  
+
                   return true;
                 });
 
                 // Se não há itens no grupo após filtrar, não renderizar o grupo
                 if (filteredItems.length === 0) return null;
-                
+
                 return (
                   <div key={group.label} className="space-y-1">
                     {/* Group Label */}
@@ -342,12 +345,12 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                         </span>
                       </div>
                     )}
-                    
+
                     {/* Separator for collapsed state */}
                     {isCollapsed && groupIndex > 0 && (
                       <div className="h-px bg-white/10 my-1" />
                     )}
-                    
+
                     {/* Group Items */}
                     {filteredItems.map((item) => {
                       const hasSubItems = item.subItems && item.subItems.length > 0
@@ -568,8 +571,8 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                         </Tooltip>
                       )
                     })}
-                </div>
-              );
+                  </div>
+                );
               })}
             </div>
           </div>
@@ -579,7 +582,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
         <div className={`flex-shrink-0 border-t border-white/10 ${isCollapsed ? 'p-1 space-y-2.5' : 'p-4 space-y-2.5'}`}>
           {/* Theme Toggle */}
           <ThemeToggle isCollapsed={isCollapsed} />
-          
+
           {/* Settings */}
           {(() => {
             const active = isActive('/configuracoes');
@@ -606,19 +609,19 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                 </div>
               </div>
             );
-            
+
             return (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <NavLink 
+                  <NavLink
                     to="/configuracoes"
                     className={`
                       group relative w-full block
                       ${isCollapsed ? 'p-2.5' : 'px-4 py-3.5'}
                       rounded-2xl text-base font-medium
                       transition-all duration-200
-                      ${active 
-                        ? 'bg-primary text-white shadow-sm' 
+                      ${active
+                        ? 'bg-primary text-white shadow-sm'
                         : 'text-white/70 hover:bg-white/5 hover:text-white'
                       }
                     `}
@@ -634,7 +637,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
               </Tooltip>
             );
           })()}
-          
+
           {/* User info and logout */}
           {!isCollapsed && (
             <div className="mt-3 px-3 py-2.5 bg-white/5 rounded-2xl">

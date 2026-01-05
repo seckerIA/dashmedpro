@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, LabelList } from "recharts";
 import { formatCurrency } from "@/lib/currency";
+import { translateAppointmentType } from "@/lib/translations";
 import { getChartColor, getGradient, CHART_COLORS } from "@/lib/chart-colors";
 import { EnhancedTooltip } from "@/components/charts/EnhancedTooltip";
 
@@ -46,6 +47,12 @@ export function RevenueChart({ data, type = "pie" }: RevenueChartProps) {
     return data.reduce((sum, item) => sum + Number(item.value || 0), 0);
   }, [data]);
 
+  // Translate names for display (must be before any conditional returns)
+  const translatedData = useMemo(() => data.map(item => ({
+    ...item,
+    name: translateAppointmentType(item.name),
+  })), [data]);
+
   if (!data || data.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-muted-foreground">
@@ -56,7 +63,7 @@ export function RevenueChart({ data, type = "pie" }: RevenueChartProps) {
 
   if (type === "pie" || type === "donut") {
     const innerRadius = type === "donut" ? 60 : 0;
-    
+
     return (
       <div className="w-full">
         <ResponsiveContainer width="100%" height={320}>
@@ -70,7 +77,7 @@ export function RevenueChart({ data, type = "pie" }: RevenueChartProps) {
               ))}
             </defs>
             <Pie
-              data={data}
+              data={translatedData}
               cx="50%"
               cy="50%"
               labelLine={false}
@@ -82,30 +89,30 @@ export function RevenueChart({ data, type = "pie" }: RevenueChartProps) {
               stroke="hsl(var(--background))"
               strokeWidth={2}
             >
-              {data.map((entry, index) => (
-                <Cell 
-                  key={`cell-${index}`} 
+              {translatedData.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
                   fill={`url(#revenueGradient-${index % CHART_COLORS.gradients.length})`}
                 />
               ))}
             </Pie>
-            <EnhancedTooltip 
+            <EnhancedTooltip
               valueFormatter={(value) => formatCurrency(value)}
             />
           </PieChart>
         </ResponsiveContainer>
-        
+
         {/* Legenda melhorada com valores formatados */}
         <div className="grid grid-cols-2 gap-3 mt-4">
-          {data.map((entry, index) => {
+          {translatedData.map((entry, index) => {
             const percentage = totalValue > 0 ? ((Number(entry.value) / totalValue) * 100).toFixed(1) : '0.0';
             const gradient = getGradient(index);
-            
+
             return (
               <div key={index} className="flex items-center gap-2 text-sm">
-                <div 
+                <div
                   className="w-4 h-4 rounded flex-shrink-0"
-                  style={{ 
+                  style={{
                     background: `linear-gradient(135deg, ${gradient.start}, ${gradient.end})`
                   }}
                 />
@@ -129,32 +136,32 @@ export function RevenueChart({ data, type = "pie" }: RevenueChartProps) {
         <LineChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
           <defs>
             <linearGradient id="lineGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#6366f1" stopOpacity={0.8}/>
-              <stop offset="95%" stopColor="#6366f1" stopOpacity={0.1}/>
+              <stop offset="5%" stopColor="#6366f1" stopOpacity={0.8} />
+              <stop offset="95%" stopColor="#6366f1" stopOpacity={0.1} />
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
-          <XAxis 
-            dataKey="name" 
+          <XAxis
+            dataKey="name"
             stroke="hsl(var(--muted-foreground))"
             style={{ fontSize: '12px' }}
             tickLine={false}
             axisLine={false}
           />
-          <YAxis 
+          <YAxis
             stroke="hsl(var(--muted-foreground))"
             style={{ fontSize: '12px' }}
             tickLine={false}
             axisLine={false}
             tickFormatter={(value) => value.toLocaleString('pt-BR')}
           />
-          <EnhancedTooltip 
+          <EnhancedTooltip
             valueFormatter={(value) => value.toLocaleString('pt-BR')}
           />
-          <Line 
-            type="monotone" 
-            dataKey="value" 
-            stroke="#6366f1" 
+          <Line
+            type="monotone"
+            dataKey="value"
+            stroke="#6366f1"
             strokeWidth={3}
             dot={{ fill: '#6366f1', r: 4 }}
             activeDot={{ r: 6 }}
@@ -171,42 +178,42 @@ export function RevenueChart({ data, type = "pie" }: RevenueChartProps) {
           <defs>
             {CHART_COLORS.gradients.map((gradient, index) => (
               <linearGradient key={index} id={`barGradient-${index}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={gradient.start} stopOpacity={0.9}/>
-                <stop offset="100%" stopColor={gradient.end} stopOpacity={0.7}/>
+                <stop offset="0%" stopColor={gradient.start} stopOpacity={0.9} />
+                <stop offset="100%" stopColor={gradient.end} stopOpacity={0.7} />
               </linearGradient>
             ))}
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
-          <XAxis 
-            dataKey="name" 
+          <XAxis
+            dataKey="name"
             stroke="hsl(var(--muted-foreground))"
             style={{ fontSize: '12px' }}
             tickLine={false}
             axisLine={false}
           />
-          <YAxis 
+          <YAxis
             stroke="hsl(var(--muted-foreground))"
             style={{ fontSize: '12px' }}
             tickLine={false}
             axisLine={false}
             tickFormatter={(value) => value.toLocaleString('pt-BR')}
           />
-          <EnhancedTooltip 
+          <EnhancedTooltip
             valueFormatter={(value) => formatCurrency(value)}
           />
-          <Bar 
-            dataKey="value" 
+          <Bar
+            dataKey="value"
             radius={[8, 8, 0, 0]}
           >
             {data.map((entry, index) => (
-              <Cell 
-                key={`cell-${index}`} 
+              <Cell
+                key={`cell-${index}`}
                 fill={`url(#barGradient-${index % CHART_COLORS.gradients.length})`}
               />
             ))}
-            <LabelList 
-              dataKey="value" 
-              position="top" 
+            <LabelList
+              dataKey="value"
+              position="top"
               formatter={(value: number) => formatCurrency(value)}
               style={{ fontSize: '11px', fill: 'hsl(var(--muted-foreground))' }}
             />

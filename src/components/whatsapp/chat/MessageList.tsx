@@ -9,6 +9,7 @@ import { Loader2, ArrowDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { MessageItem } from './MessageItem';
+import { AITypingIndicator } from './AITypingIndicator';
 import type { WhatsAppMessageWithRelations } from '@/types/whatsapp';
 
 interface MessageListProps {
@@ -18,6 +19,8 @@ interface MessageListProps {
   hasMore?: boolean;
   onLoadMore?: () => void;
   onReply?: (message: WhatsAppMessageWithRelations) => void;
+  aiProcessing?: boolean;
+  aiProcessingStartedAt?: string | null;
 }
 
 export function MessageList({
@@ -27,6 +30,8 @@ export function MessageList({
   hasMore,
   onLoadMore,
   onReply,
+  aiProcessing,
+  aiProcessingStartedAt,
 }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -203,6 +208,8 @@ export function MessageList({
           })}
         </Fragment>
       ))}
+
+
 
       {/* Bottom anchor - IMPORTANTE: Mantém o scroll ancorado aqui */}
       <div ref={bottomRef} className="h-4 w-full" />

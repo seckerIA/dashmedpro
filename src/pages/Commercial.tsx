@@ -9,8 +9,8 @@ import { CampaignsManagement } from "@/components/commercial/CampaignsManagement
 import { CommercialReports } from "@/components/commercial/CommercialReports";
 import { PipelineManagement } from "@/components/commercial/PipelineManagement";
 import { LeadForm } from "@/components/commercial/LeadForm";
-import { LeadScoringPanel } from "@/components/commercial/LeadScoringPanel";
-import { ReactivationCampaignManager } from "@/components/commercial/ReactivationCampaignManager";
+import { AIInsightsDashboard } from "@/components/commercial/AIInsightsDashboard";
+
 
 export default function Commercial() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -18,7 +18,7 @@ export default function Commercial() {
   const actionFromUrl = searchParams.get("action");
   const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [isLeadFormOpen, setIsLeadFormOpen] = useState(actionFromUrl === "new");
-  
+
   useEffect(() => {
     if (tabFromUrl) {
       setActiveTab(tabFromUrl);
@@ -137,32 +137,7 @@ export default function Commercial() {
         </TabsContent>
 
         <TabsContent value="intelligence" className="mt-6">
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold mb-2">Inteligência de Leads</h2>
-              <p className="text-muted-foreground">
-                Configure o sistema de scoring e automação de reativação
-              </p>
-            </div>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div>
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <Brain className="w-5 h-5" />
-                  Scoring de Leads
-                </h3>
-                <LeadScoringPanel />
-              </div>
-              
-              <div>
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <MessageSquare className="w-5 h-5" />
-                  Reativação Automática
-                </h3>
-                <ReactivationCampaignManager />
-              </div>
-            </div>
-          </div>
+          <AIInsightsDashboard />
         </TabsContent>
 
         <TabsContent value="sales" className="mt-6">

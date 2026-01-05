@@ -20,6 +20,7 @@ import {
   Download,
   Play,
   CornerUpLeft,
+  Bot,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -49,6 +50,13 @@ export const MessageItem = memo(function MessageItem({
     ? format(new Date(message.sent_at), 'HH:mm')
     : '';
 
+  // Check if message was sent by AI
+  const isAIMessage = isOutbound && (
+    (message.metadata as any)?.auto_reply === true ||
+    (message.metadata as any)?.ai_generated === true
+  );
+  const aiConfidence = (message.metadata as any)?.confidence;
+
   return (
     <div
       className={cn(
@@ -72,10 +80,24 @@ export const MessageItem = memo(function MessageItem({
         className={cn(
           'relative max-w-[70%] rounded-2xl px-3 py-2',
           isOutbound
-            ? 'bg-emerald-600 text-white rounded-br-md shadow-sm'
+            ? isAIMessage
+              ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-br-md shadow-sm'
+              : 'bg-emerald-600 text-white rounded-br-md shadow-sm'
             : 'bg-muted rounded-bl-md'
         )}
       >
+        {/* AI Badge */}
+        {isAIMessage && (
+          <div className="flex items-center gap-1 mb-1 text-[10px] text-white/80">
+            <Bot className="h-3 w-3" />
+            <span>Enviado pela IA</span>
+            {aiConfidence && (
+              <span className="ml-1 px-1.5 py-0.5 bg-white/20 rounded text-[9px] font-medium">
+                {(aiConfidence * 100).toFixed(0)}%
+              </span>
+            )}
+          </div>
+        )}
         {/* Contexto de reply */}
         {message.reply_to && (
           <div

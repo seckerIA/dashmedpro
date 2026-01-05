@@ -45,6 +45,7 @@ import type {
   WhatsAppMessageWithRelations,
   WhatsAppConversationStatus,
 } from '@/types/whatsapp';
+import { CallButton } from '@/components/voip/CallButton';
 
 interface ChatWindowProps {
   conversation: WhatsAppConversationWithRelations;
@@ -97,40 +98,9 @@ export function ChatWindow({
     isSending,
   } = useWhatsAppMessages({ conversationId: conversation.id });
 
-  // Lógica para detectar se a IA está processando (buffer de 45s)
   useEffect(() => {
-    if (!messages || messages.length === 0 || !aiConfig?.auto_reply_enabled) {
-      setIsAIProcessing(false);
-      return;
-    }
-
-    // Assumindo que messages[0] é a mais recente (ordem decrescente do backend/hook)
-    // Se a mensagem for INBOUND (cliente), a IA pode estar processando
-    const latestMsg = messages[0];
-
-    if (latestMsg.direction !== 'inbound') {
-      setIsAIProcessing(false);
-      return;
-    }
-
-    const checkProcessing = () => {
-      const msgTime = new Date(latestMsg.created_at).getTime();
-      const now = Date.now();
-      const diff = (now - msgTime) / 1000;
-
-      // Se faz menos de 45s que a mensagem chegou, mostramos o indicador
-      if (diff < 45) {
-        setIsAIProcessing(true);
-      } else {
-        setIsAIProcessing(false);
-      }
-    };
-
-    checkProcessing(); // Check imediato
-    const interval = setInterval(checkProcessing, 1000); // Check a cada segundo
-
-    return () => clearInterval(interval);
-  }, [messages, aiConfig]);
+    setIsAIProcessing(false);
+  }, []);
 
   // Conversation actions
   const {
@@ -413,6 +383,14 @@ export function ChatWindow({
               <Search className="h-5 w-5" />
             </Button>
 
+            <CallButton
+              phoneNumber={conversation.phone_number}
+              contactName={displayName}
+              contactId={conversation.contact_id || undefined}
+              conversationId={conversation.id}
+              className="hidden md:flex"
+            />
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon">
@@ -489,16 +467,31 @@ export function ChatWindow({
             hasMore={hasNextPage}
             onLoadMore={fetchNextPage}
             onReply={handleReply}
+            aiProcessing={isAIProcessing}
+            aiProcessingStartedAt={(conversation as any).ai_processing_started_at}
           />
         </div>
 
-        {/* AI Typing Indicator */}
+        {/* AI Typing Indicator (bottom bar) */}
         {isAIProcessing && (
-          <div className="px-4 py-2 bg-muted/30 border-t flex items-center gap-2 animate-in fade-in duration-300">
-            <Bot className="h-4 w-4 text-emerald-500 twitter-spin animate-pulse" />
-            <span className="text-xs text-muted-foreground font-medium animate-pulse">
-              IA está analisando para responder...
-            </span>
+          <div className="px-4 py-3 bg-gradient-to-r from-purple-500/10 to-blue-500/10 border-t border-purple-500/20 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="relative">
+              <Bot className="h-5 w-5 text-purple-500" />
+              <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-purple-500 rounded-full animate-ping" />
+            </div>
+            <div className="flex-1">
+              <span className="text-sm font-medium text-foreground">
+                IA processando resposta
+              </span>
+              <span className="text-xs text-muted-foreground ml-2">
+                Analisando contexto da conversa...
+              </span>
+            </div>
+            <div className="flex gap-1">
+              <span className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
           </div>
         )}
 

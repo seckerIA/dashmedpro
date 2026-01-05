@@ -1,8 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { MetricCard } from "./MetricCard";
 import { ConversionFunnel } from "./ConversionFunnel";
 import { RevenueChart } from "./RevenueChart";
-import { ConversionBottleneckCard } from "./ConversionBottleneckCard";
 import { RevenueDistributionCard } from "./RevenueDistributionCard";
 import { Button } from "@/components/ui/button";
 import { Plus, Calendar, AlertTriangle, TrendingUp, ArrowRight } from "lucide-react";
@@ -21,7 +21,7 @@ export function CommercialDashboard() {
   const { metrics, isLoading, error } = useCommercialMetrics();
   const { data: bottlenecks, isLoading: isLoadingBottlenecks } = useBottleneckMetrics();
   const { leads } = useCommercialLeads();
-  
+
   // Filtrar leads prioritários (score alto)
   const priorityLeads = leads
     .filter((lead: any) => {
@@ -30,7 +30,7 @@ export function CommercialDashboard() {
     })
     .sort((a: any, b: any) => (b.conversion_score || 0) - (a.conversion_score || 0))
     .slice(0, 5);
-  
+
   // Debug log
   console.log('🔍 CommercialDashboard - Dados recebidos:', {
     metrics,
@@ -40,13 +40,13 @@ export function CommercialDashboard() {
     totalRevenue: metrics?.totalRevenue,
     scheduledProcedures: metrics?.scheduledProcedures,
   });
-  
+
   // Handle navigation with query params
   const handleNewLead = () => {
     // Abrir modal "Novo Paciente" sem trocar a aba para Leads automaticamente
     navigate("/comercial?tab=dashboard&action=new");
   };
-  
+
 
   return (
     <div className="space-y-6">
@@ -132,15 +132,28 @@ export function CommercialDashboard() {
       )}
 
       {/* Alertas de Gargalo */}
-      {!isLoadingBottlenecks && bottlenecks && bottlenecks.length > 0 && (
+      {!isLoadingBottlenecks && bottlenecks && bottlenecks.bottlenecks && bottlenecks.bottlenecks.length > 0 && (
         <AnimatedWrapper animationType="slideDown" delay={0.15}>
           <div className="space-y-3">
-            <div className="flex items-center gap-2 text-lg font-semibold text-foreground">
-              <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-              Gargalos Identificados
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                Gargalos Identificados
+                <Badge variant="outline" className="ml-2">
+                  {bottlenecks.bottlenecks.length}
+                </Badge>
+              </div>
+              {bottlenecks.summary && (
+                <Badge
+                  variant={bottlenecks.summary.healthScore >= 70 ? "default" : "destructive"}
+                  className="text-sm"
+                >
+                  Saúde: {bottlenecks.summary.healthScore}/100
+                </Badge>
+              )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {bottlenecks.slice(0, 4).map((bottleneck, index) => (
+              {bottlenecks.bottlenecks.slice(0, 4).map((bottleneck, index) => (
                 <AnimatedWrapper key={bottleneck.id} animationType="slideUp" delay={0.2 + index * 0.05}>
                   <BottleneckCard bottleneck={bottleneck} />
                 </AnimatedWrapper>
@@ -174,15 +187,10 @@ export function CommercialDashboard() {
         ))}
       </div>
 
-      {/* Cards de Gargalo Específicos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <AnimatedWrapper animationType="slideUp" delay={0.6}>
-          <ConversionBottleneckCard />
-        </AnimatedWrapper>
-        <AnimatedWrapper animationType="slideUp" delay={0.65}>
-          <RevenueDistributionCard />
-        </AnimatedWrapper>
-      </div>
+      {/* Card de Distribuição de Receita */}
+      <AnimatedWrapper animationType="slideUp" delay={0.6}>
+        <RevenueDistributionCard />
+      </AnimatedWrapper>
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

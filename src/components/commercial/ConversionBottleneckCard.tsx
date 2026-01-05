@@ -19,7 +19,11 @@ export function ConversionBottleneckCard() {
   for (let i = 1; i < metrics.funnelData.length; i++) {
     const prevStage = metrics.funnelData[i - 1];
     const currentStage = metrics.funnelData[i];
-    const drop = prevStage.percentage - currentStage.percentage;
+
+    // Fix: Handle cases where percentage might be 0
+    const prevPct = prevStage.percentage || 0;
+    const currPct = currentStage.percentage || 0;
+    const drop = Math.max(0, prevPct - currPct);
 
     if (drop > maxDrop) {
       maxDrop = drop;
@@ -28,16 +32,18 @@ export function ConversionBottleneckCard() {
     }
   }
 
-  // Se não há gargalo significativo (>30% de queda), não mostrar
-  if (maxDrop < 30) {
+  // Se não há gargalo significativo (>30% de queda) ou não há dados suficientes, não mostrar
+  if (maxDrop < 30 || bottleneckIndex === -1) {
     return null;
   }
 
   const bottleneck = metrics.funnelData[bottleneckIndex];
   const prevStage = metrics.funnelData[bottleneckIndex - 1];
-  const conversionRate = prevStage.count > 0 
+
+  // Fix: Prevent division by zero and handle edge cases
+  const conversionRate = prevStage.count > 0
     ? ((bottleneck.count / prevStage.count) * 100).toFixed(1)
-    : "0.0";
+    : (bottleneck.count > 0 ? "100.0" : "0.0");
 
   const severity = maxDrop > 50 ? "high" : maxDrop > 40 ? "medium" : "low";
 
@@ -67,7 +73,7 @@ export function ConversionBottleneckCard() {
             <CardTitle className="text-base font-semibold text-foreground mb-1">
               Gargalo no Funil de Conversão
             </CardTitle>
-            <Badge 
+            <Badge
               variant={severity === "high" ? "destructive" : severity === "medium" ? "default" : "secondary"}
               className="text-xs"
             >
@@ -83,7 +89,7 @@ export function ConversionBottleneckCard() {
             <span className="text-muted-foreground">Etapa com maior perda:</span>
             <span className="font-bold text-foreground">{bottleneckStage}</span>
           </div>
-          
+
           <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
             <div className="flex-1">
               <div className="text-xs text-muted-foreground mb-1">Etapa Anterior</div>

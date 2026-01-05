@@ -601,11 +601,29 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
 
       const newPatients = (newContacts as any[])?.length || 0;
 
-      // Preparar dados do funil
+      // Preparar dados do funil - Fix: Handle when leads=0 but appointments exist
+      // If there are no formal leads but there are appointments, treat appointments as 100%
+      const funnelBaseCount = totalLeads > 0 ? totalLeads : completedAppointments.length;
       const funnelData = [
-        { stage: 'Leads', count: totalLeads, percentage: 100 },
-        { stage: 'Consultas', count: completedAppointments.length, percentage: leadsToAppointments },
-        { stage: 'Vendas', count: sales?.length || 0, percentage: overallConversion },
+        {
+          stage: 'Leads',
+          count: totalLeads,
+          percentage: totalLeads > 0 ? 100 : 0
+        },
+        {
+          stage: 'Consultas',
+          count: completedAppointments.length,
+          percentage: funnelBaseCount > 0
+            ? Math.min((completedAppointments.length / funnelBaseCount) * 100, 100)
+            : (completedAppointments.length > 0 ? 100 : 0)
+        },
+        {
+          stage: 'Vendas',
+          count: sales?.length || 0,
+          percentage: funnelBaseCount > 0
+            ? Math.min(((sales?.length || 0) / funnelBaseCount) * 100, 100)
+            : (sales?.length > 0 ? 100 : 0)
+        },
       ];
 
       // Preparar receita por procedimento

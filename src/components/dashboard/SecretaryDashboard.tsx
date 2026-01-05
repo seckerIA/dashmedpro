@@ -6,6 +6,8 @@ import { HotLeadsCard } from "@/components/dashboard/HotLeadsCard";
 import { AnimatedWrapper } from "@/components/shared/AnimatedWrapper";
 import { useSecretaryMetrics } from "@/hooks/useSecretaryMetrics";
 import { useSecretarySinalMetrics } from "@/hooks/useSecretarySinalMetrics";
+import { useSecretaryProductivityMetrics } from "@/hooks/useSecretaryProductivityMetrics";
+import { Progress } from "@/components/ui/progress";
 import {
   Calendar,
   Users,
@@ -20,7 +22,12 @@ import {
   MessageSquare,
   TrendingUp,
   DollarSign,
-  Receipt
+  Receipt,
+  Timer,
+  PhoneCall,
+  PhoneMissed,
+  Activity,
+  Target
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format, isToday, isTomorrow, parseISO } from "date-fns";
@@ -31,6 +38,7 @@ const SecretaryDashboard = () => {
   const navigate = useNavigate();
   const { data: metrics, isLoading, error } = useSecretaryMetrics();
   const { data: sinalMetrics, isLoading: isLoadingSinal } = useSecretarySinalMetrics();
+  const { data: productivityMetrics, isLoading: isLoadingProductivity } = useSecretaryProductivityMetrics();
 
   if (isLoading) {
     return (
@@ -145,6 +153,117 @@ const SecretaryDashboard = () => {
           />
         </div>
       </AnimatedWrapper>
+
+      {/* Performance & Productivity Metrics */}
+      {!isLoadingProductivity && productivityMetrics && (
+        <AnimatedWrapper animationType="slideUp" delay={0.12}>
+          <Card className="bg-card border-border">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-primary" />
+                    Métricas de Produtividade
+                  </CardTitle>
+                  <CardDescription>Desempenho e eficiência no atendimento</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Target className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Score:</span>
+                  <Badge
+                    className={`
+                      ${productivityMetrics.performanceScore >= 80 ? 'bg-green-500/20 text-green-600' : ''}
+                      ${productivityMetrics.performanceScore >= 60 && productivityMetrics.performanceScore < 80 ? 'bg-yellow-500/20 text-yellow-600' : ''}
+                      ${productivityMetrics.performanceScore < 60 ? 'bg-red-500/20 text-red-600' : ''}
+                    `}
+                  >
+                    {productivityMetrics.performanceScore}/100
+                  </Badge>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {/* Response Time */}
+                <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Timer className="h-4 w-4 text-blue-600" />
+                    <p className="text-sm font-medium text-blue-600">Tempo de Resposta</p>
+                  </div>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {productivityMetrics.avgResponseTimeMinutes.toFixed(0)} min
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {productivityMetrics.responsesUnder5Min} respostas {'<'}5min
+                  </p>
+                </div>
+
+                {/* Calls Today */}
+                <div className="p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <PhoneCall className="h-4 w-4 text-purple-600" />
+                    <p className="text-sm font-medium text-purple-600">Chamadas Hoje</p>
+                  </div>
+                  <p className="text-2xl font-bold text-purple-600">
+                    {productivityMetrics.callsToday}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {productivityMetrics.callsThisWeek} esta semana
+                  </p>
+                </div>
+
+                {/* Confirmation Rate */}
+                <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <p className="text-sm font-medium text-green-600">Taxa Confirmação</p>
+                  </div>
+                  <p className="text-2xl font-bold text-green-600">
+                    {productivityMetrics.confirmationRate.toFixed(1)}%
+                  </p>
+                  <Progress
+                    value={productivityMetrics.confirmationRate}
+                    className="h-2 mt-2"
+                  />
+                </div>
+
+                {/* No-Show Rate */}
+                <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <PhoneMissed className="h-4 w-4 text-red-600" />
+                    <p className="text-sm font-medium text-red-600">Taxa No-Show</p>
+                  </div>
+                  <p className="text-2xl font-bold text-red-600">
+                    {productivityMetrics.noShowRate.toFixed(1)}%
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {productivityMetrics.missedCalls} chamadas perdidas
+                  </p>
+                </div>
+              </div>
+
+              {/* Activity Summary */}
+              <div className="mt-4 pt-4 border-t border-border flex flex-wrap gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <CalendarCheck className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Agendados hoje:</span>
+                  <span className="font-semibold">{productivityMetrics.appointmentsScheduledToday}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Mensagens enviadas:</span>
+                  <span className="font-semibold">{productivityMetrics.messagesHandledToday}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Duração média chamada:</span>
+                  <span className="font-semibold">{Math.floor(productivityMetrics.avgCallDuration / 60)}:{(productivityMetrics.avgCallDuration % 60).toString().padStart(2, '0')}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </AnimatedWrapper>
+      )}
 
       {/* Card de Sinais - Mini Financeiro */}
       {!isLoadingSinal && sinalMetrics && (
