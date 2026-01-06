@@ -41,7 +41,7 @@ import { useSinalReceipts } from '@/hooks/useSinalReceipts';
 // Ensure ptBR is available (defensive check)
 const locale = ptBR || undefined;
 import { cn } from '@/lib/utils';
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { parseISO } from 'date-fns';
 import { formatCurrencyInput, parseCurrencyToNumber, formatCurrency } from '@/lib/currency';
 
@@ -148,7 +148,7 @@ export function AppointmentForm({
 
       // Se não há contatos carregados, forçar refetch
       if (contacts.length === 0 && refetchContacts) {
-        refetchContacts().catch(() => {});
+        refetchContacts().catch(() => { });
       }
     }
   }, [open, user?.id, queryClient, refetchContacts, isLoadingContacts, contacts.length]);
@@ -458,14 +458,14 @@ export function AppointmentForm({
       if (!linkedProcedure && (selectedContact as any).service_value) {
         const serviceValue = (selectedContact as any).service_value;
         const currentEstimatedValue = watch('estimated_value');
-        
+
         // Preencher valor estimado se estiver vazio
         if (!currentEstimatedValue || currentEstimatedValue === '') {
           const formattedPrice = formatCurrency(serviceValue);
           setEstimatedValueDisplay(formattedPrice);
           setValue('estimated_value', formattedPrice as any);
         }
-        
+
         // Preencher título se estiver vazio
         const currentTitle = watch('title');
         if (!currentTitle || currentTitle.trim() === '') {
@@ -477,7 +477,7 @@ export function AppointmentForm({
             setValue('title', service || 'Consulta');
           }
         }
-        
+
         return; // Não precisa continuar se não tem procedimento vinculado
       }
 
@@ -527,6 +527,12 @@ export function AppointmentForm({
   // NOTA: setValue, watch e setEstimatedValueDisplay são funções estáveis do react-hook-form
   // mas não devem estar nas dependências para evitar loop infinito de re-renders
 
+  // Filtrar contatos pelo médico selecionado
+  const filteredContacts = React.useMemo(() => {
+    if (!selectedDoctorId) return contacts;
+    return contacts.filter(contact => (contact as any).user_id === selectedDoctorId);
+  }, [contacts, selectedDoctorId]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -567,10 +573,10 @@ export function AppointmentForm({
             >
               <SelectTrigger>
                 <SelectValue placeholder={
-                  !user?.id 
-                    ? "Aguardando autenticação..." 
-                    : isLoadingContacts 
-                      ? "Carregando pacientes..." 
+                  !user?.id
+                    ? "Aguardando autenticação..."
+                    : isLoadingContacts
+                      ? "Carregando pacientes..."
                       : "Selecione o paciente"
                 } />
               </SelectTrigger>
@@ -584,12 +590,12 @@ export function AppointmentForm({
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Carregando pacientes...
                   </div>
-                ) : contacts.length === 0 ? (
+                ) : filteredContacts.length === 0 ? (
                   <div className="p-2 text-sm text-muted-foreground">
                     Nenhum paciente cadastrado. Clique em "Cadastrar novo paciente" para adicionar.
                   </div>
                 ) : (
-                  contacts.map((contact) => (
+                  filteredContacts.map((contact) => (
                     <SelectItem key={contact.id} value={contact.id}>
                       <div className="flex flex-col">
                         <span className="font-medium">{contact.full_name || 'Sem nome'}</span>
@@ -945,7 +951,7 @@ export function AppointmentForm({
                   Sinal já foi pago
                 </Label>
               </div>
-              
+
               <div className="flex items-center gap-3">
                 <Checkbox
                   id="has_no_sinal"

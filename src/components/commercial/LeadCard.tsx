@@ -123,7 +123,11 @@ export function LeadCard({ lead }: LeadCardProps) {
                 </Badge>
                 {(lead as any).doctor?.full_name && (
                   <Badge variant="secondary" className="text-xs bg-blue-500/10 text-blue-400 border-blue-500/20">
-                    Dr(a). {(lead as any).doctor.full_name}
+                    {(() => {
+                      const name = (lead as any).doctor.full_name;
+                      const hasPrefix = name.toLowerCase().startsWith('dr.') || name.toLowerCase().startsWith('dra.');
+                      return hasPrefix ? name : `Dr(a). ${name}`;
+                    })()}
                   </Badge>
                 )}
               </div>

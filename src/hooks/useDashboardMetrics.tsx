@@ -89,15 +89,15 @@ const fetchDashboardMetrics = async (
     return sum + (value || 0);
   }, 0);
 
-  const activeDeals = dealsData.filter(d => 
+  const activeDeals = dealsData.filter(d =>
     !d.stage.includes('fechado')
   ).length;
 
-  const wonDeals = dealsData.filter(d => 
+  const wonDeals = dealsData.filter(d =>
     d.stage === 'fechado_ganho'
   ).length;
 
-  const lostDeals = dealsData.filter(d => 
+  const lostDeals = dealsData.filter(d =>
     d.stage === 'fechado_perdido'
   ).length;
 
@@ -110,21 +110,21 @@ const fetchDashboardMetrics = async (
 
   // Taxa de conversão: deals ganhos / total de deals (incluindo ativos, ganhos e perdidos)
   // Garantir que não haja divisão por zero e que o resultado seja um número válido
-  const conversionRate = dealsData.length > 0 
+  const conversionRate = dealsData.length > 0
     ? Math.round((wonDeals / dealsData.length) * 100 * 100) / 100 // Arredondar para 2 casas decimais
     : 0;
 
   // Calcular deals por estágio
   const dealsByStage: Record<string, { count: number; value: number }> = {};
   const stages = ['lead_novo', 'qualificado', 'apresentacao', 'proposta', 'negociacao', 'fechado_ganho', 'fechado_perdido'];
-  
+
   stages.forEach(stage => {
     const stageDeals = dealsData.filter(d => d.stage === stage);
     const stageValue = stageDeals.reduce((sum, deal) => {
       const value = typeof deal.value === 'string' ? parseFloat(deal.value) : deal.value;
       return sum + (value || 0);
     }, 0);
-    
+
     dealsByStage[stage] = {
       count: stageDeals.length,
       value: stageValue
@@ -135,50 +135,68 @@ const fetchDashboardMetrics = async (
   const monthlyLeads = [];
   const monthlyRevenue = [];
   const currentDate = new Date();
-  
+
   for (let i = 11; i >= 0; i--) {
     const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
     const monthName = date.toLocaleDateString('pt-BR', { month: 'short' });
-    
-    // Contar leads criados no mês
-    const monthLeads = contactsData.filter(contact => {
-      const contactDate = new Date(contact.created_at);
-      return contactDate.getFullYear() === date.getFullYear() && 
-             contactDate.getMonth() === date.getMonth();
-    }).length;
-    
+    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+    // Contar leads criados no mês (usando comparação de string YYYY-MM para bater com o banco)
+    const monthLeads = contactsData.filter(contact =>
+      contact.created_at?.startsWith(monthKey)
+    ).length;
+
     // Calcular receita projetada e fechada do mês
-    const monthDeals = dealsData.filter(deal => {
-      const dealDate = new Date(deal.created_at);
-      return dealDate.getFullYear() === date.getFullYear() && 
-             dealDate.getMonth() === date.getMonth();
-    });
-    
+    const monthDeals = dealsData.filter(deal =>
+      deal.created_at?.startsWith(monthKey)
+    );
+
     const monthProjected = monthDeals.reduce((sum, deal) => {
       const value = typeof deal.value === 'string' ? parseFloat(deal.value) : deal.value;
       return sum + (value || 0);
     }, 0);
-    
+
     const monthClosed = monthDeals
       .filter(deal => deal.stage === 'fechado_ganho')
       .reduce((sum, deal) => {
         const value = typeof deal.value === 'string' ? parseFloat(deal.value) : deal.value;
         return sum + (value || 0);
       }, 0);
-    
+
     monthlyLeads.push({ month: monthName, leads: monthLeads });
-    monthlyRevenue.push({ 
-      month: monthName, 
-      projected: monthProjected, 
-      closed: monthClosed 
+    monthlyRevenue.push({
+      month: monthName,
+      projected: monthProjected,
+      closed: monthClosed
     });
   }
 
   // Calcular interesse por serviços - com labels traduzidos
-  const servicesInterest: Array<{ service: string; count: number }> = [];
-  const serviceCounts: Record<string, number> = {};
+  // Primeiro, coletar todos os procedure_ids únicos
+  const procedureIds = new Set<string>();
+  contactsData.forEach(contact => {
+    const contactService = getContactService(contact);
+    if (contactService) {
+      procedureIds.add(contactService);
+    }
+  });
 
-  // Mapeamento de nomes técnicos para labels amigáveis
+  // Buscar nomes dos procedimentos do banco de dados
+  let procedureNames: Record<string, string> = {};
+  if (procedureIds.size > 0) {
+    const { data: procedures } = await supabase
+      .from('commercial_procedures')
+      .select('id, name')
+      .in('id', Array.from(procedureIds));
+
+    if (procedures) {
+      procedures.forEach((proc: any) => {
+        procedureNames[proc.id] = proc.name;
+      });
+    }
+  }
+
+  // Mapeamento de nomes técnicos para labels amigáveis (fallback para serviços não-médicos)
   const serviceLabels: Record<string, string> = {
     'procedure': 'Procedimentos',
     'first_visit': 'Primeira Consulta',
@@ -192,10 +210,14 @@ const fetchDashboardMetrics = async (
     'automacao_ia': 'Automação IA'
   };
 
+  const servicesInterest: Array<{ service: string; count: number }> = [];
+  const serviceCounts: Record<string, number> = {};
+
   contactsData.forEach(contact => {
     const contactService = getContactService(contact);
     if (contactService) {
-      const label = serviceLabels[contactService] || contactService;
+      // Prioridade: nome do procedimento do banco > label hardcoded > ID original
+      const label = procedureNames[contactService] || serviceLabels[contactService] || contactService;
       serviceCounts[label] = (serviceCounts[label] || 0) + 1;
     }
   });
@@ -207,14 +229,14 @@ const fetchDashboardMetrics = async (
   // Calcular conversão por estágio
   const conversionByStage = [];
   const stageOrder = ['lead_novo', 'qualificado', 'apresentacao', 'proposta', 'negociacao'];
-  
+
   for (let i = 0; i < stageOrder.length - 1; i++) {
     const currentStage = stageOrder[i];
     const nextStage = stageOrder[i + 1];
-    
+
     const currentCount = dealsByStage[currentStage]?.count || 0;
     const nextCount = dealsByStage[nextStage]?.count || 0;
-    
+
     const conversion = currentCount > 0 ? (nextCount / currentCount) * 100 : 0;
     conversionByStage.push({ stage: currentStage, conversion });
   }

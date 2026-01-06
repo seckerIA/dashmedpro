@@ -338,8 +338,15 @@ Analise a conversa e gere respostas naturais. Responda diretamente.`;
 
     const { data: savedSuggestions } = await supabaseAdmin.from('whatsapp_ai_suggestions').insert(suggestionsToInsert).select();
 
-    // Auto-Reply
-    if (aiConfig?.auto_reply_enabled) {
+    // Debug: Log config status
+    console.log('[AI] Auto-reply config:', {
+      auto_reply_enabled: aiConfig?.auto_reply_enabled,
+      configExists: !!aiConfig,
+      userId: conversation.user_id
+    });
+
+    // Auto-Reply - Só executa se auto_reply_enabled for EXPLICITAMENTE true
+    if (aiConfig?.auto_reply_enabled === true) {
       const bestSuggestion = (aiResponse.suggestions || [])
         .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))[0];
 

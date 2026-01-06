@@ -107,7 +107,27 @@ export function TeamOverviewDashboard({ metrics, isLoading }: TeamOverviewDashbo
                   <Card key={teamMetric.userId} className="bg-muted/50">
                     <CardContent className="pt-6">
                       <div className="space-y-2">
-                        <h4 className="font-semibold text-lg">{teamMetric.userName}</h4>
+                        <div className="flex items-center justify-between gap-2">
+                          <h4 className="font-semibold text-lg">{teamMetric.userName}</h4>
+                          {teamMetric.userRole && (
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${teamMetric.userRole === 'admin' ? 'bg-purple-500/20 text-purple-400' :
+                                teamMetric.userRole === 'dono' ? 'bg-amber-500/20 text-amber-400' :
+                                  teamMetric.userRole === 'medico' ? 'bg-emerald-500/20 text-emerald-400' :
+                                    teamMetric.userRole === 'secretaria' ? 'bg-blue-500/20 text-blue-400' :
+                                      teamMetric.userRole === 'vendedor' ? 'bg-cyan-500/20 text-cyan-400' :
+                                        teamMetric.userRole === 'gestor_trafego' ? 'bg-orange-500/20 text-orange-400' :
+                                          'bg-muted text-muted-foreground'
+                              }`}>
+                              {teamMetric.userRole === 'admin' ? 'Admin' :
+                                teamMetric.userRole === 'dono' ? 'Proprietário' :
+                                  teamMetric.userRole === 'medico' ? 'Médico' :
+                                    teamMetric.userRole === 'secretaria' ? 'Secretária' :
+                                      teamMetric.userRole === 'vendedor' ? 'Vendedor' :
+                                        teamMetric.userRole === 'gestor_trafego' ? 'Gestor de Tráfego' :
+                                          teamMetric.userRole}
+                            </span>
+                          )}
+                        </div>
                         <div className="grid grid-cols-2 gap-2 text-sm">
                           {/* Pipeline - oculto para secretária */}
                           {!isSecretaria && (

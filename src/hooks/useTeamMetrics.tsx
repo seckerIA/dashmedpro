@@ -25,6 +25,7 @@ export interface TeamMetrics {
   userId: string;
   userName: string;
   userEmail: string;
+  userRole?: string; // Cargo do usuário: admin, dono, medico, secretaria, vendedor
   totalPipeline: number;
   totalRevenue: number;
   activeDeals: number;
@@ -212,7 +213,7 @@ const fetchTeamMetrics = async (
 
     const profilesQuery = supabase
       .from('profiles')
-      .select('id, email, full_name')
+      .select('id, email, full_name, role')
       .eq('id', userId);
 
     const [dealsResult, contactsResult, leadsResult, profilesResult] = await Promise.all([
@@ -283,7 +284,7 @@ const fetchTeamMetrics = async (
 
   const profilesQuery = supabase
     .from('profiles')
-    .select('id, email, full_name')
+    .select('id, email, full_name, role')
     .in('id', targetUserIds);
 
   const [dealsResult, contactsResult, leadsResult, profilesResult] = await Promise.all([
@@ -475,6 +476,7 @@ function calculateUserMetricsFromData(
     userId,
     userName: profile?.full_name || profile?.email || 'Usuário',
     userEmail: profile?.email || '',
+    userRole: profile?.role || undefined,
     totalPipeline,
     totalRevenue,
     activeDeals: activeDeals.length,

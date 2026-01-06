@@ -445,9 +445,12 @@ async function getOrCreateConversation(
   return newConversation.id;
 }
 
+
 // =========================================
 // Extrair conteúdo da mensagem
 // =========================================
+
+
 function extractMessageContent(message: IncomingMessage): { content: string; messageType: string } {
   switch (message.type) {
     case 'text':

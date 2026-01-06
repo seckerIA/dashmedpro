@@ -118,7 +118,7 @@ export function useBottleneckMetrics() {
         supabaseQueryWithTimeout(
           supabase
             .from("commercial_leads")
-            .select("id, status, created_at, last_contact_at")
+            .select("id, status, created_at")
             .in("user_id", targetUserIds.length > 0 ? targetUserIds : [user.id])
             .gte("created_at", currentMonthStart.toISOString()) as any,
           30000,

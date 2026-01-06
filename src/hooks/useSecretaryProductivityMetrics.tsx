@@ -78,7 +78,7 @@ export function useSecretaryProductivityMetrics() {
             // 1. Fetch WhatsApp message response times (from AI analysis or manual)
             const { data: messages } = await supabase
                 .from('whatsapp_messages' as any)
-                .select('created_at, direction, sender_type')
+                .select('created_at, direction')
                 .in('user_id', targetUserIds)
                 .gte('created_at', monthStart.toISOString())
                 .order('created_at', { ascending: true });

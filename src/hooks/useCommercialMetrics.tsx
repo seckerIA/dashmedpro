@@ -501,7 +501,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       // Buscar procedimentos do catálogo (total de procedimentos ativos cadastrados) - MOVER PARA ANTES DO LOG
       const proceduresQuery = supabase
         .from("commercial_procedures")
-        .select("id")
+        .select("id, name")
         .eq("user_id", user.id)
         .eq("is_active", true);
 
@@ -626,11 +626,32 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         },
       ];
 
-      // Preparar receita por procedimento
-      const revenueByProcedure = procedureEfficiency.map(p => ({
-        name: p.procedureType,
-        value: p.averageRevenue * p.count,
-      }));
+      // Preparar receita por procedimento (Agrupando vendas por nome do procedimento)
+      const procedureNamesMap = new Map(procedures?.map(p => [p.id, p.name]) || []);
+      const revenueByProcedureMap = new Map<string, number>();
+
+      sales?.forEach(sale => {
+        const procedureName = procedureNamesMap.get(sale.procedure_id) || "Outros";
+        const currentTotal = revenueByProcedureMap.get(procedureName) || 0;
+        revenueByProcedureMap.set(procedureName, currentTotal + Number(sale.value || 0));
+      });
+
+      const revenueByProcedure = Array.from(revenueByProcedureMap.entries()).map(([name, value]) => ({
+        name,
+        value,
+      })).sort((a, b) => b.value - a.value);
+
+      // Se não houver vendas, mostrar por tipo de consulta como fallback
+      if (revenueByProcedure.length === 0) {
+        procedureEfficiency.forEach(p => {
+          revenueByProcedure.push({
+            name: p.procedureType === 'first_visit' ? 'Primeira Consulta' :
+              p.procedureType === 'follow_up' ? 'Retorno' :
+                p.procedureType === 'procedure' ? 'Procedimento' : 'Outros',
+            value: p.averageRevenue * p.count,
+          });
+        });
+      }
 
       // Preparar tendência de leads (últimos 6 meses)
       const leadsTrend = [];

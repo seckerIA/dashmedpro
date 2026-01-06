@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 
 interface MetricCardProps {
   title: string;
-  value: string | number;
+  value: string | number | undefined | null;
   icon: "trending-up" | "target" | "dollar-sign" | "bar-chart" | "user-plus" | "calendar";
   format?: "currency" | "number" | "percentage";
   isLoading?: boolean;
@@ -24,7 +24,8 @@ const iconMap = {
 export function MetricCard({ title, value, icon, format = "number", isLoading }: MetricCardProps) {
   const Icon = iconMap[icon];
 
-  const formatValue = (val: string | number): string => {
+  const formatValue = (val: string | number | undefined | null): string => {
+    if (val === undefined || val === null) return "-";
     if (typeof val === "string") return val;
 
     if (format === "currency") {

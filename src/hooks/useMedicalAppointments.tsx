@@ -94,7 +94,7 @@ const updateDealPipeline = async (
     // Primeiro, tentar encontrar deal no stage "agendado" (caso já tenha sido movido para lá)
     // Depois, tentar qualquer deal ativo para o contato
     let existingDeal = null;
-    
+
     // Buscar deal no stage "agendado" primeiro (mais específico)
     const { data: dealInAgendado } = await supabase
       .from('crm_deals')
@@ -103,7 +103,7 @@ const updateDealPipeline = async (
       .eq('stage', 'agendado')
       .not('stage', 'in', '("fechado_ganho","fechado_perdido")')
       .maybeSingle();
-    
+
     if (dealInAgendado) {
       existingDeal = dealInAgendado;
     } else {
@@ -117,7 +117,7 @@ const updateDealPipeline = async (
         .order('updated_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-      
+
       if (anyActiveDeal) {
         existingDeal = anyActiveDeal;
       }
@@ -557,9 +557,9 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
   useEffect(() => {
     if (user?.id) {
       // Invalidar todas as queries de medical-appointments para garantir dados corretos
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ['medical-appointments'],
-        exact: false 
+        exact: false
       });
     }
   }, [user?.id, queryClient]);
@@ -686,13 +686,13 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
       // Verificar se deve criar transação financeira
       const paymentStatus = appointment.payment_status;
       const alreadyPaid = paymentStatus === 'paid' || paymentStatus === 'partial';
-      
+
       // Só criar transação se:
       // 1. Não existe transação ainda
       // 2. Tem valor estimado
       // 3. E (pagamento já está confirmado OU confirmação explícita de que pagou)
-      const shouldCreateTransaction = !financialTransactionId 
-        && appointment.estimated_value 
+      const shouldCreateTransaction = !financialTransactionId
+        && appointment.estimated_value
         && appointment.estimated_value > 0
         && (alreadyPaid || confirmedPayment === true);
 
@@ -725,17 +725,17 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
 
         const categoryId = categories && categories.length > 0 ? categories[0].id : null;
         const accountId = accounts && accounts.length > 0 ? accounts[0].id : null;
-        
+
         // Validar ANTES de tentar criar transação
         if (!accountId || !categoryId) {
           const missingItems = [];
           if (!accountId) missingItems.push('conta financeira ativa');
           if (!categoryId) missingItems.push('categoria de entrada');
-          
+
           const errorMessage = `Não foi possível criar a transação financeira: ${missingItems.join(' e ')} não encontrada(s). Por favor, configure uma conta financeira ativa e uma categoria de entrada no sistema antes de finalizar consultas.`;
-          
+
           console.warn(errorMessage);
-          
+
           // Não criar a transação, mas não falhar a operação principal
           // A consulta será marcada como concluída mesmo sem transação
           toast({
@@ -791,11 +791,15 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
       }
 
       // Atualizar a consulta com status concluído e vincular transação se criada
+      // Se o usuário confirmou o pagamento, também atualizar payment_status para 'paid'
+      const shouldMarkAsPaid = confirmedPayment === true || appointment.payment_status === 'paid';
+
       return updateMutation.mutateAsync({
         id,
         updates: {
           status: 'completed',
           completed_at: new Date().toISOString(),
+          ...(shouldMarkAsPaid ? { payment_status: 'paid' as PaymentStatus } : {}),
           ...(financialTransactionId && !appointment.financial_transaction_id
             ? { financial_transaction_id: financialTransactionId }
             : {}),
@@ -803,14 +807,11 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
       });
     },
     onSuccess: async (data, variables) => {
-      // Invalidar todas as queries relacionadas
+      // Invalidar queries de appointments e financial primeiro
       queryClient.invalidateQueries({ queryKey: ['medical-appointments'] });
       queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['financial-metrics'] });
       queryClient.invalidateQueries({ queryKey: ['financial-accounts'] });
-      // Invalidar queries do CRM/pipeline para refletir mudanças
-      queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
-      queryClient.invalidateQueries({ queryKey: ['crm-pipeline'] });
 
       // Verificar se uma transação foi criada
       const hasTransaction = data?.financial_transaction_id;
@@ -824,12 +825,18 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
       // Verificar se paciente deve ir para "Aguardando Retorno"
       // Isso só acontece se não estiver em tratamento (verificação feita dentro da função)
       if (data?.contact_id) {
-        // Executar de forma assíncrona sem bloquear a UI
-        checkAndMoveToAguardandoRetorno(data.contact_id).catch((error) => {
+        try {
+          await checkAndMoveToAguardandoRetorno(data.contact_id);
+        } catch (error) {
           console.error('[markAsCompleted] Erro ao verificar aguardando retorno:', error);
           // Não mostrar erro ao usuário - é uma operação secundária
-        });
+        }
       }
+
+      // Invalidar queries do CRM/pipeline APÓS mover o deal para refletir mudanças em tempo real
+      queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
+      queryClient.invalidateQueries({ queryKey: ['crm-pipeline'] });
+      queryClient.invalidateQueries({ queryKey: ['crm-contacts'] });
     },
     onError: (error: Error) => {
       toast({
@@ -845,7 +852,7 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
     mutationFn: async (id: string) => {
       return updateMutation.mutateAsync({
         id,
-        updates: { 
+        updates: {
           status: 'no_show',
           completed_at: new Date().toISOString(),
         },

@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Camera, Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface AvatarUploadProps {
   currentAvatarUrl: string | null;
@@ -15,6 +16,7 @@ interface AvatarUploadProps {
 const AvatarUpload = ({ currentAvatarUrl, onUploadComplete }: AvatarUploadProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -82,19 +84,19 @@ const AvatarUpload = ({ currentAvatarUrl, onUploadComplete }: AvatarUploadProps)
       if (uploadError) {
         // Log the full error for debugging
         console.error('Upload error details:', uploadError);
-        
+
         // If bucket doesn't exist, provide helpful error message
-        if (uploadError.message?.includes('Bucket not found') || 
-            uploadError.message?.includes('not found') ||
-            uploadError.message?.includes('does not exist')) {
+        if (uploadError.message?.includes('Bucket not found') ||
+          uploadError.message?.includes('not found') ||
+          uploadError.message?.includes('does not exist')) {
           throw new Error('Bucket de avatares não encontrado. Entre em contato com o suporte.');
         }
-        
+
         // Handle permission errors
         if (uploadError.message?.includes('permission') || uploadError.message?.includes('policy')) {
           throw new Error('Você não tem permissão para fazer upload. Verifique suas permissões.');
         }
-        
+
         throw uploadError;
       }
 
@@ -104,7 +106,21 @@ const AvatarUpload = ({ currentAvatarUrl, onUploadComplete }: AvatarUploadProps)
         .getPublicUrl(fileName);
 
       if (data?.publicUrl) {
+        // Update profile in DB immediately for better UX
+        const { error: dbError } = await (supabase
+          .from('profiles')
+          .update({ avatar_url: data.publicUrl } as any)
+          .eq('id', user.id) as any);
+
+        if (dbError) {
+          console.warn('Could not update profile in DB, but image was uploaded:', dbError);
+        }
+
+        // Invalidate profile query to update global state (header avatar, etc)
+        queryClient.invalidateQueries({ queryKey: ['user-profile', user.id] });
+
         onUploadComplete(data.publicUrl);
+
         toast({
           title: 'Avatar atualizado!',
           description: 'Sua foto de perfil foi atualizada com sucesso.',
@@ -140,6 +156,15 @@ const AvatarUpload = ({ currentAvatarUrl, onUploadComplete }: AvatarUploadProps)
           .remove([`${user.id}/${fileName}`]);
       }
 
+      // Update profile in DB immediately
+      await (supabase
+        .from('profiles')
+        .update({ avatar_url: null } as any)
+        .eq('id', user.id) as any);
+
+      // Invalidate profile query
+      queryClient.invalidateQueries({ queryKey: ['user-profile', user.id] });
+
       onUploadComplete('');
       toast({
         title: 'Avatar removido',
@@ -168,9 +193,9 @@ const AvatarUpload = ({ currentAvatarUrl, onUploadComplete }: AvatarUploadProps)
     <div className="flex flex-col items-center gap-4">
       <div className="relative">
         <Avatar className="w-24 h-24 border-4 border-primary/20">
-          <AvatarImage 
-            src={displayUrl || undefined} 
-            alt="Avatar" 
+          <AvatarImage
+            src={displayUrl || undefined}
+            alt="Avatar"
             className="object-cover object-center"
           />
           <AvatarFallback className="text-2xl bg-primary/10 text-primary">

@@ -21,7 +21,7 @@ export async function supabaseQueryWithTimeout<T>(
   // console.log(`🔍 [TimeoutWrapper] Iniciando: ${queryDesc}`);
 
   if (signal?.aborted) {
-    console.warn(`🛑 [TimeoutWrapper] Query abortada antes de começar: ${queryDesc}`);
+    // Query já abortada pelo React Query (comportamento normal em navegação rápida)
     throw new Error('Query cancelada');
   }
 

@@ -23,10 +23,12 @@ import {
 interface AISettingsDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    targetUserId?: string; // ID do médico dono da conversa
 }
 
-export function AISettingsDialog({ open, onOpenChange }: AISettingsDialogProps) {
-    const { aiConfig, updateAIConfig, isUpdatingConfig, isLoadingConfig } = useWhatsAppAI();
+export function AISettingsDialog({ open, onOpenChange, targetUserId }: AISettingsDialogProps) {
+    // Passa o targetUserId para garantir que estamos editando a config do médico correto
+    const { aiConfig, updateAIConfig, isUpdatingConfig, isLoadingConfig } = useWhatsAppAI({ targetUserId });
 
     const [formData, setFormData] = useState({
         knowledge_base: '',

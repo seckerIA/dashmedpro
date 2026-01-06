@@ -49,6 +49,16 @@ export type CostType = 'ferramentas' | 'operacional' | 'terceirizacao';
 // ============================================
 
 export interface FinancialTransactionWithDetails extends FinancialTransaction {
+  id: string;
+  transaction_date: string;
+  description: string;
+  amount: number;
+  type: TransactionType;
+  status: TransactionStatus;
+  has_costs: boolean;
+  total_costs: number;
+  category_id: string | null;
+  account_id: string | null;
   account?: FinancialAccount;
   category?: FinancialCategory;
   category_name?: string;

@@ -16,11 +16,11 @@ import { startOfMonth, endOfMonth, subMonths, format, addMonths } from "date-fns
 export const useFinancialMetrics = () => {
   const { user } = useAuth();
   const { profile } = useUserProfile();
-  
+
   const now = new Date();
   const currentMonthStart = startOfMonth(now);
   const currentMonthEnd = endOfMonth(now);
-  
+
   // Buscar breakdown de custos do mês atual
   const { data: costsBreakdown } = useCostsBreakdown(
     format(currentMonthStart, "yyyy-MM-dd"),
@@ -32,8 +32,8 @@ export const useFinancialMetrics = () => {
     queryFn: async ({ signal }) => {
       if (!user) throw new Error("Usuário não autenticado");
 
-      // Admin e Dono veem dados de TODOS os usuários
-      const isAdminOrDono = profile?.role === 'admin' || profile?.role === 'dono';
+      // Admin e Dono veem dados de TODOS os usuários. Secretária confia no RLS.
+      const canViewAll = profile?.role === 'admin' || profile?.role === 'dono' || profile?.role === 'secretaria';
 
       // 1. Buscar todas as contas ativas
       let accountsQuery = supabase
@@ -41,7 +41,7 @@ export const useFinancialMetrics = () => {
         .select("current_balance")
         .eq("is_active", true);
 
-      if (!isAdminOrDono) {
+      if (!canViewAll) {
         accountsQuery = accountsQuery.eq("user_id", user.id);
       }
 
@@ -58,7 +58,7 @@ export const useFinancialMetrics = () => {
         .gte("transaction_date", format(currentMonthStart, "yyyy-MM-dd"))
         .lte("transaction_date", format(currentMonthEnd, "yyyy-MM-dd"));
 
-      if (!isAdminOrDono) {
+      if (!canViewAll) {
         transactionsQuery = transactionsQuery.eq("user_id", user.id);
       }
 
@@ -86,10 +86,10 @@ export const useFinancialMetrics = () => {
 
       // Lucro bruto (receitas - despesas)
       const monthProfit = monthRevenue - monthExpenses;
-      
+
       // Lucro líquido (receitas - despesas - custos)
       const monthNetProfit = monthRevenue - monthExpenses - monthTotalCosts;
-      
+
       const profitMargin = monthRevenue > 0 ? (monthProfit / monthRevenue) * 100 : 0;
       const netProfitMargin = monthRevenue > 0 ? (monthNetProfit / monthRevenue) * 100 : 0;
 
@@ -99,7 +99,7 @@ export const useFinancialMetrics = () => {
         .select("*", { count: "exact", head: true })
         .eq("status", "concluida");
 
-      if (!isAdminOrDono) {
+      if (!canViewAll) {
         countQuery = countQuery.eq("user_id", user.id);
       }
 
@@ -137,7 +137,7 @@ export const useFinancialMetrics = () => {
     queryFn: async ({ signal }) => {
       if (!user) throw new Error("Usuário não autenticado");
 
-      const isAdminOrDono = profile?.role === 'admin' || profile?.role === 'dono';
+      const canViewAll = profile?.role === 'admin' || profile?.role === 'dono' || profile?.role === 'secretaria';
       const now = new Date();
       const monthlyResults: MonthlyData[] = [];
 
@@ -153,7 +153,7 @@ export const useFinancialMetrics = () => {
           .gte("transaction_date", format(monthStart, "yyyy-MM-dd"))
           .lte("transaction_date", format(monthEnd, "yyyy-MM-dd"));
 
-        if (!isAdminOrDono) {
+        if (!canViewAll) {
           query = query.eq("user_id", user.id);
         }
 
@@ -190,7 +190,7 @@ export const useFinancialMetrics = () => {
     queryFn: async ({ signal }) => {
       if (!user) throw new Error("Usuário não autenticado");
 
-      const isAdminOrDono = profile?.role === 'admin' || profile?.role === 'dono';
+      const canViewAll = profile?.role === 'admin' || profile?.role === 'dono' || profile?.role === 'secretaria';
       const now = new Date();
       const monthStart = startOfMonth(now);
       const monthEnd = endOfMonth(now);
@@ -206,7 +206,7 @@ export const useFinancialMetrics = () => {
         .gte("transaction_date", format(monthStart, "yyyy-MM-dd"))
         .lte("transaction_date", format(monthEnd, "yyyy-MM-dd"));
 
-      if (!isAdminOrDono) {
+      if (!canViewAll) {
         query = query.eq("user_id", user.id);
       }
 
@@ -221,7 +221,7 @@ export const useFinancialMetrics = () => {
       const grouped = transactionsData.reduce((acc, transaction) => {
         const categoryName = transaction.category?.name || "Outros";
         const categoryColor = transaction.category?.color || "#6b7280";
-        
+
         if (!acc[categoryName]) {
           acc[categoryName] = {
             name: categoryName,
@@ -230,7 +230,7 @@ export const useFinancialMetrics = () => {
             percentage: 0,
           };
         }
-        
+
         acc[categoryName].value += transaction.amount;
         return acc;
       }, {} as Record<string, CategoryExpense>);
@@ -261,7 +261,7 @@ export const useFinancialMetrics = () => {
     queryFn: async ({ signal }) => {
       if (!user) throw new Error("Usuário não autenticado");
 
-      const isAdminOrDono = profile?.role === 'admin' || profile?.role === 'dono';
+      const canViewAll = profile?.role === 'admin' || profile?.role === 'dono' || profile?.role === 'secretaria';
       const now = new Date();
       const projectionData: CashFlowProjection[] = [];
 
@@ -271,7 +271,7 @@ export const useFinancialMetrics = () => {
         .select("current_balance")
         .eq("is_active", true);
 
-      if (!isAdminOrDono) {
+      if (!canViewAll) {
         accountsQuery = accountsQuery.eq("user_id", user.id);
       }
 
@@ -298,7 +298,7 @@ export const useFinancialMetrics = () => {
       for (let i = 1; i <= 2; i++) {
         const futureMonth = addMonths(now, i);
         runningBalance += avgProfit;
-        
+
         projectionData.push({
           month: format(futureMonth, "MMM"),
           saldo: runningBalance,

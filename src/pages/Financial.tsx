@@ -1,8 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { 
-  TrendingUp, 
+import {
+  TrendingUp,
   TrendingDown,
   DollarSign,
   Wallet,
@@ -27,7 +27,7 @@ import {
   MoreVertical,
   AlertCircle
 } from "lucide-react"
-import { 
+import {
   Table,
   TableBody,
   TableCell,
@@ -49,12 +49,16 @@ import { formatCurrency, formatCurrencyShort, formatNumberShort } from "@/lib/cu
 import { EnhancedTooltip } from "@/components/charts/EnhancedTooltip"
 import { getGradient, CHART_COLORS } from "@/lib/chart-colors"
 
+import { AccountForm } from "@/components/financial/AccountForm"
+import { useState } from "react"
+
 const Financial = () => {
   const navigate = useNavigate();
-  const { isAdmin, isVendedor, isGestorTrafego } = useUserProfile();
+  const { isAdmin, isVendedor, isGestorTrafego, isSecretaria } = useUserProfile();
   const { metrics, monthlyData, expensesByCategory, costsBreakdown, cashFlowProjection, isLoading } = useFinancialMetrics();
   const { accountsSummary, totalBalance } = useFinancialAccounts();
   const { transactions } = useFinancialTransactions();
+  const [isAccountFormOpen, setIsAccountFormOpen] = useState(false);
 
   // Bloquear acesso para vendedores e gestores de tráfego
   if (isVendedor || isGestorTrafego) {
@@ -81,8 +85,8 @@ const Financial = () => {
                 Entre em contato com seu gestor para mais informações.
               </AlertDescription>
             </Alert>
-            <Button 
-              className="w-full" 
+            <Button
+              className="w-full"
               onClick={() => navigate('/')}
             >
               Voltar ao Dashboard
@@ -129,7 +133,7 @@ const Financial = () => {
             <Download className="w-4 h-4 mr-2" />
             Exportar
           </Button>
-          <Button 
+          <Button
             className="bg-emerald-500 hover:bg-emerald-600 text-white"
             onClick={() => navigate("/financeiro/nova-transacao")}
           >
@@ -145,11 +149,11 @@ const Financial = () => {
         <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 border-none text-white">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-emerald-100">Saldo Total</p>
+              <p className="text-sm text-emerald-100">{isSecretaria ? "Total de Sinais" : "Saldo Total"}</p>
               <Wallet className="w-5 h-5 text-emerald-100" />
             </div>
             <p className="text-3xl font-bold mb-1">{formatCurrency(metrics?.totalBalance || 0)}</p>
-            <p className="text-xs text-emerald-100">Todas as contas</p>
+            <p className="text-xs text-emerald-100">{isSecretaria ? "Acumulado" : "Todas as contas"}</p>
           </CardContent>
         </Card>
 
@@ -157,7 +161,7 @@ const Financial = () => {
         <Card className="bg-gradient-to-br from-card to-card/50 border-border">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground">Receitas do Mês</p>
+              <p className="text-sm text-muted-foreground">{isSecretaria ? "Sinais do Mês" : "Receitas do Mês"}</p>
               <ArrowUpRight className="w-5 h-5 text-emerald-500" />
             </div>
             <p className="text-3xl font-bold text-emerald-500 mb-1">{formatCurrency(metrics?.monthRevenue || 0)}</p>
@@ -168,94 +172,115 @@ const Financial = () => {
           </CardContent>
         </Card>
 
-        {/* Despesas do Mês */}
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground">Despesas do Mês</p>
-              <ArrowDownLeft className="w-5 h-5 text-red-500" />
-            </div>
-            <p className="text-3xl font-bold text-red-500 mb-1">{formatCurrency((metrics?.monthExpenses || 0) + (metrics?.monthTotalCosts || 0))}</p>
-            <div className="flex items-center gap-1">
-              <TrendingUp className="w-3 h-3 text-red-500" />
-              <span className="text-xs text-muted-foreground">+8.2% vs mês anterior</span>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Cards ocultos para secretária */}
+        {!isSecretaria && (
+          <>
+            {/* Despesas do Mês */}
+            <Card className="bg-gradient-to-br from-card to-card/50 border-border">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-muted-foreground">Despesas do Mês</p>
+                  <ArrowDownLeft className="w-5 h-5 text-red-500" />
+                </div>
+                <p className="text-3xl font-bold text-red-500 mb-1">{formatCurrency((metrics?.monthExpenses || 0) + (metrics?.monthTotalCosts || 0))}</p>
+                <div className="flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3 text-red-500" />
+                  <span className="text-xs text-muted-foreground">+8.2% vs mês anterior</span>
+                </div>
+              </CardContent>
+            </Card>
 
-        {/* Custos Totais */}
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground">Custos Totais</p>
-              <ShoppingCart className="w-5 h-5 text-orange-500" />
-            </div>
-            <p className="text-3xl font-bold text-orange-500 mb-1">{formatCurrency(metrics?.monthTotalCosts || 0)}</p>
-            <div className="flex items-center gap-1">
-              <TrendingUp className="w-3 h-3 text-orange-500" />
-              <span className="text-xs text-muted-foreground">Custos de serviços</span>
-            </div>
-          </CardContent>
-        </Card>
+            {/* Custos Totais */}
+            <Card className="bg-gradient-to-br from-card to-card/50 border-border">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-muted-foreground">Custos Totais</p>
+                  <ShoppingCart className="w-5 h-5 text-orange-500" />
+                </div>
+                <p className="text-3xl font-bold text-orange-500 mb-1">{formatCurrency(metrics?.monthTotalCosts || 0)}</p>
+                <div className="flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3 text-orange-500" />
+                  <span className="text-xs text-muted-foreground">Custos de serviços</span>
+                </div>
+              </CardContent>
+            </Card>
 
-        {/* Lucro Líquido */}
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground">Lucro Líquido</p>
-              <DollarSign className="w-5 h-5 text-blue-500" />
-            </div>
-            <p className="text-3xl font-bold text-blue-500 mb-1">{formatCurrency(metrics?.monthNetProfit || 0)}</p>
-            <div className="flex items-center gap-1">
-              <TrendingUp className="w-3 h-3 text-blue-500" />
-              <span className="text-xs text-muted-foreground">{metrics?.netProfitMargin.toFixed(2)}% margem</span>
-            </div>
-          </CardContent>
-        </Card>
+            {/* Lucro Líquido */}
+            <Card className="bg-gradient-to-br from-card to-card/50 border-border">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-muted-foreground">Lucro Líquido</p>
+                  <DollarSign className="w-5 h-5 text-blue-500" />
+                </div>
+                <p className="text-3xl font-bold text-blue-500 mb-1">{formatCurrency(metrics?.monthNetProfit || 0)}</p>
+                <div className="flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3 text-blue-500" />
+                  <span className="text-xs text-muted-foreground">{metrics?.netProfitMargin.toFixed(2)}% margem</span>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
-      {/* Widget de Transações Recorrentes */}
-      <RecurringTransactionsWidget />
+      {/* Widget de Transações Recorrentes - Oculto para secretária */}
+      {!isSecretaria && <RecurringTransactionsWidget />}
 
-      {/* Contas Bancárias */}
-      <Card className="bg-gradient-to-br from-card to-card/50 border-border">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-foreground">Contas Bancárias</CardTitle>
-            <Button variant="outline" size="sm">
-              <Plus className="w-4 h-4 mr-2" />
-              Nova Conta
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {accountsSummary.map((account) => (
-              <Card key={account.id} className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="p-2 bg-blue-500/10 rounded-lg">
-                        {account.type === 'conta_corrente' && <Building2 className="w-4 h-4 text-blue-500" />}
-                        {account.type === 'poupanca' && <PieChart className="w-4 h-4 text-blue-500" />}
-                        {account.type === 'caixa' && <Wallet className="w-4 h-4 text-blue-500" />}
+      {/* Contas Bancárias - Oculto para secretária */}
+      {!isSecretaria && (
+        <Card className="bg-gradient-to-br from-card to-card/50 border-border">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-foreground">Contas Bancárias</CardTitle>
+              <Button
+                className="bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm hover:shadow-md transition-all"
+                size="sm"
+                onClick={() => setIsAccountFormOpen(true)}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Nova Conta
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {accountsSummary.length === 0 && (
+              <Alert className="mb-4 border-amber-500/50 bg-amber-500/10">
+                <AlertCircle className="h-4 w-4 text-amber-500" />
+                <AlertTitle className="text-amber-600">Nenhuma conta bancária cadastrada</AlertTitle>
+                <AlertDescription className="text-amber-600/80">
+                  Para que os recebimentos de consultas e transações financeiras sejam registrados corretamente,
+                  você precisa cadastrar pelo menos uma conta bancária ativa. Clique em <strong>"Nova Conta"</strong> para começar.
+                </AlertDescription>
+              </Alert>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {accountsSummary.map((account) => (
+                <Card key={account.id} className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="p-2 bg-blue-500/10 rounded-lg">
+                          {account.type === 'conta_corrente' && <Building2 className="w-4 h-4 text-blue-500" />}
+                          {account.type === 'poupanca' && <PieChart className="w-4 h-4 text-blue-500" />}
+                          {account.type === 'caixa' && <Wallet className="w-4 h-4 text-blue-500" />}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">{account.name}</p>
+                          <p className="text-xs text-muted-foreground">{account.bank_name || '-'}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{account.name}</p>
-                        <p className="text-xs text-muted-foreground">{account.bank_name || '-'}</p>
-                      </div>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
                     </div>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                      <MoreVertical className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  <p className="text-2xl font-bold text-foreground">{formatCurrency(account.balance || 0)}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+                    <p className="text-2xl font-bold text-foreground">{formatCurrency(account.balance || 0)}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -270,12 +295,12 @@ const Financial = () => {
               <AreaChart data={monthlyData || []}>
                 <defs>
                   <linearGradient id="colorReceitas" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colorDespesas" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
@@ -335,8 +360,8 @@ const Financial = () => {
                   >
                     {(costsBreakdown || []).map((entry, index) => {
                       return (
-                        <Cell 
-                          key={`cell-${index}`} 
+                        <Cell
+                          key={`cell-${index}`}
                           fill={`url(#costGradient-${index})`}
                         />
                       );
@@ -404,18 +429,18 @@ const Financial = () => {
             <LineChart data={cashFlowProjection || []}>
               <defs>
                 <linearGradient id="cashFlowGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.05}/>
+                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.05} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
               <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} tickLine={false} axisLine={false} />
               <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} tickLine={false} axisLine={false} tickFormatter={(value: number) => formatCurrencyShort(value)} />
               <EnhancedTooltip valueFormatter={(value: number) => formatCurrency(value)} />
-              <Line 
-                type="monotone" 
-                dataKey="saldo" 
-                stroke="#3b82f6" 
+              <Line
+                type="monotone"
+                dataKey="saldo"
+                stroke="#3b82f6"
                 strokeWidth={3}
                 dot={{ fill: '#3b82f6', r: 5 }}
                 activeDot={{ r: 7 }}
@@ -464,52 +489,52 @@ const Financial = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-            {recentTransactions.map((transaction) => (
-              <TableRow key={transaction.id}>
-                <TableCell className="text-muted-foreground">
-                  {format(new Date(transaction.transaction_date), 'dd/MM/yyyy')}
-                </TableCell>
-                <TableCell className="font-medium">{transaction.description}</TableCell>
-                <TableCell>
-                  <Badge variant="outline" className="text-xs">
-                    {transaction.category?.name || 'Sem categoria'}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-muted-foreground text-sm">{transaction.account?.name || '-'}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    {transaction.type === 'entrada' ? (
-                      <>
-                        <ArrowUpRight className="w-4 h-4 text-emerald-500" />
-                        <span className="text-xs text-emerald-500">Entrada</span>
-                      </>
-                    ) : (
-                      <>
-                        <ArrowDownLeft className="w-4 h-4 text-red-500" />
-                        <span className="text-xs text-red-500">Saída</span>
-                      </>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className={`text-right font-semibold ${transaction.type === 'entrada' ? 'text-emerald-500' : 'text-red-500'}`}>
-                  {transaction.type === 'entrada' ? '+' : '-'} {formatCurrency(transaction.amount)}
-                </TableCell>
-                <TableCell className="text-center">
-                  {transaction.type === 'entrada' && transaction.has_costs ? (
-                    <Badge variant="outline" className="text-xs text-orange-500 border-orange-500/20">
-                      R$ {formatCurrency(transaction.total_costs || 0)}
+              {recentTransactions.map((transaction) => (
+                <TableRow key={transaction.id}>
+                  <TableCell className="text-muted-foreground">
+                    {format(new Date(transaction.transaction_date), 'dd/MM/yyyy')}
+                  </TableCell>
+                  <TableCell className="font-medium">{transaction.description}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="text-xs">
+                      {transaction.category?.name || 'Sem categoria'}
                     </Badge>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">-</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-center">
-                  <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
-                    {transaction.status || 'concluída'}
-                  </Badge>
-                </TableCell>
-              </TableRow>
-            ))}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm">{transaction.account?.name || '-'}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      {transaction.type === 'entrada' ? (
+                        <>
+                          <ArrowUpRight className="w-4 h-4 text-emerald-500" />
+                          <span className="text-xs text-emerald-500">Entrada</span>
+                        </>
+                      ) : (
+                        <>
+                          <ArrowDownLeft className="w-4 h-4 text-red-500" />
+                          <span className="text-xs text-red-500">Saída</span>
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className={`text-right font-semibold ${transaction.type === 'entrada' ? 'text-emerald-500' : 'text-red-500'}`}>
+                    {transaction.type === 'entrada' ? '+' : '-'} {formatCurrency(transaction.amount)}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {transaction.type === 'entrada' && transaction.has_costs ? (
+                      <Badge variant="outline" className="text-xs text-orange-500 border-orange-500/20">
+                        R$ {formatCurrency(transaction.total_costs || 0)}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
+                      {transaction.status || 'concluída'}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </CardContent>
@@ -546,6 +571,11 @@ const Financial = () => {
           </div>
         </CardContent>
       </Card>
+
+      <AccountForm
+        open={isAccountFormOpen}
+        onOpenChange={setIsAccountFormOpen}
+      />
     </div>
   )
 }

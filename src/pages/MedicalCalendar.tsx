@@ -291,7 +291,7 @@ export default function MedicalCalendar() {
         id: appointmentForPayment.id,
         confirmedPayment: paid,
       });
-      
+
       // Fechar modal
       setShowPaymentConfirmation(false);
       setAppointmentForPayment(null);
@@ -450,17 +450,17 @@ export default function MedicalCalendar() {
           </div>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
-          <Button 
-            onClick={() => setShowAppointmentForm(true)} 
-            size="lg" 
+          <Button
+            onClick={() => setShowAppointmentForm(true)}
+            size="lg"
             className="flex-1 sm:flex-none bg-primary hover:bg-primary/90"
           >
             <Plus className="h-5 w-5 mr-2" />
             Nova Consulta
           </Button>
-          <Button 
-            onClick={() => setShowMeetingForm(true)} 
-            size="lg" 
+          <Button
+            onClick={() => setShowMeetingForm(true)}
+            size="lg"
             variant="outline"
             className="flex-1 sm:flex-none"
           >
@@ -502,35 +502,61 @@ export default function MedicalCalendar() {
 
       {/* Filters */}
       <Card className="p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="space-y-2">
-            <Label>Médico / Paciente</Label>
-            <Select value={searchFilter} onValueChange={setSearchFilter}>
+            <Label>Médico</Label>
+            <Select
+              value={searchFilter.startsWith('doctor:') ? searchFilter : 'all'}
+              onValueChange={(value) => {
+                if (value === 'all') {
+                  // Se limpar médico, manter filtro de paciente se houver
+                  if (!searchFilter.startsWith('patient:')) {
+                    setSearchFilter('all');
+                  }
+                } else {
+                  setSearchFilter(value);
+                }
+              }}
+            >
               <SelectTrigger>
-                <SelectValue placeholder="Todos" />
+                <SelectValue placeholder="Todos os Médicos" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                {doctors.length > 0 && (
-                  <SelectGroup>
-                    <SelectLabel>Médicos</SelectLabel>
-                    {doctors.map((doctor) => (
-                      <SelectItem key={doctor.id} value={`doctor:${doctor.id}`}>
-                        {doctor.full_name || doctor.email}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                )}
-                {uniquePatients.length > 0 && (
-                  <SelectGroup>
-                    <SelectLabel>Pacientes</SelectLabel>
-                    {uniquePatients.map((patient) => (
-                      <SelectItem key={patient.id} value={`patient:${patient.id}`}>
-                        {patient.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                )}
+                <SelectItem value="all">Todos os Médicos</SelectItem>
+                {doctors.map((doctor) => (
+                  <SelectItem key={doctor.id} value={`doctor:${doctor.id}`}>
+                    {doctor.full_name?.startsWith('Dr') ? doctor.full_name : `Dr(a). ${doctor.full_name}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Paciente</Label>
+            <Select
+              value={searchFilter.startsWith('patient:') ? searchFilter : 'all'}
+              onValueChange={(value) => {
+                if (value === 'all') {
+                  // Se limpar paciente, manter filtro de médico se houver
+                  if (!searchFilter.startsWith('doctor:')) {
+                    setSearchFilter('all');
+                  }
+                } else {
+                  setSearchFilter(value);
+                }
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Todos os Pacientes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Pacientes</SelectItem>
+                {uniquePatients.map((patient) => (
+                  <SelectItem key={patient.id} value={`patient:${patient.id}`}>
+                    {patient.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -600,7 +626,7 @@ export default function MedicalCalendar() {
               appointments={filteredAppointments}
               meetings={meetings}
             />
-            
+
           </div>
 
           {/* Appointments List - Right Column */}

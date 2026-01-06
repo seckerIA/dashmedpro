@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
 import { ensureValidSession } from '@/utils/supabaseHelpers';
+import { useAuth } from './useAuth';
 
 export interface TeamMember {
   id: string;
@@ -10,15 +11,73 @@ export interface TeamMember {
   role: string;
 }
 
-const fetchTeamMembers = async (signal?: AbortSignal): Promise<TeamMember[]> => {
+const fetchTeamMembers = async (userId: string | undefined, signal?: AbortSignal): Promise<TeamMember[]> => {
   // Verificar e garantir sessão válida
   await ensureValidSession();
 
-  const queryPromise = supabase
+  if (!userId) return [];
+
+  // 1. Buscar role do usuário atual
+  const { data: currentUserProfile, error: profileError } = await supabase
     .from('profiles')
-    .select('id, email, full_name, role')
-    .eq('is_active', true)
-    .order('full_name', { ascending: true });
+    .select('role')
+    .eq('id', userId)
+    .single();
+
+  if (profileError) {
+    console.error('Erro ao buscar perfil do usuário:', profileError);
+    return [];
+  }
+
+  const role = currentUserProfile?.role;
+  let queryPromise;
+
+  // 2. Construir query baseada no role
+  if (role === 'dono' || role === 'admin') {
+    // Dono/Admin vê todos
+    queryPromise = supabase
+      .from('profiles')
+      .select('id, email, full_name, role')
+      .eq('is_active', true)
+      .order('full_name', { ascending: true });
+  } else if (role === 'medico') {
+    // Médico vê apenas secretárias vinculadas e a si mesmo
+    const { data: links } = await supabase
+      .from('secretary_doctor_links')
+      .select('secretary_id')
+      .eq('doctor_id', userId);
+
+    const allowedIds = [userId, ...(links?.map(l => l.secretary_id) || [])];
+
+    queryPromise = supabase
+      .from('profiles')
+      .select('id, email, full_name, role')
+      .in('id', allowedIds)
+      .eq('is_active', true)
+      .order('full_name', { ascending: true });
+  } else if (role === 'secretaria') {
+    // Secretária vê apenas médicos vinculados e a si mesma
+    const { data: links } = await supabase
+      .from('secretary_doctor_links')
+      .select('doctor_id')
+      .eq('secretary_id', userId);
+
+    const allowedIds = [userId, ...(links?.map(l => l.doctor_id) || [])];
+
+    queryPromise = supabase
+      .from('profiles')
+      .select('id, email, full_name, role')
+      .in('id', allowedIds)
+      .eq('is_active', true)
+      .order('full_name', { ascending: true });
+  } else {
+    // Outros roles veem apenas a si mesmos por segurança
+    queryPromise = supabase
+      .from('profiles')
+      .select('id, email, full_name, role')
+      .eq('id', userId)
+      .eq('is_active', true);
+  }
 
   const { data, error } = await supabaseQueryWithTimeout(queryPromise, 30000, signal);
 
@@ -27,13 +86,16 @@ const fetchTeamMembers = async (signal?: AbortSignal): Promise<TeamMember[]> => 
 };
 
 export function useTeamMembers() {
+  const { user } = useAuth();
+
   const {
     data: teamMembers = [],
     isLoading,
     error
   } = useQuery({
-    queryKey: ['team-members'],
-    queryFn: ({ signal }) => fetchTeamMembers(signal),
+    queryKey: ['team-members', user?.id],
+    queryFn: ({ signal }) => fetchTeamMembers(user?.id, signal),
+    enabled: !!user?.id,
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
     refetchOnMount: false,
@@ -49,4 +111,5 @@ export function useTeamMembers() {
     error
   };
 }
+
 

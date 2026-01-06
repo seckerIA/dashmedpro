@@ -71,7 +71,8 @@ export function ChatWindow({
   const { canScheduleForOthers, isMedico } = useUserProfile();
   const canViewProcedures = canScheduleForOthers || isMedico;
 
-  // AI Analysis
+  // AI Analysis - Passamos o user_id da conversa explicitamente para garantir
+  // que a configuração do dono (médico) seja buscada corretamente
   const {
     analysis,
     suggestions,
@@ -80,7 +81,10 @@ export function ChatWindow({
     analyzeConversation,
     markSuggestionUsed,
     aiConfig,
-  } = useWhatsAppAI({ conversationId: conversation.id }); // Hook centralizado para IA
+  } = useWhatsAppAI({
+    conversationId: conversation.id,
+    targetUserId: conversation.user_id // <-- Passa o dono da conversa diretamente
+  });
 
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [showAISettings, setShowAISettings] = useState(false);
@@ -98,9 +102,72 @@ export function ChatWindow({
     isSending,
   } = useWhatsAppMessages({ conversationId: conversation.id });
 
+  // ======================================================
+  // Lógica de detecção do indicador "IA pensando"
+  // Ativa quando: mensagem inbound recente + auto_reply ativo
+  // Desativa quando: mensagem outbound chega OU timeout de 25s
+  // ======================================================
+  const [aiProcessingStartTime, setAiProcessingStartTime] = useState<string | null>(null);
+
   useEffect(() => {
-    setIsAIProcessing(false);
-  }, []);
+    // Verificar se auto-reply está ativado
+    if (!aiConfig?.auto_reply_enabled) {
+      setIsAIProcessing(false);
+      setAiProcessingStartTime(null);
+      return;
+    }
+
+    // Pegar a última mensagem (mais recente)
+    if (!messages || messages.length === 0) {
+      setIsAIProcessing(false);
+      return;
+    }
+
+    // Ordenar para garantir que pegamos a mais recente
+    const sortedMsgs = [...messages].sort((a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+    const latestMsg = sortedMsgs[0];
+
+    // Se a última mensagem é OUTBOUND (resposta nossa/IA), parar indicador
+    if (latestMsg.direction === 'outbound') {
+      setIsAIProcessing(false);
+      setAiProcessingStartTime(null);
+      return;
+    }
+
+    // Se a última mensagem é INBOUND (do paciente), verificar tempo
+    const msgTime = new Date(latestMsg.created_at).getTime();
+    const now = Date.now();
+    const secondsSinceMessage = (now - msgTime) / 1000;
+
+    // Mostrar indicador por até 25 segundos após mensagem do paciente
+    // (15s debounce + ~10s para GPT processar)
+    const INDICATOR_TIMEOUT_SECONDS = 25;
+
+    if (secondsSinceMessage < INDICATOR_TIMEOUT_SECONDS) {
+      setIsAIProcessing(true);
+      if (!aiProcessingStartTime) {
+        setAiProcessingStartTime(latestMsg.created_at);
+      }
+    } else {
+      setIsAIProcessing(false);
+      setAiProcessingStartTime(null);
+    }
+
+    // Timer para atualizar o estado a cada segundo
+    const interval = setInterval(() => {
+      const nowInner = Date.now();
+      const secSinceMsg = (nowInner - msgTime) / 1000;
+
+      if (secSinceMsg >= INDICATOR_TIMEOUT_SECONDS) {
+        setIsAIProcessing(false);
+        setAiProcessingStartTime(null);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [messages, aiConfig?.auto_reply_enabled]);
 
   // Conversation actions
   const {
@@ -468,7 +535,7 @@ export function ChatWindow({
             onLoadMore={fetchNextPage}
             onReply={handleReply}
             aiProcessing={isAIProcessing}
-            aiProcessingStartedAt={(conversation as any).ai_processing_started_at}
+            aiProcessingStartedAt={aiProcessingStartTime}
           />
         </div>
 
@@ -553,6 +620,7 @@ export function ChatWindow({
       <AISettingsDialog
         open={showAISettings}
         onOpenChange={setShowAISettings}
+        targetUserId={conversation.user_id}
       />
     </div>
   );

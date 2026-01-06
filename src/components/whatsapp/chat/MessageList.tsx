@@ -209,7 +209,11 @@ export function MessageList({
         </Fragment>
       ))}
 
-
+      {/* AI Typing Indicator - Mostra quando IA está processando */}
+      <AITypingIndicator
+        isVisible={aiProcessing || false}
+        startedAt={aiProcessingStartedAt}
+      />
 
       {/* Bottom anchor - IMPORTANTE: Mantém o scroll ancorado aqui */}
       <div ref={bottomRef} className="h-4 w-full" />

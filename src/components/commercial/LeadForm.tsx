@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useAuth } from "@/hooks/useAuth";
 import { useCommercialLeads } from "@/hooks/useCommercialLeads";
 import { useCommercialProcedures } from "@/hooks/useCommercialProcedures";
 import { CommercialLead, CommercialLeadInsert } from "@/types/commercial";
@@ -34,6 +35,7 @@ interface LeadFormProps {
 }
 
 export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
+  const { user } = useAuth();
   const { createLead, updateLead } = useCommercialLeads();
   const { procedures, isLoading: isLoadingProcedures } = useCommercialProcedures();
   const isEditing = !!lead;
@@ -84,19 +86,28 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
 
   const onSubmit = async (data: LeadFormData) => {
     try {
+      if (!user?.id) {
+        console.error("User not authenticated");
+        return;
+      }
+
       // Buscar o procedimento selecionado para obter o valor estimado se não foi preenchido
       const selectedProcedure = procedures?.find(p => p.id === data.procedure_id);
+
+      // O valor vem do hook-form transformado (number), mas o watch retorna string do input
+      // Como estamos no onSubmit, data.estimated_value já passou pelo transform do zod e é number | undefined
       const estimatedValue = data.estimated_value || (selectedProcedure ? Number(selectedProcedure.price) : null);
-      
+
       const leadData: CommercialLeadInsert = {
         name: data.name,
         email: data.email || null,
         phone: data.phone || null,
         origin: data.origin,
-        status: "new", // Sempre criar como "new" (lead novo)
+        status: "new",
         procedure_id: data.procedure_id && data.procedure_id !== "none" ? data.procedure_id : null,
         estimated_value: estimatedValue,
         notes: data.notes || null,
+        user_id: user.id, // Adicionado user_id obrigatório
       };
 
       if (isEditing && lead) {
@@ -158,7 +169,25 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
               <Input
                 id="phone"
                 {...register("phone")}
+                onChange={(e) => {
+                  let value = e.target.value.replace(/\D/g, "");
+                  if (value.length > 11) value = value.slice(0, 11);
+
+                  if (value.length > 2) {
+                    value = `(${value.slice(0, 2)}) ${value.slice(2)}`;
+                  }
+                  if (value.length > 9) {
+                    value = `${value.slice(0, 9)}-${value.slice(9)}`;
+                  } // Ajuste para o nono dígito (celular) ou fixo
+
+                  // Melhor formatação para móvel vs fixo
+                  // (XX) XXXXX-XXXX -> Móvel (11 chars)
+                  // (XX) XXXX-XXXX -> Fixo (10 chars)
+
+                  setValue("phone", value);
+                }}
                 placeholder="(00) 00000-0000"
+                maxLength={15}
               />
             </div>
 

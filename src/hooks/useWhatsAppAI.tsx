@@ -48,6 +48,8 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
   // Determinar quem é o dono da config
   const configOwnerId = targetUserId || conversationData?.user_id || user?.id;
 
+
+
   // =====================================================
   // Query: Análise da conversa atual
   // =====================================================
@@ -314,7 +316,9 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
   const aiConfigQuery = useQuery({
     queryKey: ['whatsapp-ai-config', configOwnerId],
     queryFn: async () => {
-      if (!configOwnerId) return null;
+      if (!configOwnerId) {
+        return null;
+      }
 
       const { data, error } = await supabase
         .from('whatsapp_ai_config')
@@ -326,6 +330,7 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
         console.error('[useWhatsAppAI] Error fetching config:', error);
         return null;
       }
+
 
       return data as AIConfig | null;
     },
