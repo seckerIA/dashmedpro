@@ -3,16 +3,21 @@
  */
 
 import { useState } from 'react';
-import { MessageCircle, Settings, ArrowLeft, Loader2 } from 'lucide-react';
+import { MessageCircle, Settings, ArrowLeft, Loader2, Users, Phone, CheckCircle, XCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { SetupGuide } from '@/components/whatsapp/settings/SetupGuide';
 import { CredentialsForm } from '@/components/whatsapp/settings/CredentialsForm';
-import { useWhatsAppConfig } from '@/hooks/useWhatsAppConfig';
+import { useWhatsAppConfig, useTeamWhatsAppConfigs } from '@/hooks/useWhatsAppConfig';
+import { useUserProfile } from '@/hooks/useUserProfile';
 
 export default function WhatsAppSettings() {
   const { config, isLoading, isConfigured, isActive } = useWhatsAppConfig();
+  const { isAdmin } = useUserProfile();
+  const { teamConfigs, isLoading: isLoadingTeam } = useTeamWhatsAppConfigs();
   const [webhookUrl, setWebhookUrl] = useState<string>('');
   const [webhookVerifyToken, setWebhookVerifyToken] = useState<string>('');
 
@@ -63,17 +68,15 @@ export default function WhatsAppSettings() {
       {/* Status Badge */}
       {isConfigured && (
         <div
-          className={`p-4 rounded-lg border ${
-            isActive
+          className={`p-4 rounded-lg border ${isActive
               ? 'bg-green-500/10 border-green-500/20'
               : 'bg-yellow-500/10 border-yellow-500/20'
-          }`}
+            }`}
         >
           <div className="flex items-center gap-3">
             <div
-              className={`h-3 w-3 rounded-full ${
-                isActive ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'
-              }`}
+              className={`h-3 w-3 rounded-full ${isActive ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'
+                }`}
             />
             <div>
               <p className="font-medium">
@@ -92,8 +95,14 @@ export default function WhatsAppSettings() {
       )}
 
       {/* Tabs de configuração */}
-      <Tabs defaultValue={isConfigured ? 'credentials' : 'guide'} className="space-y-6">
+      <Tabs defaultValue={isAdmin ? 'team' : (isConfigured ? 'credentials' : 'guide')} className="space-y-6">
         <TabsList>
+          {isAdmin && (
+            <TabsTrigger value="team">
+              <Users className="h-4 w-4 mr-2" />
+              WhatsApps da Equipe
+            </TabsTrigger>
+          )}
           <TabsTrigger value="guide">
             Guia de Configuração
           </TabsTrigger>
@@ -101,6 +110,81 @@ export default function WhatsAppSettings() {
             Credenciais
           </TabsTrigger>
         </TabsList>
+
+        {/* Tab: Team WhatsApps (Admin only) */}
+        {isAdmin && (
+          <TabsContent value="team" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  WhatsApps Configurados na Equipe
+                </CardTitle>
+                <CardDescription>
+                  Visualize todos os números de WhatsApp configurados pelos membros da sua equipe
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingTeam ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : teamConfigs.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Phone className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Nenhum WhatsApp configurado na equipe ainda.</p>
+                    <p className="text-sm">Peça para os membros da equipe configurarem suas contas.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {teamConfigs.map((teamConfig) => (
+                      <div
+                        key={teamConfig.id}
+                        className={`p-4 rounded-lg border ${teamConfig.is_active
+                            ? 'bg-green-500/5 border-green-500/20'
+                            : 'bg-muted/50 border-muted'
+                          }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className={`p-2 rounded-full ${teamConfig.is_active ? 'bg-green-500/10' : 'bg-muted'
+                              }`}>
+                              <Phone className={`h-5 w-5 ${teamConfig.is_active ? 'text-green-500' : 'text-muted-foreground'
+                                }`} />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium">{teamConfig.verified_name || 'Não verificado'}</p>
+                                {teamConfig.is_active ? (
+                                  <Badge variant="default" className="bg-green-500">
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    Ativo
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="secondary">
+                                    <XCircle className="h-3 w-3 mr-1" />
+                                    Inativo
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                {teamConfig.display_phone_number || 'Número não configurado'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-medium">{teamConfig.user_name}</p>
+                            <p className="text-xs text-muted-foreground">{teamConfig.user_email}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
         <TabsContent value="guide" className="space-y-6">
           <div className="grid lg:grid-cols-2 gap-6">
@@ -148,3 +232,4 @@ export default function WhatsAppSettings() {
     </div>
   );
 }
+

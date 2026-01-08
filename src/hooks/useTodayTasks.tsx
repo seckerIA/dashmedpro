@@ -19,7 +19,7 @@ const fetchTodayTasks = async (userId: string, signal?: AbortSignal): Promise<Ta
     .lt('due_date', endOfDay.toISOString())
     .order('due_date', { ascending: true });
 
-  const { data, error } = await supabaseQueryWithTimeout(query as any, 30000, signal);
+  const { data, error } = await supabaseQueryWithTimeout(query as any, undefined, signal);
 
   if (error) {
     throw new Error(`Erro ao buscar tarefas do dia: ${error.message}`);

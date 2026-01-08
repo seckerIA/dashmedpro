@@ -54,15 +54,15 @@ export const useCostsBreakdown = (startDate?: string, endDate?: string) => {
           .gte('transaction_date', startDate)
           .lte('transaction_date', endDate)
 
-        const filteredResult = await supabaseQueryWithTimeout(filteredTransactionsQuery as any, 30000, signal);
+        const filteredResult = await supabaseQueryWithTimeout(filteredTransactionsQuery as any, undefined, signal);
         const transactionIds = filteredResult.data?.map(t => t.id) || []
-        
+
         if (transactionIds.length > 0) {
           query = query.in('transaction_id', transactionIds)
         }
       }
 
-      const queryResult = await supabaseQueryWithTimeout(query as any, 30000, signal);
+      const queryResult = await supabaseQueryWithTimeout(query as any, undefined, signal);
       const { data, error } = queryResult;
 
       if (error) throw error
@@ -133,7 +133,7 @@ export const useCreateTransactionCost = () => {
       queryClient.invalidateQueries({ queryKey: ['financial-transactions'] })
       queryClient.invalidateQueries({ queryKey: ['financial-metrics'] })
       queryClient.invalidateQueries({ queryKey: ['costs-breakdown'] })
-      
+
       toast({
         title: "Sucesso",
         description: "Custo adicionado com sucesso!",
@@ -174,7 +174,7 @@ export const useUpdateTransactionCost = () => {
       queryClient.invalidateQueries({ queryKey: ['financial-transactions'] })
       queryClient.invalidateQueries({ queryKey: ['financial-metrics'] })
       queryClient.invalidateQueries({ queryKey: ['costs-breakdown'] })
-      
+
       toast({
         title: "Sucesso",
         description: "Custo atualizado com sucesso!",
@@ -213,7 +213,7 @@ export const useDeleteTransactionCost = () => {
       queryClient.invalidateQueries({ queryKey: ['financial-transactions'] })
       queryClient.invalidateQueries({ queryKey: ['financial-metrics'] })
       queryClient.invalidateQueries({ queryKey: ['costs-breakdown'] })
-      
+
       toast({
         title: "Sucesso",
         description: "Custo removido com sucesso!",
@@ -255,7 +255,7 @@ export const useCreateMultipleCosts = () => {
         queryClient.invalidateQueries({ queryKey: ['financial-metrics'] })
         queryClient.invalidateQueries({ queryKey: ['costs-breakdown'] })
       }
-      
+
       toast({
         title: "Sucesso",
         description: `${data.length} custo(s) adicionado(s) com sucesso!`,

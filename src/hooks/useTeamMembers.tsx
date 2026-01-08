@@ -79,7 +79,7 @@ const fetchTeamMembers = async (userId: string | undefined, signal?: AbortSignal
       .eq('is_active', true);
   }
 
-  const { data, error } = await supabaseQueryWithTimeout(queryPromise, 30000, signal);
+  const { data, error } = await supabaseQueryWithTimeout(queryPromise, undefined, signal);
 
   if (error) throw new Error(`Erro ao buscar membros da equipe: ${error.message}`);
   return data || [];

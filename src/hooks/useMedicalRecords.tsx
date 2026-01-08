@@ -44,7 +44,7 @@ export function useMedicalRecords(contactId?: string) {
         .eq('contact_id', contactId)
         .order('created_at', { ascending: false });
 
-      const { data, error } = await supabaseQueryWithTimeout(query, 30000, signal);
+      const { data, error } = await supabaseQueryWithTimeout(query as any, undefined, signal);
 
       if (error) {
         console.error('Erro ao buscar prontuários:', error);
@@ -323,7 +323,7 @@ export function usePrescriptions(contactId?: string) {
         .eq('contact_id', contactId)
         .order('created_at', { ascending: false });
 
-      const { data, error } = await supabaseQueryWithTimeout(query, 30000, signal);
+      const { data, error } = await supabaseQueryWithTimeout(query as any, undefined, signal);
 
       if (error) {
         console.error('Erro ao buscar receitas:', error);
@@ -457,18 +457,18 @@ export function usePatientMedicalHistory(contactId: string | null) {
         .order('created_at', { ascending: false });
 
       const [recordsResult, appointmentsResult, prescriptionsResult] = await Promise.all([
-        supabaseQueryWithTimeout(recordsQuery, 30000, signal),
-        supabaseQueryWithTimeout(appointmentsQuery, 30000, signal),
-        supabaseQueryWithTimeout(prescriptionsQuery, 30000, signal),
+        supabaseQueryWithTimeout(recordsQuery as any, undefined, signal),
+        supabaseQueryWithTimeout(appointmentsQuery as any, undefined, signal),
+        supabaseQueryWithTimeout(prescriptionsQuery as any, undefined, signal),
       ]);
 
       return {
-        records: recordsResult.data || [],
-        appointments: appointmentsResult.data || [],
-        prescriptions: prescriptionsResult.data || [],
-        totalRecords: recordsResult.data?.length || 0,
-        totalAppointments: appointmentsResult.data?.length || 0,
-        totalPrescriptions: prescriptionsResult.data?.length || 0,
+        records: (recordsResult.data as MedicalRecord[]) || [],
+        appointments: (appointmentsResult.data as any[]) || [],
+        prescriptions: (prescriptionsResult.data as Prescription[]) || [],
+        totalRecords: (recordsResult.data as MedicalRecord[])?.length || 0,
+        totalAppointments: (appointmentsResult.data as any[])?.length || 0,
+        totalPrescriptions: (prescriptionsResult.data as Prescription[])?.length || 0,
       };
     },
     enabled: !!contactId && !!user?.id,
@@ -512,7 +512,7 @@ export function usePatientRecordHistory(contactId: string | null) {
         .order('created_at', { ascending: false })
         .limit(10);
 
-      const { data, error } = await supabaseQueryWithTimeout(query, 10000, signal);
+      const { data, error } = await supabaseQueryWithTimeout(query as any, undefined, signal);
 
       if (error) throw new Error(`Erro ao buscar histórico: ${error.message}`);
       return data || [];
@@ -555,7 +555,7 @@ export function useMedicalRecord(recordId: string | null) {
         .eq('id', recordId)
         .single();
 
-      const { data, error } = await supabaseQueryWithTimeout(query, 10000, signal);
+      const { data, error } = await supabaseQueryWithTimeout(query as any, undefined, signal);
 
       if (error) {
         throw new Error(`Erro ao buscar prontuário: ${error.message}`);

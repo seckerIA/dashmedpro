@@ -15,6 +15,7 @@ import type {
 
 // Query keys
 export const WHATSAPP_CONFIG_QUERY_KEY = 'whatsapp-config';
+export const WHATSAPP_TEAM_CONFIGS_QUERY_KEY = 'whatsapp-team-configs';
 
 interface ValidateCredentialsPayload {
   phone_number_id: string;
@@ -279,5 +280,63 @@ export function useWhatsAppConfig() {
 
     // Refetch
     refetch: configQuery.refetch,
+  };
+}
+
+// =========================================
+// Hook: Buscar configs da equipe (para admins)
+// =========================================
+export interface TeamWhatsAppConfig extends WhatsAppConfig {
+  user_email?: string;
+  user_name?: string;
+}
+
+export function useTeamWhatsAppConfigs() {
+  const teamConfigsQuery = useQuery({
+    queryKey: [WHATSAPP_TEAM_CONFIGS_QUERY_KEY],
+    queryFn: async (): Promise<TeamWhatsAppConfig[]> => {
+      // Buscar todas as configs de WhatsApp
+      const { data: configs, error } = await supabase
+        .from('whatsapp_config')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('[useTeamWhatsAppConfigs] Error:', error);
+        throw error;
+      }
+
+      if (!configs || configs.length === 0) {
+        return [];
+      }
+
+      // Buscar informações dos usuários
+      const userIds = configs.map((c: any) => c.user_id).filter(Boolean);
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', userIds);
+
+      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+
+      return configs.map((config: any) => {
+        const profile = profileMap.get(config.user_id);
+        return {
+          ...config,
+          user_name: profile?.full_name || 'Usuário desconhecido',
+          user_email: profile?.email || '',
+        } as TeamWhatsAppConfig;
+      });
+    },
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+  });
+
+  return {
+    teamConfigs: teamConfigsQuery.data || [],
+    isLoading: teamConfigsQuery.isLoading,
+    isError: teamConfigsQuery.isError,
+    error: teamConfigsQuery.error,
+    refetch: teamConfigsQuery.refetch,
   };
 }

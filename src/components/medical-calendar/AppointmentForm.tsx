@@ -32,7 +32,7 @@ import {
 } from '@/types/medicalAppointments';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarIcon, Loader2, AlertCircle, Upload, Eye, X } from 'lucide-react';
+import { CalendarIcon, Loader2, AlertCircle, Upload, Eye, X, Search } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -100,6 +100,7 @@ export function AppointmentForm({
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
   const [showNewContactForm, setShowNewContactForm] = useState(false);
   const [formInitialized, setFormInitialized] = useState(false);
+  const [patientSearchTerm, setPatientSearchTerm] = useState('');
 
   // Estados para Sinal (entrada/depósito)
   const [sinalPaid, setSinalPaid] = useState(false);
@@ -527,11 +528,20 @@ export function AppointmentForm({
   // NOTA: setValue, watch e setEstimatedValueDisplay são funções estáveis do react-hook-form
   // mas não devem estar nas dependências para evitar loop infinito de re-renders
 
-  // Filtrar contatos pelo médico selecionado
+  // Filtrar contatos pela busca do usuário
+  // NOTA: Ordenação alfabética já é feita no backend. Aqui filtramos por texto de busca.
   const filteredContacts = React.useMemo(() => {
-    if (!selectedDoctorId) return contacts;
-    return contacts.filter(contact => (contact as any).user_id === selectedDoctorId);
-  }, [contacts, selectedDoctorId]);
+    if (!patientSearchTerm.trim()) {
+      return contacts;
+    }
+    const searchLower = patientSearchTerm.toLowerCase().trim();
+    return contacts.filter(contact => {
+      const name = (contact.full_name || '').toLowerCase();
+      const phone = (contact.phone || '').toLowerCase();
+      const email = (contact.email || '').toLowerCase();
+      return name.includes(searchLower) || phone.includes(searchLower) || email.includes(searchLower);
+    });
+  }, [contacts, patientSearchTerm]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -580,32 +590,51 @@ export function AppointmentForm({
                       : "Selecione o paciente"
                 } />
               </SelectTrigger>
-              <SelectContent>
-                {!user?.id ? (
-                  <div className="p-2 text-sm text-muted-foreground">
-                    Aguardando autenticação...
+              <SelectContent className="max-h-[300px] overflow-hidden">
+                {/* Campo de busca de pacientes - fixo no topo */}
+                <div className="p-2 border-b bg-background sticky top-0 z-50 -mt-1 pt-2">
+                  <div className="relative">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar por nome, telefone ou email..."
+                      value={patientSearchTerm}
+                      onChange={(e) => setPatientSearchTerm(e.target.value)}
+                      className="pl-8 h-9"
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    />
                   </div>
-                ) : isLoadingContacts ? (
-                  <div className="p-2 text-sm text-muted-foreground flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Carregando pacientes...
-                  </div>
-                ) : filteredContacts.length === 0 ? (
-                  <div className="p-2 text-sm text-muted-foreground">
-                    Nenhum paciente cadastrado. Clique em "Cadastrar novo paciente" para adicionar.
-                  </div>
-                ) : (
-                  filteredContacts.map((contact) => (
-                    <SelectItem key={contact.id} value={contact.id}>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{contact.full_name || 'Sem nome'}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {contact.phone || ''} {contact.email && `• ${contact.email}`}
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))
-                )}
+                </div>
+                <div className="overflow-y-auto max-h-[220px]">
+                  {!user?.id ? (
+                    <div className="p-2 text-sm text-muted-foreground">
+                      Aguardando autenticação...
+                    </div>
+                  ) : isLoadingContacts ? (
+                    <div className="p-2 text-sm text-muted-foreground flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Carregando pacientes...
+                    </div>
+                  ) : filteredContacts.length === 0 ? (
+                    <div className="p-2 text-sm text-muted-foreground">
+                      {patientSearchTerm ?
+                        `Nenhum paciente encontrado para "${patientSearchTerm}".` :
+                        'Nenhum paciente cadastrado. Clique em "Cadastrar novo paciente" para adicionar.'
+                      }
+                    </div>
+                  ) : (
+                    filteredContacts.map((contact) => (
+                      <SelectItem key={contact.id} value={contact.id}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{contact.full_name || 'Sem nome'}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {contact.phone || ''} {contact.email && `• ${contact.email}`}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
+                </div>
               </SelectContent>
             </Select>
             {errors.contact_id && (

@@ -2,12 +2,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
 import { ensureValidSession } from '@/utils/supabaseHelpers';
-import { 
-  SalesCall, 
-  SalesCallWithRelations, 
-  SalesCallInsert, 
+import {
+  SalesCall,
+  SalesCallWithRelations,
+  SalesCallInsert,
   SalesCallUpdate,
-  SalesCallStatus 
+  SalesCallStatus
 } from '@/types/salesCalls';
 import { useAuth } from './useAuth';
 import { useNotifications } from './useNotifications';
@@ -16,7 +16,7 @@ import { ptBR } from 'date-fns/locale';
 
 // Fetch sales calls with relations
 const fetchSalesCalls = async (
-  userId: string, 
+  userId: string,
   filters?: {
     startDate?: Date;
     endDate?: Date;
@@ -49,7 +49,7 @@ const fetchSalesCalls = async (
     query = query.eq('status', filters.status);
   }
 
-  const { data, error } = await supabaseQueryWithTimeout(query, 30000, signal);
+  const { data, error } = await supabaseQueryWithTimeout(query, undefined, signal);
 
   if (error) throw new Error(`Erro ao buscar calls: ${error.message}`);
   return (data || []) as SalesCallWithRelations[];
@@ -113,12 +113,12 @@ export function useSalesCalls(filters?: {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['sales-calls'] });
-      
+
       // Criar notificação de confirmação
       if (user?.id && data.contact) {
         const scheduledDate = new Date(data.scheduled_at);
         const formattedDate = format(scheduledDate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
-        
+
         createNotification({
           user_id: user.id,
           type: 'call_scheduled',
@@ -172,7 +172,7 @@ export function useSalesCalls(filters?: {
     mutationFn: async (id: string) => {
       const { data, error } = await supabase
         .from('sales_calls')
-        .update({ 
+        .update({
           status: 'completed' as SalesCallStatus,
           completed_at: new Date().toISOString()
         })

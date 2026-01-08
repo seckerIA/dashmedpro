@@ -63,7 +63,8 @@ export function SupabaseProjectValidator({ children }: { children: React.ReactNo
     return null;
   }
 
-  // Se tudo estiver OK, renderizar normalmente
+  // Se tudo estiver OK (ou apenas com avisos), renderizar normalmente
+  // Bloquear apenas se houver ERROS ou falha na validação básica
   if (validation.projectValid && validation.sessionValid && validation.errors.length === 0) {
     return <>{children}</>;
   }

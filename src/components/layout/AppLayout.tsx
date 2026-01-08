@@ -18,6 +18,7 @@ import { NotificationBell } from "@/components/notifications/NotificationBell"
 import { useOverdueAppointments } from "@/hooks/useOverdueAppointments"
 import { AlertTriangle } from "lucide-react"
 import { GlobalSearch } from "@/components/crm/GlobalSearch"
+import { CortanaButtonCompact } from "@/components/cortana"
 
 interface AppLayoutProps {
   children: ReactNode
@@ -115,6 +116,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               </div>
 
               <div className="flex items-center gap-4">
+                <CortanaButtonCompact className="mr-2" />
                 <div className="hidden md:flex items-center gap-6 text-sm">
                   <a
                     href="https://wa.me/5511999998888"

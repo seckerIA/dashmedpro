@@ -9,7 +9,7 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { useUserProfile } from "./hooks/useUserProfile";
 import { SupabaseProjectValidator } from "./components/SupabaseProjectValidator";
-import { CortanaProvider, CortanaButton, CortanaOverlay } from "./components/cortana";
+import { CortanaProvider, CortanaOverlay } from "./components/cortana";
 import Dashboard from "./pages/Dashboard";
 import Calculadora from "./pages/Calculadora";
 import CalculadoraSelection from "./pages/CalculadoraSelection";
@@ -94,7 +94,7 @@ const queryClient = new QueryClient({
       staleTime: 2 * 60 * 1000,
       gcTime: 5 * 60 * 1000,
       refetchOnWindowFocus: false,
-      refetchOnMount: false,
+      refetchOnMount: true,
       refetchOnReconnect: true,
       networkMode: 'online',
     },
@@ -151,8 +151,8 @@ const StuckQueryDetector = () => {
 
           if (fetchStartTime) {
             const timeSinceStart = now - fetchStartTime;
-            // Timeout de detecção aumentado para 180s (deve ser maior que o timeout de 60s/90s do fetch)
-            const stuckThreshold = 180000;
+            // Timeout de detecção aumentado para 300s (deve ser maior que o timeout de 120s do fetch)
+            const stuckThreshold = 300000;
 
             if (timeSinceStart > stuckThreshold) {
               stuckQueries.push(query);
@@ -429,10 +429,6 @@ const AppRoutes = () => {
       </AppLayout>
 
       {/* Cortana - Assistente de Voz IA */}
-      <CortanaButton />
-      <CortanaOverlay />
-      {/* Cortana - Assistente de Voz IA */}
-      <CortanaButton />
       <CortanaOverlay />
 
       {/* VOIP Components */}

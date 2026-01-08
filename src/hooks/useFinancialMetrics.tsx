@@ -45,7 +45,7 @@ export const useFinancialMetrics = () => {
         accountsQuery = accountsQuery.eq("user_id", user.id);
       }
 
-      const accountsResult = await supabaseQueryWithTimeout(accountsQuery as any, 30000, signal);
+      const accountsResult = await supabaseQueryWithTimeout(accountsQuery as any, undefined, signal);
       const { data: accounts } = accountsResult;
       const accountsData = (accounts || []) as Array<{ current_balance: number }>;
       const totalBalance = accountsData.reduce((sum, acc) => sum + (acc.current_balance || 0), 0);
@@ -62,7 +62,7 @@ export const useFinancialMetrics = () => {
         transactionsQuery = transactionsQuery.eq("user_id", user.id);
       }
 
-      const transactionsResult = await supabaseQueryWithTimeout(transactionsQuery as any, 30000, signal);
+      const transactionsResult = await supabaseQueryWithTimeout(transactionsQuery as any, undefined, signal);
       const { data: currentMonthTransactions } = transactionsResult;
       const transactionsData = (currentMonthTransactions || []) as Array<{
         type: string;
@@ -103,7 +103,7 @@ export const useFinancialMetrics = () => {
         countQuery = countQuery.eq("user_id", user.id);
       }
 
-      const countResult = await supabaseQueryWithTimeout(countQuery as any, 30000, signal);
+      const countResult = await supabaseQueryWithTimeout(countQuery as any, undefined, signal);
       const activeTransactions = (countResult as any).count || 0;
 
       const metricsData: FinancialMetrics = {
@@ -157,7 +157,7 @@ export const useFinancialMetrics = () => {
           query = query.eq("user_id", user.id);
         }
 
-        const queryResult = await supabaseQueryWithTimeout(query as any, 30000, signal);
+        const queryResult = await supabaseQueryWithTimeout(query as any, undefined, signal);
         const { data } = queryResult;
         const transactionsData = (data || []) as Array<{ type: string; amount: number }>;
 
@@ -210,7 +210,7 @@ export const useFinancialMetrics = () => {
         query = query.eq("user_id", user.id);
       }
 
-      const queryResult = await supabaseQueryWithTimeout(query as any, 30000, signal);
+      const queryResult = await supabaseQueryWithTimeout(query as any, undefined, signal);
       const { data } = queryResult;
       const transactionsData = (data || []) as Array<{
         amount: number;
@@ -275,7 +275,7 @@ export const useFinancialMetrics = () => {
         accountsQuery = accountsQuery.eq("user_id", user.id);
       }
 
-      const accountsResult = await supabaseQueryWithTimeout(accountsQuery as any, 30000, signal);
+      const accountsResult = await supabaseQueryWithTimeout(accountsQuery as any, undefined, signal);
       const { data: accounts } = accountsResult;
       const accountsData = (accounts || []) as Array<{ current_balance: number }>;
 

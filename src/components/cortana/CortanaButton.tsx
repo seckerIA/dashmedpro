@@ -23,7 +23,8 @@ export function CortanaButton({
   className,
   size = 'lg',
   showTooltip = true,
-}: CortanaButtonProps) {
+  fixedPosition = true,
+}: CortanaButtonProps & { fixedPosition?: boolean }) {
   const { state, isConfigured, startConversation, stopConversation } = useCortanaContext();
 
   const handleClick = () => {
@@ -106,7 +107,7 @@ export function CortanaButton({
       onClick={handleClick}
       disabled={!isConfigured || state.status === 'connecting'}
       className={cn(
-        'fixed bottom-6 right-6 z-50',
+        fixedPosition ? 'fixed bottom-6 right-6 z-50' : 'relative z-50',
         'rounded-full shadow-lg',
         'flex items-center justify-center',
         'text-white font-medium',
@@ -182,5 +183,5 @@ export function CortanaButton({
 
 // Exportar componente compacto para uso no header
 export function CortanaButtonCompact({ className }: { className?: string }) {
-  return <CortanaButton size="sm" className={className} />;
+  return <CortanaButton size="sm" fixedPosition={false} className={className} />;
 }

@@ -63,7 +63,7 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
       let data, error;
 
       try {
-        const result = await supabaseQueryWithTimeout(queryPromise as any, 90000, signal);
+        const result = await supabaseQueryWithTimeout(queryPromise as any, 120000, signal);
         data = result.data;
         error = result.error;
       } catch (err: any) {
@@ -76,7 +76,7 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
           .in("user_id", targetUserIds)
           .order("created_at", { ascending: false });
 
-        const result = await supabaseQueryWithTimeout(fallbackQuery as any, 30000, signal);
+        const result = await supabaseQueryWithTimeout(fallbackQuery as any, undefined, signal);
         data = result.data;
         error = result.error;
       }

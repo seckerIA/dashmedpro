@@ -18,16 +18,24 @@ const fetchContacts = async (
   signal?: AbortSignal,
   doctorIds?: string[]
 ): Promise<CRMContact[]> => {
-  if (!userId && !fetchAll && (!doctorIds || doctorIds.length === 0)) return [];
+  // Se fetchAll=true, busca todos sem filtro de user_id
+  if (!fetchAll && !userId && (!doctorIds || doctorIds.length === 0)) return [];
+
   let queryPromise = supabase.from('crm_contacts').select('*');
-  if (doctorIds && doctorIds.length > 0) {
-    queryPromise = (queryPromise as any).in('user_id', [userId, ...doctorIds]);
-  } else if (!fetchAll && userId) {
-    queryPromise = (queryPromise as any).eq('user_id', userId);
+
+  // Apenas aplica filtro de user_id se NÃO for fetchAll
+  if (!fetchAll) {
+    if (doctorIds && doctorIds.length > 0) {
+      queryPromise = (queryPromise as any).in('user_id', [userId, ...doctorIds]);
+    } else if (userId) {
+      queryPromise = (queryPromise as any).eq('user_id', userId);
+    }
   }
+
+  // Ordenar por nome alfabeticamente
   const { data, error } = await supabaseQueryWithTimeout(
-    (queryPromise as any).order('created_at', { ascending: false }).limit(1000),
-    30000,
+    (queryPromise as any).order('full_name', { ascending: true }).limit(1000),
+    undefined,
     signal
   );
   if (error) throw new Error(`Erro ao buscar contatos: ${error.message}`);
@@ -56,14 +64,14 @@ const fetchDeals = async (
 
   const { data, error } = await supabaseQueryWithTimeout(
     (queryPromise as any).or(orCondition).order('position', { ascending: true }).limit(500),
-    30000,
+    undefined,
     signal
   );
 
   if (error) {
     console.error('❌ Erro no PostgREST crm_deals:', error);
     // Fallback absoluto sem subquery
-    const fallback = await supabaseQueryWithTimeout(supabase.from('crm_deals').select('*').or(orCondition).limit(500) as any, 30000, signal);
+    const fallback = await supabaseQueryWithTimeout(supabase.from('crm_deals').select('*').or(orCondition).limit(500) as any, undefined, signal);
     if (fallback.error) throw new Error(`Erro ao buscar deals: ${fallback.error.message}`);
     return (fallback.data || []) as CRMDealWithContact[];
   }
@@ -109,7 +117,7 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
   const queryClient = useQueryClient();
   const doctorIdsToUse = isSecretaria ? doctorIds : [];
 
-  const { data: contacts = [], isLoading: isLoadingContacts } = useQuery({
+  const { data: contacts = [], isLoading: isLoadingContacts, refetch: refetchContacts } = useQuery({
     queryKey: ['crm-contacts', user?.id, fetchAllContacts, doctorIdsToUse],
     queryFn: ({ signal }) => fetchContacts(user?.id || '', fetchAllContacts, signal, doctorIdsToUse),
     enabled: !!user?.id || fetchAllContacts || doctorIdsToUse.length > 0,
@@ -196,6 +204,8 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
     contacts,
     deals,
     isLoading: isLoadingContacts || isLoadingDeals || isLoadingProfile,
+    isLoadingContacts,
+    refetchContacts,
     createContact: createContactMutation.mutateAsync,
     createDeal: createDealMutation.mutateAsync,
     updateDeal: updateDealMutation.mutateAsync,

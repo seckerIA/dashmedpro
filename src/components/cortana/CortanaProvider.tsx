@@ -12,7 +12,7 @@ import { ToastAction } from '@/components/ui/toast';
 import { CORTANA_CONFIG, isCortanaConfigured } from '@/config/cortana';
 import { supabase } from '@/integrations/supabase/client';
 import { CortanaStatus, CortanaState, CortanaContext as CortanaUserContext } from '@/types/cortana';
-import { buildCortanaContext } from '@/services/cortana/contextBuilder';
+import { buildCortanaContext, getDynamicOverrides } from '@/services/cortana/contextBuilder';
 import { createClientTools, setActionCallback, PendingAction } from '@/services/cortana/clientTools';
 import { initializeActionExecutor, injectHighlightStyles, executeAction } from '@/services/cortana/actionExecutor';
 
@@ -194,10 +194,14 @@ export function CortanaProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // Gerar variáveis dinâmicas
+      const dynamicVariables = getDynamicOverrides(userContext);
+
       // Se passou, iniciar sessão
       await conversation.startSession({
         agentId: CORTANA_CONFIG.agentId,
         clientTools,
+        dynamicVariables,
       });
 
       console.log('[Cortana] Sessão iniciada com sucesso');

@@ -16,7 +16,7 @@ const fetchTasks = async (userId: string, signal?: AbortSignal): Promise<TaskWit
     .select('*')
     .order('created_at', { ascending: false });
 
-  const { data, error } = await supabaseQueryWithTimeout(queryPromise, 30000, signal);
+  const { data, error } = await supabaseQueryWithTimeout<TaskWithCRM[]>(queryPromise as any, undefined, signal);
 
   if (error) {
     console.error('Erro ao buscar tarefas:', error);

@@ -95,6 +95,8 @@ export function getDynamicOverrides(context: CortanaContext): Record<string, str
     }),
     currentDate: now.toLocaleDateString('pt-BR'),
     currentTime: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    // Instrução crítica para evitar repetições
+    systemInstruction: "IMPORTANTE: Você é a Cortana, uma assistente eficiente. NÃO repita confirmações múltiplas vezes. Confirme o comando APENAS UMA VEZ e execute. Seja direta.",
   };
 }
 
