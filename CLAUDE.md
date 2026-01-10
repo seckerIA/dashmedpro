@@ -159,11 +159,15 @@ supabase/functions/
 - **WhatsApp Token Expiration**: Tokens Meta expiram periodicamente, reconfigurar quando necessário
 - **Webhook Meta**: Configurar callback URL no Meta Business Manager após deploy
 
-### Latest Changes (2026-01-04)
-- Fix: WhatsApp AI Authentication (JWT Role Check bypass + Webhook User Priority)
-- Fix: RLS Bypass in AI Analysis using `supabaseAdmin`
-- Feature: AI Auto-reply enabled with confidence threshold 0.7
-- Update: `whatsapp-ai-analyze` e `whatsapp-webhook` atualizados para produção
+### Contexto Atual (Fevereiro 2026 - Sprint CRM & WhatsApp)
+- **WhatsApp OAuth**: Configuração automática via Facebook Login (Fluxo: `useWhatsAppOAuth` -> `whatsapp-oauth-callback`)
+- **Novos Componentes UI**:
+  - `CollapsibleSection` (Dashboards)
+  - `NotificationBell` redesenhado (backdrop blur, ícones coloridos por tipo)
+  - `FacebookConnectButton` e `PhoneNumberSelector` (Setup WhatsApp)
+  - `HeroMetrics` e `UnifiedChart` (Página principal)
+- **Dashboard**: Sistema de abas Resumo/Detalhado persistente (`localStorage`)
+- **Fixes**: Consistência de formatação percentual (1 casa decimal) e escala de gráficos de conversão.
 
 ---
-**Version:** 0.2.1 | 2026-01-04 | https://github.com/seckerIA/dashmedpro
+**Version:** 0.3.0 | 2026-02-05 | https://github.com/seckerIA/dashmedpro

@@ -1,60 +1,51 @@
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PIPELINE_STAGES } from "@/types/crm"
 import { TodayTasksWidget } from "@/components/tasks/TodayTasksWidget"
 import { UpcomingCallsWidget } from "@/components/calendar/UpcomingCallsWidget"
-import { LeadsChart } from "@/components/charts/LeadsChart"
-import { RevenueChart } from "@/components/charts/RevenueChart"
 import { ServicesChart } from "@/components/charts/ServicesChart"
 import { ConversionChart } from "@/components/charts/ConversionChart"
-import { TicketMedioChart } from "@/components/charts/TicketMedioChart"
 import { ReceitaDespesasChart } from "@/components/charts/ReceitaDespesasChart"
 import { TreatmentEvolutionChart } from "@/components/charts/TreatmentEvolutionChart"
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics"
 import { useFinancialMetrics } from "@/hooks/useFinancialMetrics"
 import { useUserProfile } from "@/hooks/useUserProfile"
-import { useBottleneckMetrics } from "@/hooks/useBottleneckMetrics"
 import { useEnhancedDashboardMetrics } from "@/hooks/useEnhancedDashboardMetrics"
 import { MetricCard, QuickActionCard } from "@/components/dashboard/MetricCard"
 import { PipelineFunnelCard } from "@/components/dashboard/PipelineFunnelCard"
-import { SalesChart } from "@/components/dashboard/SalesChart"
-import { StatsPanel } from "@/components/dashboard/StatsPanel"
 import { CustomerTable } from "@/components/dashboard/CustomerTable"
 import { OverdueAppointmentsAlert } from "@/components/shared/OverdueAppointmentsAlert"
-import { BottleneckCard } from "@/components/dashboard/BottleneckCard"
-import { AttendanceMetricsCard } from "@/components/medical-calendar/AttendanceMetricsCard"
 import { AnimatedWrapper } from "@/components/shared/AnimatedWrapper"
 import SecretaryDashboard from "@/components/dashboard/SecretaryDashboard"
-import { 
-  Calculator, 
-  TrendingUp, 
-  PieChart, 
-  Users, 
-  Target, 
-  BarChart3,
+
+// Novos componentes simplificados
+import { HeroMetrics } from "@/components/dashboard/HeroMetrics"
+import { SmartAlerts } from "@/components/dashboard/SmartAlerts"
+import { UnifiedChart } from "@/components/dashboard/UnifiedChart"
+import { CollapsibleSection } from "@/components/dashboard/CollapsibleSection"
+
+import {
+  TrendingUp,
+  Users,
+  Target,
   DollarSign,
-  Search,
-  Bell,
-  ArrowUpRight,
-  ArrowDownLeft,
-  MoreHorizontal,
-  CreditCard,
-  Activity,
-  Zap,
-  Plus,
   Calendar,
-  Gift,
-  RefreshCw,
-  Filter,
-  Eye,
+  Activity,
   Coins,
-  AlertTriangle
+  BarChart3,
+  PieChart,
+  Briefcase,
+  LayoutDashboard,
+  ListTodo,
+  Eye
 } from "lucide-react"
-import { Link, useNavigate } from "react-router-dom"
+import { useNavigate } from "react-router-dom"
 import { formatCurrency } from "@/lib/currency"
 import { getContactService } from "@/lib/crm"
+
+type DashboardView = "resumo" | "detalhado"
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -62,7 +53,18 @@ const Dashboard = () => {
   const { data: metrics, isLoading, error } = useDashboardMetrics();
   const { data: enhancedMetrics } = useEnhancedDashboardMetrics();
   const { metrics: financialMetrics } = useFinancialMetrics();
-  const { data: bottlenecks, isLoading: isLoadingBottlenecks } = useBottleneckMetrics();
+
+  // Estado para alternar entre visão resumida e detalhada
+  const [dashboardView, setDashboardView] = useState<DashboardView>(() => {
+    // Persistir preferência no localStorage
+    const saved = localStorage.getItem('dashboard_view');
+    return (saved === 'detalhado' ? 'detalhado' : 'resumo') as DashboardView;
+  });
+
+  const handleViewChange = (view: string) => {
+    setDashboardView(view as DashboardView);
+    localStorage.setItem('dashboard_view', view);
+  };
 
   // Se for secretária, mostrar dashboard específico da secretária
   if (isSecretaria) {
@@ -92,354 +94,266 @@ const Dashboard = () => {
     return <VendedorDashboard />;
   }
 
-  // Dashboard completo para Admin/Dono
+  // Dashboard para Admin/Dono com tabs
   return (
-    <div className="min-h-screen space-y-4 sm:space-y-6 lg:space-y-8 bg-background font-sans px-3 sm:px-4 lg:px-6">
+    <div className="min-h-screen space-y-5 bg-background font-sans px-3 sm:px-4 lg:px-6 pb-10">
 
-      {/* Overdue Appointments Alert */}
+      {/* Header com Tabs de Visualização */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
+            {dashboardView === 'resumo' ? 'Visão resumida' : 'Visão completa com todas as métricas'}
+          </p>
+        </div>
+
+        {/* Tabs de Visualização */}
+        <Tabs value={dashboardView} onValueChange={handleViewChange}>
+          <TabsList className="bg-muted/50">
+            <TabsTrigger value="resumo" className="gap-1.5 data-[state=active]:bg-background">
+              <LayoutDashboard className="h-4 w-4" />
+              <span className="hidden sm:inline">Resumo</span>
+            </TabsTrigger>
+            <TabsTrigger value="detalhado" className="gap-1.5 data-[state=active]:bg-background">
+              <Eye className="h-4 w-4" />
+              <span className="hidden sm:inline">Detalhado</span>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {/* Overdue Appointments Alert - mantido pois é crítico */}
       <OverdueAppointmentsAlert />
 
-      {/* Gargalos Identificados */}
-      {!isLoadingBottlenecks && bottlenecks && bottlenecks.length > 0 && (
-        <AnimatedWrapper animationType="slideDown" delay={0.1}>
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-lg font-semibold text-foreground">
-              <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-              Gargalos Identificados
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {bottlenecks.slice(0, 6).map((bottleneck, index) => (
-                <AnimatedWrapper key={bottleneck.id} animationType="slideUp" delay={0.15 + index * 0.05}>
-                  <BottleneckCard bottleneck={bottleneck} />
-                </AnimatedWrapper>
-              ))}
-            </div>
+      {/* HERO: 3 Métricas Principais - sempre visível */}
+      <AnimatedWrapper animationType="fadeIn" delay={0}>
+        <HeroMetrics />
+      </AnimatedWrapper>
+
+      {/* Alertas Inteligentes - sempre visível */}
+      <AnimatedWrapper animationType="slideUp" delay={0.1}>
+        <SmartAlerts maxVisible={3} />
+      </AnimatedWrapper>
+
+      {/* Grid Principal: Gráfico Unificado + Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Gráfico Unificado com Tabs */}
+        <AnimatedWrapper animationType="slideUp" delay={0.15} className="lg:col-span-2">
+          <UnifiedChart />
+        </AnimatedWrapper>
+
+        {/* Quick Actions */}
+        <AnimatedWrapper animationType="slideUp" delay={0.2}>
+          <Card className="bg-card border-border h-full">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Acesso Rápido</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-3">
+              <QuickActionCard
+                title="Nova Consulta"
+                description="Agendar"
+                variant="red"
+                icon={Calendar}
+                onClick={() => navigate('/calendar')}
+              />
+              <QuickActionCard
+                title="CRM"
+                description="Leads"
+                variant="cyan"
+                icon={Users}
+                onClick={() => navigate('/comercial')}
+              />
+              <QuickActionCard
+                title="Financeiro"
+                description="Transações"
+                variant="green"
+                icon={DollarSign}
+                onClick={() => navigate('/financeiro')}
+              />
+              <QuickActionCard
+                title="WhatsApp"
+                description="Conversas"
+                variant="yellow"
+                icon={Activity}
+                onClick={() => navigate('/whatsapp')}
+              />
+            </CardContent>
+          </Card>
+        </AnimatedWrapper>
+      </div>
+
+      {/* Tarefas e Compromissos (Colapsável) */}
+      <AnimatedWrapper animationType="slideUp" delay={0.25}>
+        <CollapsibleSection
+          id="dashboard-tasks"
+          title="Tarefas e Agenda"
+          icon={Target}
+          defaultOpen={true}
+        >
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <TodayTasksWidget />
+            <UpcomingCallsWidget />
           </div>
+        </CollapsibleSection>
+      </AnimatedWrapper>
+
+      {/* Funil de Pipeline - oculto na visão resumida */}
+      {dashboardView === 'detalhado' && (
+        <AnimatedWrapper animationType="slideUp" delay={0.3}>
+          <CollapsibleSection
+            id="dashboard-pipeline"
+            title="Funil de Vendas"
+            icon={BarChart3}
+            badge={metrics?.activeDeals || 0}
+            defaultOpen={true}
+          >
+            <PipelineFunnelCard
+              dealsByStage={metrics?.dealsByStage || {}}
+              formatCurrency={formatCurrency}
+            />
+          </CollapsibleSection>
         </AnimatedWrapper>
       )}
 
-      {/* Top Metrics - Métricas Financeiras */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6 animate-fade-in">
-        <MetricCard
-          title="Saldo Total"
-          value={formatCurrency(financialMetrics?.totalBalance || 0)}
-          variant="green"
-          icon={DollarSign}
-          trend={{
-            value: financialMetrics?.profitMargin || 0,
-            label: "margem bruta"
-          }}
-        />
+      {/* Métricas Detalhadas - ocultas na visão resumida */}
+      {dashboardView === 'detalhado' && (
+        <AnimatedWrapper animationType="slideUp" delay={0.35}>
+          <CollapsibleSection
+            id="dashboard-detailed-metrics"
+            title="Métricas Detalhadas"
+            icon={PieChart}
+            defaultOpen={true}
+          >
+            {/* Métricas CRM */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <MetricCard
+                title="Valor Pipeline"
+                value={formatCurrency(metrics?.totalPipelineValue || 0)}
+                variant="red"
+                icon={Briefcase}
+                trend={{
+                  value: metrics?.activeDeals || 0,
+                  label: `${metrics?.activeDeals || 0} negócios ativos`
+                }}
+              />
+              <MetricCard
+                title="Valor Fechado"
+                value={formatCurrency(metrics?.totalClosedValue || 0)}
+                variant="green"
+                icon={Target}
+                trend={{
+                  value: metrics?.wonDeals || 0,
+                  label: `${metrics?.wonDeals || 0} ganhos`
+                }}
+              />
+              <MetricCard
+                title="Ticket Médio"
+                value={formatCurrency(enhancedMetrics?.averageDealValue || 0)}
+                variant="cyan"
+                icon={Coins}
+                trend={{
+                  value: 0,
+                  label: "por negócio"
+                }}
+              />
+              <MetricCard
+                title="Taxa Inadimplência"
+                value={`${(enhancedMetrics?.defaultRate || 0).toFixed(1)}%`}
+                variant="yellow"
+                icon={Activity}
+                trend={{
+                  value: 0,
+                  label: "negócios inadimplentes"
+                }}
+              />
+            </div>
 
-        <MetricCard
-          title="Receita do Mês"
-          value={formatCurrency(financialMetrics?.monthRevenue || 0)}
-          variant="red"
-          icon={ArrowUpRight}
-          trend={{
-            value: 0,
-            label: "entradas"
-          }}
-        />
+            {/* Gráficos Detalhados */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Card className="bg-card border-border">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Distribuição por Procedimento</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ServicesChart data={metrics?.servicesInterest} />
+                </CardContent>
+              </Card>
+              <Card className="bg-card border-border">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Conversão por Etapa</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ConversionChart data={metrics?.conversionByStage} />
+                </CardContent>
+              </Card>
+            </div>
+          </CollapsibleSection>
+        </AnimatedWrapper>
+      )}
 
-        <MetricCard
-          title="Despesas do Mês"
-          value={formatCurrency(financialMetrics?.monthExpenses || 0)}
-          variant="cyan"
-          icon={ArrowDownLeft}
-          trend={{
-            value: 0,
-            label: "saídas"
-          }}
-        />
+      {/* Gráficos Financeiros - ocultos na visão resumida */}
+      {dashboardView === 'detalhado' && enhancedMetrics && (
+        <AnimatedWrapper animationType="slideUp" delay={0.4}>
+          <CollapsibleSection
+            id="dashboard-financial-charts"
+            title="Análise Financeira"
+            icon={DollarSign}
+            defaultOpen={true}
+          >
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Card className="bg-card border-border">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Receita vs Despesas</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ReceitaDespesasChart data={enhancedMetrics.receitaDespesas} />
+                </CardContent>
+              </Card>
+              <Card className="bg-card border-border">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Evolução de Pacientes</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <TreatmentEvolutionChart data={enhancedMetrics.treatmentEvolution} />
+                </CardContent>
+              </Card>
+            </div>
+          </CollapsibleSection>
+        </AnimatedWrapper>
+      )}
 
-        <MetricCard
-          title="Lucro do Mês"
-          value={formatCurrency(financialMetrics?.monthNetProfit || 0)}
-          variant="yellow"
-          icon={Activity}
-          trend={{
-            value: financialMetrics?.netProfitMargin || 0,
-            label: "margem líquida"
-          }}
-        />
-      </div>
 
-      {/* CRM Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6 animate-fade-in animation-delay-200">
-        <MetricCard
-          title="Valor Total Fechado"
-          value={formatCurrency(metrics?.totalClosedValue || 0)}
-          variant="green"
-          icon={Target}
-          trend={{
-            value: metrics?.wonDeals || 0,
-            label: `${metrics?.wonDeals || 0} contratos ganhos`
-          }}
-        />
-
-        <MetricCard
-          title="Valor em Pipeline"
-          value={formatCurrency(metrics?.totalPipelineValue || 0)}
-          variant="red"
-          icon={PieChart}
-          trend={{
-            value: metrics?.activeDeals || 0,
-            label: `${metrics?.activeDeals || 0} negócios ativos`
-          }}
-        />
-
-        <MetricCard
-          title="Total de Contatos"
-          value={metrics?.totalContacts || 0}
-          variant="yellow"
-          icon={Users}
-          trend={{
-            value: 0,
-            label: "contatos cadastrados"
-          }}
-        />
-
-        <MetricCard
-          title="Taxa de Conversão"
-          value={`${(metrics?.conversionRate ?? 0).toFixed(2)}%`}
-          variant="cyan"
-          icon={TrendingUp}
-          trend={{
-            value: metrics?.wonDeals || 0,
-            label: `${metrics?.wonDeals || 0} negócios ganhos`
-          }}
-        />
-      </div>
-
-      {/* Enhanced Metrics - Novas métricas adicionais */}
-      {enhancedMetrics && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6 animate-fade-in animation-delay-300">
-          <MetricCard
-            title="Ticket Médio"
-            value={formatCurrency(enhancedMetrics.averageDealValue || 0)}
-            variant="purple"
-            icon={Coins}
-            trend={{
-              value: 0,
-              label: "valor médio por negócio"
-            }}
-          />
-
-          <MetricCard
-            title="Tempo Médio no Pipeline"
-            value={`${Math.round(enhancedMetrics.averagePipelineTime || 0)} dias`}
-            variant="cyan"
-            icon={RefreshCw}
-            trend={{
-              value: 0,
-              label: "da criação ao fechamento"
-            }}
-          />
-
-          <MetricCard
-            title="Pacientes em Tratamento"
-            value={enhancedMetrics.activeTreatments || 0}
-            variant="green"
+      {/* Últimas Atualizações (Colapsável) */}
+      {metrics?.recentDeals && metrics.recentDeals.length > 0 && (
+        <AnimatedWrapper animationType="slideUp" delay={0.45}>
+          <CollapsibleSection
+            id="dashboard-recent-deals"
+            title="Últimas Atualizações"
             icon={Activity}
-            trend={{
-              value: 0,
-              label: "em tratamento ativo"
-            }}
-          />
-
-          <MetricCard
-            title="Taxa de Inadimplência"
-            value={`${(enhancedMetrics.defaultRate || 0).toFixed(1)}%`}
-            variant="red"
-            icon={AlertTriangle}
-            trend={{
-              value: 0,
-              label: "negócios inadimplentes"
-            }}
-          />
-        </div>
-      )}
-
-      {/* Consultas do Mês */}
-      {enhancedMetrics && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6 animate-fade-in animation-delay-400">
-          <MetricCard
-            title="Consultas Agendadas"
-            value={enhancedMetrics.appointmentsThisMonth || 0}
-            variant="cyan"
-            icon={Calendar}
-            trend={{
-              value: 0,
-              label: "neste mês"
-            }}
-          />
-
-          <MetricCard
-            title="Consultas Realizadas"
-            value={enhancedMetrics.completedAppointmentsThisMonth || 0}
-            variant="green"
-            icon={Activity}
-            trend={{
-              value: enhancedMetrics.appointmentCompletionRate || 0,
-              label: `${(enhancedMetrics.appointmentCompletionRate || 0).toFixed(1)}% de conclusão`
-            }}
-          />
-
-          <MetricCard
-            title="Follow-ups Pendentes"
-            value={enhancedMetrics.pendingFollowUps || 0}
-            variant="yellow"
-            icon={Bell}
-            trend={{
-              value: 0,
-              label: "ações necessárias"
-            }}
-          />
-        </div>
-      )}
-
-      {/* Funil Section */}
-      <PipelineFunnelCard
-        dealsByStage={metrics?.dealsByStage || {}}
-        formatCurrency={formatCurrency}
-      />
-
-      {/* Charts Section - Novo Layout com SalesChart + StatsPanel */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
-        {/* Coluna Esquerda (2/3 width) - Gráficos */}
-        <div className="lg:col-span-2 space-y-3 sm:space-y-4 lg:space-y-6">
-          {/* Novo: SalesChart */}
-          <SalesChart
-            data={metrics?.monthlyRevenue.map(m => ({
-              name: m.month,
-              current: m.closed / 1000, // k format
-            })) || []}
-            title="Receita Fechada - Últimos 12 Meses"
-          />
-
-          {/* Manter: LeadsChart */}
-          <Card className="bg-card rounded-2xl border border-border">
-            <CardHeader className="p-3 sm:p-4 lg:p-6">
-              <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Novos Leads por Mês</CardTitle>
-              <CardDescription className="text-xs sm:text-sm">Evolução de novos contatos cadastrados</CardDescription>
-            </CardHeader>
-            <CardContent className="p-3 sm:p-4 lg:p-6">
-              <LeadsChart data={metrics?.monthlyLeads} />
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Coluna Direita (1/3 width) - Novo: StatsPanel */}
-        <div>
-          <StatsPanel
-            distributionData={
-              metrics?.servicesInterest.slice(0, 4).map((s, i) => ({
-                name: s.service,
-                value: Math.round((s.count / (metrics.totalContacts || 1)) * 100),
-                color: ['#8B5CF6', '#06B6D4', '#F59E0B', '#10B981'][i]
-              })) || []
-            }
-          />
-        </div>
-      </div>
-
-      {/* Novos Gráficos Financeiros e de Tratamento */}
-      {enhancedMetrics && (
-        <>
-          {/* Receita vs Despesas + Evolução de Pacientes */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
-            <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-              <CardHeader className="p-3 sm:p-4 lg:p-6">
-                <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Receita vs Despesas</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">Comparativo mensal de receitas e despesas</CardDescription>
-              </CardHeader>
-              <CardContent className="p-3 sm:p-4 lg:p-6">
-                <ReceitaDespesasChart data={enhancedMetrics.receitaDespesas} />
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-              <CardHeader className="p-3 sm:p-4 lg:p-6">
-                <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Evolução de Pacientes</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">Acompanhamento de pacientes em tratamento, agendados e inadimplentes</CardDescription>
-              </CardHeader>
-              <CardContent className="p-3 sm:p-4 lg:p-6">
-                <TreatmentEvolutionChart data={enhancedMetrics.treatmentEvolution} />
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Ticket Médio por Procedimento */}
-          {enhancedMetrics.averageTicketByProcedure.length > 0 && (
-            <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-              <CardHeader className="p-3 sm:p-4 lg:p-6">
-                <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Ticket Médio por Procedimento</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">Valor médio de fechamento por tipo de procedimento</CardDescription>
-              </CardHeader>
-              <CardContent className="p-3 sm:p-4 lg:p-6">
-                <TicketMedioChart data={enhancedMetrics.averageTicketByProcedure} />
-              </CardContent>
-            </Card>
-          )}
-        </>
-      )}
-
-      {/* Performance Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardHeader className="p-3 sm:p-4 lg:p-6">
-            <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Distribuição de Pacientes por Procedimento</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Total de pacientes interessados em cada procedimento</CardDescription>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 lg:p-6">
-            <ServicesChart data={metrics?.servicesInterest} />
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardHeader className="p-3 sm:p-4 lg:p-6">
-            <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Conversão Entre Etapas do Funil</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Percentual de conversão de uma etapa para a próxima</CardDescription>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 lg:p-6">
-            <ConversionChart data={metrics?.conversionByStage} />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Últimos Deals - Novo: CustomerTable */}
-      {metrics && metrics.recentDeals && metrics.recentDeals.length > 0 && (
-        <CustomerTable
-          customers={metrics.recentDeals.map(deal => ({
-            id: deal.id,
-            customer: deal.contact?.full_name || 'Sem contato',
-            date: new Date(deal.updated_at).toLocaleDateString('pt-BR'),
-            invoicedAmount: formatCurrency(deal.value || 0),
-            status: deal.stage === 'fechado_ganho' ? 'Paid' as const :
-                    deal.stage === 'negociacao' ? 'Shipped' as const :
+            badge={metrics.recentDeals.length}
+            defaultOpen={false}
+          >
+            <CustomerTable
+              customers={metrics.recentDeals.map(deal => ({
+                id: deal.id,
+                customer: deal.contact?.full_name || 'Sem contato',
+                date: new Date(deal.updated_at).toLocaleDateString('pt-BR'),
+                invoicedAmount: formatCurrency(deal.value || 0),
+                status: deal.stage === 'fechado_ganho' ? 'Paid' as const :
+                  deal.stage === 'negociacao' ? 'Shipped' as const :
                     deal.stage === 'proposta' ? 'Delivered' as const :
-                    'Pending' as const
-          }))}
-          title="Últimas Atualizações do Pipeline"
-        />
+                      'Pending' as const
+              }))}
+              title=""
+            />
+          </CollapsibleSection>
+        </AnimatedWrapper>
       )}
-
-      {/* Agenda Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
-        <TodayTasksWidget />
-        <UpcomingCallsWidget />
-      </div>
-
-      {/* Métricas de Comparecimento */}
-      <AnimatedWrapper animationType="slideUp" delay={0.3}>
-        <AttendanceMetricsCard />
-      </AnimatedWrapper>
     </div>
   )
 }
 
-// Novo componente: Dashboard do Vendedor (sem dados financeiros sensíveis)
+// Dashboard do Vendedor (simplificado)
 const VendedorDashboard = () => {
   const navigate = useNavigate();
   const { data: metrics, isLoading } = useDashboardMetrics();
@@ -454,135 +368,125 @@ const VendedorDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen space-y-4 sm:space-y-6 lg:space-y-8 bg-background font-sans px-3 sm:px-4 lg:px-6">
+    <div className="min-h-screen space-y-5 bg-background font-sans px-3 sm:px-4 lg:px-6 pb-10">
 
-      {/* Métricas Principais do Vendedor */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6 animate-fade-in">
-        <MetricCard
-          title="Pipeline Ativo"
-          value={`${metrics?.activeDeals || 0} negócios`}
-          variant="red"
+      {/* HERO: 3 Métricas Principais */}
+      <AnimatedWrapper animationType="fadeIn" delay={0}>
+        <HeroMetrics />
+      </AnimatedWrapper>
+
+      {/* Alertas */}
+      <AnimatedWrapper animationType="slideUp" delay={0.1}>
+        <SmartAlerts maxVisible={3} />
+      </AnimatedWrapper>
+
+      {/* Gráfico + Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <AnimatedWrapper animationType="slideUp" delay={0.15} className="lg:col-span-2">
+          <UnifiedChart />
+        </AnimatedWrapper>
+
+        <AnimatedWrapper animationType="slideUp" delay={0.2}>
+          <Card className="bg-card border-border h-full">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Acesso Rápido</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-3">
+              <QuickActionCard
+                title="CRM"
+                description="Contatos"
+                variant="red"
+                icon={Users}
+                onClick={() => navigate('/comercial')}
+              />
+              <QuickActionCard
+                title="Tarefas"
+                description="Pendentes"
+                variant="cyan"
+                icon={Target}
+                onClick={() => navigate('/tarefas')}
+              />
+              <QuickActionCard
+                title="Calendário"
+                description="Agenda"
+                variant="yellow"
+                icon={Calendar}
+                onClick={() => navigate('/calendar')}
+              />
+              <QuickActionCard
+                title="Prospecção"
+                description="Guia"
+                variant="green"
+                icon={TrendingUp}
+                onClick={() => navigate('/comercial/guia-prospeccao')}
+              />
+            </CardContent>
+          </Card>
+        </AnimatedWrapper>
+      </div>
+
+      {/* Tarefas */}
+      <AnimatedWrapper animationType="slideUp" delay={0.25}>
+        <CollapsibleSection
+          id="vendedor-tasks"
+          title="Minhas Tarefas"
           icon={Target}
-          trend={{
-            value: formatCurrency(metrics?.totalPipelineValue || 0),
-            label: "valor total em pipeline"
-          }}
-        />
-        <MetricCard
-          title="Contratos Fechados"
-          value={metrics?.wonDeals || 0}
-          variant="green"
-          icon={TrendingUp}
-          trend={{
-            value: formatCurrency(metrics?.totalClosedValue || 0),
-            label: "valor total fechado"
-          }}
-        />
-        <MetricCard
-          title="Taxa de Conversão"
-          value={`${(metrics?.conversionRate ?? 0).toFixed(1)}%`}
-          variant="cyan"
+          defaultOpen={true}
+        >
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <TodayTasksWidget />
+            <UpcomingCallsWidget />
+          </div>
+        </CollapsibleSection>
+      </AnimatedWrapper>
+
+      {/* Pipeline */}
+      <AnimatedWrapper animationType="slideUp" delay={0.3}>
+        <CollapsibleSection
+          id="vendedor-pipeline"
+          title="Meu Pipeline"
           icon={BarChart3}
-          trend={{ value: 0, label: "de leads para fechamento" }}
-        />
-      </div>
-
-      {/* Métricas de Performance */}
-      {enhancedMetrics && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6 animate-fade-in animation-delay-100">
-          <MetricCard
-            title="Ticket Médio"
-            value={formatCurrency(enhancedMetrics.averageDealValue || 0)}
-            variant="purple"
-            icon={Coins}
-            trend={{ value: 0, label: "valor médio por negócio" }}
+          badge={metrics?.activeDeals || 0}
+          defaultOpen={false}
+        >
+          <PipelineFunnelCard
+            dealsByStage={metrics?.dealsByStage || {}}
+            formatCurrency={formatCurrency}
           />
-          <MetricCard
-            title="Tempo Médio no Pipeline"
-            value={`${Math.round(enhancedMetrics.averagePipelineTime || 0)} dias`}
-            variant="cyan"
-            icon={RefreshCw}
-            trend={{ value: 0, label: "da criação ao fechamento" }}
-          />
-          <MetricCard
-            title="Follow-ups Pendentes"
-            value={enhancedMetrics.pendingFollowUps || 0}
-            variant="yellow"
-            icon={Bell}
-            trend={{ value: 0, label: "ações necessárias" }}
-          />
-        </div>
-      )}
+        </CollapsibleSection>
+      </AnimatedWrapper>
 
-      {/* Pipeline por Etapa */}
-      <PipelineFunnelCard
-        dealsByStage={metrics?.dealsByStage || {}}
-        formatCurrency={formatCurrency}
-      />
-
-      {/* Gráficos de Performance */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
-        <Card className="bg-card rounded-2xl border border-border">
-          <CardHeader className="p-3 sm:p-4 lg:p-6">
-            <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Meus Leads por Mês</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Evolução dos meus contatos cadastrados</CardDescription>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 lg:p-6">
-            <LeadsChart data={metrics?.monthlyLeads} />
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardHeader className="p-3 sm:p-4 lg:p-6">
-            <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Conversão Entre Etapas</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Minha taxa de conversão por etapa do funil</CardDescription>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 lg:p-6">
-            <ConversionChart data={metrics?.conversionByStage} />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Minhas Tarefas e Compromissos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
-        <TodayTasksWidget />
-        <UpcomingCallsWidget />
-      </div>
-
-      {/* Meus Leads Recentes */}
-      {metrics && metrics.recentDeals && metrics.recentDeals.length > 0 && (
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border shadow-card">
-          <CardHeader className="p-3 sm:p-4 lg:p-6">
-            <CardTitle className="text-sm sm:text-base lg:text-lg text-foreground">Minhas Últimas Atualizações</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Seus 5 negócios mais recentes</CardDescription>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 lg:p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3 lg:gap-4">
+      {/* Leads Recentes */}
+      {metrics?.recentDeals && metrics.recentDeals.length > 0 && (
+        <AnimatedWrapper animationType="slideUp" delay={0.35}>
+          <CollapsibleSection
+            id="vendedor-recent"
+            title="Minhas Últimas Atualizações"
+            icon={Activity}
+            badge={metrics.recentDeals.length}
+            defaultOpen={false}
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
               {metrics.recentDeals.map((deal) => {
                 const stageInfo = PIPELINE_STAGES.find(s => s.value === deal.stage);
                 return (
-                  <Card key={deal.id} className="bg-muted/20 border-border/50 hover:shadow-md transition-shadow">
+                  <Card key={deal.id} className="bg-muted/20 border-border/50">
                     <CardContent className="p-4">
-                      <div className="space-y-3">
-                        <div>
-                          <h4 className="font-semibold text-sm text-foreground line-clamp-1">{deal.title}</h4>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {deal.contact?.full_name || 'Sem contato'}
-                          </p>
-                        </div>
+                      <div className="space-y-2">
+                        <h4 className="font-semibold text-sm text-foreground line-clamp-1">{deal.title}</h4>
+                        <p className="text-xs text-muted-foreground">
+                          {deal.contact?.full_name || 'Sem contato'}
+                        </p>
                         {stageInfo && (
-                          <Badge 
-                            variant="secondary" 
-                            className={`text-xs ${stageInfo.bgColor} ${stageInfo.textColor} border-primary/20`}
+                          <Badge
+                            variant="secondary"
+                            className={`text-xs ${stageInfo.bgColor} ${stageInfo.textColor}`}
                           >
                             {stageInfo.label}
                           </Badge>
                         )}
                         {getContactService(deal.contact) && (
-                          <Badge 
-                            variant="outline" 
-                            className="text-xs"
-                          >
+                          <Badge variant="outline" className="text-xs ml-1">
                             {getContactService(deal.contact)}
                           </Badge>
                         )}
@@ -592,44 +496,9 @@ const VendedorDashboard = () => {
                 );
               })}
             </div>
-          </CardContent>
-        </Card>
+          </CollapsibleSection>
+        </AnimatedWrapper>
       )}
-
-      {/* NOVO - Acesso Rápido com QuickActionCard */}
-      <div className="space-y-2 sm:space-y-3 lg:space-y-4">
-        <h3 className="text-sm sm:text-base lg:text-lg font-semibold text-foreground">Acesso Rápido</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
-          <QuickActionCard
-            title="CRM"
-            description="Gerenciar contatos"
-            variant="red"
-            icon={Users}
-            onClick={() => navigate('/crm')}
-          />
-          <QuickActionCard
-            title="Tarefas"
-            description="Ver tarefas"
-            variant="cyan"
-            icon={Target}
-            onClick={() => navigate('/tarefas')}
-          />
-          <QuickActionCard
-            title="Calendário"
-            description="Ver agenda"
-            variant="yellow"
-            icon={Calendar}
-            onClick={() => navigate('/calendar')}
-          />
-          <QuickActionCard
-            title="Prospecção"
-            description="Guia completo"
-            variant="green"
-            icon={TrendingUp}
-            onClick={() => navigate('/comercial/guia-prospeccao')}
-          />
-        </div>
-      </div>
     </div>
   );
 };

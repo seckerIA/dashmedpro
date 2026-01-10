@@ -111,12 +111,12 @@ export function TeamOverviewDashboard({ metrics, isLoading }: TeamOverviewDashbo
                           <h4 className="font-semibold text-lg">{teamMetric.userName}</h4>
                           {teamMetric.userRole && (
                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${teamMetric.userRole === 'admin' ? 'bg-purple-500/20 text-purple-400' :
-                                teamMetric.userRole === 'dono' ? 'bg-amber-500/20 text-amber-400' :
-                                  teamMetric.userRole === 'medico' ? 'bg-emerald-500/20 text-emerald-400' :
-                                    teamMetric.userRole === 'secretaria' ? 'bg-blue-500/20 text-blue-400' :
-                                      teamMetric.userRole === 'vendedor' ? 'bg-cyan-500/20 text-cyan-400' :
-                                        teamMetric.userRole === 'gestor_trafego' ? 'bg-orange-500/20 text-orange-400' :
-                                          'bg-muted text-muted-foreground'
+                              teamMetric.userRole === 'dono' ? 'bg-amber-500/20 text-amber-400' :
+                                teamMetric.userRole === 'medico' ? 'bg-emerald-500/20 text-emerald-400' :
+                                  teamMetric.userRole === 'secretaria' ? 'bg-blue-500/20 text-blue-400' :
+                                    teamMetric.userRole === 'vendedor' ? 'bg-cyan-500/20 text-cyan-400' :
+                                      teamMetric.userRole === 'gestor_trafego' ? 'bg-orange-500/20 text-orange-400' :
+                                        'bg-muted text-muted-foreground'
                               }`}>
                               {teamMetric.userRole === 'admin' ? 'Admin' :
                                 teamMetric.userRole === 'dono' ? 'Proprietário' :
@@ -145,7 +145,7 @@ export function TeamOverviewDashboard({ metrics, isLoading }: TeamOverviewDashbo
                           )}
                           <div>
                             <p className="text-muted-foreground">Conversão</p>
-                            <p className="font-semibold">{teamMetric.conversionRate.toFixed(2)}%</p>
+                            <p className="font-semibold">{teamMetric.conversionRate.toFixed(1)}%</p>
                           </div>
                           <div>
                             <p className="text-muted-foreground">Ativos</p>

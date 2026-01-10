@@ -227,6 +227,7 @@ const fetchDashboardMetrics = async (
   });
 
   // Calcular conversão por estágio
+  // A conversão representa: dos deals que entraram nesse estágio, quantos % passaram para o próximo
   const conversionByStage = [];
   const stageOrder = ['lead_novo', 'qualificado', 'apresentacao', 'proposta', 'negociacao'];
 
@@ -237,8 +238,11 @@ const fetchDashboardMetrics = async (
     const currentCount = dealsByStage[currentStage]?.count || 0;
     const nextCount = dealsByStage[nextStage]?.count || 0;
 
-    const conversion = currentCount > 0 ? (nextCount / currentCount) * 100 : 0;
-    conversionByStage.push({ stage: currentStage, conversion });
+    // Limitar a 100% - não pode ter mais conversão do que 100%
+    const conversion = currentCount > 0
+      ? Math.min((nextCount / currentCount) * 100, 100)
+      : 0;
+    conversionByStage.push({ stage: currentStage, conversion: Math.round(conversion * 10) / 10 }); // 1 casa decimal
   }
 
   // Pegar os 5 últimos deals atualizados

@@ -31,19 +31,8 @@ export function CommercialDashboard() {
     .sort((a: any, b: any) => (b.conversion_score || 0) - (a.conversion_score || 0))
     .slice(0, 5);
 
-  // Debug log
-  console.log('🔍 CommercialDashboard - Dados recebidos:', {
-    metrics,
-    isLoading,
-    error,
-    totalLeads: metrics?.totalLeads,
-    totalRevenue: metrics?.totalRevenue,
-    scheduledProcedures: metrics?.scheduledProcedures,
-  });
-
   // Handle navigation with query params
   const handleNewLead = () => {
-    // Abrir modal "Novo Paciente" sem trocar a aba para Leads automaticamente
     navigate("/comercial?tab=dashboard&action=new");
   };
 
@@ -244,4 +233,3 @@ export function CommercialDashboard() {
     </div>
   );
 }
-

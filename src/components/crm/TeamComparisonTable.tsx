@@ -96,7 +96,7 @@ export function TeamComparisonTable({ teamMetrics, isLoading }: TeamComparisonTa
                   )}
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {metric.conversionRate.toFixed(2)}%
+                      {metric.conversionRate.toFixed(1)}%
                       {getTrendIcon(metric.conversionRate, avgConversion)}
                     </div>
                   </TableCell>
