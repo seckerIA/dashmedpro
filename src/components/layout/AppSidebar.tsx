@@ -102,7 +102,7 @@ const navigationGroups: Array<{
       label: "Atendimento",
       items: [
         { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle, badge: "Novo", variant: "new" as const },
-        { title: "Chamadas", url: "/calls", icon: Phone, badge: "Novo", variant: "new" as const },
+        // { title: "Chamadas", url: "/calls", icon: Phone, badge: "Novo", variant: "new" as const }, // Oculto temporariamente
         { title: "Prontuários", url: "/prontuarios", icon: ClipboardList, medicoOnly: true },
         { title: "Meu Financeiro", url: "/secretaria/financeiro", icon: Receipt, secretariaOnly: true },
       ]
@@ -120,7 +120,7 @@ const navigationGroups: Array<{
       label: "Administração",
       items: [
         { title: "Gerenciar Equipe", url: "/equipe", icon: UserPlus, adminOnly: true },
-        { title: "Configurar VoIP", url: "/voip/settings", icon: Phone, adminOnly: true },
+        // { title: "Configurar VoIP", url: "/voip/settings", icon: Phone, adminOnly: true }, // Oculto temporariamente
       ]
     }
   ]

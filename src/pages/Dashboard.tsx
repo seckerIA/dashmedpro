@@ -1,19 +1,14 @@
 import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PIPELINE_STAGES } from "@/types/crm"
 import { TodayTasksWidget } from "@/components/tasks/TodayTasksWidget"
 import { UpcomingCallsWidget } from "@/components/calendar/UpcomingCallsWidget"
-import { ServicesChart } from "@/components/charts/ServicesChart"
-import { ConversionChart } from "@/components/charts/ConversionChart"
-import { ReceitaDespesasChart } from "@/components/charts/ReceitaDespesasChart"
-import { TreatmentEvolutionChart } from "@/components/charts/TreatmentEvolutionChart"
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics"
-import { useFinancialMetrics } from "@/hooks/useFinancialMetrics"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { useEnhancedDashboardMetrics } from "@/hooks/useEnhancedDashboardMetrics"
-import { MetricCard, QuickActionCard } from "@/components/dashboard/MetricCard"
+import { QuickActionCard } from "@/components/dashboard/MetricCard"
 import { PipelineFunnelCard } from "@/components/dashboard/PipelineFunnelCard"
 import { CustomerTable } from "@/components/dashboard/CustomerTable"
 import { OverdueAppointmentsAlert } from "@/components/shared/OverdueAppointmentsAlert"
@@ -25,6 +20,7 @@ import { HeroMetrics } from "@/components/dashboard/HeroMetrics"
 import { SmartAlerts } from "@/components/dashboard/SmartAlerts"
 import { UnifiedChart } from "@/components/dashboard/UnifiedChart"
 import { CollapsibleSection } from "@/components/dashboard/CollapsibleSection"
+import { DetailedMetricsSection } from "@/components/dashboard/DetailedMetricsSection"
 
 import {
   TrendingUp,
@@ -33,12 +29,8 @@ import {
   DollarSign,
   Calendar,
   Activity,
-  Coins,
   BarChart3,
-  PieChart,
-  Briefcase,
   LayoutDashboard,
-  ListTodo,
   Eye
 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
@@ -52,13 +44,12 @@ const Dashboard = () => {
   const { isVendedor, isSecretaria } = useUserProfile();
   const { data: metrics, isLoading, error } = useDashboardMetrics();
   const { data: enhancedMetrics } = useEnhancedDashboardMetrics();
-  const { metrics: financialMetrics } = useFinancialMetrics();
 
-  // Estado para alternar entre visão resumida e detalhada
+  // Estado para alternar entre visão resumida e detalhada (default: detalhado)
   const [dashboardView, setDashboardView] = useState<DashboardView>(() => {
-    // Persistir preferência no localStorage
     const saved = localStorage.getItem('dashboard_view');
-    return (saved === 'detalhado' ? 'detalhado' : 'resumo') as DashboardView;
+    // Se nao houver preferencia salva, usar 'detalhado' como padrao
+    return (saved === 'resumo' ? 'resumo' : 'detalhado') as DashboardView;
   });
 
   const handleViewChange = (view: string) => {
@@ -197,128 +188,10 @@ const Dashboard = () => {
         </CollapsibleSection>
       </AnimatedWrapper>
 
-      {/* Funil de Pipeline - oculto na visão resumida */}
+      {/* Visao Detalhada - todas as metricas */}
       {dashboardView === 'detalhado' && (
         <AnimatedWrapper animationType="slideUp" delay={0.3}>
-          <CollapsibleSection
-            id="dashboard-pipeline"
-            title="Funil de Vendas"
-            icon={BarChart3}
-            badge={metrics?.activeDeals || 0}
-            defaultOpen={true}
-          >
-            <PipelineFunnelCard
-              dealsByStage={metrics?.dealsByStage || {}}
-              formatCurrency={formatCurrency}
-            />
-          </CollapsibleSection>
-        </AnimatedWrapper>
-      )}
-
-      {/* Métricas Detalhadas - ocultas na visão resumida */}
-      {dashboardView === 'detalhado' && (
-        <AnimatedWrapper animationType="slideUp" delay={0.35}>
-          <CollapsibleSection
-            id="dashboard-detailed-metrics"
-            title="Métricas Detalhadas"
-            icon={PieChart}
-            defaultOpen={true}
-          >
-            {/* Métricas CRM */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <MetricCard
-                title="Valor Pipeline"
-                value={formatCurrency(metrics?.totalPipelineValue || 0)}
-                variant="red"
-                icon={Briefcase}
-                trend={{
-                  value: metrics?.activeDeals || 0,
-                  label: `${metrics?.activeDeals || 0} negócios ativos`
-                }}
-              />
-              <MetricCard
-                title="Valor Fechado"
-                value={formatCurrency(metrics?.totalClosedValue || 0)}
-                variant="green"
-                icon={Target}
-                trend={{
-                  value: metrics?.wonDeals || 0,
-                  label: `${metrics?.wonDeals || 0} ganhos`
-                }}
-              />
-              <MetricCard
-                title="Ticket Médio"
-                value={formatCurrency(enhancedMetrics?.averageDealValue || 0)}
-                variant="cyan"
-                icon={Coins}
-                trend={{
-                  value: 0,
-                  label: "por negócio"
-                }}
-              />
-              <MetricCard
-                title="Taxa Inadimplência"
-                value={`${(enhancedMetrics?.defaultRate || 0).toFixed(1)}%`}
-                variant="yellow"
-                icon={Activity}
-                trend={{
-                  value: 0,
-                  label: "negócios inadimplentes"
-                }}
-              />
-            </div>
-
-            {/* Gráficos Detalhados */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <Card className="bg-card border-border">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Distribuição por Procedimento</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ServicesChart data={metrics?.servicesInterest} />
-                </CardContent>
-              </Card>
-              <Card className="bg-card border-border">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Conversão por Etapa</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ConversionChart data={metrics?.conversionByStage} />
-                </CardContent>
-              </Card>
-            </div>
-          </CollapsibleSection>
-        </AnimatedWrapper>
-      )}
-
-      {/* Gráficos Financeiros - ocultos na visão resumida */}
-      {dashboardView === 'detalhado' && enhancedMetrics && (
-        <AnimatedWrapper animationType="slideUp" delay={0.4}>
-          <CollapsibleSection
-            id="dashboard-financial-charts"
-            title="Análise Financeira"
-            icon={DollarSign}
-            defaultOpen={true}
-          >
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <Card className="bg-card border-border">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Receita vs Despesas</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ReceitaDespesasChart data={enhancedMetrics.receitaDespesas} />
-                </CardContent>
-              </Card>
-              <Card className="bg-card border-border">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Evolução de Pacientes</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <TreatmentEvolutionChart data={enhancedMetrics.treatmentEvolution} />
-                </CardContent>
-              </Card>
-            </div>
-          </CollapsibleSection>
+          <DetailedMetricsSection />
         </AnimatedWrapper>
       )}
 
