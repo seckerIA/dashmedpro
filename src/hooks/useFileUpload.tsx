@@ -2,9 +2,6 @@ import { useState } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from '@/hooks/use-toast'
 
-// URL do Supabase para edge functions
-const SUPABASE_URL = "https://adzaqkduxnpckbcuqpmg.supabase.co"
-
 export interface UploadedFile {
   id: string
   name: string
@@ -12,46 +9,58 @@ export interface UploadedFile {
   type: string
   url: string
   path: string
-  googleDriveId?: string
-  googleDriveUrl?: string
 }
 
 export const useFileUpload = () => {
   const [isUploading, setIsUploading] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
 
-  const uploadFile = async (file: File, bucket: string = 'financial-attachments'): Promise<UploadedFile | null> => {
+  const uploadFile = async (file: File, bucket: string = 'medical-files'): Promise<UploadedFile | null> => {
     setIsUploading(true)
-    
+
     try {
-      // Validar tamanho do arquivo (10MB máximo)
-      const maxSize = 10 * 1024 * 1024 // 10MB
+      // Validar tamanho do arquivo (50MB máximo para medical-files)
+      const maxSize = 50 * 1024 * 1024 // 50MB
       if (file.size > maxSize) {
         toast({
           title: "Erro",
-          description: "Arquivo muito grande. Tamanho máximo: 10MB",
+          description: "Arquivo muito grande. Tamanho máximo: 50MB",
           variant: "destructive",
         })
         return null
       }
 
       // Validar tipo do arquivo
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf']
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp', 'image/heic', 'application/pdf']
       if (!allowedTypes.includes(file.type)) {
         toast({
           title: "Erro",
-          description: "Tipo de arquivo não permitido. Use: JPG, PNG ou PDF",
+          description: "Tipo de arquivo não permitido. Use: JPG, PNG, GIF, WebP, HEIC ou PDF",
           variant: "destructive",
         })
         return null
       }
 
-      // Gerar nome único para o arquivo
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
-      const filePath = `financial-attachments/${fileName}`
+      // Obter usuário autenticado para criar pasta isolada
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        toast({
+          title: "Erro",
+          description: "Você precisa estar logado para fazer upload de arquivos",
+          variant: "destructive",
+        })
+        return null
+      }
 
-      // Upload para Supabase Storage
+      // Organizar arquivos em: {user_id}/{ano}/{mes}/{arquivo}
+      const now = new Date()
+      const year = now.getFullYear()
+      const month = String(now.getMonth() + 1).padStart(2, '0')
+      const fileExt = file.name.split('.').pop()
+      const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
+      const filePath = `${user.id}/${year}/${month}/${uniqueName}`
+
+      // Upload para Supabase Storage (multi-tenant com RLS)
       const { data, error } = await supabase.storage
         .from(bucket)
         .upload(filePath, file)
@@ -66,54 +75,22 @@ export const useFileUpload = () => {
         return null
       }
 
-      // Obter URL pública
-      const { data: urlData } = supabase.storage
+      // Obter URL assinada (para arquivos privados)
+      const { data: signedUrlData } = await supabase.storage
         .from(bucket)
-        .getPublicUrl(filePath)
+        .createSignedUrl(filePath, 60 * 60 * 24 * 7) // 7 dias
 
       const uploadedFile: UploadedFile = {
         id: data.path,
         name: file.name,
         size: file.size,
         type: file.type,
-        url: urlData.publicUrl,
+        url: signedUrlData?.signedUrl || '',
         path: filePath,
       }
 
-      // Upload para Google Drive via Edge Function
-      try {
-        const fileContent = await fileToBase64(file)
-        
-        const response = await fetch(`${SUPABASE_URL}/functions/v1/upload-to-google-drive`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-          },
-          body: JSON.stringify({
-            fileName: file.name,
-            fileContent: fileContent,
-            fileType: file.type,
-            description: `Comprovante financeiro - ${new Date().toLocaleString('pt-BR')}`,
-          }),
-        })
-
-        if (response.ok) {
-          const googleDriveData = await response.json()
-          if (googleDriveData.success) {
-            uploadedFile.googleDriveId = googleDriveData.file.id
-            uploadedFile.googleDriveUrl = googleDriveData.file.webViewLink
-          }
-        } else {
-          console.error('Error uploading to Google Drive:', await response.text())
-        }
-      } catch (error) {
-        console.error('Error uploading to Google Drive:', error)
-        // Não falha o upload principal se o Google Drive falhar
-      }
-
       setUploadedFiles(prev => [...prev, uploadedFile])
-      
+
       toast({
         title: "Sucesso",
         description: "Arquivo enviado com sucesso!",
@@ -198,7 +175,7 @@ export const useFileUpload = () => {
       // Extrair o caminho do arquivo da URL
       const urlParts = imageUrl.split('/task-images/');
       if (urlParts.length < 2) return false;
-      
+
       const filePath = urlParts[1];
 
       const { error } = await supabase.storage
@@ -206,7 +183,7 @@ export const useFileUpload = () => {
         .remove([filePath]);
 
       if (error) throw error;
-      
+
       return true;
     } catch (error) {
       console.error('Erro ao deletar imagem:', error);
@@ -223,19 +200,4 @@ export const useFileUpload = () => {
     uploadTaskImage,
     deleteTaskImage,
   }
-}
-
-// Função auxiliar para converter arquivo para base64
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.readAsDataURL(file)
-    reader.onload = () => {
-      const result = reader.result as string
-      // Remove o prefixo "data:image/jpeg;base64," ou similar
-      const base64 = result.split(',')[1]
-      resolve(base64)
-    }
-    reader.onerror = error => reject(error)
-  })
 }
