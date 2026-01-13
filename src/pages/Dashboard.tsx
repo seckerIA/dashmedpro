@@ -15,12 +15,11 @@ import { OverdueAppointmentsAlert } from "@/components/shared/OverdueAppointment
 import { AnimatedWrapper } from "@/components/shared/AnimatedWrapper"
 import SecretaryDashboard from "@/components/dashboard/SecretaryDashboard"
 
-// Novos componentes simplificados
-import { HeroMetrics } from "@/components/dashboard/HeroMetrics"
-import { SmartAlerts } from "@/components/dashboard/SmartAlerts"
-import { UnifiedChart } from "@/components/dashboard/UnifiedChart"
-import { CollapsibleSection } from "@/components/dashboard/CollapsibleSection"
+import { SummaryDashboard } from "@/components/dashboard/SummaryDashboard"
+import { DetailedDashboard } from "@/components/dashboard/DetailedDashboard"
 import { DetailedMetricsSection } from "@/components/dashboard/DetailedMetricsSection"
+import { CollapsibleSection } from "@/components/dashboard/CollapsibleSection"
+import { OverdueAppointmentsAlert } from "@/components/shared/OverdueAppointmentsAlert"
 
 import {
   TrendingUp,
@@ -40,16 +39,14 @@ import { getContactService } from "@/lib/crm"
 type DashboardView = "resumo" | "detalhado"
 
 const Dashboard = () => {
-  const navigate = useNavigate();
   const { isVendedor, isSecretaria } = useUserProfile();
-  const { data: metrics, isLoading, error } = useDashboardMetrics();
-  const { data: enhancedMetrics } = useEnhancedDashboardMetrics();
+  const { isLoading, error } = useDashboardMetrics();
 
-  // Estado para alternar entre visão resumida e detalhada (default: detalhado)
+  // Estado para alternar entre visão resumida e detalhada (default: resumida para agilidade)
   const [dashboardView, setDashboardView] = useState<DashboardView>(() => {
     const saved = localStorage.getItem('dashboard_view');
-    // Se nao houver preferencia salva, usar 'detalhado' como padrao
-    return (saved === 'resumo' ? 'resumo' : 'detalhado') as DashboardView;
+    // Default to 'resumo' if not set, as it is cleaner for first impression
+    return (saved === 'detalhado' ? 'detalhado' : 'resumo') as DashboardView;
   });
 
   const handleViewChange = (view: string) => {
@@ -85,143 +82,49 @@ const Dashboard = () => {
     return <VendedorDashboard />;
   }
 
-  // Dashboard para Admin/Dono com tabs
+  // Dashboard para Admin/Dono com modo de visualização distinto
   return (
     <div className="min-h-screen space-y-5 bg-background font-sans px-3 sm:px-4 lg:px-6 pb-10">
 
       {/* Header com Tabs de Visualização */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
-            {dashboardView === 'resumo' ? 'Visão resumida' : 'Visão completa com todas as métricas'}
-          </p>
+          {/* Título pode ser renderizado dentro dos componentes filhos se precisar ser diferente, 
+             mas manter aqui ajuda na consistência da UI ao trocar de tab */}
         </div>
 
-        {/* Tabs de Visualização */}
-        <Tabs value={dashboardView} onValueChange={handleViewChange}>
-          <TabsList className="bg-muted/50">
-            <TabsTrigger value="resumo" className="gap-1.5 data-[state=active]:bg-background">
-              <LayoutDashboard className="h-4 w-4" />
-              <span className="hidden sm:inline">Resumo</span>
-            </TabsTrigger>
-            <TabsTrigger value="detalhado" className="gap-1.5 data-[state=active]:bg-background">
-              <Eye className="h-4 w-4" />
-              <span className="hidden sm:inline">Detalhado</span>
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        {/* Tabs de Visualização - Design Pill flutuante */}
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 sm:relative sm:bottom-auto sm:left-auto sm:translate-x-0 sm:z-0">
+          <Tabs value={dashboardView} onValueChange={handleViewChange} className="bg-background/80 backdrop-blur-md p-1 rounded-full shadow-lg border sm:bg-muted/50 sm:shadow-none sm:border-none sm:backdrop-blur-none">
+            <TabsList className="bg-transparent h-9">
+              <TabsTrigger
+                value="resumo"
+                className="rounded-full px-4 text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
+              >
+                <LayoutDashboard className="h-3.5 w-3.5 mr-2" />
+                Resumo
+              </TabsTrigger>
+              <TabsTrigger
+                value="detalhado"
+                className="rounded-full px-4 text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
+              >
+                <Eye className="h-3.5 w-3.5 mr-2" />
+                Detalhado
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
 
-      {/* Overdue Appointments Alert - mantido pois é crítico */}
-      <OverdueAppointmentsAlert />
-
-      {/* HERO: 3 Métricas Principais - sempre visível */}
-      <AnimatedWrapper animationType="fadeIn" delay={0}>
-        <HeroMetrics />
-      </AnimatedWrapper>
-
-      {/* Alertas Inteligentes - sempre visível */}
-      <AnimatedWrapper animationType="slideUp" delay={0.1}>
-        <SmartAlerts maxVisible={3} />
-      </AnimatedWrapper>
-
-      {/* Grid Principal: Gráfico Unificado + Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Gráfico Unificado com Tabs */}
-        <AnimatedWrapper animationType="slideUp" delay={0.15} className="lg:col-span-2">
-          <UnifiedChart />
-        </AnimatedWrapper>
-
-        {/* Quick Actions */}
-        <AnimatedWrapper animationType="slideUp" delay={0.2}>
-          <Card className="bg-card border-border h-full">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Acesso Rápido</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-3">
-              <QuickActionCard
-                title="Nova Consulta"
-                description="Agendar"
-                variant="red"
-                icon={Calendar}
-                onClick={() => navigate('/calendar')}
-              />
-              <QuickActionCard
-                title="CRM"
-                description="Leads"
-                variant="cyan"
-                icon={Users}
-                onClick={() => navigate('/comercial')}
-              />
-              <QuickActionCard
-                title="Financeiro"
-                description="Transações"
-                variant="green"
-                icon={DollarSign}
-                onClick={() => navigate('/financeiro')}
-              />
-              <QuickActionCard
-                title="WhatsApp"
-                description="Conversas"
-                variant="yellow"
-                icon={Activity}
-                onClick={() => navigate('/whatsapp')}
-              />
-            </CardContent>
-          </Card>
-        </AnimatedWrapper>
+      {/* Renderização Condicional Limpa - Sem mistura de lógica */}
+      <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+        {dashboardView === 'resumo' ? (
+          <SummaryDashboard />
+        ) : (
+          <DetailedDashboard />
+        )}
       </div>
 
-      {/* Tarefas e Compromissos (Colapsável) */}
-      <AnimatedWrapper animationType="slideUp" delay={0.25}>
-        <CollapsibleSection
-          id="dashboard-tasks"
-          title="Tarefas e Agenda"
-          icon={Target}
-          defaultOpen={true}
-        >
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <TodayTasksWidget />
-            <UpcomingCallsWidget />
-          </div>
-        </CollapsibleSection>
-      </AnimatedWrapper>
-
-      {/* Visao Detalhada - todas as metricas */}
-      {dashboardView === 'detalhado' && (
-        <AnimatedWrapper animationType="slideUp" delay={0.3}>
-          <DetailedMetricsSection />
-        </AnimatedWrapper>
-      )}
-
-
-      {/* Últimas Atualizações (Colapsável) */}
-      {metrics?.recentDeals && metrics.recentDeals.length > 0 && (
-        <AnimatedWrapper animationType="slideUp" delay={0.45}>
-          <CollapsibleSection
-            id="dashboard-recent-deals"
-            title="Últimas Atualizações"
-            icon={Activity}
-            badge={metrics.recentDeals.length}
-            defaultOpen={false}
-          >
-            <CustomerTable
-              customers={metrics.recentDeals.map(deal => ({
-                id: deal.id,
-                customer: deal.contact?.full_name || 'Sem contato',
-                date: new Date(deal.updated_at).toLocaleDateString('pt-BR'),
-                invoicedAmount: formatCurrency(deal.value || 0),
-                status: deal.stage === 'fechado_ganho' ? 'Paid' as const :
-                  deal.stage === 'negociacao' ? 'Shipped' as const :
-                    deal.stage === 'proposta' ? 'Delivered' as const :
-                      'Pending' as const
-              }))}
-              title=""
-            />
-          </CollapsibleSection>
-        </AnimatedWrapper>
-      )}
     </div>
   )
 }

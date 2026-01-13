@@ -53,7 +53,34 @@ Deno.serve(async (req: Request) => {
         return new Response("ok", { headers: corsHeaders });
     }
 
+    // Verify authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+        return new Response(
+            JSON.stringify({ error: 'Authorization header required' }),
+            { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+    }
+
     try {
+        // Create Supabase client to verify token
+        const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+        const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+        const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+
+        const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+            global: { headers: { Authorization: authHeader } }
+        });
+
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+        if (authError || !user) {
+            return new Response(
+                JSON.stringify({ error: 'Invalid or expired token', details: authError?.message }),
+                { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+        }
+
         const body: CacheRequest = await req.json();
         const { action, key, value, ttl, pattern } = body;
 
