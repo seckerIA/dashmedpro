@@ -5,6 +5,7 @@ import { useTasks } from '@/hooks/useTasks';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { CheckSquare } from 'lucide-react';
+import { TaskListSkeleton } from '@/components/ui/LoadingSkeletons';
 
 const Tasks = () => {
   const { toast } = useToast();
@@ -37,7 +38,7 @@ const Tasks = () => {
   const handleTaskCreate = async (data: CreateTaskData) => {
     try {
       console.log('[Tasks] Iniciando criação de tarefa:', data);
-      
+
       if (!user?.id) {
         console.error('[Tasks] Erro: Usuário não autenticado');
         toast({
@@ -47,10 +48,10 @@ const Tasks = () => {
         });
         return;
       }
-      
+
       await createTask(data);
       console.log('[Tasks] Tarefa criada com sucesso');
-      
+
       toast({
         title: "Tarefa criada",
         description: "A tarefa foi criada com sucesso!",
@@ -116,15 +117,15 @@ const Tasks = () => {
       // Buscar a atribuição atual para determinar o novo status
       const task = tasks.find(t => t.assignments?.some(a => a.id === assignmentId));
       const assignment = task?.assignments?.find(a => a.id === assignmentId);
-      
+
       if (!assignment) {
         throw new Error('Atribuição não encontrada');
       }
-      
+
       const newStatus = assignment.status === 'pendente' ? 'concluida' : 'pendente';
-      
+
       await updateAssignment({ assignmentId, data: { status: newStatus } });
-      
+
       toast({
         title: "Status atualizado",
         description: `A tarefa foi marcada como ${newStatus === 'concluida' ? 'concluída' : 'pendente'}!`,

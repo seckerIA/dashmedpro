@@ -5,12 +5,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { 
-  Calendar, 
-  Clock, 
-  User, 
-  AlertCircle, 
-  Edit, 
+import {
+  Calendar,
+  Clock,
+  User,
+  AlertCircle,
+  Edit,
   Trash2,
   GripVertical,
   Target,
@@ -48,31 +48,31 @@ export function TaskCard({ task, onEdit, onDelete, onToggleComplete, onToggleAss
   const priorityConfig = TASK_PRIORITIES.find(p => p.value === task.priority);
   const statusConfig = TASK_STATUSES.find(s => s.value === task.status);
   const categoryConfig = TASK_CATEGORIES.find(cat => cat.value === task.category);
-  
+
   // Lógica para determinar se deve mostrar "Criada por"
   const isCreatedByOther = task.created_by && task.created_by !== user?.id;
   const isCreatedByCurrentUser = task.created_by === user?.id;
-  
+
   // Determinar status da tarefa para o usuário atual
   const currentUserStatus = task.my_assignment?.status || task.status;
   const isCompleted = currentUserStatus === 'concluida';
-  
+
   // Verificar se o usuário atual é o criador da tarefa
   const isCreator = task.created_by === user?.id;
-  
+
   // Função para formatar o texto "Criada por"
   const getCreatedByText = () => {
     if (!task.created_by_profile) return null;
-    
+
     if (isCreatedByCurrentUser) {
       return "Criada por mim";
     }
-    
+
     if (isCreatedByOther) {
       const name = task.created_by_profile.full_name;
       return name ? `Criada por ${name}` : `Criada por ${task.created_by_profile.email || 'Usuário'}`;
     }
-    
+
     return null;
   };
 
@@ -81,12 +81,11 @@ export function TaskCard({ task, onEdit, onDelete, onToggleComplete, onToggleAss
     const date = new Date(dateString);
     const now = new Date();
     const isToday = date.toDateString() === now.toDateString();
-    const isOverdue = date < now && currentUserStatus === 'pendente';
-    
+
     if (isToday) {
       return `Hoje às ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
     }
-    
+
     return date.toLocaleDateString('pt-BR', {
       day: '2-digit',
       month: '2-digit',
@@ -94,6 +93,11 @@ export function TaskCard({ task, onEdit, onDelete, onToggleComplete, onToggleAss
       minute: '2-digit'
     });
   };
+
+  // Verificar se a tarefa está atrasada
+  const isOverdue = task.due_date &&
+    currentUserStatus === 'pendente' &&
+    new Date(task.due_date) < new Date();
 
   // Função para lidar com toggle de conclusão
   const handleToggleComplete = () => {
@@ -113,7 +117,8 @@ export function TaskCard({ task, onEdit, onDelete, onToggleComplete, onToggleAss
       className={cn(
         "border border-border shadow-sm rounded-2xl transition-all duration-200 hover:shadow-md cursor-pointer group",
         isDragging && "opacity-50 scale-105 border-primary",
-        isCompleted && "opacity-60"
+        isCompleted && "opacity-60",
+        isOverdue && "border-red-500 bg-red-500/5"
       )}
     >
       <CardContent className="p-4">
@@ -142,7 +147,7 @@ export function TaskCard({ task, onEdit, onDelete, onToggleComplete, onToggleAss
                 {categoryConfig.label}
               </Badge>
             )}
-            
+
             <div className="flex items-start justify-between gap-2 mb-2">
               <h3 className={cn(
                 "font-semibold text-foreground text-sm leading-tight",
@@ -150,19 +155,29 @@ export function TaskCard({ task, onEdit, onDelete, onToggleComplete, onToggleAss
               )}>
                 {task.title}
               </h3>
-              
-              {/* Priority Badge */}
-              {task.priority && (
-                <Badge 
-                  variant="outline" 
-                  className={cn(
-                    "text-xs px-2 py-1",
-                    priorityConfig?.color
-                  )}
-                >
-                  {priorityConfig?.label}
-                </Badge>
-              )}
+
+              <div className="flex items-center gap-2">
+                {/* Overdue Badge */}
+                {isOverdue && (
+                  <Badge variant="destructive" className="text-xs px-2 py-1 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    Atrasado
+                  </Badge>
+                )}
+
+                {/* Priority Badge */}
+                {task.priority && (
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-xs px-2 py-1",
+                      priorityConfig?.color
+                    )}
+                  >
+                    {priorityConfig?.label}
+                  </Badge>
+                )}
+              </div>
             </div>
 
             {/* Description */}

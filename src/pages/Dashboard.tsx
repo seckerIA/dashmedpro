@@ -22,6 +22,7 @@ import { CollapsibleSection } from "@/components/dashboard/CollapsibleSection"
 import { HeroMetrics } from "@/components/dashboard/HeroMetrics"
 import { SmartAlerts } from "@/components/dashboard/SmartAlerts"
 import { UnifiedChart } from "@/components/dashboard/UnifiedChart"
+import { DashboardSkeleton } from "@/components/ui/LoadingSkeletons"
 
 import {
   TrendingUp,
@@ -63,8 +64,8 @@ const Dashboard = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">Carregando métricas do dashboard...</div>
+      <div className="min-h-screen space-y-5 bg-background font-sans px-3 sm:px-4 lg:px-6 pb-10 pt-6">
+        <DashboardSkeleton />
       </div>
     );
   }
@@ -139,8 +140,8 @@ const VendedorDashboard = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">Carregando suas métricas...</div>
+      <div className="min-h-screen space-y-5 bg-background font-sans px-3 sm:px-4 lg:px-6 pb-10 pt-6">
+        <DashboardSkeleton />
       </div>
     );
   }
