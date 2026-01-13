@@ -7,10 +7,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { Camera, Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
+import { cacheDelete, CacheKeys } from '@/lib/cache';
 
 interface AvatarUploadProps {
   currentAvatarUrl: string | null;
-  onUploadComplete: (url: string) => void;
+  onUploadComplete: (url: string | null) => void;
 }
 
 const AvatarUpload = ({ currentAvatarUrl, onUploadComplete }: AvatarUploadProps) => {
@@ -79,6 +80,7 @@ const AvatarUpload = ({ currentAvatarUrl, onUploadComplete }: AvatarUploadProps)
         .upload(fileName, file, {
           cacheControl: '3600',
           upsert: true,
+          contentType: file.type,
         });
 
       if (uploadError) {
@@ -107,14 +109,17 @@ const AvatarUpload = ({ currentAvatarUrl, onUploadComplete }: AvatarUploadProps)
 
       if (data?.publicUrl) {
         // Update profile in DB immediately for better UX
-        const { error: dbError } = await (supabase
+        const { error: dbError } = await supabase
           .from('profiles')
-          .update({ avatar_url: data.publicUrl } as any)
-          .eq('id', user.id) as any);
+          .update({ avatar_url: data.publicUrl } as never)
+          .eq('id', user.id);
 
         if (dbError) {
           console.warn('Could not update profile in DB, but image was uploaded:', dbError);
         }
+
+        // Invalidate Redis cache
+        await cacheDelete(CacheKeys.userProfile(user.id));
 
         // Invalidate profile query to update global state (header avatar, etc)
         queryClient.invalidateQueries({ queryKey: ['user-profile', user.id] });
@@ -157,15 +162,20 @@ const AvatarUpload = ({ currentAvatarUrl, onUploadComplete }: AvatarUploadProps)
       }
 
       // Update profile in DB immediately
-      await (supabase
+      await supabase
         .from('profiles')
-        .update({ avatar_url: null } as any)
-        .eq('id', user.id) as any);
+        .update({ avatar_url: null } as never)
+        .eq('id', user.id);
+
+      // Invalidate Redis cache
+      await cacheDelete(CacheKeys.userProfile(user.id));
 
       // Invalidate profile query
       queryClient.invalidateQueries({ queryKey: ['user-profile', user.id] });
 
-      onUploadComplete('');
+      // CRITICAL FIX: Pass null instead of empty string
+      onUploadComplete(null as any);
+
       toast({
         title: 'Avatar removido',
         description: 'Sua foto de perfil foi removida.',

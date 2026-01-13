@@ -19,7 +19,9 @@ import { SummaryDashboard } from "@/components/dashboard/SummaryDashboard"
 import { DetailedDashboard } from "@/components/dashboard/DetailedDashboard"
 import { DetailedMetricsSection } from "@/components/dashboard/DetailedMetricsSection"
 import { CollapsibleSection } from "@/components/dashboard/CollapsibleSection"
-import { OverdueAppointmentsAlert } from "@/components/shared/OverdueAppointmentsAlert"
+import { HeroMetrics } from "@/components/dashboard/HeroMetrics"
+import { SmartAlerts } from "@/components/dashboard/SmartAlerts"
+import { UnifiedChart } from "@/components/dashboard/UnifiedChart"
 
 import {
   TrendingUp,

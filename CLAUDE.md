@@ -159,15 +159,17 @@ supabase/functions/
 - **WhatsApp Token Expiration**: Tokens Meta expiram periodicamente, reconfigurar quando necessário
 - **Webhook Meta**: Configurar callback URL no Meta Business Manager após deploy
 
-### Contexto Atual (Fevereiro 2026 - Sprint CRM & WhatsApp)
-- **WhatsApp OAuth**: Configuração automática via Facebook Login (Fluxo: `useWhatsAppOAuth` -> `whatsapp-oauth-callback`)
-- **Novos Componentes UI**:
-  - `CollapsibleSection` (Dashboards)
-  - `NotificationBell` redesenhado (backdrop blur, ícones coloridos por tipo)
-  - `FacebookConnectButton` e `PhoneNumberSelector` (Setup WhatsApp)
-  - `HeroMetrics` e `UnifiedChart` (Página principal)
-- **Dashboard**: Sistema de abas Resumo/Detalhado persistente (`localStorage`)
-- **Fixes**: Consistência de formatação percentual (1 casa decimal) e escala de gráficos de conversão.
+### Contexto Atual (Janeiro 2026 - Sprint Frontend & Bugfixes)
+- **Settings Page Fix**: Corrigido salvamento de avatar e nome de perfil que não funcionava
+  - **Bug**: Ao remover avatar ou alterar nome, as mudanças não persistiam após reload
+  - **Causa**: (1) Falta de invalidação do cache Redis, (2) Tipo incorreto em `onUploadComplete` (string vazia vs null), (3) Erros TypeScript com `as any`
+  - **Fix**: 
+    - `AvatarUpload.tsx`: Adicionado `cacheDelete(CacheKeys.userProfile(user.id))` em upload e remoção, mudado retorno de `''` para `null`
+    - `ProfileTab.tsx`: Adicionado `cacheDelete` na mutation de update, corrigido tipo com `as never`
+  - Arquivos alterados: `src/components/settings/AvatarUpload.tsx`, `src/components/settings/ProfileTab.tsx`
+- **Frontend Analysis**: Auditoria completa do UI/UX via localhost:8080
+  - Identificadas 10 melhorias prioritárias (skeleton loading, estados vazios, indicadores de atraso, etc)
+  - Documentação: `docs/FRONTEND_IMPROVEMENTS.md` (a ser criada)
 
 ---
-**Version:** 0.3.0 | 2026-02-05 | https://github.com/seckerIA/dashmedpro
+**Version:** 0.4.0 | 2026-01-13 | https://github.com/seckerIA/dashmedpro

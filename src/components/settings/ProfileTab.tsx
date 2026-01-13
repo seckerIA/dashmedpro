@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 import AvatarUpload from './AvatarUpload';
 import { Loader2, Save } from 'lucide-react';
+import { cacheDelete, CacheKeys } from '@/lib/cache';
 
 const profileSchema = z.object({
   full_name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres').max(100, 'Nome muito longo'),
@@ -49,10 +50,14 @@ const ProfileTab = ({ profile, user }: ProfileTabProps) => {
         .update({
           full_name: data.full_name,
           avatar_url: avatarUrl,
-        })
+        } as never)
         .eq('id', user.id);
 
       if (error) throw error;
+
+      // Invalidate Redis cache
+      await cacheDelete(CacheKeys.userProfile(user.id));
+
       return data;
     },
     onSuccess: () => {

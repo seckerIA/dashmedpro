@@ -234,19 +234,6 @@ export function NotificationBell({ className }: NotificationBellProps) {
                 </ScrollArea>
               )}
             </CardContent>
-
-            {/* Footer - Ver todas */}
-            {notifications.length > 0 && (
-              <div className="border-t border-border p-2 bg-muted/30">
-                <Button
-                  variant="ghost"
-                  className="w-full h-9 text-sm text-muted-foreground hover:text-foreground"
-                  onClick={() => setIsOpen(false)}
-                >
-                  Ver todas as notificações
-                </Button>
-              </div>
-            )}
           </Card>
         </>
       )}
