@@ -5,14 +5,52 @@
 
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-// We use simple string concatenation for TwiML to avoid heavy dependencies,
-// or we could use twilio npm package if needed, but string is faster for simple XML.
+import { encodeBase64 } from 'https://deno.land/std@0.190.0/encoding/base64.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-twilio-signature',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 };
+
+// Twilio Signature Validation (optional but recommended)
+async function validateTwilioSignature(req: Request, params: Record<string, string>): Promise<{ valid: boolean; message: string }> {
+  const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+
+  // If no auth token configured, skip validation but log warning
+  if (!twilioAuthToken) {
+    console.warn('[VOIP-WEBHOOK] TWILIO_AUTH_TOKEN not set - signature validation skipped. Set it in Edge Function secrets for security.');
+    return { valid: true, message: 'Signature validation skipped (no TWILIO_AUTH_TOKEN)' };
+  }
+
+  const signature = req.headers.get('X-Twilio-Signature');
+  if (!signature) {
+    return { valid: false, message: 'Missing X-Twilio-Signature header' };
+  }
+
+  // Build the validation string: URL + sorted params
+  const url = req.url.split('?')[0]; // Base URL without query string
+  const sortedParams = Object.keys(params).sort().map(key => key + params[key]).join('');
+  const dataToSign = url + sortedParams;
+
+  // Create HMAC-SHA1 signature
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(twilioAuthToken),
+    { name: 'HMAC', hash: 'SHA-1' },
+    false,
+    ['sign']
+  );
+  const signatureBuffer = await crypto.subtle.sign('HMAC', key, encoder.encode(dataToSign));
+  const expectedSignature = encodeBase64(new Uint8Array(signatureBuffer));
+
+  if (expectedSignature !== signature) {
+    return { valid: false, message: 'Invalid Twilio signature' };
+  }
+
+  return { valid: true, message: 'Signature valid' };
+}
 
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
@@ -30,6 +68,13 @@ const handler = async (req: Request): Promise<Response> => {
     }
   } catch (e) {
     console.error('Error parsing body', e);
+  }
+
+  // Validate Twilio signature (optional security check)
+  const signatureValidation = await validateTwilioSignature(req, params);
+  if (!signatureValidation.valid) {
+    console.error('[VOIP-WEBHOOK] Signature validation failed:', signatureValidation.message);
+    return new Response('Forbidden: ' + signatureValidation.message, { status: 403 });
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;

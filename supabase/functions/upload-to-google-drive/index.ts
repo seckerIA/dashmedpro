@@ -1,9 +1,18 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const GOOGLE_CLIENT_ID = '510442253393-rd4mr1neifr9fl7eimgokevu5rvsu0fn.apps.googleusercontent.com'
-const GOOGLE_CLIENT_SECRET = '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'
-const SVM_FOLDER_ID = '1B79OuHQl9kLwytGyF7LkcnWG53evI7G2'
-const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
+// CORS headers
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+// Get credentials from environment (set via Supabase Dashboard -> Edge Functions -> Secrets)
+const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') || '';
+const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET') || '';
+const SVM_FOLDER_ID = Deno.env.get('SVM_FOLDER_ID') || '';
+const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 
 interface UploadRequest {
   fileName: string
@@ -23,10 +32,11 @@ interface GoogleDriveFile {
 
 // Função para obter token de acesso usando Service Account
 async function getAccessToken(): Promise<string> {
-  // Para produção, você deve usar Service Account credentials
-  // Por enquanto, vamos usar um token de acesso direto
-  // Em produção, implemente autenticação com Service Account
-  
+  // Validate credentials are configured
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+    throw new Error('Google Drive credentials not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Edge Function secrets.');
+  }
+
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: {
@@ -52,13 +62,13 @@ async function getAccessToken(): Promise<string> {
 async function ensureFolderExists(accessToken: string, folderName: string, parentId?: string): Promise<string> {
   const currentYear = new Date().getFullYear()
   const currentMonth = new Date().toLocaleString('pt-BR', { month: 'long' })
-  
+
   // Criar pasta do ano se não existir
   const yearFolderId = await createFolder(accessToken, currentYear.toString(), parentId || SVM_FOLDER_ID)
-  
+
   // Criar pasta do mês se não existir
   const monthFolderId = await createFolder(accessToken, currentMonth, yearFolderId)
-  
+
   return monthFolderId
 }
 
@@ -128,7 +138,7 @@ async function uploadFileToGoogleDrive(
   }
 
   const uploadedFile = await response.json()
-  
+
   return {
     id: uploadedFile.id,
     name: uploadedFile.name,
@@ -140,12 +150,41 @@ async function uploadFileToGoogleDrive(
 }
 
 Deno.serve(async (req: Request) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
   try {
     if (req.method !== 'POST') {
       return new Response(JSON.stringify({ error: 'Method not allowed' }), {
         status: 405,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
+    }
+
+    // Authentication check
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Authorization header required' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Verify JWT using Supabase
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const { fileName, fileContent, fileType, description }: UploadRequest = await req.json()
@@ -153,16 +192,16 @@ Deno.serve(async (req: Request) => {
     if (!fileName || !fileContent || !fileType) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
     // Obter token de acesso
     const accessToken = await getAccessToken()
-    
+
     // Garantir que a pasta existe
     const folderId = await ensureFolderExists(accessToken, fileName)
-    
+
     // Fazer upload do arquivo
     const uploadedFile = await uploadFileToGoogleDrive(accessToken, {
       fileName,
@@ -177,18 +216,19 @@ Deno.serve(async (req: Request) => {
       message: 'File uploaded to Google Drive successfully'
     }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in upload-to-google-drive function:', error)
-    
+
     return new Response(JSON.stringify({
       success: false,
       error: error.message || 'Internal server error'
     }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 })
+
