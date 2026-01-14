@@ -13,22 +13,22 @@ import type {
 import { useCostsBreakdown } from "./useTransactionCosts";
 import { startOfMonth, endOfMonth, subMonths, format, addMonths } from "date-fns";
 
-export const useFinancialMetrics = () => {
+export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date }) => {
   const { user } = useAuth();
   const { profile } = useUserProfile();
 
   const now = new Date();
-  const currentMonthStart = startOfMonth(now);
-  const currentMonthEnd = endOfMonth(now);
+  const currentMonthStart = filters?.startDate || startOfMonth(now);
+  const currentMonthEnd = filters?.endDate || endOfMonth(now);
 
-  // Buscar breakdown de custos do mês atual
+  // Buscar breakdown de custos do período selecionado
   const { data: costsBreakdown } = useCostsBreakdown(
     format(currentMonthStart, "yyyy-MM-dd"),
     format(currentMonthEnd, "yyyy-MM-dd")
   );
 
   const { data: metrics, isLoading, error } = useQuery({
-    queryKey: ["financial-metrics", user?.id, profile?.role],
+    queryKey: ["financial-metrics", user?.id, profile?.role, filters?.startDate, filters?.endDate],
     queryFn: async ({ signal }) => {
       if (!user) throw new Error("Usuário não autenticado");
 
@@ -184,16 +184,15 @@ export const useFinancialMetrics = () => {
     retryDelay: 2000,
   });
 
-  // Despesas por categoria (mês atual)
+  // Despesas por categoria (período selecionado)
   const { data: expensesByCategory } = useQuery({
-    queryKey: ["financial-expenses-by-category", user?.id, profile?.role],
+    queryKey: ["financial-expenses-by-category", user?.id, profile?.role, filters?.startDate, filters?.endDate],
     queryFn: async ({ signal }) => {
       if (!user) throw new Error("Usuário não autenticado");
 
       const canViewAll = profile?.role === 'admin' || profile?.role === 'dono' || profile?.role === 'secretaria';
-      const now = new Date();
-      const monthStart = startOfMonth(now);
-      const monthEnd = endOfMonth(now);
+      const monthStart = currentMonthStart;
+      const monthEnd = currentMonthEnd;
 
       let query = supabase
         .from("financial_transactions")

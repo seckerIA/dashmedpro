@@ -26,6 +26,11 @@ import MedicalCalendar from "./pages/MedicalCalendar";
 import Financial from "./pages/Financial";
 import FinancialTransactions from "./pages/FinancialTransactions";
 import FinancialSinais from "./pages/FinancialSinais";
+import FinancialCategories from "./pages/FinancialCategories";
+import FinancialRecurring from "./pages/FinancialRecurring";
+import FinancialReports from "./pages/FinancialReports";
+import FinancialBudgets from "./pages/FinancialBudgets";
+import FinancialForecasts from "./pages/FinancialForecasts";
 import SecretaryFinancial from "./pages/SecretaryFinancial";
 import TransactionForm from "./components/financial/TransactionForm";
 import ProspectingGuide from "./pages/ProspectingGuide";
@@ -323,6 +328,46 @@ const AppRoutes = () => {
             element={
               <RoleProtectedRoute allowedRoles={['admin', 'dono', 'medico', 'secretaria']}>
                 <FinancialSinais />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="/financeiro/categorias"
+            element={
+              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'medico']}>
+                <FinancialCategories />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="/financeiro/recorrencias"
+            element={
+              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'medico']}>
+                <FinancialRecurring />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="/financeiro/relatorios"
+            element={
+              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'medico']}>
+                <FinancialReports />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="/financeiro/orcamentos"
+            element={
+              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'medico']}>
+                <FinancialBudgets />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="/financeiro/previsoes"
+            element={
+              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'medico']}>
+                <FinancialForecasts />
               </RoleProtectedRoute>
             }
           />

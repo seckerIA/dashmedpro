@@ -93,7 +93,7 @@ export interface CreateTaskData {
   priority?: TaskPriority;
   assigned_to?: string; // Mantido para compatibilidade
   assigned_to_users?: string[]; // Novo campo para múltiplas atribuições
-  category?: TaskCategory;
+  category?: string; // Aceita categorias padrão ou personalizadas
   deal_id?: string;
   contact_id?: string;
   image_url?: string;
@@ -109,7 +109,7 @@ export interface UpdateTaskData {
   assigned_to?: string; // Mantido para compatibilidade
   assigned_to_users?: string[]; // Novo campo para múltiplas atribuições
   position?: number;
-  category?: TaskCategory;
+  category?: string; // Aceita categorias padrão ou personalizadas
   deal_id?: string;
   contact_id?: string;
   image_url?: string;

@@ -9,11 +9,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Calendar as CalendarIcon, Clock, User, AlertCircle, Save, X, Zap, Users, Target, Briefcase, ImagePlus } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, User, AlertCircle, Save, X, Zap, Users, Target, Briefcase, Paperclip, Settings2 } from 'lucide-react';
 import { TaskWithProfile, TaskWithCRM, CreateTaskData, UpdateTaskData, TASK_PRIORITIES, TASK_CATEGORIES } from '@/types/tasks';
 import { useCRM } from '@/hooks/useCRM';
-import { useFileUpload } from '@/hooks/useFileUpload';
 import { useAuth } from '@/hooks/useAuth';
+import { useTaskCategories, CATEGORY_COLORS } from '@/hooks/useTaskCategories';
+import { useTaskAttachments } from '@/hooks/useTaskAttachments';
+import { CategoryManagerModal } from './CategoryManagerModal';
+import { TaskAttachments } from './TaskAttachments';
 import { cn } from '@/lib/utils';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -30,7 +33,7 @@ const taskSchema = z.object({
   priority: z.enum(['baixa', 'media', 'alta']).optional(),
   assigned_to: z.string().optional(), // Mantido para compatibilidade
   assigned_to_users: z.array(z.string()).optional(), // Novo campo para múltiplas atribuições
-  category: z.enum(['comercial', 'marketing', 'financeiro', 'social_media', 'empresarial']).optional(),
+  category: z.string().optional(), // Aceita qualquer categoria (padrão ou personalizada)
   deal_id: z.string().optional(),
   contact_id: z.string().optional(),
 });
@@ -53,18 +56,24 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
   const [isEditing, setIsEditing] = useState(!!task);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(task?.image_url || null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(
     task?.due_date ? new Date(task.due_date) : undefined
   );
   const { deals, contacts } = useCRM();
-  const { uploadTaskImage, isUploading } = useFileUpload();
   const { user } = useAuth();
-  
+  const { categories, isLoading: isLoadingCategories } = useTaskCategories();
+  const { uploadAttachment, isUploading } = useTaskAttachments(task?.id);
+
   const timeSlots = generateTimeSlots();
-  
+
+  // Combinar categorias do banco com as padrão (fallback)
+  const allCategories = categories.length > 0
+    ? categories.map(cat => ({ value: cat.name, label: cat.name, color: cat.color }))
+    : TASK_CATEGORIES;
+
   const {
     register,
     handleSubmit,
@@ -99,8 +108,7 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
       const assignedUsers = task.assignments?.map(a => a.user_id) || [];
       const dueDate = task.due_date ? new Date(task.due_date) : undefined;
       setSelectedUsers(assignedUsers);
-      setImagePreview(task.image_url || null);
-      setImageFile(null);
+      setPendingFiles([]);
       setSelectedDate(dueDate);
       reset({
         title: task.title,
@@ -116,8 +124,7 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
       setIsEditing(true);
     } else {
       setSelectedUsers([]);
-      setImagePreview(null);
-      setImageFile(null);
+      setPendingFiles([]);
       setSelectedDate(undefined);
       reset({
         title: '',
@@ -138,41 +145,55 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
     try {
       console.log('[TaskForm] Iniciando submissão do formulário:', data);
       setIsSaving(true);
-      
-      // Upload da imagem primeiro, se houver
-      let imageUrl: string | undefined = task?.image_url || undefined;
-      
-      if (imageFile && user) {
-        console.log('[TaskForm] Fazendo upload da imagem...');
-        const uploadedUrl = await uploadTaskImage(imageFile, user.id);
-        if (uploadedUrl) {
-          imageUrl = uploadedUrl;
-          console.log('[TaskForm] Imagem carregada:', uploadedUrl);
-        }
-      }
-      
+
+      // Função para criar ISO string com timezone local (ex: 2026-01-13T09:00:00-03:00)
+      const toISOWithTimezone = (dateStr: string): string => {
+        const date = new Date(dateStr);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = '00';
+
+        // Calcular offset do timezone (ex: -03:00 para Brasil)
+        const tzOffset = date.getTimezoneOffset();
+        const sign = tzOffset <= 0 ? '+' : '-';
+        const offsetHours = String(Math.floor(Math.abs(tzOffset) / 60)).padStart(2, '0');
+        const offsetMinutes = String(Math.abs(tzOffset) % 60).padStart(2, '0');
+        const timezone = `${sign}${offsetHours}:${offsetMinutes}`;
+
+        return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${timezone}`;
+      };
+
       const formData = {
         title: data.title,
         description: data.description || undefined,
-        due_date: data.due_date ? new Date(data.due_date).toISOString() : undefined,
+        due_date: data.due_date ? toISOWithTimezone(data.due_date) : undefined,
         priority: data.priority,
-        assigned_to: data.assigned_to || undefined, // Mantido para compatibilidade
-        assigned_to_users: selectedUsers.length > 0 ? selectedUsers : undefined, // Novo campo
+        assigned_to: data.assigned_to || undefined,
+        assigned_to_users: selectedUsers.length > 0 ? selectedUsers : undefined,
         category: data.category,
         deal_id: data.deal_id || undefined,
         contact_id: data.contact_id || undefined,
-        image_url: imageUrl,
       };
 
       console.log('[TaskForm] Dados formatados:', formData);
-      await onSave(formData);
+      const savedTask = await onSave(formData);
       console.log('[TaskForm] Tarefa salva com sucesso');
-      
+
+      // Upload de anexos pendentes após salvar a tarefa
+      if (pendingFiles.length > 0 && task?.id) {
+        console.log('[TaskForm] Fazendo upload de', pendingFiles.length, 'anexos...');
+        for (const file of pendingFiles) {
+          await uploadAttachment({ file, taskId: task.id });
+        }
+      }
+
       if (!isEditing) {
         reset();
         setSelectedUsers([]);
-        setImageFile(null);
-        setImagePreview(null);
+        setPendingFiles([]);
         setSelectedDate(undefined);
       }
     } catch (error) {
@@ -195,23 +216,13 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
     }
   };
 
-  // Função para gerenciar upload de imagem
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      // Criar preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
+  // Funções para gerenciar anexos
+  const handleFilesSelected = (files: File[]) => {
+    setPendingFiles(prev => [...prev, ...files]);
   };
 
-  const handleRemoveImage = () => {
-    setImageFile(null);
-    setImagePreview(null);
+  const handleRemovePendingFile = (index: number) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const getPriorityConfig = (priority: string) => {
@@ -229,6 +240,16 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
     return '09:00';
   };
 
+  // Formatar data local sem conversão UTC (evita problema de timezone)
+  const formatLocalDateTime = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
   // Handle date selection
   const handleDateSelect = (date: Date | undefined) => {
     setSelectedDate(date);
@@ -236,7 +257,7 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
       const currentTime = getCurrentTime();
       const [hours, minutes] = currentTime.split(':');
       date.setHours(parseInt(hours), parseInt(minutes));
-      setValue('due_date', date.toISOString().slice(0, 16));
+      setValue('due_date', formatLocalDateTime(date));
     } else {
       setValue('due_date', '');
     }
@@ -249,14 +270,14 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
       const [hours, minutes] = time.split(':');
       const newDate = new Date(selectedDate);
       newDate.setHours(parseInt(hours || '0'), parseInt(minutes || '0'));
-      setValue('due_date', newDate.toISOString().slice(0, 16));
+      setValue('due_date', formatLocalDateTime(newDate));
     } else {
       // If no date selected, create a date for today with the selected time
       const today = new Date();
       const [hours, minutes] = time.split(':');
       today.setHours(parseInt(hours || '0'), parseInt(minutes || '0'));
       setSelectedDate(today);
-      setValue('due_date', today.toISOString().slice(0, 16));
+      setValue('due_date', formatLocalDateTime(today));
     }
   };
 
@@ -280,7 +301,7 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
           </Button>
         </div>
       </CardHeader>
-      
+
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {/* Título */}
@@ -400,7 +421,7 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
                 {TASK_PRIORITIES.map((priority) => (
                   <SelectItem key={priority.value} value={priority.value} className="hover:bg-accent">
                     <div className="flex items-center gap-2">
-                      <Badge 
+                      <Badge
                         className={cn(
                           "text-sm font-bold px-3 py-1",
                           priority.value === 'alta' && "bg-gradient-to-r from-red-100 to-red-200 text-red-800 border-red-300",
@@ -424,10 +445,22 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
 
           {/* Categoria */}
           <div className="space-y-3">
-            <label className="text-base font-bold text-foreground flex items-center gap-2">
-              <Target className="h-5 w-5 text-primary" />
-              Categoria
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-base font-bold text-foreground flex items-center gap-2">
+                <Target className="h-5 w-5 text-primary" />
+                Categoria
+              </label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowCategoryManager(true)}
+                className="h-8 text-xs gap-1"
+              >
+                <Settings2 className="h-3 w-3" />
+                Gerenciar
+              </Button>
+            </div>
             <Select
               value={watchedCategory}
               onValueChange={(value) => setValue('category', value as any)}
@@ -436,10 +469,10 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
                 <SelectValue placeholder="Selecione a categoria" />
               </SelectTrigger>
               <SelectContent className="bg-popover text-foreground border-border rounded-xl">
-                {TASK_CATEGORIES.map((category) => (
+                {allCategories.map((category) => (
                   <SelectItem key={category.value} value={category.value} className="hover:bg-accent">
                     <div className="flex items-center gap-2">
-                      <Badge 
+                      <Badge
                         className={cn(
                           "text-sm font-bold px-3 py-1",
                           category.color,
@@ -455,10 +488,16 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
             </Select>
             {watchedCategory && (
               <p className="text-sm text-foreground font-medium">
-                Categoria: {TASK_CATEGORIES.find(cat => cat.value === watchedCategory)?.label}
+                Categoria: {allCategories.find(cat => cat.value === watchedCategory)?.label}
               </p>
             )}
           </div>
+
+          {/* Modal de Gerenciamento de Categorias */}
+          <CategoryManagerModal
+            open={showCategoryManager}
+            onOpenChange={setShowCategoryManager}
+          />
 
           {/* Deal Relacionado */}
           {deals.length > 0 && (
@@ -536,53 +575,19 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
             </div>
           )}
 
-          {/* Upload de Imagem */}
+          {/* Anexos */}
           <div className="space-y-3">
             <label className="text-base font-bold text-foreground flex items-center gap-2">
-              <ImagePlus className="h-5 w-5 text-primary" />
-              Imagem (Opcional)
+              <Paperclip className="h-5 w-5 text-primary" />
+              Anexos
             </label>
-            
-            {!imagePreview ? (
-              <div className="border-2 border-dashed border-border rounded-xl p-6 hover:border-primary/50 transition-all">
-                <label 
-                  htmlFor="task-image-upload" 
-                  className="flex flex-col items-center justify-center cursor-pointer"
-                >
-                  <ImagePlus className="h-12 w-12 text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground text-center">
-                    Clique para adicionar uma imagem
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    PNG, JPG até 5MB
-                  </p>
-                </label>
-                <input
-                  id="task-image-upload"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                  className="hidden"
-                />
-              </div>
-            ) : (
-              <div className="relative border border-border rounded-xl overflow-hidden">
-                <img 
-                  src={imagePreview} 
-                  alt="Preview" 
-                  className="w-full h-48 object-cover"
-                />
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleRemoveImage}
-                  className="absolute top-2 right-2"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
+            <TaskAttachments
+              taskId={task?.id}
+              isEditing={true}
+              onFilesSelected={handleFilesSelected}
+              pendingFiles={pendingFiles}
+              onRemovePendingFile={handleRemovePendingFile}
+            />
           </div>
 
           {/* Atribuir para múltiplas pessoas */}
@@ -632,7 +637,7 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
               <Save className="h-5 w-5" />
               {(isLoading || isSaving) ? 'Salvando...' : (isEditing ? 'Atualizar' : 'Criar Tarefa')}
             </Button>
-            
+
             <Button
               type="button"
               variant="outline"

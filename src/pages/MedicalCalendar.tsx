@@ -8,6 +8,9 @@ import { useToast } from '@/hooks/use-toast';
 import { AppointmentForm } from '@/components/medical-calendar/AppointmentForm';
 import { AppointmentDetailsModal } from '@/components/medical-calendar/AppointmentDetailsModal';
 import { MeetingDetailsModal } from '@/components/medical-calendar/MeetingDetailsModal';
+import { MeetingActionModal, MeetingActionType } from '@/components/medical-calendar/MeetingActionModal';
+import { FinancialRequirementModal } from '@/components/financial/FinancialRequirementModal';
+import { useFinancialAccounts } from '@/hooks/useFinancialAccounts';
 import { MeetingForm } from '@/components/medical-calendar/MeetingForm';
 import { MedicalRecordModal } from '@/components/medical-records/MedicalRecordModal';
 import { MonthlyCalendarView } from '@/components/medical-calendar/MonthlyCalendarView';
@@ -63,6 +66,15 @@ export default function MedicalCalendar() {
   const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false);
   const [appointmentForPayment, setAppointmentForPayment] = useState<MedicalAppointmentWithRelations | null>(null);
 
+  // Meeting Action Modal state (cancel/delete)
+  const [showMeetingActionModal, setShowMeetingActionModal] = useState(false);
+  const [meetingActionType, setMeetingActionType] = useState<'cancel' | 'delete'>('cancel');
+  const [meetingForAction, setMeetingForAction] = useState<GeneralMeeting | null>(null);
+
+  // State for Financial Requirement Modal
+  const [showFinancialRequirement, setShowFinancialRequirement] = useState(false);
+  const { accounts } = useFinancialAccounts();
+
   // Calcular range do mês para carregar consultas
   const monthStart = startOfMonth(selectedDate);
   const monthEnd = endOfMonth(selectedDate);
@@ -89,7 +101,18 @@ export default function MedicalCalendar() {
   } = useMedicalAppointments(filters);
 
   // Buscar lista de médicos
-  const { doctors } = useDoctors();
+  const { doctors: allDoctors } = useDoctors();
+
+  // Filtrar lista de médicos baseado no role do usuário
+  // Médicos só podem ver a si mesmos, admin/dono/secretária veem todos
+  const doctors = useMemo(() => {
+    if (isMedico && !isAdmin && user?.id) {
+      // Médico só vê a si mesmo
+      return allDoctors.filter(doc => doc.id === user.id);
+    }
+    // Admin, dono e secretária veem todos
+    return allDoctors;
+  }, [allDoctors, isMedico, isAdmin, user?.id]);
 
   // Extrair lista única de pacientes das consultas
   const uniquePatients = useMemo(() => {
@@ -177,6 +200,18 @@ export default function MedicalCalendar() {
         newParams.delete('status');
         setSearchParams(newParams);
       }
+    }
+  }, [searchParams, setSearchParams]);
+
+  // Detectar query param openForm para abrir modal de nova consulta (ex: vindo do Dashboard)
+  useEffect(() => {
+    const openFormParam = searchParams.get('openForm');
+    if (openFormParam === 'true') {
+      setShowAppointmentForm(true);
+      // Limpar o query param apos abrir o modal
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('openForm');
+      setSearchParams(newParams);
     }
   }, [searchParams, setSearchParams]);
 
@@ -271,12 +306,24 @@ export default function MedicalCalendar() {
   };
 
   const handleMarkCompleted = async (appointment: MedicalAppointmentWithRelations) => {
+    // Verificar se existe conta bancária antes de prosseguir
+    if (accounts && accounts.length === 0) {
+      setShowFinancialRequirement(true);
+      return;
+    }
+
     // Usar o mesmo fluxo de confirmação de pagamento
     setAppointmentForPayment(appointment);
     setShowPaymentConfirmation(true);
   };
 
   const handleMarkAttended = async (appointment: MedicalAppointmentWithRelations) => {
+    // Verificar se existe conta bancária antes de prosseguir
+    if (accounts && accounts.length === 0) {
+      setShowFinancialRequirement(true);
+      return;
+    }
+
     // Abrir modal de confirmação de pagamento antes de marcar como compareceu
     setAppointmentForPayment(appointment);
     setShowPaymentConfirmation(true);
@@ -334,12 +381,10 @@ export default function MedicalCalendar() {
     setShowMeetingForm(true);
   };
 
-  const handleMeetingDelete = async (meeting: GeneralMeeting) => {
-    if (confirm('Tem certeza que deseja excluir esta reunião?')) {
-      await deleteMeeting.mutateAsync(meeting.id);
-      setShowMeetingDetails(false);
-      setSelectedMeeting(null);
-    }
+  const handleMeetingDelete = (meeting: GeneralMeeting) => {
+    setMeetingForAction(meeting);
+    setMeetingActionType('delete');
+    setShowMeetingActionModal(true);
   };
 
   const handleMeetingCompleted = async (meeting: GeneralMeeting) => {
@@ -348,12 +393,40 @@ export default function MedicalCalendar() {
     setSelectedMeeting(null);
   };
 
-  const handleMeetingCancel = async (meeting: GeneralMeeting) => {
-    const reason = prompt('Motivo do cancelamento (opcional):');
-    if (reason !== null) { // User clicked OK (even if empty)
-      await cancelMeeting.mutateAsync(meeting.id);
+  const handleMeetingCancel = (meeting: GeneralMeeting) => {
+    setMeetingForAction(meeting);
+    setMeetingActionType('cancel');
+    setShowMeetingActionModal(true);
+  };
+
+  // Handler para confirmar ação do modal
+  const handleMeetingActionConfirm = async (reason?: string) => {
+    if (!meetingForAction) return;
+
+    try {
+      if (meetingActionType === 'delete') {
+        await deleteMeeting.mutateAsync(meetingForAction.id);
+        toast({
+          title: 'Reunião excluída',
+          description: 'A reunião foi excluída com sucesso.',
+        });
+      } else {
+        await cancelMeeting.mutateAsync(meetingForAction.id);
+        toast({
+          title: 'Reunião cancelada',
+          description: reason ? `Motivo: ${reason}` : 'A reunião foi cancelada.',
+        });
+      }
+      setShowMeetingActionModal(false);
+      setMeetingForAction(null);
       setShowMeetingDetails(false);
       setSelectedMeeting(null);
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível completar a ação.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -364,9 +437,9 @@ export default function MedicalCalendar() {
     }
   };
 
-  const handleMeetingDetailsDelete = async () => {
+  const handleMeetingDetailsDelete = () => {
     if (selectedMeeting) {
-      await handleMeetingDelete(selectedMeeting);
+      handleMeetingDelete(selectedMeeting);
     }
   };
 
@@ -376,9 +449,9 @@ export default function MedicalCalendar() {
     }
   };
 
-  const handleMeetingDetailsCancel = async () => {
+  const handleMeetingDetailsCancel = () => {
     if (selectedMeeting) {
-      await handleMeetingCancel(selectedMeeting);
+      handleMeetingCancel(selectedMeeting);
     }
   };
 
@@ -736,12 +809,25 @@ export default function MedicalCalendar() {
         onCancel={handleMeetingDetailsCancel}
       />
 
+      <MeetingActionModal
+        open={showMeetingActionModal}
+        onOpenChange={setShowMeetingActionModal}
+        meetingTitle={meetingForAction?.title || ''}
+        actionType={meetingActionType}
+        onConfirm={handleMeetingActionConfirm}
+      />
+
       <MedicalRecordModal
         open={showMedicalRecordModal}
         onOpenChange={setShowMedicalRecordModal}
         contactId={recordContactId}
         appointmentId={recordAppointmentId}
         contactName={recordContactName}
+      />
+
+      <FinancialRequirementModal
+        isOpen={showFinancialRequirement}
+        onOpenChange={setShowFinancialRequirement}
       />
     </div>
   );

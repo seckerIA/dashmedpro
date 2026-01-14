@@ -20,13 +20,13 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TaskCard } from './TaskCard';
 import { TaskForm } from './TaskForm';
-import { TaskWithProfile, CreateTaskData, UpdateTaskData, TaskPriority } from '@/types/tasks';
+import { TaskWithProfile, TaskWithCRM, CreateTaskData, UpdateTaskData, TaskPriority } from '@/types/tasks';
 import { CheckCircle2, AlertCircle, Zap, Target, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 
 interface TaskListProps {
-  tasks: TaskWithProfile[];
+  tasks: TaskWithCRM[];
   onTaskCreate: (data: CreateTaskData) => Promise<void>;
   onTaskUpdate: (taskId: string, data: UpdateTaskData) => Promise<void>;
   onTaskDelete: (taskId: string) => Promise<void>;
@@ -50,7 +50,7 @@ export function TaskList({
   isLoading = false,
   teamMembers = [],
 }: TaskListProps) {
-  const [selectedTask, setSelectedTask] = useState<TaskWithProfile | null>(null);
+  const [selectedTask, setSelectedTask] = useState<TaskWithCRM | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [filter, setFilter] = useState<'all' | 'my_tasks'>('all');
   const [selectedPriorities, setSelectedPriorities] = useState<TaskPriority[]>([]);
@@ -72,7 +72,7 @@ export function TaskList({
 
       const newTasks = arrayMove(tasks, oldIndex, newIndex);
       const newTaskIds = newTasks.map((task) => task.id);
-      
+
       await onTaskReorder(newTaskIds);
     }
   };
@@ -111,7 +111,7 @@ export function TaskList({
     }
   };
 
-  const handleEditTask = (task: TaskWithProfile) => {
+  const handleEditTask = (task: TaskWithCRM) => {
     setSelectedTask(task);
     setIsCreating(false);
   };
@@ -133,7 +133,7 @@ export function TaskList({
   };
 
   const handlePriorityToggle = (priority: TaskPriority) => {
-    setSelectedPriorities(prev => 
+    setSelectedPriorities(prev =>
       prev.includes(priority)
         ? prev.filter(p => p !== priority)
         : [...prev, priority]
@@ -145,18 +145,18 @@ export function TaskList({
     // Filtro de "Minhas tarefas" vs "Todas"
     if (filter === 'my_tasks') {
       // Mostrar apenas tarefas criadas pelo usuário ou atribuídas a ele
-      const isMyTask = task.created_by === user?.id || 
-                       task.assigned_to === user?.id ||
-                       task.my_assignment !== null ||
-                       task.assignments?.some(a => a.user_id === user?.id);
+      const isMyTask = task.created_by === user?.id ||
+        task.assigned_to === user?.id ||
+        task.my_assignment !== null ||
+        task.assignments?.some(a => a.user_id === user?.id);
       if (!isMyTask) return false;
     }
-    
+
     // Filtro de prioridade
     if (selectedPriorities.length > 0) {
       return selectedPriorities.includes(task.priority as TaskPriority);
     }
-    
+
     return true;
   });
 
@@ -165,7 +165,7 @@ export function TaskList({
     const taskStatus = task.my_assignment?.status || task.status;
     return taskStatus === 'pendente';
   });
-  
+
   const completedTasks = filteredTasks.filter(task => {
     // Para tarefas com atribuição individual, usar o status da atribuição
     const taskStatus = task.my_assignment?.status || task.status;
@@ -344,7 +344,7 @@ export function TaskList({
 
       {/* Formulário de Criação/Edição */}
       {(isCreating || selectedTask) && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={(e) => {
             // Fecha o modal ao clicar fora dele

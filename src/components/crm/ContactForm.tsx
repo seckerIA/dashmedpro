@@ -29,6 +29,8 @@ import { useCRM } from "@/hooks/useCRM";
 import { useToast } from "@/hooks/use-toast";
 import { CRMContact, CRMPipelineStage } from "@/types/crm";
 import { useCommercialProcedures } from "@/hooks/useCommercialProcedures";
+import { useCommercialLeads } from "@/hooks/useCommercialLeads";
+import { COMMERCIAL_LEAD_ORIGIN_LABELS } from "@/types/commercial";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { ProcedureForm } from "@/components/commercial/ProcedureForm";
 import {
@@ -54,8 +56,10 @@ const contactSchema = z.object({
   full_name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
   email: z.string().email("Email inválido").optional().or(z.literal("")),
   phone: z.string().optional(),
+  origin: z.enum(['google', 'instagram', 'facebook', 'indication', 'website', 'other']).default('other'),
   company: z.string().optional(),
   position: z.string().optional(),
+  notes: z.string().optional(),
   service: z.string().optional(),
   service_value: z.string()
     .min(1, "Valor da consulta é obrigatório")
@@ -94,11 +98,13 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
   const [open, setOpen] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const [showProcedureForm, setShowProcedureForm] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const forceOpenRef = useRef<boolean | undefined>(forceOpen);
   const queryClient = useQueryClient();
-  const { createContact, updateContact, createDeal, isCreatingContact, isUpdatingContact } = useCRM();
+  const { createContact, updateContact, createDeal } = useCRM();
   const { isSecretaria } = useUserProfile();
   const { procedures, isLoading: isLoadingProcedures } = useCommercialProcedures();
+  const { createLead } = useCommercialLeads();
   const { toast } = useToast();
 
   const form = useForm<ContactFormData>({
@@ -107,8 +113,10 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
       full_name: contact?.full_name || initialData?.full_name || "",
       email: contact?.email || initialData?.email || "",
       phone: formatPhone(contact?.phone || initialData?.phone || ""),
+      origin: (contact?.custom_fields as any)?.origin || "other",
       company: contact?.company || "",
       position: contact?.position || "",
+      notes: initialData?.notes || (contact?.custom_fields as any)?.notes || "",
       service: contact?.service || (contact?.custom_fields as any)?.procedure_id || "none",
       service_value: (contact?.service_value?.toString() || "") as any,
       tags: contact?.tags || [],
@@ -156,10 +164,10 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
         phone: initialData.phone ? formatPhone(initialData.phone) : "",
         company: "",
         position: "",
-      service: "none",
-      service_value: "" as any,
-      tags: [],
-      create_deal: true, // Sempre true para novos contatos
+        service: "none",
+        service_value: "" as any,
+        tags: [],
+        create_deal: true, // Sempre true para novos contatos
       });
     }
   }, [initialData, open, contact, initialStage, form]);
@@ -167,7 +175,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
   const watchedTags = form.watch("tags");
   const watchedService = form.watch("service");
   const watchedServiceValue = form.watch("service_value");
-  
+
   // Atualizar valor automaticamente quando um procedimento for selecionado
   useEffect(() => {
     if (watchedService && watchedService !== "none") {
@@ -199,7 +207,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
 
   const onSubmit = async (data: ContactFormData) => {
     console.log('📝 ContactForm onSubmit chamado com data:', data);
-    
+
     // Função auxiliar para criar timeout em promises
     const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> => {
       return Promise.race([
@@ -226,12 +234,12 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
       // Para novos contatos, sempre criar deal
       const create_deal = !contact ? true : data.create_deal;
       const { create_deal: _, ...contactData } = data;
-      
+
       // Buscar o procedimento selecionado para obter o valor
       const selectedProcedure = procedures?.find(p => p.id === contactData.service);
       const parsedServiceValue = contactData.service_value ? parseCurrencyToNumber(contactData.service_value) : null;
       const serviceValue = parsedServiceValue || (selectedProcedure ? Number(selectedProcedure.price) : null);
-      
+
       // Preparar custom_fields com procedure_id se houver procedimento selecionado
       console.log('🔍 ContactForm - Preparando custom_fields:', {
         contactData_service: contactData.service,
@@ -239,15 +247,15 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
         contact_custom_fields: contact?.custom_fields,
         contact_custom_fields_type: typeof contact?.custom_fields,
       });
-      
+
       // Inicializar customFields a partir do contato existente ou objeto vazio
       const existingCustomFields = contact?.custom_fields as any;
-      const customFields: any = existingCustomFields && typeof existingCustomFields === 'object' 
-        ? { ...existingCustomFields } 
+      const customFields: any = existingCustomFields && typeof existingCustomFields === 'object'
+        ? { ...existingCustomFields }
         : {};
-      
+
       console.log('🔍 ContactForm - customFields inicial:', customFields);
-      
+
       // Adicionar ou remover procedure_id baseado na seleção
       if (contactData.service && contactData.service !== "none") {
         customFields.procedure_id = contactData.service;
@@ -256,27 +264,37 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
         delete customFields.procedure_id;
         console.log('🗑️ ContactForm - Removendo procedure_id (service é "none" ou vazio)');
       }
-      
+
+      // Adicionar origin aos custom_fields
+      if (contactData.origin) {
+        customFields.origin = contactData.origin;
+      }
+
+      // Adicionar notes aos custom_fields
+      if (contactData.notes) {
+        customFields.notes = contactData.notes;
+      }
+
       console.log('🔍 ContactForm - customFields final:', customFields);
       console.log('🔍 ContactForm - customFields keys:', Object.keys(customFields));
-      
+
       // Remover campos que não existem na tabela crm_contacts
-      // service não é campo direto, mas service_value é
-      const { service, service_value, ...contactDataForDB } = contactData;
-      
-      // Adicionar service_value ao objeto de dados para salvar
+      // service, service_value, origin e notes não são colunas diretas
+      const { service, service_value, origin, notes, ...contactDataForDB } = contactData;
+
+      // Adicionar service_value ao objeto de dados para salvar (esta coluna existe)
       if (serviceValue) {
         (contactDataForDB as any).service_value = serviceValue;
       }
-      
+
       // Remover formatação do telefone antes de salvar (manter apenas números)
       if (contactDataForDB.phone) {
         contactDataForDB.phone = parsePhoneToNumber(contactDataForDB.phone);
       }
-      
-      // Adicionar custom_fields com procedure_id
-      contactDataForDB.custom_fields = customFields;
-      
+
+      // Adicionar custom_fields com procedure_id, origin e notes
+      (contactDataForDB as any).custom_fields = customFields;
+
       console.log('💾 ContactForm - Salvando contato com custom_fields:', {
         customFields,
         procedure_id: customFields.procedure_id,
@@ -285,7 +303,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
         custom_fields_to_save_keys: Object.keys(contactDataForDB.custom_fields || {}),
         full_contactDataForDB: contactDataForDB,
       });
-      
+
       if (contact) {
         console.log('✏️ Atualizando contato existente:', contact.id);
         // Atualizar contato existente
@@ -301,7 +319,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
           custom_fields_type: typeof updateData.custom_fields,
           custom_fields_keys: updateData.custom_fields ? Object.keys(updateData.custom_fields) : [],
         });
-        
+
         try {
           await withTimeout(
             updateContact({
@@ -311,12 +329,12 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
             30000, // 30 segundos de timeout
             "Timeout ao atualizar contato. Tente novamente."
           );
-          
+
           toast({
             title: "Contato atualizado",
             description: "O contato foi atualizado com sucesso.",
           });
-          
+
           setOpen(false);
           form.reset();
           onSuccess?.();
@@ -340,9 +358,9 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
           custom_fields_type: typeof createData.custom_fields,
           custom_fields_keys: createData.custom_fields ? Object.keys(createData.custom_fields) : [],
         });
-        
+
         let newContact: CRMContact | null = null;
-        
+
         try {
           // Criar contato com timeout
           newContact = await withTimeout(
@@ -350,12 +368,15 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
             30000, // 30 segundos de timeout
             "Timeout ao criar contato. Tente novamente."
           );
-          
+
           console.log('✅ Contato criado:', {
             id: newContact.id,
             custom_fields: newContact.custom_fields,
             custom_fields_type: typeof newContact.custom_fields,
           });
+
+          // NOTA: Não criamos commercial_lead aqui para evitar duplicação
+          // O deal do CRM já representa o lead no pipeline
         } catch (contactError) {
           console.error('❌ Erro ao criar contato:', contactError);
           // Fechar o formulário mesmo em caso de erro para não travar a UI
@@ -363,13 +384,13 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
           form.reset();
           throw contactError;
         }
-        
+
         // Criar contrato automaticamente (sempre para novos contatos)
         if (create_deal && newContact) {
           console.log('📄 Criando deal automático...');
           // Sempre usar "lead_novo" para novos contatos
           const dealStage = "lead_novo";
-          
+
           try {
             // Criar deal com timeout
             const newDeal = await withTimeout(
@@ -384,20 +405,20 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
               30000, // 30 segundos de timeout
               "Timeout ao criar contrato. O contato foi criado, mas o contrato não pôde ser adicionado ao pipeline."
             );
-            
+
             console.log('✅ Deal criado:', newDeal);
-            
+
             // Invalidar cache de deals para garantir que apareça imediatamente no pipeline
-            queryClient.invalidateQueries({ 
+            queryClient.invalidateQueries({
               queryKey: ['crm-deals'],
-              exact: false 
+              exact: false
             });
-            
+
             toast({
               title: "Contato e Contrato criados",
               description: `O contato foi criado e adicionado ao pipeline.`,
             });
-            
+
             setOpen(false);
             form.reset();
             console.log('🔔 Chamando onSuccess com dealId:', newDeal.id);
@@ -415,11 +436,11 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
             toast({
               variant: "destructive",
               title: "Contato criado, mas erro ao criar contrato",
-              description: dealError instanceof Error 
-                ? dealError.message 
+              description: dealError instanceof Error
+                ? dealError.message
                 : "O contato foi criado, mas não foi possível adicioná-lo ao pipeline. Tente adicionar manualmente.",
             });
-            
+
             setOpen(false);
             form.reset();
             // Chamar callback com contactId mesmo se o deal falhou
@@ -436,13 +457,13 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
             description: "O contato foi criado com sucesso.",
           });
         }
-        
+
         // Chamar callback com contactId quando contato for criado
         if (newContact?.id) {
           console.log('🔔 Chamando onContactCreated com contactId:', newContact.id);
           onContactCreated?.(newContact.id);
         }
-        
+
         setOpen(false);
         form.reset();
         console.log('🔔 Chamando onSuccess sem dealId');
@@ -450,12 +471,12 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
       }
     } catch (error) {
       console.error('❌ Erro no onSubmit:', error);
-      
+
       // Garantir que o formulário sempre feche mesmo em caso de erro
       // para não travar a UI
       setOpen(false);
       form.reset();
-      
+
       toast({
         variant: "destructive",
         title: "Erro",
@@ -482,7 +503,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
     }
   };
 
-  const isLoading = isCreatingContact || isUpdatingContact;
+  const isLoading = isSubmitting;
 
   const handleOpenChange = (newOpen: boolean) => {
     // Se não há procedimento CONSULTA e é um novo contato, não permitir fechar
@@ -498,7 +519,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
       }
       return;
     }
-    
+
     // Se forceOpen é true e está tentando fechar, chamar onCancel se disponível
     // mas ainda permitir fechar se onCancel foi fornecido (para controle externo)
     if (forceOpen && !newOpen) {
@@ -508,7 +529,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
       }
       return;
     }
-    
+
     setOpen(newOpen);
     if (!newOpen) {
       // Limpar o formulário quando fechar
@@ -535,13 +556,13 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
             {contact ? "Editar Contato" : "Novo Contato"}
           </DialogTitle>
           <DialogDescription>
-            {contact 
-              ? "Atualize as informações do contato existente." 
+            {contact
+              ? "Atualize as informações do contato existente."
               : "Preencha as informações para criar um novo contato no CRM."
             }
           </DialogDescription>
         </DialogHeader>
-        
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
@@ -566,10 +587,10 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="email" 
-                        placeholder="email@exemplo.com" 
-                        {...field} 
+                      <Input
+                        type="email"
+                        placeholder="email@exemplo.com"
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -602,12 +623,35 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
 
             <FormField
               control={form.control}
+              name="origin"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Origem *</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a origem do lead" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {Object.entries(COMMERCIAL_LEAD_ORIGIN_LABELS).map(([key, label]) => (
+                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="service"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Procedimento de Interesse</FormLabel>
-                  <Select 
-                    onValueChange={field.onChange} 
+                  <Select
+                    onValueChange={field.onChange}
                     value={field.value}
                     disabled={isLoadingProcedures}
                   >
@@ -654,12 +698,12 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
                 const selectedProcedure = procedures?.find(p => p.id === watchedService);
                 const isEmpty = !field.value || field.value === "";
                 const showAlert = !contact && (!hasConsultationProcedure || isEmpty);
-                
+
                 return (
                   <FormItem>
                     <FormLabel>Valor Estimado da 1ª Consulta *</FormLabel>
                     <FormControl>
-                      <Input 
+                      <Input
                         placeholder="R$ 0,00"
                         {...field}
                         value={field.value || ""}
@@ -696,8 +740,8 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
                                 }
                               }}
                             >
-                              {!hasConsultationProcedure 
-                                ? "Cadastrar Valor da Consulta" 
+                              {!hasConsultationProcedure
+                                ? "Cadastrar Valor da Consulta"
                                 : "Preencher Valor"}
                             </Button>
                           </div>
@@ -708,6 +752,24 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
                   </FormItem>
                 );
               }}
+            />
+
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Observações</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Observações sobre o paciente..."
+                      {...field}
+                      rows={3}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
 
             <FormField

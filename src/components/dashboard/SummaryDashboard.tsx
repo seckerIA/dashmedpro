@@ -1,4 +1,3 @@
-
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -56,7 +55,7 @@ export function SummaryDashboard() {
                                 description="Agendar"
                                 variant="red"
                                 icon={CalendarIcon}
-                                onClick={() => navigate('/calendar')}
+                                onClick={() => navigate('/calendar?openForm=true')}
                             />
                             <QuickActionCard
                                 title="CRM"

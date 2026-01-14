@@ -158,6 +158,7 @@ export function ConversionModal({
             .from("financial_accounts")
             .select("id")
             .eq("user_id", user.id)
+            .order("is_default", { ascending: false }) // Priorizar conta padrão
             .limit(1);
 
           if (categories && categories.length > 0 && accounts && accounts.length > 0) {

@@ -417,13 +417,19 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                         )
                       }
 
-                      // Se tem sub-itens e sidebar está expandido
                       if (hasSubItems && !isCollapsed) {
                         return (
                           <div key={item.title} className="space-y-1">
-                            {/* Item pai - botão de expansão */}
+                            {/* Item pai - botão que navega E expande */}
                             <button
-                              onClick={() => toggleExpanded(item.title)}
+                              onClick={() => {
+                                // Navegar para a URL principal do item
+                                navigate(item.url);
+                                // Expandir se não estiver expandido
+                                if (!expanded) {
+                                  toggleExpanded(item.title);
+                                }
+                              }}
                               className={`
                                 group relative w-full flex items-center justify-between
                                 px-4 py-3.5 rounded-2xl text-base font-medium
@@ -451,11 +457,19 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                                   {item.title}
                                 </span>
                               </div>
-                              {expanded ? (
-                                <ChevronDown className="w-5 h-5 text-white/50 transition-transform duration-200" />
-                              ) : (
-                                <ChevronRight className="w-5 h-5 text-white/50 transition-transform duration-200" />
-                              )}
+                              <div
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleExpanded(item.title);
+                                }}
+                                className="p-1 hover:bg-white/10 rounded-lg"
+                              >
+                                {expanded ? (
+                                  <ChevronDown className="w-5 h-5 text-white/50 transition-transform duration-200" />
+                                ) : (
+                                  <ChevronRight className="w-5 h-5 text-white/50 transition-transform duration-200" />
+                                )}
+                              </div>
                             </button>
 
                             {/* Sub-itens - com animação de expansão */}

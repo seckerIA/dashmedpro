@@ -716,6 +716,7 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
           .from('financial_accounts')
           .select('id, name')
           .eq('is_active', true)
+          .order('is_default', { ascending: false }) // Priorizar conta padrão
           .limit(1);
 
         if (accountsError) {

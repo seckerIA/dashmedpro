@@ -330,12 +330,15 @@ export function AppointmentForm({
   const selectedType = watch('appointment_type');
   const selectedDoctorId = watch('doctor_id');
 
-  // Filtrar procedimentos pelo médico selecionado
+  // Para usuários que não podem agendar para outros (médicos), usar user.id como doctor_id
+  const effectiveDoctorId = selectedDoctorId || (!canScheduleForOthers && user?.id) || null;
+
+  // Filtrar procedimentos pelo médico selecionado ou pelo usuário atual (se médico)
   const filteredProcedures = procedures.filter(p => {
-    // Se não tem médico selecionado, não mostrar procedimentos
-    if (!selectedDoctorId) return false;
-    // Mostrar procedimentos do médico selecionado
-    return p.user_id === selectedDoctorId;
+    // Se não tem médico efetivo, não mostrar procedimentos
+    if (!effectiveDoctorId) return false;
+    // Mostrar procedimentos do médico selecionado/atual
+    return p.user_id === effectiveDoctorId;
   });
 
   // Handler para quando seleciona um procedimento
@@ -738,7 +741,7 @@ export function AppointmentForm({
           </div>
 
           {/* Procedure Selection - Only show when type is 'procedure' and doctor is selected */}
-          {selectedType === 'procedure' && selectedDoctorId && (
+          {selectedType === 'procedure' && effectiveDoctorId && (
             <div className="space-y-2">
               <Label htmlFor="procedure_id">Procedimento *</Label>
               <Select
@@ -780,7 +783,7 @@ export function AppointmentForm({
                   )}
                 </SelectContent>
               </Select>
-              {selectedType === 'procedure' && !selectedDoctorId && (
+              {selectedType === 'procedure' && !effectiveDoctorId && (
                 <p className="text-sm text-amber-600">Selecione um médico primeiro</p>
               )}
             </div>

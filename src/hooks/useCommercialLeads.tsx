@@ -169,7 +169,7 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
               user_id: user.id,
               stage: 'lead_novo', // Forçar entrada no início do pipeline
               value: lead.estimated_value || null,
-              notes: lead.notes || `Criado via Novo Paciente (Origem: ${lead.origin})`,
+              description: lead.notes || `Criado via Novo Paciente (Origem: ${lead.origin})`,
               created_at: new Date().toISOString()
             } as any);
 
