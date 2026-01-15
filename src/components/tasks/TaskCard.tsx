@@ -20,6 +20,8 @@ import {
 import { TaskWithProfile, TaskWithCRM, TASK_PRIORITIES, TASK_STATUSES, TASK_CATEGORIES } from '@/types/tasks';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { useTaskCategories } from '@/hooks/useTaskCategories';
+import { TaskAttachmentsBadge } from './TaskAttachments';
 
 interface TaskCardProps {
   task: TaskWithCRM;
@@ -31,6 +33,7 @@ interface TaskCardProps {
 
 export function TaskCard({ task, onEdit, onDelete, onToggleComplete, onToggleAssignmentComplete }: TaskCardProps) {
   const { user } = useAuth();
+  const { categories } = useTaskCategories();
   const {
     attributes,
     listeners,
@@ -47,7 +50,14 @@ export function TaskCard({ task, onEdit, onDelete, onToggleComplete, onToggleAss
 
   const priorityConfig = TASK_PRIORITIES.find(p => p.value === task.priority);
   const statusConfig = TASK_STATUSES.find(s => s.value === task.status);
-  const categoryConfig = TASK_CATEGORIES.find(cat => cat.value === task.category);
+
+  // Buscar configuração da categoria - primeiro no banco, depois nas padrão
+  const dynamicCategory = categories.find(cat => cat.name === task.category);
+  const staticCategory = TASK_CATEGORIES.find(cat => cat.value === task.category);
+
+  // Label e cor para exibição (prioridade: banco > padrão > fallback)
+  const categoryLabel = dynamicCategory?.name || staticCategory?.label || (task.category ? task.category.charAt(0).toUpperCase() + task.category.slice(1).replace(/_/g, ' ') : null);
+  const categoryColor = dynamicCategory?.color || staticCategory?.color || 'text-gray-600';
 
   // Lógica para determinar se deve mostrar "Criada por"
   const isCreatedByOther = task.created_by && task.created_by !== user?.id;
@@ -142,11 +152,14 @@ export function TaskCard({ task, onEdit, onDelete, onToggleComplete, onToggleAss
           {/* Task Content */}
           <div className="flex-1 min-w-0">
             {/* Categoria Badge */}
-            {categoryConfig && (
-              <Badge variant="outline" className="mb-2 text-xs">
-                {categoryConfig.label}
+            {categoryLabel && (
+              <Badge variant="outline" className={cn("mb-2 text-xs", categoryColor)}>
+                {categoryLabel}
               </Badge>
             )}
+
+            {/* Badge de Anexos */}
+            <TaskAttachmentsBadge taskId={task.id} />
 
             <div className="flex items-start justify-between gap-2 mb-2">
               <h3 className={cn(

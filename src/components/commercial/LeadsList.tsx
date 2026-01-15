@@ -33,14 +33,6 @@ export function LeadsList({ searchTerm }: LeadsListProps) {
 
   const { leads, isLoading, error } = useCommercialLeads(filters);
 
-  console.log('🔍 LeadsList Render:', {
-    userId: user?.id,
-    isSecretaria,
-    doctorIds,
-    leadsCount: leads?.length || 0,
-    isLoading
-  });
-
   const filteredAndSortedLeads = useMemo(() => {
     let filtered = leads.filter(lead => {
       const matchesSearch = !searchTerm ||
@@ -132,13 +124,6 @@ export function LeadsList({ searchTerm }: LeadsListProps) {
           <ArrowUpDown className="w-4 h-4 mr-2" />
           Ordenar por {sortBy === "score" ? "Data" : "Score"}
         </Button>
-      </div>
-
-      {/* Debug Info (Only in dev/test) */}
-      <div className="text-[10px] text-muted-foreground bg-muted/30 p-2 rounded border border-dashed">
-        DEBUG: User {user?.id} | Role: {isSecretaria ? 'Secretária' : 'Outro'} |
-        Docs: {doctorIds?.length || 0} ({doctorIds?.join(', ') || 'Nenhum'}) |
-        Leads: {leads?.length || 0}
       </div>
 
       {/* Leads Grid */}

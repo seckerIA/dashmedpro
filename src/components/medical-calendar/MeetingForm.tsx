@@ -65,10 +65,14 @@ export function MeetingForm({
   prefilledEnd,
 }: MeetingFormProps) {
   const { user } = useAuth();
-  const { checkAvailability } = useAvailability();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [attendeesInput, setAttendeesInput] = useState<string>('');
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date>(prefilledStart || new Date());
+
+  // Passar a data selecionada para o hook carregar os dados do mês correto
+  // Passar a data selecionada para o hook carregar os dados do mês correto
+  const { checkAvailability, busySlots, isLoading: checkingAvailability } = useAvailability(selectedDate, selectedDate);
 
   const timeSlots = generateTimeSlots();
 
@@ -97,6 +101,7 @@ export function MeetingForm({
       const startDate = parseISO(meeting.start_time);
       const attendeesStr = meeting.attendees?.join(', ') || '';
       setAttendeesInput(attendeesStr);
+      setSelectedDate(startDate); // Sincronizar data selecionada
       reset({
         title: meeting.title,
         description: meeting.description || '',
@@ -111,13 +116,15 @@ export function MeetingForm({
         status: meeting.status,
       });
     } else if (!meeting && open) {
+      const initialDate = prefilledStart || new Date();
       setAttendeesInput('');
+      setSelectedDate(initialDate); // Sincronizar data selecionada
       reset({
         meeting_type: 'meeting',
         status: 'scheduled',
         duration_minutes: 30,
         is_busy: true,
-        start_date: prefilledStart || new Date(),
+        start_date: initialDate,
         start_time: prefilledStart ? format(prefilledStart, 'HH:mm') : '09:00',
         title: '',
         description: '',
@@ -141,28 +148,39 @@ export function MeetingForm({
       // Calculate end time
       const endDateTime = new Date(startDateTime.getTime() + data.duration_minutes * 60000);
 
-      // Check availability (exclude current meeting if editing)
-      // Se is_busy = true, verifica conflitos; se false, permite sobreposição
-      if (data.is_busy) {
-        const availability = checkAvailability(
-          startDateTime,
-          endDateTime,
-          meeting?.id
-        );
+      // Verificar disponibilidade
+      // SEMPRE verifica conflitos com consultas médicas
+      // Só verifica conflitos com outras reuniões se is_busy = true
+      const availability = checkAvailability(
+        startDateTime,
+        endDateTime,
+        meeting?.id
+      );
 
-        if (!availability.available) {
-          const conflictMessages = availability.conflicts.map((conflict) => {
-            const conflictType = conflict.type === 'appointment' ? 'Consulta médica' : 'Reunião';
-            const conflictTime = format(parseISO(conflict.start_time), 'HH:mm', { locale: ptBR });
-            return `${conflictType}: ${conflict.title} às ${conflictTime}`;
-          });
 
-          setAvailabilityError(
-            `Horário indisponível! Conflito com: ${conflictMessages.join(', ')}`
-          );
-          setIsSubmitting(false);
-          return;
+
+      // Filtrar conflitos: sempre bloqueia para consultas, só bloqueia para reuniões se is_busy
+      const relevantConflicts = availability.conflicts.filter((conflict) => {
+        if (conflict.type === 'appointment') {
+          // Sempre verifica conflitos com consultas médicas
+          return true;
         }
+        // Para reuniões, só verifica se is_busy está ativo
+        return data.is_busy;
+      });
+
+      if (relevantConflicts.length > 0) {
+        const conflictMessages = relevantConflicts.map((conflict) => {
+          const conflictType = conflict.type === 'appointment' ? 'Consulta médica' : 'Reunião';
+          const conflictTime = format(parseISO(conflict.start_time), 'HH:mm', { locale: ptBR });
+          return `${conflictType}: ${conflict.title} às ${conflictTime}`;
+        });
+
+        setAvailabilityError(
+          `Horário indisponível! Conflito com: ${conflictMessages.join(', ')}`
+        );
+        setIsSubmitting(false);
+        return;
       }
 
       // Parse attendees
@@ -287,7 +305,12 @@ export function MeetingForm({
                   <Calendar
                     mode="single"
                     selected={watch('start_date')}
-                    onSelect={(date) => date && setValue('start_date', date)}
+                    onSelect={(date) => {
+                      if (date) {
+                        setValue('start_date', date);
+                        setSelectedDate(date);
+                      }
+                    }}
                     initialFocus
                   />
                 </PopoverContent>
@@ -407,11 +430,16 @@ export function MeetingForm({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting || checkingAvailability}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Salvando...
+                </>
+              ) : checkingAvailability ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Verificando agenda...
                 </>
               ) : meeting ? (
                 'Salvar Alterações'

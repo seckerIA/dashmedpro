@@ -6,7 +6,7 @@ import { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/type
 
 export type FinancialAccount = Tables<"financial_accounts">;
 export type FinancialAccountInsert = TablesInsert<"financial_accounts">;
-export type FinancialAccountUpdate = TablesUpdate<"financial_accounts">;
+export type FinancialAccountUpdate = TablesUpdate<"financial_accounts"> & { is_default?: boolean };
 
 export type FinancialCategory = Tables<"financial_categories">;
 export type FinancialCategoryInsert = TablesInsert<"financial_categories">;
@@ -57,9 +57,8 @@ export interface FinancialTransactionWithDetails extends FinancialTransaction {
   status: TransactionStatus;
   has_costs: boolean;
   total_costs: number;
-  category_id: string | null;
   account_id: string | null;
-  account?: FinancialAccount;
+  account?: FinancialAccount & { is_default?: boolean };
   category?: FinancialCategory;
   category_name?: string;
   account_name?: string;

@@ -30,13 +30,13 @@ export function useAvailability(startDate?: Date, endDate?: Date) {
   const monthEnd = endDate ? endOfMonth(endDate) : endOfMonth(new Date());
 
   // Buscar consultas médicas do período
-  const { appointments = [] } = useMedicalAppointments({
+  const { appointments = [], isLoading: isLoadingAppointments } = useMedicalAppointments({
     startDate: monthStart,
     endDate: monthEnd,
   });
 
   // Buscar reuniões ocupadas do período
-  const { busyPeriods = [] } = useGeneralMeetings({
+  const { busyPeriods = [], isLoading: isLoadingMeetings } = useGeneralMeetings({
     startDate: monthStart,
     endDate: monthEnd,
     isBusy: true,
@@ -62,7 +62,8 @@ export function useAvailability(startDate?: Date, endDate?: Date) {
 
     // Adicionar reuniões ocupadas (apenas as que têm is_busy = true)
     (busyPeriods || []).forEach((meeting) => {
-      if (meeting.is_busy && (meeting.status === 'scheduled' || meeting.status === 'confirmed')) {
+      // Correção de lint: verificar status explicitamente suportados pelo tipo ou apenas existentes
+      if (meeting.is_busy && meeting.status === 'scheduled') {
         slots.push({
           start: parseISO(meeting.start_time),
           end: parseISO(meeting.end_time),
@@ -138,7 +139,7 @@ export function useAvailability(startDate?: Date, endDate?: Date) {
     getBusyPeriods,
     hasEventAt,
     busySlots,
-    isLoading: false, // Dados já vêm de hooks que gerenciam loading
+    isLoading: isLoadingAppointments || isLoadingMeetings,
   };
 }
 

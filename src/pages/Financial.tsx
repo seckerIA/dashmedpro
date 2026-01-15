@@ -25,7 +25,11 @@ import {
   Upload,
   Eye,
   MoreVertical,
-  AlertCircle
+  AlertCircle,
+  Pencil,
+  Trash2,
+  User,
+  Settings
 } from "lucide-react"
 import {
   Table,
@@ -40,7 +44,13 @@ import { useFinancialMetrics } from "@/hooks/useFinancialMetrics"
 import { useFinancialAccounts } from "@/hooks/useFinancialAccounts"
 import { useFinancialTransactions } from "@/hooks/useFinancialTransactions"
 import { useNavigate } from "react-router-dom"
-import { format } from "date-fns"
+import { format, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear, subDays } from "date-fns"
+import { ptBR } from "date-fns/locale"
+import { DateRange } from "react-day-picker"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar as CalendarIcon } from "lucide-react"
+import { Calendar as CalendarComponent } from "@/components/ui/calendar"
+import { cn } from "@/lib/utils"
 import { RecurringTransactionsManager } from "@/components/financial/RecurringTransactionsManager"
 import { RecurringTransactionsWidget } from "@/components/financial/RecurringTransactionsWidget"
 import { useUserProfile } from "@/hooks/useUserProfile"
@@ -50,15 +60,44 @@ import { EnhancedTooltip } from "@/components/charts/EnhancedTooltip"
 import { getGradient, CHART_COLORS } from "@/lib/chart-colors"
 
 import { AccountForm } from "@/components/financial/AccountForm"
-import { useState } from "react"
+import { FinancialRequirementModal } from "@/components/financial/FinancialRequirementModal"
+import { useState, useEffect } from "react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { FinancialAccount } from "@/types/financial"
+
+import { FinancialDistributionConfig } from "@/components/financial/FinancialDistributionConfig"
 
 const Financial = () => {
   const navigate = useNavigate();
   const { isAdmin, isVendedor, isGestorTrafego, isSecretaria } = useUserProfile();
-  const { metrics, monthlyData, expensesByCategory, costsBreakdown, cashFlowProjection, isLoading } = useFinancialMetrics();
-  const { accountsSummary, totalBalance } = useFinancialAccounts();
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date()),
+  });
+
+  const { metrics, monthlyData, expensesByCategory, costsBreakdown, cashFlowProjection, isLoading } = useFinancialMetrics({
+    startDate: dateRange?.from,
+    endDate: dateRange?.to,
+  });
+  const { accountsSummary, totalBalance, accounts, isLoading: isLoadingAccounts, deleteAccount } = useFinancialAccounts();
   const { transactions } = useFinancialTransactions();
   const [isAccountFormOpen, setIsAccountFormOpen] = useState(false);
+  const [showRequirementModal, setShowRequirementModal] = useState(false);
+  const [isDistributionConfigOpen, setIsDistributionConfigOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<FinancialAccount | null>(null);
+
+  // Verificar obrigatoriedade de conta bancária
+  useEffect(() => {
+    if (!isLoadingAccounts && accounts && accounts.length === 0) {
+      setShowRequirementModal(true);
+    }
+  }, [accounts, isLoadingAccounts]);
 
   // Bloquear acesso para vendedores e gestores de tráfego
   if (isVendedor || isGestorTrafego) {
@@ -111,6 +150,33 @@ const Financial = () => {
   // Pegar últimas 5 transações
   const recentTransactions = transactions?.slice(0, 5) || [];
 
+  const handleExport = () => {
+    // Implementação básica de exportação para CSV
+    const headers = ["Data", "Descrição", "Categoria", "Valor", "Tipo", "Status"];
+    const rows = transactions?.map(t => [
+      format(new Date(t.transaction_date), 'dd/MM/yyyy'),
+      t.description,
+      t.category?.name || '-',
+      formatCurrency(t.amount),
+      t.type,
+      t.status
+    ]) || [];
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `financeiro_${format(new Date(), 'dd-MM-yyyy')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="min-h-screen space-y-6 bg-background p-6">
       {/* Header */}
@@ -125,11 +191,113 @@ const Financial = () => {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm">
-            <Filter className="w-4 h-4 mr-2" />
-            Filtros
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className={cn(
+                "justify-start text-left font-normal",
+                !dateRange && "text-muted-foreground"
+              )}>
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateRange?.from ? (
+                  dateRange.to ? (
+                    <>
+                      {format(dateRange.from, "dd/MM/y")} -{" "}
+                      {format(dateRange.to, "dd/MM/y")}
+                    </>
+                  ) : (
+                    format(dateRange.from, "dd/MM/y")
+                  )
+                ) : (
+                  <span>Selecione um período</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <div className="flex border-b border-border">
+                <div className="flex flex-col gap-2 p-3 border-r border-border min-w-[140px] bg-muted/10">
+                  <div className="text-xs font-semibold text-muted-foreground mb-1 px-1">Período</div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="justify-start text-xs font-normal"
+                    onClick={() => setDateRange({
+                      from: startOfMonth(new Date()),
+                      to: endOfMonth(new Date())
+                    })}
+                  >
+                    Este mês
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="justify-start text-xs font-normal"
+                    onClick={() => setDateRange({
+                      from: startOfMonth(subMonths(new Date(), 1)),
+                      to: endOfMonth(subMonths(new Date(), 1))
+                    })}
+                  >
+                    Mês passado
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="justify-start text-xs font-normal"
+                    onClick={() => setDateRange({
+                      from: startOfMonth(subMonths(new Date(), 3)),
+                      to: endOfMonth(new Date())
+                    })}
+                  >
+                    Últimos 3 meses
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="justify-start text-xs font-normal"
+                    onClick={() => setDateRange({
+                      from: startOfMonth(subMonths(new Date(), 6)),
+                      to: endOfMonth(new Date())
+                    })}
+                  >
+                    Últimos 6 meses
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="justify-start text-xs font-normal"
+                    onClick={() => setDateRange({
+                      from: startOfYear(new Date()),
+                      to: endOfYear(new Date())
+                    })}
+                  >
+                    Este ano
+                  </Button>
+                </div>
+                <div className="p-0">
+                  <CalendarComponent
+                    initialFocus
+                    mode="range"
+                    defaultMonth={dateRange?.from}
+                    selected={dateRange}
+                    onSelect={setDateRange}
+                    numberOfMonths={2}
+                    locale={ptBR}
+                    className="p-3"
+                  />
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsDistributionConfigOpen(true)}
+            className="mr-2"
+          >
+            <Settings className="w-4 h-4 mr-2" />
+            Configurar Distribuição
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="w-4 h-4 mr-2" />
             Exportar
           </Button>
@@ -145,7 +313,13 @@ const Financial = () => {
 
       {/* Cards de Métricas Principais */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-        {/* Saldo Total */}
+        {/* Modal de Configuração de Distribuição */}
+        <FinancialDistributionConfig
+          open={isDistributionConfigOpen}
+          onOpenChange={setIsDistributionConfigOpen}
+        />
+
+        {/* Modal de Nova Conta */}
         <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 border-none text-white">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-2">
@@ -253,30 +427,90 @@ const Financial = () => {
                 </AlertDescription>
               </Alert>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {accountsSummary.map((account) => (
-                <Card key={account.id} className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="p-2 bg-blue-500/10 rounded-lg">
-                          {account.type === 'conta_corrente' && <Building2 className="w-4 h-4 text-blue-500" />}
-                          {account.type === 'poupanca' && <PieChart className="w-4 h-4 text-blue-500" />}
-                          {account.type === 'caixa' && <Wallet className="w-4 h-4 text-blue-500" />}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {accountsSummary.map((account) => {
+                const accountColor = account.color || '#3b82f6';
+                return (
+                  <Card
+                    key={account.id}
+                    className="relative overflow-hidden border-2 transition-all hover:shadow-lg"
+                    style={{
+                      borderColor: `${accountColor}30`,
+                      background: `linear-gradient(135deg, ${accountColor}08 0%, ${accountColor}03 100%)`
+                    }}
+                  >
+                    {/* Barra de cor no topo */}
+                    <div
+                      className="absolute top-0 left-0 right-0 h-1"
+                      style={{ backgroundColor: accountColor }}
+                    />
+                    <CardContent className="p-5 pt-4">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="p-2.5 rounded-xl"
+                            style={{ backgroundColor: `${accountColor}20` }}
+                          >
+                            {account.type === 'conta_corrente' && <Building2 className="w-5 h-5" style={{ color: accountColor }} />}
+                            {account.type === 'poupanca' && <PieChart className="w-5 h-5" style={{ color: accountColor }} />}
+                            {account.type === 'caixa' && <Wallet className="w-5 h-5" style={{ color: accountColor }} />}
+                            {account.type === 'investimento' && <TrendingUp className="w-5 h-5" style={{ color: accountColor }} />}
+                            {(!account.type || account.type === 'outros') && <CreditCard className="w-5 h-5" style={{ color: accountColor }} />}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">{account.name}</p>
+                            <p className="text-xs text-muted-foreground">{account.bank_name || 'Sem instituição'}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">{account.name}</p>
-                          <p className="text-xs text-muted-foreground">{account.bank_name || '-'}</p>
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-muted">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                const fullAccount = accounts?.find(a => a.id === account.id);
+                                if (fullAccount) {
+                                  setEditingAccount(fullAccount);
+                                  setIsAccountFormOpen(true);
+                                }
+                              }}
+                              className="cursor-pointer"
+                            >
+                              <Pencil className="w-4 h-4 mr-2" />
+                              Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => {
+                                if (confirm('Tem certeza que deseja excluir esta conta?')) {
+                                  deleteAccount(account.id);
+                                }
+                              }}
+                              className="cursor-pointer text-red-500 focus:text-red-500"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Excluir
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                        <MoreVertical className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    <p className="text-2xl font-bold text-foreground">{formatCurrency(account.balance || 0)}</p>
-                  </CardContent>
-                </Card>
-              ))}
+
+                      <p className="text-2xl font-bold text-foreground mb-2">{formatCurrency(account.balance || 0)}</p>
+
+                      {/* Mostrar criador se for admin/dono e tiver owner_name */}
+                      {account.owner_name && (
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-2 pt-2 border-t border-border/50">
+                          <User className="w-3 h-3" />
+                          <span>Criada por: <span className="font-medium text-foreground/80">{account.owner_name}</span></span>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -546,20 +780,26 @@ const Financial = () => {
           <CardTitle className="text-foreground">Acesso Rápido</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
             {[
               { icon: Receipt, label: 'Transações', color: 'blue', path: '/financeiro/transacoes' },
               { icon: DollarSign, label: 'Sinais', color: 'yellow', path: '/financeiro/sinais' },
-              { icon: Building2, label: 'Contas', color: 'emerald', path: null },
-              { icon: ShoppingCart, label: 'Categorias', color: 'purple', path: null },
-              { icon: Zap, label: 'Recorrências', color: 'orange', path: null },
-              { icon: BarChart3, label: 'Relatórios', color: 'pink', path: null },
-              { icon: FileText, label: 'Orçamentos', color: 'indigo', path: null },
-              { icon: TrendingUp, label: 'Previsões', color: 'cyan', path: null },
+              { icon: Building2, label: 'Contas', color: 'emerald', path: null, action: 'openAccounts' },
+              { icon: ShoppingCart, label: 'Categorias', color: 'purple', path: '/financeiro/categorias' },
+              { icon: Zap, label: 'Recorrências', color: 'orange', path: '/financeiro/recorrencias' },
+              { icon: BarChart3, label: 'Relatórios', color: 'pink', path: '/financeiro/relatorios' },
+              { icon: FileText, label: 'Orçamentos', color: 'indigo', path: '/financeiro/orcamentos' },
+              { icon: TrendingUp, label: 'Previsões', color: 'cyan', path: '/financeiro/previsoes' },
             ].map((item, index) => (
               <button
                 key={index}
-                onClick={() => item.path && navigate(item.path)}
+                onClick={() => {
+                  if (item.action === 'openAccounts') {
+                    setIsAccountFormOpen(true);
+                  } else if (item.path) {
+                    navigate(item.path);
+                  }
+                }}
                 className="flex flex-col items-center justify-center p-6 bg-muted/20 hover:bg-muted/40 rounded-xl border border-border transition-all hover:scale-105 hover:shadow-lg"
               >
                 <div className={`p-3 bg-${item.color}-500/10 rounded-xl mb-3`}>
@@ -574,9 +814,18 @@ const Financial = () => {
 
       <AccountForm
         open={isAccountFormOpen}
-        onOpenChange={setIsAccountFormOpen}
+        onOpenChange={(open) => {
+          setIsAccountFormOpen(open);
+          if (!open) setEditingAccount(null);
+        }}
+        account={editingAccount}
       />
-    </div>
+
+      <FinancialRequirementModal
+        isOpen={showRequirementModal}
+        onOpenChange={setShowRequirementModal}
+      />
+    </div >
   )
 }
 

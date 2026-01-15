@@ -8,7 +8,7 @@ import { SalesManagement } from "@/components/commercial/SalesManagement";
 import { CampaignsManagement } from "@/components/commercial/CampaignsManagement";
 import { CommercialReports } from "@/components/commercial/CommercialReports";
 import { PipelineManagement } from "@/components/commercial/PipelineManagement";
-import { LeadForm } from "@/components/commercial/LeadForm";
+import { ContactForm } from "@/components/crm/ContactForm";
 import { AIInsightsDashboard } from "@/components/commercial/AIInsightsDashboard";
 
 
@@ -17,7 +17,7 @@ export default function Commercial() {
   const tabFromUrl = searchParams.get("tab") || "dashboard";
   const actionFromUrl = searchParams.get("action");
   const [activeTab, setActiveTab] = useState(tabFromUrl);
-  const [isLeadFormOpen, setIsLeadFormOpen] = useState(actionFromUrl === "new");
+  const [isContactFormOpen, setIsContactFormOpen] = useState(actionFromUrl === "new");
 
   useEffect(() => {
     if (tabFromUrl) {
@@ -26,7 +26,7 @@ export default function Commercial() {
   }, [tabFromUrl]);
 
   useEffect(() => {
-    setIsLeadFormOpen(actionFromUrl === "new");
+    setIsContactFormOpen(actionFromUrl === "new");
   }, [actionFromUrl]);
 
   const handleTabChange = (nextTab: string) => {
@@ -42,8 +42,8 @@ export default function Commercial() {
     });
   };
 
-  const handleLeadFormOpenChange = (open: boolean) => {
-    setIsLeadFormOpen(open);
+  const handleContactFormOpenChange = (open: boolean) => {
+    setIsContactFormOpen(open);
 
     // Ao fechar o modal, limpe o `action` da URL para não reabrir ao recarregar
     if (!open) {
@@ -154,7 +154,13 @@ export default function Commercial() {
       </Tabs>
 
       {/* Modal global: abrir "Novo Paciente" sem obrigar trocar de aba */}
-      <LeadForm open={isLeadFormOpen} onOpenChange={handleLeadFormOpenChange} />
+      {isContactFormOpen && (
+        <ContactForm
+          forceOpen={true}
+          onCancel={() => handleContactFormOpenChange(false)}
+          onSuccess={() => handleContactFormOpenChange(false)}
+        />
+      )}
     </div>
   );
 }

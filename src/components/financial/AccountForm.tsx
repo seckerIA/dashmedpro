@@ -29,7 +29,7 @@ interface AccountFormProps {
     account?: FinancialAccount | null;
 }
 
-export function AccountForm({ open, onOpenChange, account }: AccountFormProps) {
+export function AccountForm({ open, onOpenChange, account, onSuccess, onCancel, embedded = false }: AccountFormProps & { onSuccess?: () => void, onCancel?: () => void, embedded?: boolean }) {
     const { createAccount, updateAccount, isCreating, isUpdating } = useFinancialAccounts();
     const isEditing = !!account;
     const isLoading = isCreating || isUpdating;
@@ -47,13 +47,15 @@ export function AccountForm({ open, onOpenChange, account }: AccountFormProps) {
             name: "",
             type: "conta_corrente",
             bank_name: "",
-            initial_balance: 0, // Inicializa como número 0 para satisfazer o tipo
+            initial_balance: 0,
             color: "#3b82f6",
         },
     });
 
     useEffect(() => {
-        if (open) {
+        // Se estiver embedded, montamos o form na renderização inicial se não tiver account (criação)
+        // Se tiver open controlado, respeitamos
+        if (open || embedded) {
             if (account) {
                 reset({
                     name: account.name,
@@ -72,16 +74,9 @@ export function AccountForm({ open, onOpenChange, account }: AccountFormProps) {
                 });
             }
         }
-    }, [account, open, reset]);
+    }, [account, open, embedded, reset]);
 
     const onSubmit = (data: AccountFormData) => {
-        // O valor de initial_balance vem do formulário, que pode ser string mascarada.
-        // O Zod schema já tem um transform, mas se o useForm estiver manipulando 'any', precisamos garantir.
-        // Convertendo explicitamente para garantir que seja number no payload
-
-        // Em um form com inputs controlados de máscara, as vezes o valor "bruto" no submit ainda precisa de limpeza extra se o resolver não atuou como esperado ou se o tipo de input conflitou.
-        // Mas como definimos z.string().transform(...), 'data.initial_balance' JÁ É number aqui (inferred types).
-
         if (isEditing && account) {
             updateAccount({
                 id: account.id,
@@ -93,7 +88,8 @@ export function AccountForm({ open, onOpenChange, account }: AccountFormProps) {
                 }
             }, {
                 onSuccess: () => {
-                    onOpenChange(false);
+                    if (onOpenChange) onOpenChange(false);
+                    if (onSuccess) onSuccess();
                     reset();
                 }
             });
@@ -102,13 +98,14 @@ export function AccountForm({ open, onOpenChange, account }: AccountFormProps) {
                 name: data.name,
                 type: data.type,
                 bank_name: data.bank_name || null,
-                initial_balance: Number(data.initial_balance), // Garante number
-                current_balance: Number(data.initial_balance), // Garante number
+                initial_balance: Number(data.initial_balance),
+                current_balance: Number(data.initial_balance),
                 color: data.color,
                 is_active: true
             }, {
                 onSuccess: () => {
-                    onOpenChange(false);
+                    if (onOpenChange) onOpenChange(false);
+                    if (onSuccess) onSuccess();
                     reset();
                 }
             });
@@ -117,10 +114,133 @@ export function AccountForm({ open, onOpenChange, account }: AccountFormProps) {
 
     const handleBalanceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const formatted = formatCurrencyInput(e.target.value);
-        // Precisamos setar o valor no form. Como o field é transformado, isso pode ser tricky com types.
-        // Vamos usar any para contornar a rigidez do TS aqui temporariamente, pois o input é texto visualmente.
         setValue("initial_balance", formatted as any);
     };
+
+    const FormContent = (
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <div className="space-y-2">
+                <Label htmlFor="name">Nome da Conta *</Label>
+                <Input
+                    id="name"
+                    {...register("name")}
+                    placeholder="Ex: Nubank Principal"
+                />
+                {errors.name && (
+                    <p className="text-sm text-destructive">{errors.name.message}</p>
+                )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label htmlFor="type">Tipo *</Label>
+                    <Select
+                        value={watch("type")}
+                        onValueChange={(value) => setValue("type", value as any)}
+                    >
+                        <SelectTrigger>
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="conta_corrente">Conta Corrente</SelectItem>
+                            <SelectItem value="poupanca">Poupança</SelectItem>
+                            <SelectItem value="caixa">Caixa Físico</SelectItem>
+                            <SelectItem value="investimento">Investimento</SelectItem>
+                            <SelectItem value="outros">Outros</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                <div className="space-y-2">
+                    <Label htmlFor="color">Cor de Identificação</Label>
+                    <div className="flex gap-3 items-center">
+                        <div className="relative group">
+                            <div
+                                className="w-10 h-10 rounded-full border-2 border-border shadow-sm overflow-hidden ring-offset-background transition-all hover:scale-105 group-hover:ring-2 ring-emerald-500/50 cursor-pointer"
+                                style={{ backgroundColor: watch("color") }}
+                            >
+                                <Input
+                                    id="color"
+                                    type="color"
+                                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer p-0 border-none"
+                                    {...register("color")}
+                                />
+                            </div>
+                        </div>
+                        <div className="flex-1">
+                            <Input
+                                {...register("color")}
+                                placeholder="#000000"
+                                className="uppercase"
+                                maxLength={7}
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="space-y-2">
+                <Label htmlFor="bank_name">Instituição Financeira</Label>
+                <Input
+                    id="bank_name"
+                    {...register("bank_name")}
+                    placeholder="Ex: Nubank, Itaú, etc."
+                />
+            </div>
+
+            <div className="space-y-2">
+                <Label htmlFor="initial_balance">Saldo Inicial</Label>
+                <Input
+                    id="initial_balance"
+                    {...register("initial_balance")}
+                    onChange={handleBalanceChange}
+                    placeholder="R$ 0,00"
+                    disabled={isEditing}
+                />
+                {isEditing && (
+                    <p className="text-xs text-muted-foreground">
+                        O saldo inicial não pode ser alterado após a criação. Para ajustar o saldo, crie uma transação de ajuste.
+                    </p>
+                )}
+            </div>
+
+            <div className={embedded ? "flex justify-end gap-2 pt-4" : "hidden"}>
+                {onCancel && (
+                    <Button type="button" variant="outline" onClick={onCancel}>
+                        Cancelar
+                    </Button>
+                )}
+                <Button
+                    type="submit"
+                    disabled={isLoading}
+                    className="bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm transition-all"
+                >
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {isEditing ? "Salvar Alterações" : "Criar Conta"}
+                </Button>
+            </div>
+
+            {!embedded && (
+                <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => onOpenChange && onOpenChange(false)}>
+                        Cancelar
+                    </Button>
+                    <Button
+                        type="submit"
+                        disabled={isLoading}
+                        className="bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm transition-all"
+                    >
+                        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {isEditing ? "Salvar Alterações" : "Criar Conta"}
+                    </Button>
+                </DialogFooter>
+            )}
+        </form>
+    );
+
+    if (embedded) {
+        return FormContent;
+    }
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -128,107 +248,7 @@ export function AccountForm({ open, onOpenChange, account }: AccountFormProps) {
                 <DialogHeader>
                     <DialogTitle>{isEditing ? "Editar Conta" : "Nova Conta"}</DialogTitle>
                 </DialogHeader>
-
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="name">Nome da Conta *</Label>
-                        <Input
-                            id="name"
-                            {...register("name")}
-                            placeholder="Ex: Nubank Principal"
-                        />
-                        {errors.name && (
-                            <p className="text-sm text-destructive">{errors.name.message}</p>
-                        )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="type">Tipo *</Label>
-                            <Select
-                                value={watch("type")}
-                                onValueChange={(value) => setValue("type", value as any)}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="conta_corrente">Conta Corrente</SelectItem>
-                                    <SelectItem value="poupanca">Poupança</SelectItem>
-                                    <SelectItem value="caixa">Caixa Físico</SelectItem>
-                                    <SelectItem value="investimento">Investimento</SelectItem>
-                                    <SelectItem value="outros">Outros</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="color">Cor de Identificação</Label>
-                            <div className="flex gap-3 items-center">
-                                <div className="relative group">
-                                    <div
-                                        className="w-10 h-10 rounded-full border-2 border-border shadow-sm overflow-hidden ring-offset-background transition-all hover:scale-105 group-hover:ring-2 ring-emerald-500/50 cursor-pointer"
-                                        style={{ backgroundColor: watch("color") }}
-                                    >
-                                        <Input
-                                            id="color"
-                                            type="color"
-                                            className="absolute inset-0 opacity-0 w-full h-full cursor-pointer p-0 border-none"
-                                            {...register("color")}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="flex-1">
-                                    <Input
-                                        {...register("color")}
-                                        placeholder="#000000"
-                                        className="uppercase"
-                                        maxLength={7}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="bank_name">Instituição Financeira</Label>
-                        <Input
-                            id="bank_name"
-                            {...register("bank_name")}
-                            placeholder="Ex: Nubank, Itaú, etc."
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="initial_balance">Saldo Inicial</Label>
-                        <Input
-                            id="initial_balance"
-                            {...register("initial_balance")}
-                            onChange={handleBalanceChange}
-                            placeholder="R$ 0,00"
-                            disabled={isEditing}
-                        />
-                        {isEditing && (
-                            <p className="text-xs text-muted-foreground">
-                                O saldo inicial não pode ser alterado após a criação. Para ajustar o saldo, crie uma transação de ajuste.
-                            </p>
-                        )}
-                    </div>
-
-                    <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                            Cancelar
-                        </Button>
-                        <Button
-                            type="submit"
-                            disabled={isLoading}
-                            className="bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm transition-all"
-                        >
-                            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {isEditing ? "Salvar Alterações" : "Criar Conta"}
-                        </Button>
-                    </DialogFooter>
-                </form>
+                {FormContent}
             </DialogContent>
         </Dialog>
     );

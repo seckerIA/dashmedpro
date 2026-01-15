@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
+import { useToast } from '@/hooks/use-toast'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -8,25 +9,18 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { 
-  ArrowUpRight,
-  ArrowDownLeft,
-  Upload,
-  X,
-  FileText,
-  Image,
-  File,
-  Loader2,
-  Plus,
-  Trash2,
-  DollarSign,
-  RefreshCw,
-} from "lucide-react"
+import { ArrowUpRight, ArrowDownLeft, Upload, X, FileText, Image, File, Loader2, Plus, Trash2, DollarSign, RefreshCw, Calendar as CalendarIcon } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { format } from "date-fns"
+import { ptBR } from "date-fns/locale"
+import { cn } from "@/lib/utils"
 import { useFinancialCategories } from '@/hooks/useFinancialCategories'
 import { useFinancialAccounts } from '@/hooks/useFinancialAccounts'
 import { useCreateFinancialTransaction, useUpdateFinancialTransaction } from '@/hooks/useFinancialTransactionMutations'
+import { useCreateFinancialCategory } from '@/hooks/useFinancialCategoryMutations'
 import { useFileUpload } from '@/hooks/useFileUpload'
 import { useCreateMultipleCosts, useTransactionCosts, useDeleteTransactionCost } from '@/hooks/useTransactionCosts'
 import { FinancialTransaction, TransactionCostFormData, CostType } from '@/types/financial'
@@ -56,16 +50,17 @@ const TransactionForm = () => {
   const location = useLocation()
   const existingTransaction = location.state?.transaction as FinancialTransaction | undefined
   const queryClient = useQueryClient()
-  
+  const { toast } = useToast()
+
   const { data: categories = [], isLoading: isLoadingCategories, refetch: refetchCategories } = useFinancialCategories()
   const { accountsSummary = [] } = useFinancialAccounts()
-  
+
   // Invalidar cache ao montar para garantir que categorias e contas sejam carregadas
   useEffect(() => {
     queryClient.invalidateQueries({ queryKey: ['financial-categories'] })
     queryClient.invalidateQueries({ queryKey: ['financial-accounts'] })
   }, [queryClient])
-  
+
   const handleRefreshCategories = async () => {
     console.log('🔄 Atualizando categorias...')
     queryClient.removeQueries({ queryKey: ['financial-categories'] })
@@ -73,7 +68,7 @@ const TransactionForm = () => {
     const result = await refetchCategories()
     console.log('✅ Categorias atualizadas:', result.data?.length || 0)
   }
-  
+
   const handleRefreshAccounts = () => {
     queryClient.invalidateQueries({ queryKey: ['financial-accounts'] })
   }
@@ -82,7 +77,7 @@ const TransactionForm = () => {
   const createMultipleCosts = useCreateMultipleCosts()
   const { uploadFile, removeFile, isUploading, uploadedFiles } = useFileUpload()
   const { data: existingCosts } = useTransactionCosts(id)
-  
+
   const isEditMode = !!id && !!existingTransaction
 
   const [formData, setFormData] = useState<TransactionFormData>({
@@ -103,6 +98,41 @@ const TransactionForm = () => {
     costs: [],
   })
 
+  // Estado para nova categoria
+  const [isNewCategoryModalOpen, setIsNewCategoryModalOpen] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+
+  const createCategory = useCreateFinancialCategory()
+
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) return
+
+    try {
+      await createCategory.mutateAsync({
+        name: newCategoryName,
+        type: formData.type,
+        color: '#64748b' // Default color
+      })
+      setNewCategoryName('')
+      setIsNewCategoryModalOpen(false)
+      // Recarregar categorias
+      handleRefreshCategories()
+      toast({
+        title: 'Categoria criada!',
+        description: `A categoria "${newCategoryName}" foi criada com sucesso.`,
+      })
+    } catch (error) {
+      console.error('Erro ao criar categoria:', error)
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao criar categoria',
+        description: 'Não foi possível criar a categoria. Tente novamente.',
+      })
+    }
+  }
+
+  // Categorias padrão removidas - usuário deve criar suas próprias categorias
+
   const [newTag, setNewTag] = useState('')
   const [dragActive, setDragActive] = useState(false)
 
@@ -118,7 +148,7 @@ const TransactionForm = () => {
     if (dealId && !isEditMode) {
       // Converter valor para centavos
       const valueInCents = value ? (parseFloat(value) * 100).toString() : '';
-      
+
       setFormData(prev => ({
         ...prev,
         type: 'entrada', // Deal fechado é sempre uma entrada (receita)
@@ -178,7 +208,7 @@ const TransactionForm = () => {
         attachment: null,
         attachment_id: cost.attachment_id,
       }))
-      
+
       setFormData(prev => ({
         ...prev,
         has_costs: true,
@@ -235,7 +265,7 @@ const TransactionForm = () => {
   const handleCostChange = (index: number, field: keyof TransactionCostFormData, value: any) => {
     setFormData(prev => ({
       ...prev,
-      costs: prev.costs.map((cost, i) => 
+      costs: prev.costs.map((cost, i) =>
         i === index ? { ...cost, [field]: value } : cost
       )
     }))
@@ -281,7 +311,7 @@ const TransactionForm = () => {
     e.preventDefault()
     e.stopPropagation()
     setDragActive(false)
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFileUpload(e.dataTransfer.files)
     }
@@ -290,10 +320,10 @@ const TransactionForm = () => {
   const formatCurrency = (value: string) => {
     // Remove tudo que não é dígito
     const numericValue = value.replace(/\D/g, '')
-    
+
     // Converte para centavos
     const cents = parseInt(numericValue) || 0
-    
+
     // Formata como moeda
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -305,10 +335,10 @@ const TransactionForm = () => {
   const handleAmountChange = (value: string) => {
     // Remove formatação anterior
     const numericValue = value.replace(/\D/g, '')
-    
+
     // Formata como moeda
     const formatted = formatCurrency(numericValue)
-    
+
     setFormData(prev => ({
       ...prev,
       amount: numericValue
@@ -321,27 +351,47 @@ const TransactionForm = () => {
 
     // Validações básicas
     if (!formData.description.trim()) {
-      alert('Descrição é obrigatória')
+      toast({
+        variant: 'destructive',
+        title: 'Campo obrigatório',
+        description: 'A descrição é obrigatória.',
+      })
       return
     }
 
     if (!formData.amount || parseFloat(formData.amount) <= 0) {
-      alert('Valor deve ser maior que zero')
+      toast({
+        variant: 'destructive',
+        title: 'Valor inválido',
+        description: 'O valor deve ser maior que zero.',
+      })
       return
     }
 
     if (!formData.category_id) {
-      alert('Categoria é obrigatória')
+      toast({
+        variant: 'destructive',
+        title: 'Campo obrigatório',
+        description: 'Selecione uma categoria. Clique no botão + para criar uma nova.',
+      })
       return
     }
 
     if (!formData.account_id) {
-      alert('Conta bancária é obrigatória')
+      toast({
+        variant: 'destructive',
+        title: 'Campo obrigatório',
+        description: 'Selecione uma conta bancária.',
+      })
       return
     }
 
     if (!formData.payment_method) {
-      alert('Método de pagamento é obrigatório')
+      toast({
+        variant: 'destructive',
+        title: 'Campo obrigatório',
+        description: 'Selecione um método de pagamento.',
+      })
       return
     }
 
@@ -349,9 +399,13 @@ const TransactionForm = () => {
       console.log(isEditMode ? 'Iniciando atualização da transação...' : 'Iniciando criação da transação...')
       const { data: { user } } = await supabase.auth.getUser()
       console.log('Usuário:', user)
-      
+
       if (!user) {
-        alert('Usuário não autenticado')
+        toast({
+          variant: 'destructive',
+          title: 'Erro de autenticação',
+          description: 'Você precisa estar autenticado para realizar esta operação.',
+        })
         return
       }
 
@@ -378,12 +432,12 @@ const TransactionForm = () => {
       }
 
       console.log('Dados da transação:', transactionData)
-      
+
       if (isEditMode && id) {
         console.log('Chamando updateTransaction.mutateAsync...')
         await updateTransaction.mutateAsync({ id, ...transactionData })
         console.log('Transação atualizada com sucesso!')
-        
+
         // Atualizar custos no modo de edição
         // Primeiro, deletar todos os custos existentes
         if (existingCosts && existingCosts.length > 0) {
@@ -392,11 +446,11 @@ const TransactionForm = () => {
             await supabase.from('transaction_costs').delete().eq('id', cost.id)
           }
         }
-        
+
         // Depois, criar os novos custos
         if (formData.has_costs && formData.costs.length > 0) {
           console.log('Criando novos custos associados...')
-          
+
           const costsToCreate = formData.costs
             .filter(cost => parseFloat(cost.amount) > 0)
             .map(cost => ({
@@ -406,23 +460,23 @@ const TransactionForm = () => {
               description: cost.description || null,
               attachment_id: null,
             }))
-          
+
           if (costsToCreate.length > 0) {
             await createMultipleCosts.mutateAsync(costsToCreate)
             console.log('Custos criados com sucesso!')
           }
         }
-        
+
         navigate('/financeiro/transacoes')
       } else {
         console.log('Chamando createTransaction.mutateAsync...')
         const createdTransaction = await createTransaction.mutateAsync(transactionData)
         console.log('Transação criada com sucesso!', createdTransaction)
-        
+
         // Se tem custos, criar os custos associados
         if (formData.has_costs && formData.costs.length > 0 && createdTransaction) {
           console.log('Criando custos associados...')
-          
+
           const costsToCreate = formData.costs
             .filter(cost => parseFloat(cost.amount) > 0)
             .map(cost => ({
@@ -432,13 +486,13 @@ const TransactionForm = () => {
               description: cost.description || null,
               attachment_id: null, // TODO: Implementar upload de comprovantes de custos
             }))
-          
+
           if (costsToCreate.length > 0) {
             await createMultipleCosts.mutateAsync(costsToCreate)
             console.log('Custos criados com sucesso!')
           }
         }
-        
+
         navigate('/financeiro/transacoes')
       }
     } catch (error) {
@@ -447,7 +501,7 @@ const TransactionForm = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6 flex items-center justify-center">
+    <div className="w-full flex items-start justify-center py-4">
       <Card className="w-full max-w-4xl bg-gradient-to-br from-card to-card/50 border-border">
         <CardHeader>
           <CardTitle className="text-2xl text-foreground">
@@ -463,11 +517,10 @@ const TransactionForm = () => {
                 <button
                   type="button"
                   onClick={() => handleInputChange('type', 'entrada')}
-                  className={`flex items-center justify-center gap-3 p-4 border-2 rounded-xl transition-all ${
-                    formData.type === 'entrada'
-                      ? 'bg-emerald-500/10 border-emerald-500'
-                      : 'bg-muted/20 border-border hover:bg-muted/40'
-                  }`}
+                  className={`flex items-center justify-center gap-3 p-4 border-2 rounded-xl transition-all ${formData.type === 'entrada'
+                    ? 'bg-emerald-500/10 border-emerald-500'
+                    : 'bg-muted/20 border-border hover:bg-muted/40'
+                    }`}
                 >
                   <ArrowUpRight className={`w-5 h-5 ${formData.type === 'entrada' ? 'text-emerald-500' : 'text-muted-foreground'}`} />
                   <span className={`font-semibold ${formData.type === 'entrada' ? 'text-emerald-500' : 'text-muted-foreground'}`}>
@@ -477,11 +530,10 @@ const TransactionForm = () => {
                 <button
                   type="button"
                   onClick={() => handleInputChange('type', 'saida')}
-                  className={`flex items-center justify-center gap-3 p-4 border-2 rounded-xl transition-all ${
-                    formData.type === 'saida'
-                      ? 'bg-red-500/10 border-red-500'
-                      : 'bg-muted/20 border-border hover:bg-muted/40'
-                  }`}
+                  className={`flex items-center justify-center gap-3 p-4 border-2 rounded-xl transition-all ${formData.type === 'saida'
+                    ? 'bg-red-500/10 border-red-500'
+                    : 'bg-muted/20 border-border hover:bg-muted/40'
+                    }`}
                 >
                   <ArrowDownLeft className={`w-5 h-5 ${formData.type === 'saida' ? 'text-red-500' : 'text-muted-foreground'}`} />
                   <span className={`font-semibold ${formData.type === 'saida' ? 'text-red-500' : 'text-muted-foreground'}`}>
@@ -524,23 +576,54 @@ const TransactionForm = () => {
                 </div>
               </div>
 
-              {/* Data */}
+              {/* Data da Transação */}
               <div className="space-y-2">
                 <Label htmlFor="transaction_date" className="text-sm font-medium text-foreground">Data da Transação *</Label>
-                <Input
-                  id="transaction_date"
-                  type="date"
-                  value={formData.transaction_date}
-                  onChange={(e) => handleInputChange('transaction_date', e.target.value)}
-                  className="w-full"
-                  required
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal pl-3",
+                        !formData.transaction_date && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.transaction_date ? (
+                        format(new Date(formData.transaction_date + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
+                      ) : (
+                        <span>Selecione uma data</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={formData.transaction_date ? new Date(formData.transaction_date + 'T12:00:00') : undefined}
+                      onSelect={(date) => date && handleInputChange('transaction_date', format(date, 'yyyy-MM-dd'))}
+                      initialFocus
+                      locale={ptBR}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
 
               {/* Categoria */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="category" className="text-sm font-medium text-foreground">Categoria *</Label>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => setIsNewCategoryModalOpen(true)}
+                      title="Nova Categoria"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                    <Label htmlFor="category" className="text-sm font-medium text-foreground">Categoria *</Label>
+                  </div>
                   <Button
                     type="button"
                     variant="ghost"
@@ -552,8 +635,8 @@ const TransactionForm = () => {
                     Atualizar
                   </Button>
                 </div>
-                <Select 
-                  value={formData.category_id} 
+                <Select
+                  value={formData.category_id}
                   onValueChange={(value) => handleInputChange('category_id', value)}
                   disabled={isLoadingCategories}
                 >
@@ -568,13 +651,13 @@ const TransactionForm = () => {
                       </div>
                     ) : categories && categories.length > 0 ? (
                       (() => {
-                        const filteredCategories = categories.filter(category => 
-                          category.id && 
-                          category.name && 
+                        const filteredCategories = categories.filter(category =>
+                          category.id &&
+                          category.name &&
                           category.type === formData.type
                         )
                         console.log('📋 Categorias filtradas para', formData.type, ':', filteredCategories.length)
-                        
+
                         return filteredCategories.length > 0 ? (
                           filteredCategories.map((category) => (
                             <SelectItem key={category.id} value={category.id}>
@@ -582,21 +665,23 @@ const TransactionForm = () => {
                             </SelectItem>
                           ))
                         ) : (
-                          <div className="p-2 text-sm text-muted-foreground">
-                            Nenhuma categoria de {formData.type === 'entrada' ? 'entrada' : 'saída'} disponível.
+                          <div className="p-3 text-sm text-muted-foreground text-center">
+                            <p className="mb-2">Nenhuma categoria de {formData.type === 'entrada' ? 'receita' : 'despesa'} encontrada.</p>
+                            <p className="text-xs text-amber-500">Clique no botão <strong>+</strong> ao lado de "Categoria" para criar uma nova.</p>
                           </div>
                         )
                       })()
                     ) : (
-                      <div className="p-2 text-sm text-muted-foreground">
-                        Nenhuma categoria disponível. Clique em "Atualizar" para carregar as categorias padrão.
+                      <div className="p-3 text-sm text-muted-foreground text-center">
+                        <p className="mb-2">Nenhuma categoria cadastrada.</p>
+                        <p className="text-xs text-amber-500">Clique no botão <strong>+</strong> ao lado de "Categoria" para criar sua primeira categoria.</p>
                       </div>
                     )}
                   </SelectContent>
                 </Select>
                 {!isLoadingCategories && categories && categories.filter(category => category.type === formData.type).length === 0 && (
                   <p className="text-xs text-amber-500">
-                    ⚠️ Nenhuma categoria disponível para {formData.type === 'entrada' ? 'entrada' : 'saída'}. 
+                    ⚠️ Nenhuma categoria disponível para {formData.type === 'entrada' ? 'entrada' : 'saída'}.
                     Total de categorias carregadas: {categories.length}
                   </p>
                 )}
@@ -725,11 +810,33 @@ const TransactionForm = () => {
               </div>
             </div>
 
+            {/* Modal de Nova Categoria - Inserido aqui para aproveitar o contexto do form */}
+            {isNewCategoryModalOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+                <div className="bg-zinc-900 p-6 rounded-xl shadow-2xl w-full max-w-sm space-y-4 border border-zinc-700 mx-4 overflow-hidden">
+                  <h3 className="text-lg font-semibold text-white">Nova Categoria de {formData.type === 'entrada' ? 'Receita' : 'Despesa'}</h3>
+                  <div className="space-y-2">
+                    <Label className="text-zinc-300">Nome da Categoria</Label>
+                    <Input
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="Ex: Consultas, Aluguel..."
+                      className="bg-zinc-800 border-zinc-600 text-white placeholder:text-zinc-500"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button variant="outline" onClick={() => setIsNewCategoryModalOpen(false)} className="border-zinc-600 text-zinc-300 hover:bg-zinc-800">Cancelar</Button>
+                    <Button onClick={handleCreateCategory} disabled={!newCategoryName.trim()}>Salvar</Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Seção de Custos - Apenas para Entradas */}
             {formData.type === 'entrada' && (
               <>
                 <Separator className="my-6" />
-                
+
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -737,7 +844,7 @@ const TransactionForm = () => {
                       <p className="text-sm text-muted-foreground">Adicione os custos associados a esta receita para calcular o lucro líquido</p>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Checkbox 
+                      <Checkbox
                         id="has_costs"
                         checked={formData.has_costs}
                         onCheckedChange={(checked) => {
@@ -773,8 +880,8 @@ const TransactionForm = () => {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div className="space-y-2">
                               <Label className="text-xs">Tipo de Custo *</Label>
-                              <Select 
-                                value={cost.cost_type} 
+                              <Select
+                                value={cost.cost_type}
                                 onValueChange={(value) => handleCostChange(index, 'cost_type', value as CostType)}
                               >
                                 <SelectTrigger>
@@ -861,14 +968,13 @@ const TransactionForm = () => {
             {/* Upload de Comprovantes */}
             <div className="space-y-3">
               <Label className="text-sm font-medium text-foreground">Comprovantes</Label>
-              
+
               {/* Área de Upload */}
               <div
-                className={`border-2 border-dashed rounded-xl p-8 transition-all cursor-pointer ${
-                  dragActive
-                    ? 'border-emerald-500 bg-emerald-500/10'
-                    : 'border-border hover:border-emerald-500 bg-muted/10 hover:bg-muted/20'
-                }`}
+                className={`border-2 border-dashed rounded-xl p-8 transition-all cursor-pointer ${dragActive
+                  ? 'border-emerald-500 bg-emerald-500/10'
+                  : 'border-border hover:border-emerald-500 bg-muted/10 hover:bg-muted/20'
+                  }`}
                 onDragEnter={handleDrag}
                 onDragLeave={handleDrag}
                 onDragOver={handleDrag}

@@ -41,18 +41,24 @@ const fetchTeamMembers = async (userId: string | undefined, signal?: AbortSignal
       .eq('is_active', true)
       .order('full_name', { ascending: true });
   } else if (role === 'medico') {
-    // Médico vê apenas secretárias vinculadas e a si mesmo
+    // Médico vê apenas secretárias vinculadas (não inclui a si mesmo)
+    // Se não atribuir a ninguém, a tarefa vai para ele mesmo por padrão
     const { data: links } = await supabase
       .from('secretary_doctor_links')
       .select('secretary_id')
       .eq('doctor_id', userId);
 
-    const allowedIds = [userId, ...(links?.map(l => l.secretary_id) || [])];
+    const secretaryIds = links?.map(l => l.secretary_id) || [];
+
+    // Se não há secretárias vinculadas, retorna lista vazia
+    if (secretaryIds.length === 0) {
+      return [];
+    }
 
     queryPromise = supabase
       .from('profiles')
       .select('id, email, full_name, role')
-      .in('id', allowedIds)
+      .in('id', secretaryIds)
       .eq('is_active', true)
       .order('full_name', { ascending: true });
   } else if (role === 'secretaria') {
