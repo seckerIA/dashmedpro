@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, CURRENT_PROJECT_REF } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, LogIn, UserPlus, Loader2, RefreshCw } from 'lucide-react';
 import dashmedLogo from "@/assets/dashmed-logo.png";
@@ -24,6 +24,36 @@ const Login = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Clear all Supabase cache on mount to prevent cross-project issues
+  useEffect(() => {
+    const clearAllSupabaseCache = async () => {
+      try {
+        // Sign out any existing session
+        await supabase.auth.signOut();
+
+        // Clear all localStorage keys related to Supabase
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (
+            key.includes('supabase') ||
+            key.startsWith('sb-') ||
+            key.includes('auth-token')
+          )) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+
+        console.log('🧹 Cache do Supabase limpo na inicialização da página de login');
+      } catch (error) {
+        console.error('Erro ao limpar cache:', error);
+      }
+    };
+
+    clearAllSupabaseCache();
+  }, []);
+
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setSendingResetEmail(true);
@@ -31,10 +61,10 @@ const Login = () => {
     try {
       // Force localhost in development, use window.location.origin otherwise
       const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const redirectUrl = isDevelopment 
+      const redirectUrl = isDevelopment
         ? `http://localhost:8080/reset-password`
         : `${window.location.origin}/reset-password`;
-      
+
       const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
         redirectTo: redirectUrl,
       });
@@ -75,10 +105,10 @@ const Login = () => {
       }
     }
     keysToRemove.forEach(key => localStorage.removeItem(key));
-    
+
     // Limpar sessão do Supabase
     supabase.auth.signOut();
-    
+
     toast({
       title: 'Cache limpo',
       description: 'Credenciais antigas foram removidas. Tente fazer login novamente.',
@@ -90,67 +120,31 @@ const Login = () => {
     setLoading(true);
 
     try {
-      // Verificar se o projeto está correto antes de fazer login
-      const { data: { session: existingSession } } = await supabase.auth.getSession();
-      if (existingSession) {
-        // Se há sessão existente, verificar se é do projeto correto
-        const sessionProjectRef = existingSession.user?.app_metadata?.project_ref;
-        const currentProjectRef = 'adzaqkduxnpckbcuqpmg';
-        
-        if (sessionProjectRef && sessionProjectRef !== currentProjectRef) {
-          // Sessão de projeto antigo, limpar e continuar
-          await supabase.auth.signOut();
-          clearSupabaseCache();
-        }
-      }
+      console.log('🔍 DEBUG Login - Tentando login com email:', email);
+      console.log('🔍 DEBUG Login - Project Ref esperado:', CURRENT_PROJECT_REF);
 
-      // DEBUG: Verificar URL e chave antes do login
-      console.log('🔍 DEBUG Login - Email tentando login:', email);
-      console.log('🔍 DEBUG Login - Project Ref esperado: adzaqkduxnpckbcuqpmg');
-      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      // DEBUG: Verificar resultado
-      if (data?.user) {
-        console.log('🔍 DEBUG Login - Usuário autenticado:', data.user.email);
-        console.log('🔍 DEBUG Login - User ID:', data.user.id);
-        
-        // Verificar se o usuário existe no perfil do banco atual
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id, email, full_name, role')
-          .eq('id', data.user.id)
-          .single();
-        
-        console.log('🔍 DEBUG Login - Perfil encontrado:', profile);
-        console.log('🔍 DEBUG Login - Erro ao buscar perfil:', profileError);
-        
-        if (profileError || !profile) {
-          console.error('❌ ERRO: Usuário autenticado mas não existe no banco atual!');
-          console.error('❌ Isso significa que o Auth está validando contra outro projeto!');
-          
-          await supabase.auth.signOut();
-          clearSupabaseCache();
-          
+      if (error) {
+        console.error('❌ Erro de autenticação:', error);
+
+        // Detectar email não confirmado
+        if (error.message.includes('Email not confirmed') || error.message.includes('email_not_confirmed')) {
           toast({
             variant: 'destructive',
-            title: 'Erro de configuração',
-            description: 'O usuário foi autenticado em outro projeto. Limpe o cache e tente novamente. Se o problema persistir, verifique a configuração do Supabase Auth.',
+            title: 'Email não confirmado',
+            description: 'Você precisa confirmar seu email antes de fazer login. Verifique sua caixa de entrada (e spam).',
           });
-          return;
         }
-      }
-
-      if (error) {
-        // Se erro de credenciais inválidas, pode ser cache antigo ou usuário não existe no banco novo
-        if (error.message === 'Invalid login credentials' || error.status === 400) {
+        // Se erro de credenciais inválidas
+        else if (error.message === 'Invalid login credentials' || error.status === 400) {
           toast({
             variant: 'destructive',
             title: 'Credenciais inválidas',
-            description: 'Este usuário não existe no banco de dados atual. Se você migrou de um banco antigo, o usuário precisa ser recriado no novo banco.',
+            description: 'Email ou senha incorretos.',
           });
         } else {
           toast({
@@ -163,14 +157,21 @@ const Login = () => {
       }
 
       // Verificar se o usuário existe no perfil após login bem-sucedido
-      if (data.user) {
-        const { data: profile, error: profileError } = await supabase
+      if (data?.user) {
+        console.log('✅ Usuário autenticado:', data.user.email);
+        console.log('✅ User ID:', data.user.id);
+
+        // Aguardar um momento para garantir que a sessão foi totalmente estabelecida
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('id, email')
+          .select('id, email, full_name, role')
           .eq('id', data.user.id)
           .single();
 
-        if (profileError || !profile) {
+        if (profileError || !profileData) {
+
           toast({
             variant: 'destructive',
             title: 'Erro no perfil',
@@ -185,9 +186,10 @@ const Login = () => {
         title: 'Login realizado com sucesso!',
         description: 'Redirecionando para o dashboard...',
       });
-      
+
       navigate('/');
     } catch (error) {
+      console.error('❌ Erro inesperado no login:', error);
       toast({
         variant: 'destructive',
         title: 'Erro inesperado',
@@ -200,7 +202,7 @@ const Login = () => {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (password !== confirmPassword) {
       toast({
         variant: 'destructive',
@@ -234,13 +236,26 @@ const Login = () => {
       });
 
       if (error) {
-        toast({
-          variant: 'destructive',
-          title: 'Erro no cadastro',
-          description: error.message === 'User already registered' 
-            ? 'Este email já está cadastrado. Tente fazer login.'
-            : error.message,
-        });
+        // Detectar se o problema é email não confirmado
+        if (error.message.includes('Email not confirmed') || error.message.includes('email_not_confirmed')) {
+          toast({
+            variant: 'destructive',
+            title: 'Email não confirmado',
+            description: 'Verifique sua caixa de entrada (e spam) para confirmar seu email antes de fazer login. Se não recebeu o email, entre em contato com o administrador.',
+          });
+        } else if (error.message === 'User already registered') {
+          toast({
+            variant: 'destructive',
+            title: 'Email já cadastrado',
+            description: 'Este email já está cadastrado. Tente fazer login ou recuperar sua senha.',
+          });
+        } else {
+          toast({
+            variant: 'destructive',
+            title: 'Erro no cadastro',
+            description: error.message,
+          });
+        }
         return;
       }
 
@@ -248,7 +263,7 @@ const Login = () => {
         title: 'Cadastro realizado com sucesso!',
         description: 'Você foi automaticamente logado.',
       });
-      
+
       navigate('/');
     } catch (error) {
       toast({
@@ -293,9 +308,9 @@ const Login = () => {
                     />
                   </div>
 
-                  <Button 
-                    type="submit" 
-                    className="w-full" 
+                  <Button
+                    type="submit"
+                    className="w-full"
                     disabled={sendingResetEmail}
                   >
                     {sendingResetEmail ? (
@@ -304,10 +319,10 @@ const Login = () => {
                     Enviar Link de Recuperação
                   </Button>
 
-                  <Button 
+                  <Button
                     type="button"
-                    variant="ghost" 
-                    className="w-full" 
+                    variant="ghost"
+                    className="w-full"
                     onClick={() => setForgotPasswordMode(false)}
                   >
                     Voltar para o Login
@@ -336,15 +351,15 @@ const Login = () => {
         <div className="mx-auto grid w-[350px] gap-6">
           <Card className="border-0 shadow-none">
             <CardHeader className="text-left space-y-2">
-                <div className="flex items-center gap-3">
-                    <img src={dashmedLogo} alt="DashMed Pro Logo" className="w-10 h-10" />
-                    <div>
-                        <CardTitle className="text-2xl font-bold text-foreground">Bem-vindo</CardTitle>
-                        <CardDescription>
-                            Acesse ou crie sua conta na plataforma
-                        </CardDescription>
-                    </div>
+              <div className="flex items-center gap-3">
+                <img src={dashmedLogo} alt="DashMed Pro Logo" className="w-10 h-10" />
+                <div>
+                  <CardTitle className="text-2xl font-bold text-foreground">Bem-vindo</CardTitle>
+                  <CardDescription>
+                    Acesse ou crie sua conta na plataforma
+                  </CardDescription>
                 </div>
+              </div>
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="login" className="space-y-4">
@@ -352,7 +367,7 @@ const Login = () => {
                   <TabsTrigger value="login">Login</TabsTrigger>
                   <TabsTrigger value="signup">Cadastro</TabsTrigger>
                 </TabsList>
-                
+
                 <TabsContent value="login">
                   <form onSubmit={handleLogin} className="space-y-4">
                     <div className="space-y-2">
@@ -366,18 +381,18 @@ const Login = () => {
                         required
                       />
                     </div>
-                    
+
                     <div className="space-y-2">
-                        <div className="flex items-center">
-                            <Label htmlFor="login-password">Senha</Label>
-                            <button 
-                              type="button"
-                              onClick={() => setForgotPasswordMode(true)}
-                              className="ml-auto inline-block text-sm underline hover:text-primary"
-                            >
-                                Esqueceu sua senha?
-                            </button>
-                        </div>
+                      <div className="flex items-center">
+                        <Label htmlFor="login-password">Senha</Label>
+                        <button
+                          type="button"
+                          onClick={() => setForgotPasswordMode(true)}
+                          className="ml-auto inline-block text-sm underline hover:text-primary"
+                        >
+                          Esqueceu sua senha?
+                        </button>
+                      </div>
                       <div className="relative">
                         <Input
                           id="login-password"
@@ -399,9 +414,9 @@ const Login = () => {
                       </div>
                     </div>
 
-                    <Button 
-                      type="submit" 
-                      className="w-full" 
+                    <Button
+                      type="submit"
+                      className="w-full"
                       disabled={loading}
                     >
                       {loading ? (
@@ -438,7 +453,7 @@ const Login = () => {
                         required
                       />
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label htmlFor="signup-password">Senha</Label>
                       <div className="relative">
@@ -485,9 +500,9 @@ const Login = () => {
                       </div>
                     </div>
 
-                    <Button 
-                      type="submit" 
-                      className="w-full" 
+                    <Button
+                      type="submit"
+                      className="w-full"
                       disabled={loading}
                     >
                       {loading ? (
@@ -506,11 +521,11 @@ const Login = () => {
       </div>
       <div className="hidden bg-muted lg:flex items-center justify-center p-12 text-center">
         <div className="space-y-4">
-            <img src={dashmedLogo} alt="DashMed Pro Logo" className="w-24 h-24 mx-auto" />
-            <h1 className="text-3xl font-bold text-foreground">DashMed Pro</h1>
-            <p className="text-muted-foreground">
-                A plataforma completa para impulsionar o seu negócio.
-            </p>
+          <img src={dashmedLogo} alt="DashMed Pro Logo" className="w-24 h-24 mx-auto" />
+          <h1 className="text-3xl font-bold text-foreground">DashMed Pro</h1>
+          <p className="text-muted-foreground">
+            A plataforma completa para impulsionar o seu negócio.
+          </p>
         </div>
       </div>
     </div>

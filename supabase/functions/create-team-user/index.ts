@@ -25,7 +25,7 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     // Get the Authorization header from the request
     const authHeader = req.headers.get('Authorization')!;
-    
+
     // Create Supabase client with service role key for admin operations
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -46,7 +46,7 @@ const handler = async (req: Request): Promise<Response> => {
     );
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
+
     if (authError || !user) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
@@ -54,14 +54,14 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Check if user has admin or dono role
+    // Check if user has admin, dono or medico role
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single();
 
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'dono')) {
+    if (!profile || !['admin', 'dono', 'medico'].includes(profile.role)) {
       return new Response(
         JSON.stringify({ error: 'Insufficient permissions' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -75,6 +75,14 @@ const handler = async (req: Request): Promise<Response> => {
       return new Response(
         JSON.stringify({ error: 'Email, password, and role are required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Médicos só podem criar 'medico' ou 'secretaria'
+    if (profile.role === 'medico' && !['medico', 'secretaria'].includes(role)) {
+      return new Response(
+        JSON.stringify({ error: 'Médicos só podem criar usuários com role medico ou secretaria' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -157,7 +165,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         success: true,
         user: newUser.user,
         message: 'User created successfully'

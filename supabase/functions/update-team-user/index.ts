@@ -40,14 +40,38 @@ const handler = async (req: Request): Promise<Response> => {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'dono')) {
+    const { data: profile } = await supabase.from('profiles').select('role, id').eq('id', user.id).single();
+    if (!profile || !['admin', 'dono', 'medico'].includes(profile.role)) {
       return new Response(JSON.stringify({ error: 'Insufficient permissions' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const { userId, full_name, role, password, doctor_id, consultation_value }: UpdateUserRequest = await req.json();
     if (!userId) {
       return new Response(JSON.stringify({ error: 'User ID is required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Verificar se usuário alvo foi criado pelo médico (quando é médico)
+    if (profile.role === 'medico') {
+      const { data: targetUser } = await supabaseAdmin
+        .from('profiles')
+        .select('invited_by')
+        .eq('id', userId)
+        .single();
+
+      if (!targetUser || targetUser.invited_by !== profile.id) {
+        return new Response(
+          JSON.stringify({ error: 'Médicos só podem editar usuários que eles criaram' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Médicos só podem atualizar para roles 'medico' ou 'secretaria'
+      if (role && !['medico', 'secretaria'].includes(role)) {
+        return new Response(
+          JSON.stringify({ error: 'Médicos só podem definir role como medico ou secretaria' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Validate: secretaria must have doctor_id
@@ -59,7 +83,7 @@ const handler = async (req: Request): Promise<Response> => {
         .select('role, doctor_id')
         .eq('id', userId)
         .single();
-      
+
       if (currentProfile?.role !== 'secretaria' && !doctor_id) {
         return new Response(
           JSON.stringify({ error: 'Secretária deve ser vinculada a um médico (doctor_id obrigatório)' }),
@@ -82,7 +106,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Update profile
     const updateData: any = {};
     if (full_name !== undefined) updateData.full_name = full_name || null;
-    
+
     // Try to update role in profiles table (if column exists)
     if (role !== undefined) {
       updateData.role = role;
@@ -134,7 +158,7 @@ const handler = async (req: Request): Promise<Response> => {
               .from('profiles')
               .update(updateData)
               .eq('id', userId);
-            
+
             if (retryError) {
               return new Response(JSON.stringify({ error: retryError.message }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
             }
@@ -158,9 +182,9 @@ const handler = async (req: Request): Promise<Response> => {
         // Insert new role
         const { error: roleError } = await supabaseAdmin
           .from('user_roles')
-          .insert({ 
-            user_id: userId, 
-            role: role 
+          .insert({
+            user_id: userId,
+            role: role
           });
 
         // Ignore error if table doesn't exist (some databases use profiles.role directly)

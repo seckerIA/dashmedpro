@@ -20,6 +20,7 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import TeamManagement from "./pages/TeamManagement";
+import Procedimentos from "./pages/Procedimentos";
 import Tasks from "./pages/Tasks";
 import CRM from "./pages/CRM";
 import MedicalCalendar from "./pages/MedicalCalendar";
@@ -271,8 +272,16 @@ const AppRoutes = () => {
           <Route
             path="/equipe"
             element={
-              <RoleProtectedRoute allowedRoles={['admin', 'dono']}>
+              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'medico']}>
                 <TeamManagement />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="/procedimentos"
+            element={
+              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'medico']}>
+                <Procedimentos />
               </RoleProtectedRoute>
             }
           />

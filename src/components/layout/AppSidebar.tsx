@@ -6,6 +6,7 @@ import {
   Users,
   Mail,
   FileText,
+  DollarSign,
   Target,
   PieChart,
   Home,
@@ -92,6 +93,7 @@ const navigationGroups: Array<{
         },
         { title: "Guia de Prospecção", url: "/comercial/guia-prospeccao", icon: Compass, badge: "Novo", variant: "new" as const },
         { title: "Calculadora", url: "/calculadora", icon: Calculator, badge: "Novo", variant: "new" as const },
+        { title: "Tabela de Preços", url: "/procedimentos", icon: DollarSign, medicoOnly: true, badge: "Novo", variant: "new" as const },
         { title: "Métricas de Equipe", url: "/crm", icon: Users },
         { title: "Calendário", url: "/calendar", icon: Calendar, badge: "Novo", variant: "new" as const },
         // { title: "Follow-ups", url: "/follow-ups", icon: RotateCcw }, // Ocultado
@@ -119,7 +121,7 @@ const navigationGroups: Array<{
     {
       label: "Administração",
       items: [
-        { title: "Gerenciar Equipe", url: "/equipe", icon: UserPlus, adminOnly: true },
+        { title: "Gerenciar Equipe", url: "/equipe", icon: UserPlus, medicoOnly: true },
         // { title: "Configurar VoIP", url: "/voip/settings", icon: Phone, adminOnly: true }, // Oculto temporariamente
       ]
     }

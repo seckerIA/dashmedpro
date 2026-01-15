@@ -13,6 +13,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { UserPlus, Users, Eye, EyeOff, Stethoscope } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useSecretaryDoctorLinks } from '@/hooks/useSecretaryDoctors';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import { useAuth } from '@/hooks/useAuth';
 
 import { DataTable } from '@/components/datatable/DataTable';
 import { getColumns, Profile } from '@/components/datatable/DataColumns';
@@ -36,13 +38,23 @@ const TeamManagement = () => {
   });
   const { toast } = useToast();
   const { updateSecretaryLinks, getLinksForSecretary } = useSecretaryDoctorLinks();
+  const { user } = useAuth();
+  const { isAdmin, isMedico, profile } = useUserProfile();
+  const isAdminOrDono = isAdmin; // isAdmin já inclui 'dono'
+  const isMedicoOnly = isMedico && !isAdmin;
 
   const fetchProfiles = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('profiles')
-        .select('id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by, doctor_id, consultation_value')
-        .order('created_at', { ascending: false });
+        .select('id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by, doctor_id, consultation_value');
+
+      // Médicos veem apenas os usuários que eles criaram
+      if (isMedicoOnly && user?.id) {
+        query = query.eq('invited_by', user.id);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) {
         throw error;
@@ -344,7 +356,7 @@ const TeamManagement = () => {
   const handleDelete = async (userId: string) => {
     try {
       setLoading(true);
-      
+
       // Chama edge function para excluir usuário
       const { data, error } = await supabase.functions.invoke('delete-team-user', {
         body: { userId }
@@ -402,7 +414,7 @@ const TeamManagement = () => {
             Gerencie os membros da sua equipe e suas permissões
           </p>
         </div>
-        
+
         <Dialog open={dialogOpen} onOpenChange={(open) => {
           setDialogOpen(open);
           if (!open) {
@@ -422,12 +434,12 @@ const TeamManagement = () => {
               <DialogHeader>
                 <DialogTitle>{editingProfile ? 'Editar Membro' : 'Adicionar Novo Membro'}</DialogTitle>
                 <DialogDescription>
-                  {editingProfile 
-                    ? 'Atualize os dados do membro da equipe.' 
+                  {editingProfile
+                    ? 'Atualize os dados do membro da equipe.'
                     : 'Preencha os dados para criar um novo usuário na equipe.'}
                 </DialogDescription>
               </DialogHeader>
-              
+
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
                   <Label htmlFor="name">Nome Completo</Label>
@@ -438,7 +450,7 @@ const TeamManagement = () => {
                     placeholder="Nome do usuário"
                   />
                 </div>
-                
+
                 <div className="grid gap-2">
                   <Label htmlFor="email">Email *</Label>
                   <Input
@@ -454,7 +466,7 @@ const TeamManagement = () => {
                     <p className="text-xs text-muted-foreground">O email não pode ser alterado.</p>
                   )}
                 </div>
-                
+
                 <div className="grid gap-2">
                   <Label htmlFor="password">Senha {editingProfile ? '(deixe em branco para não alterar)' : '*'}</Label>
                   <div className="relative">
@@ -477,15 +489,15 @@ const TeamManagement = () => {
                     </Button>
                   </div>
                 </div>
-                
+
                 <div className="grid gap-2">
                   <Label htmlFor="role">Função *</Label>
-                  <Select 
-                    value={formData.role} 
+                  <Select
+                    value={formData.role}
                     onValueChange={(value) => {
                       const newRole = value as Profile['role'];
-                      setFormData({ 
-                        ...formData, 
+                      setFormData({
+                        ...formData,
                         role: newRole,
                         // Limpar doctor_id se não for secretária
                         doctor_id: newRole === 'secretaria' ? formData.doctor_id : ''
@@ -496,12 +508,12 @@ const TeamManagement = () => {
                       <SelectValue placeholder="Selecione uma função" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="admin">Administrador</SelectItem>
-                      <SelectItem value="dono">Dono</SelectItem>
+                      {isAdminOrDono && <SelectItem value="admin">Administrador</SelectItem>}
+                      {isAdminOrDono && <SelectItem value="dono">Dono</SelectItem>}
                       <SelectItem value="medico">Médico</SelectItem>
                       <SelectItem value="secretaria">Secretária</SelectItem>
-                      <SelectItem value="vendedor">Vendedor</SelectItem>
-                      <SelectItem value="gestor_trafego">Gestor de Tráfego</SelectItem>
+                      {isAdminOrDono && <SelectItem value="vendedor">Vendedor</SelectItem>}
+                      {isAdminOrDono && <SelectItem value="gestor_trafego">Gestor de Tráfego</SelectItem>}
                     </SelectContent>
                   </Select>
                 </div>
@@ -583,7 +595,7 @@ const TeamManagement = () => {
                   </div>
                 )}
               </div>
-              
+
               <DialogFooter>
                 <Button
                   type="button"
@@ -599,8 +611,8 @@ const TeamManagement = () => {
                   Cancelar
                 </Button>
                 <Button type="submit" disabled={loading}>
-                  {loading 
-                    ? (editingProfile ? 'Atualizando...' : 'Criando...') 
+                  {loading
+                    ? (editingProfile ? 'Atualizando...' : 'Criando...')
                     : (editingProfile ? 'Atualizar Usuário' : 'Criar Usuário')}
                 </Button>
               </DialogFooter>

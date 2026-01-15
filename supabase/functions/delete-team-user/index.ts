@@ -20,7 +20,7 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     // Get the Authorization header from the request
     const authHeader = req.headers.get('Authorization')!;
-    
+
     // Create Supabase client with service role key for admin operations
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -41,7 +41,7 @@ const handler = async (req: Request): Promise<Response> => {
     );
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
+
     if (authError || !user) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
@@ -49,14 +49,14 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Check if user has admin or dono role
+    // Check if user has admin, dono or medico role
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, id')
       .eq('id', user.id)
       .single();
 
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'dono')) {
+    if (!profile || !['admin', 'dono', 'medico'].includes(profile.role)) {
       return new Response(
         JSON.stringify({ error: 'Insufficient permissions' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -84,7 +84,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Check if the user to be deleted exists and get their role
     const { data: targetProfile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('role')
+      .select('role, invited_by')
       .eq('id', userId)
       .single();
 
@@ -92,6 +92,14 @@ const handler = async (req: Request): Promise<Response> => {
       return new Response(
         JSON.stringify({ error: 'User not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Médicos só podem deletar usuários que eles criaram
+    if (profile.role === 'medico' && targetProfile.invited_by !== profile.id) {
+      return new Response(
+        JSON.stringify({ error: 'Médicos só podem deletar usuários que eles criaram' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -115,7 +123,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         success: true,
         message: 'User deleted successfully'
       }),

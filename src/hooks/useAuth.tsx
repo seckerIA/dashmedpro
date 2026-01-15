@@ -17,38 +17,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Verificar se a sessão é do projeto correto
-    const validateSession = async () => {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-      if (session) {
-        // Verificar se o usuário existe no perfil do banco correto
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('id, email')
-          .eq('id', session.user.id)
-          .single();
-
-        // Se não encontrar perfil, a sessão é inválida (de outro projeto)
-        if (error || !profile) {
-          console.warn('Sessão inválida: usuário não encontrado no banco atual. Limpando sessão...');
-          await supabase.auth.signOut();
-          // Limpar localStorage
-          const keysToRemove: string[] = [];
-          for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
-              keysToRemove.push(key);
-            }
-          }
-          keysToRemove.forEach(key => localStorage.removeItem(key));
-          setSession(null);
-          setUser(null);
-          setLoading(false);
-          return;
-        }
-      }
-
+    // Simplified session loading without profile validation
+    const loadSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -57,32 +28,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        // Validar sessão quando mudar
-        if (session) {
-          const { data: profile, error } = await supabase
-            .from('profiles')
-            .select('id, email')
-            .eq('id', session.user.id)
-            .single();
-
-          if (error || !profile) {
-            console.warn('Sessão inválida detectada. Limpando...');
-            await supabase.auth.signOut();
-            setSession(null);
-            setUser(null);
-            setLoading(false);
-            return;
-          }
-        }
-
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
       }
     );
 
-    // Validar sessão inicial
-    validateSession();
+    loadSession();
 
     return () => {
       subscription.unsubscribe();
