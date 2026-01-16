@@ -72,6 +72,16 @@ import {
 import { FinancialAccount } from "@/types/financial"
 
 import { FinancialDistributionConfig } from "@/components/financial/FinancialDistributionConfig"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 const Financial = () => {
   const navigate = useNavigate();
@@ -91,6 +101,7 @@ const Financial = () => {
   const [showRequirementModal, setShowRequirementModal] = useState(false);
   const [isDistributionConfigOpen, setIsDistributionConfigOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<FinancialAccount | null>(null);
+  const [accountToDelete, setAccountToDelete] = useState<string | null>(null);
 
   // Verificar obrigatoriedade de conta bancária
   useEffect(() => {
@@ -175,6 +186,13 @@ const Financial = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (accountToDelete) {
+      deleteAccount(accountToDelete);
+      setAccountToDelete(null);
+    }
   };
 
   return (
@@ -484,11 +502,7 @@ const Financial = () => {
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                              onClick={() => {
-                                if (confirm('Tem certeza que deseja excluir esta conta?')) {
-                                  deleteAccount(account.id);
-                                }
-                              }}
+                              onClick={() => setAccountToDelete(account.id)}
                               className="cursor-pointer text-red-500 focus:text-red-500"
                             >
                               <Trash2 className="w-4 h-4 mr-2" />
@@ -511,6 +525,18 @@ const Financial = () => {
                   </Card>
                 );
               })}
+
+              {/* Botão Card para Nova Conta */}
+              <button
+                onClick={() => setIsAccountFormOpen(true)}
+                className="group flex flex-col items-center justify-center h-full min-h-[160px] p-6 rounded-xl border-2 border-dashed border-muted-foreground/20 hover:border-emerald-500/50 bg-muted/5 hover:bg-emerald-500/5 transition-all duration-300"
+              >
+                <div className="p-4 rounded-full bg-muted group-hover:bg-emerald-500/10 transition-colors mb-3">
+                  <Plus className="w-6 h-6 text-muted-foreground group-hover:text-emerald-500 transition-colors" />
+                </div>
+                <p className="font-medium text-muted-foreground group-hover:text-emerald-600 transition-colors">Adicionar Nova Conta</p>
+                <p className="text-xs text-muted-foreground/60 mt-1">Conta corrente, caixa ou investimento</p>
+              </button>
             </div>
           </CardContent>
         </Card>
@@ -580,13 +606,12 @@ const Financial = () => {
                     data={costsBreakdown || []}
                     cx="50%"
                     cy="50%"
-                    labelLine={false}
+                    labelLine={true}
                     label={({ name, percent }) => {
-                      if (percent < 0.05) return '';
                       return `${name}: ${(percent * 100).toFixed(1)}%`;
                     }}
-                    outerRadius={100}
-                    innerRadius={60}
+                    outerRadius={80}
+                    innerRadius={50}
                     fill="#8884d8"
                     dataKey="value"
                     stroke="hsl(var(--background))"
@@ -624,7 +649,7 @@ const Financial = () => {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={expensesByCategory || []} layout="vertical" margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+                <BarChart data={expensesByCategory || []} layout="vertical" margin={{ left: 0, right: 30, top: 0, bottom: 0 }}>
                   <defs>
                     {(expensesByCategory || []).map((entry, index) => {
                       const gradient = getGradient(index);
@@ -636,11 +661,11 @@ const Financial = () => {
                       );
                     })}
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} horizontal={false} />
                   <XAxis type="number" stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} tickLine={false} axisLine={false} tickFormatter={(value: number) => formatCurrencyShort(value)} />
                   <YAxis type="category" dataKey="name" width={100} stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} tickLine={false} axisLine={false} />
                   <EnhancedTooltip valueFormatter={(value: number) => formatCurrency(value)} />
-                  <Bar dataKey="value" radius={[8, 8, 8, 8]}>
+                  <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={32}>
                     {(expensesByCategory || []).map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={`url(#expenseGradient-${index})`} />
                     ))}
@@ -812,6 +837,27 @@ const Financial = () => {
         </CardContent>
       </Card>
 
+      <AlertDialog open={!!accountToDelete} onOpenChange={(open) => !open && setAccountToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tem certeza que deseja excluir esta conta?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Isso excluirá permanentemente a conta
+              e pode afetar o cálculo do seu saldo total se houver transações vinculadas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-500 hover:bg-red-600 focus:ring-red-500"
+              onClick={handleDeleteConfirm}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AccountForm
         open={isAccountFormOpen}
         onOpenChange={(open) => {
@@ -825,7 +871,7 @@ const Financial = () => {
         isOpen={showRequirementModal}
         onOpenChange={setShowRequirementModal}
       />
-    </div >
+    </div>
   )
 }
 

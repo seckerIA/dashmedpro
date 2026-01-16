@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useSecretaryDoctors } from '@/hooks/useSecretaryDoctors';
+import { useDoctorSecretaries } from '@/hooks/useDoctorSecretaries';
 import { toast } from '@/components/ui/use-toast';
 import type {
   WhatsAppConversation,
@@ -34,11 +35,22 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { doctorIds } = useSecretaryDoctors();
+  const { secretaryIds } = useDoctorSecretaries();
 
-  // IDs para filtrar (próprio usuário + médicos vinculados para secretária)
-  const userIds = useMemo(() =>
-    user?.id ? [user.id, ...(doctorIds || [])] : []
-    , [user?.id, doctorIds]);
+  // IDs para filtrar:
+  // - próprio usuário
+  // - médicos vinculados (se for secretária)
+  // - secretárias vinculadas (se for médico)
+  const userIds = useMemo(() => {
+    if (!user?.id) return [];
+
+    return [
+      user.id,
+      ...(doctorIds || []),
+      ...(secretaryIds || [])
+    ];
+  }, [user?.id, doctorIds, secretaryIds]);
+
 
   // =========================================
   // Query: Lista de conversas

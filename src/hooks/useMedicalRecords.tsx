@@ -34,7 +34,7 @@ export function useMedicalRecords(contactId?: string) {
     queryFn: async ({ signal }) => {
       if (!contactId || !user?.id) return [];
 
-      // Buscar prontuários sem JOIN com profiles (não há FK direta)
+      // 1. Buscar prontuários
       const query = supabase
         .from('medical_records')
         .select(`
@@ -44,14 +44,42 @@ export function useMedicalRecords(contactId?: string) {
         .eq('contact_id', contactId)
         .order('created_at', { ascending: false });
 
-      const { data, error } = await supabaseQueryWithTimeout(query as any, undefined, signal);
+      const { data: recordsData, error: recordsError } = await supabaseQueryWithTimeout(query as any, undefined, signal);
 
-      if (error) {
-        console.error('Erro ao buscar prontuários:', error);
-        throw new Error(`Erro ao buscar prontuários: ${error.message}`);
+      if (recordsError) {
+        console.error('Erro ao buscar prontuários:', recordsError);
+        throw new Error(`Erro ao buscar prontuários: ${recordsError.message}`);
       }
 
-      return (data || []) as MedicalRecord[];
+      const records = (recordsData || []) as MedicalRecord[];
+
+      // 2. Extrair IDs dos médicos
+      const doctorIds = Array.from(new Set(records.map(r => r.doctor_id).filter(Boolean)));
+
+      if (doctorIds.length === 0) {
+        return records;
+      }
+
+      // 3. Buscar perfis dos médicos
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', doctorIds);
+
+      if (profilesError) {
+        console.error('Erro ao buscar perfis dos médicos:', profilesError);
+        // Não falhar tudo se não conseguir buscar médicos, apenas retornar sem info extra
+        return records;
+      }
+
+      // 4. Mapear perfis para acesso rápido
+      const profilesMap = new Map(profilesData?.map(p => [p.id, p]));
+
+      // 5. Enriquecer registros com dados do médico
+      return records.map(record => ({
+        ...record,
+        doctor: record.doctor_id ? profilesMap.get(record.doctor_id) : undefined
+      }));
     },
     enabled: !!contactId && !!user?.id,
     staleTime: 2 * 60 * 1000,
@@ -561,7 +589,22 @@ export function useMedicalRecord(recordId: string | null) {
         throw new Error(`Erro ao buscar prontuário: ${error.message}`);
       }
 
-      return data as MedicalRecord;
+      const record = data as MedicalRecord;
+
+      // Buscar perfil do médico manualmente
+      if (record.doctor_id) {
+        const { data: doctorData } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .eq('id', record.doctor_id)
+          .single();
+
+        if (doctorData) {
+          record.doctor = doctorData;
+        }
+      }
+
+      return record;
     },
     enabled: !!recordId && !!user?.id,
     staleTime: 2 * 60 * 1000,

@@ -76,13 +76,7 @@ export function usePatients() {
         const query = supabase
           .from('crm_contacts')
           .select(`
-            id,
-            full_name,
-            email,
-            phone,
-            custom_fields,
-            created_at,
-            updated_at
+            *
           `)
           .in('id', contactIds)
           .order('full_name', { ascending: true })
@@ -138,13 +132,7 @@ export function usePatients() {
     const { data, error } = await supabase
       .from('crm_contacts')
       .select(`
-        id,
-        full_name,
-        email,
-        phone,
-        custom_fields,
-        created_at,
-        updated_at
+        *
       `)
       .eq('id', patientId)
       .single();
@@ -201,8 +189,9 @@ export function usePatients() {
 
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['patients'] });
+      queryClient.invalidateQueries({ queryKey: ['patient', variables.patientId] });
       toast({
         title: 'Sucesso',
         description: 'Informações do paciente atualizadas.',
@@ -333,13 +322,7 @@ export function usePatient(patientId: string | null) {
       const query = supabase
         .from('crm_contacts')
         .select(`
-          id,
-          full_name,
-          email,
-          phone,
-          custom_fields,
-          created_at,
-          updated_at
+          *
         `)
         .eq('id', patientId)
         .single();

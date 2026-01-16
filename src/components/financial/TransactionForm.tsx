@@ -17,6 +17,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { cn } from "@/lib/utils"
+import { DatePicker } from "@/components/ui/date-picker"
 import { useFinancialCategories } from '@/hooks/useFinancialCategories'
 import { useFinancialAccounts } from '@/hooks/useFinancialAccounts'
 import { useCreateFinancialTransaction, useUpdateFinancialTransaction } from '@/hooks/useFinancialTransactionMutations'
@@ -579,33 +580,12 @@ const TransactionForm = () => {
               {/* Data da Transação */}
               <div className="space-y-2">
                 <Label htmlFor="transaction_date" className="text-sm font-medium text-foreground">Data da Transação *</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-full justify-start text-left font-normal pl-3",
-                        !formData.transaction_date && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.transaction_date ? (
-                        format(new Date(formData.transaction_date + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
-                      ) : (
-                        <span>Selecione uma data</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={formData.transaction_date ? new Date(formData.transaction_date + 'T12:00:00') : undefined}
-                      onSelect={(date) => date && handleInputChange('transaction_date', format(date, 'yyyy-MM-dd'))}
-                      initialFocus
-                      locale={ptBR}
-                    />
-                  </PopoverContent>
-                </Popover>
+                <DatePicker
+                  date={formData.transaction_date ? new Date(formData.transaction_date + 'T12:00:00') : undefined}
+                  setDate={(date) => date && handleInputChange('transaction_date', format(date, 'yyyy-MM-dd'))}
+                  label="Selecione uma data"
+                  className="w-full justify-start text-left font-normal pl-3"
+                />
               </div>
 
               {/* Categoria */}
@@ -1084,10 +1064,9 @@ const TransactionForm = () => {
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs text-muted-foreground">Próxima Execução</Label>
-                    <Input
-                      type="date"
-                      value={formData.next_execution_date || ''}
-                      onChange={(e) => handleInputChange('next_execution_date', e.target.value)}
+                    <DatePicker
+                      date={formData.next_execution_date ? new Date(formData.next_execution_date + 'T12:00:00') : undefined}
+                      setDate={(date) => handleInputChange('next_execution_date', date ? format(date, 'yyyy-MM-dd') : '')}
                     />
                   </div>
                 </div>

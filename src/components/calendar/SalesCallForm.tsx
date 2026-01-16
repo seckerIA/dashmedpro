@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -45,18 +46,18 @@ interface FormData {
   notes?: string;
 }
 
-export function SalesCallForm({ 
-  open, 
-  onOpenChange, 
-  editCall, 
+export function SalesCallForm({
+  open,
+  onOpenChange,
+  editCall,
   preSelectedContactId,
-  preSelectedDealId 
+  preSelectedDealId
 }: SalesCallFormProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const { contacts } = useCRM();
   const { createCall, updateCall } = useSalesCalls();
-  
+
   const [selectedContactId, setSelectedContactId] = useState<string>(
     preSelectedContactId || editCall?.contact_id || ''
   );
@@ -73,7 +74,7 @@ export function SalesCallForm({
       contact_id: preSelectedContactId || editCall?.contact_id || '',
       deal_id: preSelectedDealId || editCall?.deal_id || '',
       title: editCall?.title || '',
-      scheduled_date: editCall 
+      scheduled_date: editCall
         ? format(new Date(editCall.scheduled_at), 'yyyy-MM-dd')
         : format(new Date(), 'yyyy-MM-dd'),
       scheduled_time: editCall
@@ -102,8 +103,8 @@ export function SalesCallForm({
   }, [editCall, preSelectedContactId, setValue]);
 
   // Obter deals do contato selecionado
-const selectedContact = contacts.find(c => c.id === selectedContactId);
-const contactDeals = (selectedContact as any)?.deals ?? [];
+  const selectedContact = contacts.find(c => c.id === selectedContactId);
+  const contactDeals = (selectedContact as any)?.deals ?? [];
 
   const onSubmit = async (data: FormData) => {
     if (!user?.id) return;
@@ -173,7 +174,7 @@ const contactDeals = (selectedContact as any)?.deals ?? [];
             {editCall ? 'Editar Call' : 'Agendar Nova Call'}
           </DialogTitle>
           <DialogDescription>
-            {editCall 
+            {editCall
               ? 'Atualize as informações da call de vendas'
               : 'Preencha os dados para agendar uma call de vendas'
             }
@@ -254,10 +255,9 @@ const contactDeals = (selectedContact as any)?.deals ?? [];
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="scheduled_date">Data *</Label>
-              <Input
-                id="scheduled_date"
-                type="date"
-                {...register('scheduled_date', { required: true })}
+              <DatePicker
+                date={watch('scheduled_date') ? new Date(watch('scheduled_date')! + 'T00:00:00') : undefined}
+                setDate={(date) => setValue('scheduled_date', date ? format(date, 'yyyy-MM-dd') : '')}
               />
               {errors.scheduled_date && (
                 <p className="text-sm text-destructive">Data é obrigatória</p>

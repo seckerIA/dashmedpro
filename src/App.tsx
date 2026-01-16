@@ -392,7 +392,7 @@ const AppRoutes = () => {
           <Route
             path="/whatsapp"
             element={
-              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'secretaria']}>
+              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'secretaria', 'medico']}>
                 <WhatsAppInbox />
               </RoleProtectedRoute>
             }
@@ -400,7 +400,7 @@ const AppRoutes = () => {
           <Route
             path="/whatsapp/settings"
             element={
-              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'secretaria']}>
+              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'secretaria', 'medico']}>
                 <WhatsAppSettings />
               </RoleProtectedRoute>
             }

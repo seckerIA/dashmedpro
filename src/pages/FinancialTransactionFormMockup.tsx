@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { 
+import {
   ArrowUpRight,
   ArrowDownLeft,
   Upload,
@@ -11,7 +11,14 @@ import {
   File
 } from "lucide-react"
 
+import { useState } from "react"
+import { DatePicker } from "@/components/ui/date-picker"
+import { format } from "date-fns"
+import { ptBR } from "date-fns/locale"
+
 const FinancialTransactionFormMockup = () => {
+  const [date, setDate] = useState<Date | undefined>(new Date("2025-05-07"))
+  const [nextDate, setNextDate] = useState<Date | undefined>()
   return (
     <div className="min-h-screen bg-background p-6 flex items-center justify-center">
       <Card className="w-full max-w-4xl bg-gradient-to-br from-card to-card/50 border-border">
@@ -39,7 +46,7 @@ const FinancialTransactionFormMockup = () => {
             {/* Descrição */}
             <div className="space-y-2 md:col-span-2">
               <label className="text-sm font-medium text-foreground">Descrição</label>
-              <input 
+              <input
                 type="text"
                 placeholder="Ex: Venda CRM - Cliente Nexus"
                 className="w-full p-3 bg-muted/20 border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -52,7 +59,7 @@ const FinancialTransactionFormMockup = () => {
               <label className="text-sm font-medium text-foreground">Valor</label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">R$</span>
-                <input 
+                <input
                   type="text"
                   placeholder="0,00"
                   className="w-full p-3 pl-12 bg-muted/20 border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -64,10 +71,10 @@ const FinancialTransactionFormMockup = () => {
             {/* Data */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">Data da Transação</label>
-              <input 
-                type="date"
-                className="w-full p-3 bg-muted/20 border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                defaultValue="2025-05-07"
+              <DatePicker
+                date={date}
+                setDate={setDate}
+                className="w-full p-3 bg-muted/20 border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500 justify-start text-left font-normal"
               />
             </div>
 
@@ -128,8 +135,8 @@ const FinancialTransactionFormMockup = () => {
                   marketing-digital
                   <button className="ml-2"><X className="w-3 h-3" /></button>
                 </Badge>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   placeholder="Adicionar tag..."
                   className="flex-1 min-w-[120px] bg-transparent outline-none text-foreground placeholder:text-muted-foreground"
                 />
@@ -139,7 +146,7 @@ const FinancialTransactionFormMockup = () => {
             {/* Observações */}
             <div className="space-y-2 md:col-span-2">
               <label className="text-sm font-medium text-foreground">Observações (opcional)</label>
-              <textarea 
+              <textarea
                 placeholder="Adicione observações sobre esta transação..."
                 className="w-full p-3 bg-muted/20 border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[100px] resize-none"
                 defaultValue="Pagamento recebido via PIX. Cliente fechou contrato de gestão de tráfego por 12 meses."
@@ -150,7 +157,7 @@ const FinancialTransactionFormMockup = () => {
           {/* Upload de Comprovantes */}
           <div className="space-y-3">
             <label className="text-sm font-medium text-foreground">Comprovantes</label>
-            
+
             {/* Área de Upload */}
             <div className="border-2 border-dashed border-border hover:border-emerald-500 rounded-xl p-8 transition-all cursor-pointer bg-muted/10 hover:bg-muted/20">
               <div className="flex flex-col items-center justify-center text-center">
@@ -230,7 +237,12 @@ const FinancialTransactionFormMockup = () => {
               </div>
               <div className="space-y-2">
                 <label className="text-xs text-muted-foreground">Próxima Execução</label>
-                <input type="date" className="w-full p-2 bg-muted/40 border border-border rounded-lg text-sm" disabled />
+                <DatePicker
+                  date={nextDate}
+                  setDate={setNextDate}
+                  className="w-full p-2 bg-muted/40 border border-border rounded-lg text-sm justify-start text-left font-normal"
+                  disabled
+                />
               </div>
             </div>
           </div>

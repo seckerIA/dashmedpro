@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Download, Calendar, Users, Target, TrendingUp, Clock, Filter, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { DatePicker } from "@/components/ui/date-picker";
 
 interface HistoricalReportsPanelProps {
   isOpen: boolean;
@@ -103,20 +104,16 @@ export function HistoricalReportsPanel({ isOpen, onClose }: HistoricalReportsPan
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="startDate">Data Inicial</Label>
-                  <Input
-                    id="startDate"
-                    type="date"
-                    value={filters.startDate}
-                    onChange={(e) => handleFilterChange('startDate', e.target.value)}
+                  <DatePicker
+                    date={filters.startDate ? new Date(filters.startDate + 'T00:00:00') : undefined}
+                    setDate={(date) => handleFilterChange('startDate', date ? format(date, 'yyyy-MM-dd') : '')}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="endDate">Data Final</Label>
-                  <Input
-                    id="endDate"
-                    type="date"
-                    value={filters.endDate}
-                    onChange={(e) => handleFilterChange('endDate', e.target.value)}
+                  <DatePicker
+                    date={filters.endDate ? new Date(filters.endDate + 'T00:00:00') : undefined}
+                    setDate={(date) => handleFilterChange('endDate', date ? format(date, 'yyyy-MM-dd') : '')}
                   />
                 </div>
                 {isAdmin && (
@@ -163,7 +160,7 @@ export function HistoricalReportsPanel({ isOpen, onClose }: HistoricalReportsPan
                   <p className="text-2xl font-bold mt-1">{stats.totalReports}</p>
                 </CardContent>
               </Card>
-              
+
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2">
@@ -173,7 +170,7 @@ export function HistoricalReportsPanel({ isOpen, onClose }: HistoricalReportsPan
                   <p className="text-2xl font-bold mt-1">{stats.totalCalls}</p>
                 </CardContent>
               </Card>
-              
+
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2">
@@ -183,7 +180,7 @@ export function HistoricalReportsPanel({ isOpen, onClose }: HistoricalReportsPan
                   <p className="text-2xl font-bold mt-1">{stats.totalContacts}</p>
                 </CardContent>
               </Card>
-              
+
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2">
@@ -248,7 +245,7 @@ export function HistoricalReportsPanel({ isOpen, onClose }: HistoricalReportsPan
                                 </Badge>
                               )}
                             </div>
-                            
+
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                               <div>
                                 <p className="text-muted-foreground">Meta Atendimentos</p>
@@ -261,16 +258,16 @@ export function HistoricalReportsPanel({ isOpen, onClose }: HistoricalReportsPan
                               <div>
                                 <p className="text-muted-foreground">Atendimentos</p>
                                 <p className="font-medium">{report.final_calls || 0}</p>
-                                <Progress 
-                                  value={(report.final_calls || 0) / report.goal_calls * 100} 
+                                <Progress
+                                  value={(report.final_calls || 0) / report.goal_calls * 100}
                                   className="h-1 mt-1"
                                 />
                               </div>
                               <div>
                                 <p className="text-muted-foreground">Contatos</p>
                                 <p className="font-medium">{report.final_contacts || 0}</p>
-                                <Progress 
-                                  value={(report.final_contacts || 0) / report.goal_contacts * 100} 
+                                <Progress
+                                  value={(report.final_contacts || 0) / report.goal_contacts * 100}
                                   className="h-1 mt-1"
                                 />
                               </div>

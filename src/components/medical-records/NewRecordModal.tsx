@@ -44,6 +44,8 @@ import {
   Trash2,
   Search
 } from 'lucide-react';
+import { DatePicker } from "@/components/ui/date-picker";
+import { format } from "date-fns";
 
 // Schema de validação
 const recordSchema = z.object({
@@ -105,10 +107,10 @@ export function NewRecordModal({ open, onOpenChange, contactId, patientName }: N
   // Filtrar CIDs pela busca
   const filteredCIDs = cidSearch
     ? COMMON_CID_CODES.filter(
-        cid =>
-          cid.code.toLowerCase().includes(cidSearch.toLowerCase()) ||
-          cid.description.toLowerCase().includes(cidSearch.toLowerCase())
-      )
+      cid =>
+        cid.code.toLowerCase().includes(cidSearch.toLowerCase()) ||
+        cid.description.toLowerCase().includes(cidSearch.toLowerCase())
+    )
     : COMMON_CID_CODES;
 
   const handleSubmit = async (data: RecordFormData) => {
@@ -622,10 +624,9 @@ export function NewRecordModal({ open, onOpenChange, contactId, patientName }: N
 
                     <div className="space-y-2">
                       <Label htmlFor="next_appointment_date">Data do Retorno</Label>
-                      <Input
-                        id="next_appointment_date"
-                        type="date"
-                        {...form.register('next_appointment_date')}
+                      <DatePicker
+                        date={form.watch('next_appointment_date') ? new Date(form.watch('next_appointment_date')! + 'T00:00:00') : undefined}
+                        setDate={(date) => form.setValue('next_appointment_date', date ? format(date, 'yyyy-MM-dd') : '')}
                       />
                     </div>
                   </div>

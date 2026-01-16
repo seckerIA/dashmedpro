@@ -3,6 +3,8 @@ import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { DatePicker } from "@/components/ui/date-picker";
+import { format } from "date-fns";
 import {
   Dialog,
   DialogContent,
@@ -494,9 +496,9 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
                   <FormItem>
                     <FormLabel>Data Esperada de Fechamento</FormLabel>
                     <FormControl>
-                      <Input
-                        type="date"
-                        {...field}
+                      <DatePicker
+                        date={field.value ? new Date(field.value + 'T00:00:00') : undefined}
+                        setDate={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')}
                       />
                     </FormControl>
                     <FormMessage />

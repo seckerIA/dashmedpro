@@ -238,10 +238,10 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
               />
               {!isCollapsed && (
                 <div className="flex flex-col">
-                  <span className="text-white font-semibold text-xl tracking-wide">
+                  <span className="text-white font-semibold text-xl tracking-wide whitespace-nowrap overflow-hidden">
                     DASHMED PRO
                   </span>
-                  <span className="text-white/60 text-sm">
+                  <span className="text-white/60 text-sm whitespace-nowrap overflow-hidden">
                     Dashboard
                   </span>
                 </div>
@@ -342,7 +342,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                     {/* Group Label */}
                     {!isCollapsed && (
                       <div className="px-3 mb-1.5">
-                        <span className="text-xs font-semibold text-white/35 uppercase tracking-[0.18em]">
+                        <span className="text-xs font-semibold text-white/35 uppercase tracking-[0.18em] whitespace-nowrap overflow-hidden text-ellipsis">
                           {group.label}
                         </span>
                       </div>
@@ -452,7 +452,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                                 />
                                 <span
                                   className={`
-                                    text-lg font-medium transition-colors duration-200
+                                    text-lg font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden
                                     ${active ? 'text-white' : 'text-white/70 group-hover:text-white'}
                                   `}
                                 >
@@ -503,7 +503,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                                           ${subActive ? 'text-white' : 'text-white/50 group-hover:text-white'}
                                         `}
                                       />
-                                      <span>{subItem.title}</span>
+                                      <span className="whitespace-nowrap overflow-hidden text-ellipsis">{subItem.title}</span>
                                     </NavLink>
                                   )
                                 })}
@@ -527,7 +527,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                             {!isCollapsed && (
                               <span
                                 className={`
-                                  text-lg font-medium transition-colors duration-200
+                                  text-lg font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden
                                   ${active ? 'text-white' : 'text-white/70 group-hover:text-white'}
                                 `}
                               >
@@ -615,7 +615,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                   {!isCollapsed && (
                     <span
                       className={`
-                        text-lg font-medium transition-colors duration-200
+                        text-lg font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden
                         ${active ? 'text-white' : 'text-white/70 group-hover:text-white'}
                       `}
                     >

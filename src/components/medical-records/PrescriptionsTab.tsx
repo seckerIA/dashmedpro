@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { DatePicker } from "@/components/ui/date-picker";
 import { usePrescriptions } from '@/hooks/useMedicalRecords';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import {
@@ -49,7 +50,7 @@ export function PrescriptionsTab({ contactId, patient }: PrescriptionsTabProps) 
   // Estados para nova receita
   const [medications, setMedications] = useState<MedicationPrescription[]>([]);
   const [notes, setNotes] = useState('');
-  const [validUntil, setValidUntil] = useState('');
+  const [validUntil, setValidUntil] = useState<Date | undefined>(undefined);
   const [prescriptionType, setPrescriptionType] = useState<'simple' | 'controlled' | 'special'>('simple');
   const [newMed, setNewMed] = useState<Partial<MedicationPrescription>>({});
 
@@ -80,7 +81,7 @@ export function PrescriptionsTab({ contactId, patient }: PrescriptionsTabProps) 
       contact_id: contactId,
       medications,
       notes: notes || undefined,
-      valid_until: validUntil || undefined,
+      valid_until: validUntil ? format(validUntil, 'yyyy-MM-dd') : undefined,
       prescription_type: prescriptionType,
     };
 
@@ -95,7 +96,7 @@ export function PrescriptionsTab({ contactId, patient }: PrescriptionsTabProps) 
   const resetForm = () => {
     setMedications([]);
     setNotes('');
-    setValidUntil('');
+    setValidUntil(undefined);
     setPrescriptionType('simple');
     setNewMed({});
   };
@@ -225,11 +226,10 @@ export function PrescriptionsTab({ contactId, patient }: PrescriptionsTabProps) 
 
               <div className="space-y-2">
                 <Label>Válida até</Label>
-                <Input
-                  type="date"
-                  value={validUntil}
-                  onChange={(e) => setValidUntil(e.target.value)}
-                  min={format(new Date(), 'yyyy-MM-dd')}
+                <DatePicker
+                  date={validUntil}
+                  setDate={setValidUntil}
+                  label="Selecione a data"
                 />
               </div>
             </div>

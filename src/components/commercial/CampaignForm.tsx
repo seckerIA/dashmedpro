@@ -14,6 +14,8 @@ import { CommercialCampaign, CommercialCampaignInsert } from "@/types/commercial
 import { COMMERCIAL_CAMPAIGN_TYPE_LABELS } from "@/types/commercial";
 import { formatCurrencyInput, parseCurrencyToNumber } from "@/lib/currency";
 import { Loader2 } from "lucide-react";
+import { DatePicker } from "@/components/ui/date-picker";
+import { format } from "date-fns";
 
 const campaignSchema = z.object({
   name: z.string().min(3, "Nome deve ter pelo menos 3 caracteres"),
@@ -202,10 +204,9 @@ export function CampaignForm({ open, onOpenChange, campaign }: CampaignFormProps
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="start_date">Data de Início *</Label>
-              <Input
-                id="start_date"
-                type="date"
-                {...register("start_date")}
+              <DatePicker
+                date={watch("start_date") ? new Date(watch("start_date")! + 'T00:00:00') : undefined}
+                setDate={(date) => setValue("start_date", date ? format(date, 'yyyy-MM-dd') : "")}
               />
               {errors.start_date && (
                 <p className="text-sm text-destructive">{errors.start_date.message}</p>
@@ -214,10 +215,9 @@ export function CampaignForm({ open, onOpenChange, campaign }: CampaignFormProps
 
             <div className="space-y-2">
               <Label htmlFor="end_date">Data de Término *</Label>
-              <Input
-                id="end_date"
-                type="date"
-                {...register("end_date")}
+              <DatePicker
+                date={watch("end_date") ? new Date(watch("end_date")! + 'T00:00:00') : undefined}
+                setDate={(date) => setValue("end_date", date ? format(date, 'yyyy-MM-dd') : "")}
               />
               {errors.end_date && (
                 <p className="text-sm text-destructive">{errors.end_date.message}</p>

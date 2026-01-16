@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Patient, UpdatePatientMedicalInfoInput, EmergencyContact, BLOOD_TYPES } from '@/types/medicalRecords';
 import { usePatients } from '@/hooks/usePatients';
 import {
@@ -188,17 +189,25 @@ export function PatientInfoTab({ patient, onUpdate, onNewRecord }: PatientInfoTa
           <div className="space-y-1">
             <Label className="text-muted-foreground text-xs">Data de Nascimento</Label>
             {isEditing ? (
-              <Input
-                type="date"
-                value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
+              <DatePicker
+                date={birthDate ? new Date(birthDate + 'T00:00:00') : undefined}
+                setDate={(date) => setBirthDate(date ? format(date, 'yyyy-MM-dd') : '')}
               />
             ) : (
               <p className="font-medium flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
-                {patient.birth_date
-                  ? `${format(parseISO(patient.birth_date), 'dd/MM/yyyy', { locale: ptBR })} (${age} anos)`
-                  : 'Não informado'}
+                {(() => {
+                  try {
+                    if (!patient.birth_date) return 'Não informado';
+                    const date = parseISO(patient.birth_date);
+                    // Validar se a data é válida e o ano é razoável (ex: < 3000)
+                    if (isNaN(date.getTime()) || date.getFullYear() > 2500) return 'Data inválida';
+
+                    return `${format(date, 'dd/MM/yyyy', { locale: ptBR })} (${age !== null ? age : '?'} anos)`;
+                  } catch (e) {
+                    return 'Data inválida';
+                  }
+                })()}
               </p>
             )}
           </div>
@@ -239,8 +248,8 @@ export function PatientInfoTab({ patient, onUpdate, onNewRecord }: PatientInfoTa
               {patient.insurance_type === 'convenio'
                 ? patient.insurance_name || 'Convênio'
                 : patient.insurance_type === 'particular'
-                ? 'Particular'
-                : 'Não informado'}
+                  ? 'Particular'
+                  : 'Não informado'}
             </p>
           </div>
         </CardContent>

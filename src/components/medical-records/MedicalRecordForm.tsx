@@ -25,6 +25,8 @@ import { useEffect, useState } from 'react';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useQueryClient } from '@tanstack/react-query';
+import { DatePicker } from "@/components/ui/date-picker";
+import { format } from 'date-fns';
 
 const formSchema = z.object({
   // Anamnese
@@ -235,7 +237,7 @@ export function MedicalRecordForm({
 
       // Invalidar queries do CRM para atualizar o pipeline
       queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
-      
+
       // Chamar callback onSave após tudo
       onSave?.();
     } catch (error) {
@@ -504,7 +506,10 @@ export function MedicalRecordForm({
                 <FormItem>
                   <FormLabel>Data de Retorno</FormLabel>
                   <FormControl>
-                    <Input type="date" {...field} />
+                    <DatePicker
+                      date={field.value ? new Date(field.value + 'T00:00:00') : undefined}
+                      setDate={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

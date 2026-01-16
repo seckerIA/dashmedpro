@@ -15,6 +15,8 @@ import { CommercialSale, CommercialSaleInsert } from "@/types/commercial";
 import { COMMERCIAL_SALE_STATUS_LABELS, COMMERCIAL_PAYMENT_METHOD_LABELS } from "@/types/commercial";
 import { formatCurrencyInput, parseCurrencyToNumber, formatCurrency } from "@/lib/currency";
 import { Loader2 } from "lucide-react";
+import { DatePicker } from "@/components/ui/date-picker";
+import { format } from "date-fns";
 
 const saleSchema = z.object({
   contact_id: z.string().uuid().optional().or(z.literal("")),
@@ -238,10 +240,9 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
 
           <div className="space-y-2">
             <Label htmlFor="sale_date">Data da Venda</Label>
-            <Input
-              id="sale_date"
-              type="date"
-              {...register("sale_date")}
+            <DatePicker
+              date={watch("sale_date") ? new Date(watch("sale_date")! + 'T00:00:00') : undefined}
+              setDate={(date) => setValue("sale_date", date ? format(date, 'yyyy-MM-dd') : "")}
             />
           </div>
 

@@ -173,3 +173,15 @@ supabase/functions/
 
 ---
 **Version:** 0.4.0 | 2026-01-13 | https://github.com/seckerIA/dashmedpro
+
+### Contexto Atual (16/01/2026 - Sprint UI Financeiro & Otimizações)
+- **Melhorias no Módulo Financeiro**:
+  - **Account Deletion**: Substituído `window.confirm` nativo por componente `AlertDialog` do Shadcn UI para melhor UX/UI.
+  - **Account Form**: Adicionado formatação de moeda em tempo real (`initial_balance`) e seletor de cores pré-definidas (bolinhas) com opção customizada.
+  - **Nova Conta Card**: Adicionado card visual "Adicionar Nova Conta" diretamente no grid de contas bancárias.
+- **Padronização de UI**:
+  - **DatePicker**: Substituição de inputs nativos `type="date"` pelo componente `DatePicker` (Shadcn + date-fns) em vários formulários (`SalesCallForm`, `CampaignForm`, `PatientInfoTab`, `TransactionForm`).
+- **Otimização de Performance**:
+  - **Sidebar**: Corrigido "travamento" (jank) na animação de recolhimento prevenindo quebra de linha de texto (`whitespace-nowrap`) durante a transição CSS.
+- **Fixes**:
+  - Restaurada lógica de fechamento de tags HTML perdidas em `Financial.tsx`.
