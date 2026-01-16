@@ -506,18 +506,15 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
   const isLoading = isSubmitting;
 
   const handleOpenChange = (newOpen: boolean) => {
-    // Se não há procedimento CONSULTA e é um novo contato, não permitir fechar
+    // Se não há procedimento CONSULTA e é um novo contato, avisar mas permitir fechar
     if (!contact && !hasConsultationProcedure && !newOpen) {
-      toast({
-        variant: "destructive",
-        title: "Não é possível fechar",
-        description: "É necessário cadastrar o valor da consulta antes de criar um novo paciente.",
-      });
-      // Abrir o modal de procedimento se ainda não estiver aberto
+      // Se estiver tentando fechar, permitir
+    } else if (!contact && !hasConsultationProcedure && newOpen) {
+      // Se estiver abrindo e não tem procedimento, mostrar toast e abrir form de procedimento
+      // Mas não impedir de abrir o modal principal
       if (!showProcedureForm) {
         setShowProcedureForm(true);
       }
-      return;
     }
 
     // Se forceOpen é true e está tentando fechar, chamar onCancel se disponível
@@ -820,16 +817,20 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
 
 
             <div className="flex justify-end gap-2 pt-4">
-              {!forceOpen && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setOpen(false)}
-                  disabled={isLoading}
-                >
-                  Cancelar
-                </Button>
-              )}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  if (onCancel) {
+                    onCancel();
+                  } else {
+                    setOpen(false);
+                  }
+                }}
+                disabled={isLoading}
+              >
+                Cancelar
+              </Button>
               <Button type="submit" disabled={isLoading}>
                 {isLoading ? "Salvando..." : contact ? "Atualizar" : "Criar Contato"}
               </Button>

@@ -103,102 +103,106 @@ export function TaskAttachments({
                         Anexar Arquivo
                     </Button>
                     <p className="text-xs text-muted-foreground mt-1">
-                        PDF, DOC, XLS, imagens até 10MB
+                        PDF, DOC, XLS, imagens até 50MB
                     </p>
                 </div>
             )}
 
             {/* Lista de Anexos */}
-            {allFiles.length > 0 && (
-                <div className="space-y-2">
-                    {allFiles.map((item, idx) => {
-                        if (item.type === 'pending') {
-                            const file = item.file as File;
-                            return (
-                                <div
-                                    key={`pending-${idx}`}
-                                    className="flex items-center gap-3 p-2 bg-muted/50 rounded-lg border border-dashed"
-                                >
-                                    <div className="flex-shrink-0 text-muted-foreground">
-                                        {getFileTypeIcon(file.type)}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium truncate">{file.name}</p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {formatFileSize(file.size)} • Aguardando upload
-                                        </p>
-                                    </div>
-                                    {onRemovePendingFile && (
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8"
-                                            onClick={() => onRemovePendingFile(item.index as number)}
-                                        >
-                                            <X className="h-4 w-4" />
-                                        </Button>
-                                    )}
-                                </div>
-                            );
-                        } else {
-                            const attachment = (item as any).attachment as TaskAttachment;
-                            return (
-                                <div
-                                    key={attachment.id}
-                                    className="flex items-center gap-3 p-2 bg-card rounded-lg border"
-                                >
-                                    <div className="flex-shrink-0 text-primary">
-                                        {getFileTypeIcon(attachment.file_type)}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium truncate">{attachment.file_name}</p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {formatFileSize(attachment.file_size)}
-                                        </p>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8"
-                                            onClick={() => handleDownload(attachment)}
-                                        >
-                                            <Download className="h-4 w-4" />
-                                        </Button>
-                                        {isEditing && (
+            {
+                allFiles.length > 0 && (
+                    <div className="space-y-2">
+                        {allFiles.map((item, idx) => {
+                            if (item.type === 'pending') {
+                                const file = item.file as File;
+                                return (
+                                    <div
+                                        key={`pending-${idx}`}
+                                        className="flex items-center gap-3 p-2 bg-muted/50 rounded-lg border border-dashed"
+                                    >
+                                        <div className="flex-shrink-0 text-muted-foreground">
+                                            {getFileTypeIcon(file.type)}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium truncate">{file.name}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {formatFileSize(file.size)} • Aguardando upload
+                                            </p>
+                                        </div>
+                                        {onRemovePendingFile && (
                                             <Button
                                                 type="button"
                                                 variant="ghost"
                                                 size="icon"
-                                                className="h-8 w-8 text-destructive hover:text-destructive"
-                                                onClick={() => handleDelete(attachment)}
-                                                disabled={isDeleting}
+                                                className="h-8 w-8"
+                                                onClick={() => onRemovePendingFile(item.index as number)}
                                             >
-                                                {isDeleting ? (
-                                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                                ) : (
-                                                    <Trash2 className="h-4 w-4" />
-                                                )}
+                                                <X className="h-4 w-4" />
                                             </Button>
                                         )}
                                     </div>
-                                </div>
-                            );
-                        }
-                    })}
-                </div>
-            )}
+                                );
+                            } else {
+                                const attachment = (item as any).attachment as TaskAttachment;
+                                return (
+                                    <div
+                                        key={attachment.id}
+                                        className="flex items-center gap-3 p-2 bg-card rounded-lg border"
+                                    >
+                                        <div className="flex-shrink-0 text-primary">
+                                            {getFileTypeIcon(attachment.file_type)}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium truncate">{attachment.file_name}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {formatFileSize(attachment.file_size)}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8"
+                                                onClick={() => handleDownload(attachment)}
+                                            >
+                                                <Download className="h-4 w-4" />
+                                            </Button>
+                                            {isEditing && (
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-destructive hover:text-destructive"
+                                                    onClick={() => handleDelete(attachment)}
+                                                    disabled={isDeleting}
+                                                >
+                                                    {isDeleting ? (
+                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                    ) : (
+                                                        <Trash2 className="h-4 w-4" />
+                                                    )}
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            }
+                        })}
+                    </div>
+                )
+            }
 
             {/* Loading State */}
-            {isLoading && (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm">Carregando anexos...</span>
-                </div>
-            )}
-        </div>
+            {
+                isLoading && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-sm">Carregando anexos...</span>
+                    </div>
+                )
+            }
+        </div >
     );
 }
 

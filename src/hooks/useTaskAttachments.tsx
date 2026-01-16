@@ -29,8 +29,8 @@ export const ALLOWED_FILE_TYPES = [
     'text/plain',
 ];
 
-// Tamanho máximo: 10MB
-export const MAX_FILE_SIZE = 10 * 1024 * 1024;
+// Tamanho máximo: 50MB
+export const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
 export function useTaskAttachments(taskId?: string) {
     const { user } = useAuth();

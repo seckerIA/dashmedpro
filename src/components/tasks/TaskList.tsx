@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TaskCard } from './TaskCard';
 import { TaskForm } from './TaskForm';
+import { TaskViewModal } from './TaskViewModal';
 import { TaskWithProfile, TaskWithCRM, CreateTaskData, UpdateTaskData, TaskPriority } from '@/types/tasks';
 import { CheckCircle2, AlertCircle, Zap, Target, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -51,6 +52,7 @@ export function TaskList({
   teamMembers = [],
 }: TaskListProps) {
   const [selectedTask, setSelectedTask] = useState<TaskWithCRM | null>(null);
+  const [viewingTask, setViewingTask] = useState<TaskWithCRM | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [filter, setFilter] = useState<'all' | 'my_tasks'>('all');
   const [selectedPriorities, setSelectedPriorities] = useState<TaskPriority[]>([]);
@@ -112,6 +114,7 @@ export function TaskList({
   };
 
   const handleEditTask = (task: TaskWithCRM) => {
+    setViewingTask(null); // Close view modal if open
     setSelectedTask(task);
     setIsCreating(false);
   };
@@ -130,6 +133,14 @@ export function TaskList({
     console.log('[TaskList] Team members disponíveis:', teamMembers.length);
     setIsCreating(true);
     console.log('[TaskList] Estado isCreating alterado para true');
+  };
+
+  const handleTaskClick = (task: TaskWithCRM) => {
+    setViewingTask(task);
+  };
+
+  const handleCloseView = () => {
+    setViewingTask(null);
   };
 
   const handlePriorityToggle = (priority: TaskPriority) => {
@@ -274,6 +285,7 @@ export function TaskList({
                     >
                       <TaskCard
                         task={task}
+                        onClick={() => handleTaskClick(task)}
                         onEdit={handleEditTask}
                         onDelete={handleTaskDelete}
                         onToggleComplete={handleTaskToggleComplete}
@@ -330,6 +342,7 @@ export function TaskList({
                 >
                   <TaskCard
                     task={task}
+                    onClick={() => handleTaskClick(task)}
                     onEdit={handleEditTask}
                     onDelete={handleTaskDelete}
                     onToggleComplete={handleTaskToggleComplete}
@@ -365,6 +378,14 @@ export function TaskList({
           </div>
         </div>
       )}
+
+      {/* Modal de Visualização */}
+      <TaskViewModal
+        task={viewingTask}
+        isOpen={!!viewingTask}
+        onClose={handleCloseView}
+        onEdit={handleEditTask}
+      />
 
     </div>
   );

@@ -29,9 +29,10 @@ interface TaskCardProps {
   onDelete: (taskId: string) => void;
   onToggleComplete: (taskId: string) => void;
   onToggleAssignmentComplete?: (assignmentId: string) => void;
+  onClick?: () => void;
 }
 
-export function TaskCard({ task, onEdit, onDelete, onToggleComplete, onToggleAssignmentComplete }: TaskCardProps) {
+export function TaskCard({ task, onEdit, onDelete, onToggleComplete, onToggleAssignmentComplete, onClick }: TaskCardProps) {
   const { user } = useAuth();
   const { categories } = useTaskCategories();
   const {
@@ -124,6 +125,17 @@ export function TaskCard({ task, onEdit, onDelete, onToggleComplete, onToggleAss
     <Card
       ref={setNodeRef}
       style={style}
+      onClick={(e) => {
+        // Prevent click when interacting with controls
+        if (
+          (e.target as HTMLElement).closest('button') ||
+          (e.target as HTMLElement).closest('[role="checkbox"]') ||
+          (e.target as HTMLElement).closest('[data-no-card-click="true"]')
+        ) {
+          return;
+        }
+        onClick?.();
+      }}
       className={cn(
         "border border-border shadow-sm rounded-2xl transition-all duration-200 hover:shadow-md cursor-pointer group",
         isDragging && "opacity-50 scale-105 border-primary",
@@ -138,6 +150,7 @@ export function TaskCard({ task, onEdit, onDelete, onToggleComplete, onToggleAss
             {...attributes}
             {...listeners}
             className="flex items-center justify-center p-1 rounded-lg hover:bg-muted/50 transition-colors cursor-grab active:cursor-grabbing"
+            data-no-card-click="true"
           >
             <GripVertical className="h-4 w-4 text-muted-foreground" />
           </div>

@@ -171,7 +171,8 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
         description: data.description || undefined,
         due_date: data.due_date ? toISOWithTimezone(data.due_date) : undefined,
         priority: data.priority,
-        assigned_to: data.assigned_to || undefined,
+        // Ensure assigned_to is set if users are selected (fallback to first user)
+        assigned_to: data.assigned_to || (selectedUsers.length > 0 ? selectedUsers[0] : undefined),
         assigned_to_users: selectedUsers.length > 0 ? selectedUsers : undefined,
         category: data.category,
         deal_id: data.deal_id || undefined,
