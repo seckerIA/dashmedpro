@@ -32,7 +32,7 @@ export const useFinancialAccounts = () => {
 
       let query = supabase
         .from("financial_accounts")
-        .select("*")
+        .select("*, profiles:user_id(full_name)")
         .eq("is_active", true)
         .order("created_at", { ascending: false })
         .limit(100); // Limitar para performance
@@ -235,7 +235,7 @@ export const useFinancialAccounts = () => {
     bank_name: account.bank_name,
     balance: account.current_balance || 0,
     color: account.color || '#3b82f6',
-    owner_name: undefined, // TODO: implementar busca separada do nome do criador se necessário
+    owner_name: (account as any).profiles?.full_name || undefined,
   })) || [];
 
   const totalBalance = accounts?.reduce((sum, account) => sum + (account.current_balance || 0), 0) || 0;
