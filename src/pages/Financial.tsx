@@ -29,7 +29,8 @@ import {
   Pencil,
   Trash2,
   User,
-  Settings
+  Settings,
+  CircleDollarSign
 } from "lucide-react"
 import {
   Table,
@@ -43,7 +44,7 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, Line
 import { useFinancialMetrics } from "@/hooks/useFinancialMetrics"
 import { useFinancialAccounts } from "@/hooks/useFinancialAccounts"
 import { useFinancialTransactions } from "@/hooks/useFinancialTransactions"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { format, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear, subDays } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { DateRange } from "react-day-picker"
@@ -82,10 +83,34 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import FinancialTransactions from "./FinancialTransactions"
+import { SinalTab } from "@/components/financial/SinalTab"
+import FinancialBudgets from "./FinancialBudgets"
+import FinancialForecasts from "./FinancialForecasts"
 
 const Financial = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get("tab") || "dashboard";
+  const [activeTab, setActiveTab] = useState(tabFromUrl);
+
   const { isAdmin, isVendedor, isGestorTrafego, isSecretaria } = useUserProfile();
+
+  useEffect(() => {
+    if (tabFromUrl) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
+
+  const handleTabChange = (nextTab: string) => {
+    setActiveTab(nextTab);
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev);
+      params.set("tab", nextTab);
+      return params;
+    });
+  };
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
@@ -329,513 +354,625 @@ const Financial = () => {
         </div>
       </div>
 
-      {/* Cards de Métricas Principais */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-        {/* Modal de Configuração de Distribuição */}
-        <FinancialDistributionConfig
-          open={isDistributionConfigOpen}
-          onOpenChange={setIsDistributionConfigOpen}
-        />
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-9 gap-2 h-auto p-1 bg-muted/50 mb-6">
+          <TabsTrigger value="dashboard" className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm py-3">
+            <BarChart3 className="w-4 h-4 mr-2" />
+            Dashboard
+          </TabsTrigger>
+          <TabsTrigger value="transacoes" className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm py-3">
+            <Receipt className="w-4 h-4 mr-2" />
+            Transações
+          </TabsTrigger>
+          {(!isVendedor && !isGestorTrafego) && (
+            <TabsTrigger value="sinais" className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm py-3">
+              <CircleDollarSign className="w-4 h-4 mr-2" />
+              Sinais
+            </TabsTrigger>
+          )}
+          <TabsTrigger value="contas" className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm py-3">
+            <Building2 className="w-4 h-4 mr-2" />
+            Contas
+          </TabsTrigger>
+          <TabsTrigger value="categorias" className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm py-3">
+            <ShoppingCart className="w-4 h-4 mr-2" />
+            Categorias
+          </TabsTrigger>
+          <TabsTrigger value="recorrencias" className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm py-3">
+            <Zap className="w-4 h-4 mr-2" />
+            Recorrências
+          </TabsTrigger>
+          <TabsTrigger value="relatorios" className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm py-3">
+            <BarChart3 className="w-4 h-4 mr-2" />
+            Relatórios
+          </TabsTrigger>
+          <TabsTrigger value="orcamentos" className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm py-3">
+            <FileText className="w-4 h-4 mr-2" />
+            Orçamentos
+          </TabsTrigger>
+          <TabsTrigger value="previsoes" className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm py-3">
+            <TrendingUp className="w-4 h-4 mr-2" />
+            Previsões
+          </TabsTrigger>
+        </TabsList>
 
-        {/* Modal de Nova Conta */}
-        <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 border-none text-white">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-emerald-100">{isSecretaria ? "Total de Sinais" : "Saldo Total"}</p>
-              <Wallet className="w-5 h-5 text-emerald-100" />
-            </div>
-            <p className="text-3xl font-bold mb-1">{formatCurrency(metrics?.totalBalance || 0)}</p>
-            <p className="text-xs text-emerald-100">{isSecretaria ? "Acumulado" : "Todas as contas"}</p>
-          </CardContent>
-        </Card>
+        <TabsContent value="dashboard" className="space-y-6">
+          {/* Cards de Métricas Principais */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+            {/* Modal de Configuração de Distribuição */}
+            <FinancialDistributionConfig
+              open={isDistributionConfigOpen}
+              onOpenChange={setIsDistributionConfigOpen}
+            />
 
-        {/* Receitas do Mês */}
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground">{isSecretaria ? "Sinais do Mês" : "Receitas do Mês"}</p>
-              <ArrowUpRight className="w-5 h-5 text-emerald-500" />
-            </div>
-            <p className="text-3xl font-bold text-emerald-500 mb-1">{formatCurrency(metrics?.monthRevenue || 0)}</p>
-            <div className="flex items-center gap-1">
-              <TrendingUp className="w-3 h-3 text-emerald-500" />
-              <span className="text-xs text-muted-foreground">+12.5% vs mês anterior</span>
-            </div>
-          </CardContent>
-        </Card>
+            {/* Modal de Nova Conta */}
+            <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 border-none text-white">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-emerald-100">{isSecretaria ? "Total de Sinais" : "Saldo Total"}</p>
+                  <Wallet className="w-5 h-5 text-emerald-100" />
+                </div>
+                <p className="text-3xl font-bold mb-1">{formatCurrency(metrics?.totalBalance || 0)}</p>
+                <p className="text-xs text-emerald-100">{isSecretaria ? "Acumulado" : "Todas as contas"}</p>
+              </CardContent>
+            </Card>
 
-        {/* Cards ocultos para secretária */}
-        {!isSecretaria && (
-          <>
-            {/* Despesas do Mês */}
+            {/* Receitas do Mês */}
             <Card className="bg-gradient-to-br from-card to-card/50 border-border">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm text-muted-foreground">Despesas do Mês</p>
-                  <ArrowDownLeft className="w-5 h-5 text-red-500" />
+                  <p className="text-sm text-muted-foreground">{isSecretaria ? "Sinais do Mês" : "Receitas do Mês"}</p>
+                  <ArrowUpRight className="w-5 h-5 text-emerald-500" />
                 </div>
-                <p className="text-3xl font-bold text-red-500 mb-1">{formatCurrency((metrics?.monthExpenses || 0) + (metrics?.monthTotalCosts || 0))}</p>
+                <p className="text-3xl font-bold text-emerald-500 mb-1">{formatCurrency(metrics?.monthRevenue || 0)}</p>
                 <div className="flex items-center gap-1">
-                  <TrendingUp className="w-3 h-3 text-red-500" />
-                  <span className="text-xs text-muted-foreground">+8.2% vs mês anterior</span>
+                  <TrendingUp className="w-3 h-3 text-emerald-500" />
+                  <span className="text-xs text-muted-foreground">+12.5% vs mês anterior</span>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Custos Totais */}
-            <Card className="bg-gradient-to-br from-card to-card/50 border-border">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm text-muted-foreground">Custos Totais</p>
-                  <ShoppingCart className="w-5 h-5 text-orange-500" />
-                </div>
-                <p className="text-3xl font-bold text-orange-500 mb-1">{formatCurrency(metrics?.monthTotalCosts || 0)}</p>
-                <div className="flex items-center gap-1">
-                  <TrendingUp className="w-3 h-3 text-orange-500" />
-                  <span className="text-xs text-muted-foreground">Custos de serviços</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Lucro Líquido */}
-            <Card className="bg-gradient-to-br from-card to-card/50 border-border">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm text-muted-foreground">Lucro Líquido</p>
-                  <DollarSign className="w-5 h-5 text-blue-500" />
-                </div>
-                <p className="text-3xl font-bold text-blue-500 mb-1">{formatCurrency(metrics?.monthNetProfit || 0)}</p>
-                <div className="flex items-center gap-1">
-                  <TrendingUp className="w-3 h-3 text-blue-500" />
-                  <span className="text-xs text-muted-foreground">{metrics?.netProfitMargin.toFixed(2)}% margem</span>
-                </div>
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </div>
-
-      {/* Widget de Transações Recorrentes - Oculto para secretária */}
-      {!isSecretaria && <RecurringTransactionsWidget />}
-
-      {/* Contas Bancárias - Oculto para secretária */}
-      {!isSecretaria && (
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-foreground">Contas Bancárias</CardTitle>
-              <Button
-                className="bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm hover:shadow-md transition-all"
-                size="sm"
-                onClick={() => setIsAccountFormOpen(true)}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Nova Conta
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {accountsSummary.length === 0 && (
-              <Alert className="mb-4 border-amber-500/50 bg-amber-500/10">
-                <AlertCircle className="h-4 w-4 text-amber-500" />
-                <AlertTitle className="text-amber-600">Nenhuma conta bancária cadastrada</AlertTitle>
-                <AlertDescription className="text-amber-600/80">
-                  Para que os recebimentos de consultas e transações financeiras sejam registrados corretamente,
-                  você precisa cadastrar pelo menos uma conta bancária ativa. Clique em <strong>"Nova Conta"</strong> para começar.
-                </AlertDescription>
-              </Alert>
-            )}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {accountsSummary.map((account) => {
-                const accountColor = account.color || '#3b82f6';
-                return (
-                  <Card
-                    key={account.id}
-                    className="relative overflow-hidden border-2 transition-all hover:shadow-lg"
-                    style={{
-                      borderColor: `${accountColor}30`,
-                      background: `linear-gradient(135deg, ${accountColor}08 0%, ${accountColor}03 100%)`
-                    }}
-                  >
-                    {/* Barra de cor no topo */}
-                    <div
-                      className="absolute top-0 left-0 right-0 h-1"
-                      style={{ backgroundColor: accountColor }}
-                    />
-                    <CardContent className="p-5 pt-4">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="p-2.5 rounded-xl"
-                            style={{ backgroundColor: `${accountColor}20` }}
-                          >
-                            {account.type === 'conta_corrente' && <Building2 className="w-5 h-5" style={{ color: accountColor }} />}
-                            {account.type === 'poupanca' && <PieChart className="w-5 h-5" style={{ color: accountColor }} />}
-                            {account.type === 'caixa' && <Wallet className="w-5 h-5" style={{ color: accountColor }} />}
-                            {account.type === 'investimento' && <TrendingUp className="w-5 h-5" style={{ color: accountColor }} />}
-                            {(!account.type || account.type === 'outros') && <CreditCard className="w-5 h-5" style={{ color: accountColor }} />}
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold text-foreground">{account.name}</p>
-                            <p className="text-xs text-muted-foreground">{account.bank_name || 'Sem instituição'}</p>
-                          </div>
-                        </div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-muted">
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-40">
-                            <DropdownMenuItem
-                              onClick={() => {
-                                const fullAccount = accounts?.find(a => a.id === account.id);
-                                if (fullAccount) {
-                                  setEditingAccount(fullAccount);
-                                  setIsAccountFormOpen(true);
-                                }
-                              }}
-                              className="cursor-pointer"
-                            >
-                              <Pencil className="w-4 h-4 mr-2" />
-                              Editar
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => setAccountToDelete(account.id)}
-                              className="cursor-pointer text-red-500 focus:text-red-500"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Excluir
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-
-                      <p className="text-2xl font-bold text-foreground mb-2">{formatCurrency(account.balance || 0)}</p>
-
-                      {/* Mostrar criador se for admin/dono e tiver owner_name */}
-                      {account.owner_name && (
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-2 pt-2 border-t border-border/50">
-                          <User className="w-3 h-3" />
-                          <span>Criada por: <span className="font-medium text-foreground/80">{account.owner_name}</span></span>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-
-              {/* Botão Card para Nova Conta */}
-              <button
-                onClick={() => setIsAccountFormOpen(true)}
-                className="group flex flex-col items-center justify-center h-full min-h-[160px] p-6 rounded-xl border-2 border-dashed border-muted-foreground/20 hover:border-emerald-500/50 bg-muted/5 hover:bg-emerald-500/5 transition-all duration-300"
-              >
-                <div className="p-4 rounded-full bg-muted group-hover:bg-emerald-500/10 transition-colors mb-3">
-                  <Plus className="w-6 h-6 text-muted-foreground group-hover:text-emerald-500 transition-colors" />
-                </div>
-                <p className="font-medium text-muted-foreground group-hover:text-emerald-600 transition-colors">Adicionar Nova Conta</p>
-                <p className="text-xs text-muted-foreground/60 mt-1">Conta corrente, caixa ou investimento</p>
-              </button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Gráficos */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Receitas vs Despesas */}
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border">
-          <CardHeader>
-            <CardTitle className="text-foreground">Receitas vs Despesas</CardTitle>
-            <CardDescription>Comparativo dos últimos 5 meses</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={monthlyData || []}>
-                <defs>
-                  <linearGradient id="colorReceitas" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="colorDespesas" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
-                <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} tickLine={false} axisLine={false} />
-                <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} tickLine={false} axisLine={false} tickFormatter={(value: number) => formatCurrencyShort(value)} />
-                <EnhancedTooltip valueFormatter={(value: number) => formatCurrency(value)} />
-                <Area type="monotone" dataKey="receitas" stroke="#10b981" fillOpacity={1} fill="url(#colorReceitas)" strokeWidth={2} />
-                <Area type="monotone" dataKey="despesas" stroke="#ef4444" fillOpacity={1} fill="url(#colorDespesas)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Custos por Tipo */}
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border">
-          <CardHeader>
-            <CardTitle className="text-foreground">Custos por Tipo</CardTitle>
-            <CardDescription>Distribuição dos custos de serviços</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!costsBreakdown || costsBreakdown.length === 0 ? (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                <div className="text-center">
-                  <p className="text-lg mb-2">📊</p>
-                  <p className="text-sm">Nenhum custo registrado no período</p>
-                </div>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <RechartsPieChart>
-                  <defs>
-                    {(costsBreakdown || []).map((entry, index) => {
-                      const gradient = getGradient(index);
-                      return (
-                        <linearGradient key={index} id={`costGradient-${index}`} x1="0" y1="0" x2="1" y2="1">
-                          <stop offset="0%" stopColor={gradient.start} stopOpacity={0.9} />
-                          <stop offset="100%" stopColor={gradient.end} stopOpacity={0.7} />
-                        </linearGradient>
-                      );
-                    })}
-                  </defs>
-                  <Pie
-                    data={costsBreakdown || []}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={true}
-                    label={({ name, percent }) => {
-                      return `${name}: ${(percent * 100).toFixed(1)}%`;
-                    }}
-                    outerRadius={80}
-                    innerRadius={50}
-                    fill="#8884d8"
-                    dataKey="value"
-                    stroke="hsl(var(--background))"
-                    strokeWidth={2}
-                  >
-                    {(costsBreakdown || []).map((entry, index) => {
-                      return (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={`url(#costGradient-${index})`}
-                        />
-                      );
-                    })}
-                  </Pie>
-                  <EnhancedTooltip valueFormatter={(value: number) => formatCurrency(value)} />
-                </RechartsPieChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Despesas por Categoria */}
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border">
-          <CardHeader>
-            <CardTitle className="text-foreground">Despesas por Categoria</CardTitle>
-            <CardDescription>Distribuição do mês atual</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!expensesByCategory || expensesByCategory.length === 0 ? (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                <div className="text-center">
-                  <p className="text-lg mb-2">📊</p>
-                  <p className="text-sm">Nenhuma despesa registrada no mês atual</p>
-                </div>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={expensesByCategory || []} layout="vertical" margin={{ left: 0, right: 30, top: 0, bottom: 0 }}>
-                  <defs>
-                    {(expensesByCategory || []).map((entry, index) => {
-                      const gradient = getGradient(index);
-                      return (
-                        <linearGradient key={index} id={`expenseGradient-${index}`} x1="0" y1="0" x2="1" y2="0">
-                          <stop offset="0%" stopColor={gradient.start} stopOpacity={0.9} />
-                          <stop offset="100%" stopColor={gradient.end} stopOpacity={0.7} />
-                        </linearGradient>
-                      );
-                    })}
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} horizontal={false} />
-                  <XAxis type="number" stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} tickLine={false} axisLine={false} tickFormatter={(value: number) => formatCurrencyShort(value)} />
-                  <YAxis type="category" dataKey="name" width={100} stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} tickLine={false} axisLine={false} />
-                  <EnhancedTooltip valueFormatter={(value: number) => formatCurrency(value)} />
-                  <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={32}>
-                    {(expensesByCategory || []).map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={`url(#expenseGradient-${index})`} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Fluxo de Caixa com Previsão */}
-      <Card className="bg-gradient-to-br from-card to-card/50 border-border">
-        <CardHeader>
-          <CardTitle className="text-foreground">Fluxo de Caixa e Previsão</CardTitle>
-          <CardDescription>Saldo acumulado com projeção dos próximos 2 meses</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={cashFlowProjection || []}>
-              <defs>
-                <linearGradient id="cashFlowGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.05} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
-              <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} tickLine={false} axisLine={false} />
-              <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} tickLine={false} axisLine={false} tickFormatter={(value: number) => formatCurrencyShort(value)} />
-              <EnhancedTooltip valueFormatter={(value: number) => formatCurrency(value)} />
-              <Line
-                type="monotone"
-                dataKey="saldo"
-                stroke="#3b82f6"
-                strokeWidth={3}
-                dot={{ fill: '#3b82f6', r: 5 }}
-                activeDot={{ r: 7 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-          <div className="flex items-center justify-center gap-4 mt-4">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-              <span className="text-xs text-muted-foreground">Saldo Real</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-0.5 bg-blue-500 border-dashed"></div>
-              <span className="text-xs text-muted-foreground">Previsão</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Transações Recentes */}
-      <Card className="bg-gradient-to-br from-card to-card/50 border-border">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-foreground">Transações Recentes</CardTitle>
-              <CardDescription>Últimas 5 movimentações financeiras</CardDescription>
-            </div>
-            <Button variant="outline" size="sm">
-              <Eye className="w-4 h-4 mr-2" />
-              Ver Todas
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Data</TableHead>
-                <TableHead>Descrição</TableHead>
-                <TableHead>Categoria</TableHead>
-                <TableHead>Conta</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead className="text-right">Valor</TableHead>
-                <TableHead className="text-center">Custos</TableHead>
-                <TableHead className="text-center">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {recentTransactions.map((transaction) => (
-                <TableRow key={transaction.id}>
-                  <TableCell className="text-muted-foreground">
-                    {format(new Date(transaction.transaction_date), 'dd/MM/yyyy')}
-                  </TableCell>
-                  <TableCell className="font-medium">{transaction.description}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-xs">
-                      {transaction.category?.name || 'Sem categoria'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">{transaction.account?.name || '-'}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {transaction.type === 'entrada' ? (
-                        <>
-                          <ArrowUpRight className="w-4 h-4 text-emerald-500" />
-                          <span className="text-xs text-emerald-500">Entrada</span>
-                        </>
-                      ) : (
-                        <>
-                          <ArrowDownLeft className="w-4 h-4 text-red-500" />
-                          <span className="text-xs text-red-500">Saída</span>
-                        </>
-                      )}
+            {/* Cards ocultos para secretária */}
+            {!isSecretaria && (
+              <>
+                {/* Despesas do Mês */}
+                <Card className="bg-gradient-to-br from-card to-card/50 border-border">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm text-muted-foreground">Despesas do Mês</p>
+                      <ArrowDownLeft className="w-5 h-5 text-red-500" />
                     </div>
-                  </TableCell>
-                  <TableCell className={`text-right font-semibold ${transaction.type === 'entrada' ? 'text-emerald-500' : 'text-red-500'}`}>
-                    {transaction.type === 'entrada' ? '+' : '-'} {formatCurrency(transaction.amount)}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {transaction.type === 'entrada' && transaction.has_costs ? (
-                      <Badge variant="outline" className="text-xs text-orange-500 border-orange-500/20">
-                        R$ {formatCurrency(transaction.total_costs || 0)}
-                      </Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
-                      {transaction.status || 'concluída'}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                    <p className="text-3xl font-bold text-red-500 mb-1">{formatCurrency((metrics?.monthExpenses || 0) + (metrics?.monthTotalCosts || 0))}</p>
+                    <div className="flex items-center gap-1">
+                      <TrendingUp className="w-3 h-3 text-red-500" />
+                      <span className="text-xs text-muted-foreground">+8.2% vs mês anterior</span>
+                    </div>
+                  </CardContent>
+                </Card>
 
-      {/* Cards de Navegação Rápida */}
-      <Card className="bg-gradient-to-br from-card to-card/50 border-border">
-        <CardHeader>
-          <CardTitle className="text-foreground">Acesso Rápido</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-            {[
-              { icon: Receipt, label: 'Transações', color: 'blue', path: '/financeiro/transacoes' },
-              { icon: DollarSign, label: 'Sinais', color: 'yellow', path: '/financeiro/sinais' },
-              { icon: Building2, label: 'Contas', color: 'emerald', path: null, action: 'openAccounts' },
-              { icon: ShoppingCart, label: 'Categorias', color: 'purple', path: '/financeiro/categorias' },
-              { icon: Zap, label: 'Recorrências', color: 'orange', path: '/financeiro/recorrencias' },
-              { icon: BarChart3, label: 'Relatórios', color: 'pink', path: '/financeiro/relatorios' },
-              { icon: FileText, label: 'Orçamentos', color: 'indigo', path: '/financeiro/orcamentos' },
-              { icon: TrendingUp, label: 'Previsões', color: 'cyan', path: '/financeiro/previsoes' },
-            ].map((item, index) => (
-              <button
-                key={index}
-                onClick={() => {
-                  if (item.action === 'openAccounts') {
-                    setIsAccountFormOpen(true);
-                  } else if (item.path) {
-                    navigate(item.path);
-                  }
-                }}
-                className="flex flex-col items-center justify-center p-6 bg-muted/20 hover:bg-muted/40 rounded-xl border border-border transition-all hover:scale-105 hover:shadow-lg"
-              >
-                <div className={`p-3 bg-${item.color}-500/10 rounded-xl mb-3`}>
-                  <item.icon className={`w-6 h-6 text-${item.color}-500`} />
-                </div>
-                <span className="text-sm font-medium text-foreground">{item.label}</span>
-              </button>
-            ))}
+                {/* Custos Totais */}
+                <Card className="bg-gradient-to-br from-card to-card/50 border-border">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm text-muted-foreground">Custos Totais</p>
+                      <ShoppingCart className="w-5 h-5 text-orange-500" />
+                    </div>
+                    <p className="text-3xl font-bold text-orange-500 mb-1">{formatCurrency(metrics?.monthTotalCosts || 0)}</p>
+                    <div className="flex items-center gap-1">
+                      <TrendingUp className="w-3 h-3 text-orange-500" />
+                      <span className="text-xs text-muted-foreground">Custos de serviços</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Lucro Líquido */}
+                <Card className="bg-gradient-to-br from-card to-card/50 border-border">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm text-muted-foreground">Lucro Líquido</p>
+                      <DollarSign className="w-5 h-5 text-blue-500" />
+                    </div>
+                    <p className="text-3xl font-bold text-blue-500 mb-1">{formatCurrency(metrics?.monthNetProfit || 0)}</p>
+                    <div className="flex items-center gap-1">
+                      <TrendingUp className="w-3 h-3 text-blue-500" />
+                      <span className="text-xs text-muted-foreground">{metrics?.netProfitMargin.toFixed(2)}% margem</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
           </div>
-        </CardContent>
-      </Card>
+
+          {/* Widget de Transações Recorrentes - Oculto para secretária */}
+          {!isSecretaria && <RecurringTransactionsWidget />}
+
+          {/* Contas Bancárias - Oculto para secretária */}
+          {!isSecretaria && (
+            <Card className="bg-gradient-to-br from-card to-card/50 border-border">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-foreground">Contas Bancárias</CardTitle>
+                  <Button
+                    className="bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm hover:shadow-md transition-all"
+                    size="sm"
+                    onClick={() => setIsAccountFormOpen(true)}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Nova Conta
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {accountsSummary.length === 0 && (
+                  <Alert className="mb-4 border-amber-500/50 bg-amber-500/10">
+                    <AlertCircle className="h-4 w-4 text-amber-500" />
+                    <AlertTitle className="text-amber-600">Nenhuma conta bancária cadastrada</AlertTitle>
+                    <AlertDescription className="text-amber-600/80">
+                      Para que os recebimentos de consultas e transações financeiras sejam registrados corretamente,
+                      você precisa cadastrar pelo menos uma conta bancária ativa. Clique em <strong>"Nova Conta"</strong> para começar.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {accountsSummary.map((account) => {
+                    const accountColor = account.color || '#3b82f6';
+                    return (
+                      <Card
+                        key={account.id}
+                        className="relative overflow-hidden border-2 transition-all hover:shadow-lg"
+                        style={{
+                          borderColor: `${accountColor}30`,
+                          background: `linear-gradient(135deg, ${accountColor}08 0%, ${accountColor}03 100%)`
+                        }}
+                      >
+                        {/* Barra de cor no topo */}
+                        <div
+                          className="absolute top-0 left-0 right-0 h-1"
+                          style={{ backgroundColor: accountColor }}
+                        />
+                        <CardContent className="p-5 pt-4">
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="p-2.5 rounded-xl"
+                                style={{ backgroundColor: `${accountColor}20` }}
+                              >
+                                {account.type === 'conta_corrente' && <Building2 className="w-5 h-5" style={{ color: accountColor }} />}
+                                {account.type === 'poupanca' && <PieChart className="w-5 h-5" style={{ color: accountColor }} />}
+                                {account.type === 'caixa' && <Wallet className="w-5 h-5" style={{ color: accountColor }} />}
+                                {account.type === 'investimento' && <TrendingUp className="w-5 h-5" style={{ color: accountColor }} />}
+                                {(!account.type || account.type === 'outros') && <CreditCard className="w-5 h-5" style={{ color: accountColor }} />}
+                              </div>
+                              <div>
+                                <p className="text-sm font-semibold text-foreground">{account.name}</p>
+                                <p className="text-xs text-muted-foreground">{account.bank_name || 'Sem instituição'}</p>
+                              </div>
+                            </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-muted">
+                                  <MoreVertical className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-40">
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    const fullAccount = accounts?.find(a => a.id === account.id);
+                                    if (fullAccount) {
+                                      setEditingAccount(fullAccount);
+                                      setIsAccountFormOpen(true);
+                                    }
+                                  }}
+                                  className="cursor-pointer"
+                                >
+                                  <Pencil className="w-4 h-4 mr-2" />
+                                  Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => setAccountToDelete(account.id)}
+                                  className="cursor-pointer text-red-500 focus:text-red-500"
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Excluir
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+
+                          <p className="text-2xl font-bold text-foreground mb-2">{formatCurrency(account.balance || 0)}</p>
+
+                          {/* Mostrar criador se for admin/dono e tiver owner_name */}
+                          {account.owner_name && (
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-2 pt-2 border-t border-border/50">
+                              <User className="w-3 h-3" />
+                              <span>Criada por: <span className="font-medium text-foreground/80">{account.owner_name}</span></span>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+
+                  {/* Botão Card para Nova Conta */}
+                  <button
+                    onClick={() => setIsAccountFormOpen(true)}
+                    className="group flex flex-col items-center justify-center h-full min-h-[160px] p-6 rounded-xl border-2 border-dashed border-muted-foreground/20 hover:border-emerald-500/50 bg-muted/5 hover:bg-emerald-500/5 transition-all duration-300"
+                  >
+                    <div className="p-4 rounded-full bg-muted group-hover:bg-emerald-500/10 transition-colors mb-3">
+                      <Plus className="w-6 h-6 text-muted-foreground group-hover:text-emerald-500 transition-colors" />
+                    </div>
+                    <p className="font-medium text-muted-foreground group-hover:text-emerald-600 transition-colors">Adicionar Nova Conta</p>
+                    <p className="text-xs text-muted-foreground/60 mt-1">Conta corrente, caixa ou investimento</p>
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Gráficos */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Receitas vs Despesas */}
+            <Card className="bg-gradient-to-br from-card to-card/50 border-border">
+              <CardHeader>
+                <CardTitle className="text-foreground">Receitas vs Despesas</CardTitle>
+                <CardDescription>Comparativo dos últimos 5 meses</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={monthlyData || []}>
+                    <defs>
+                      <linearGradient id="colorReceitas" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="colorDespesas" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
+                    <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} tickLine={false} axisLine={false} />
+                    <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} tickLine={false} axisLine={false} tickFormatter={(value: number) => formatCurrencyShort(value)} />
+                    <EnhancedTooltip valueFormatter={(value: number) => formatCurrency(value)} />
+                    <Area type="monotone" dataKey="receitas" stroke="#10b981" fillOpacity={1} fill="url(#colorReceitas)" strokeWidth={2} />
+                    <Area type="monotone" dataKey="despesas" stroke="#ef4444" fillOpacity={1} fill="url(#colorDespesas)" strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            {/* Custos por Tipo */}
+            <Card className="bg-gradient-to-br from-card to-card/50 border-border">
+              <CardHeader>
+                <CardTitle className="text-foreground">Custos por Tipo</CardTitle>
+                <CardDescription>Distribuição dos custos de serviços</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {!costsBreakdown || costsBreakdown.length === 0 ? (
+                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                    <div className="text-center">
+                      <p className="text-lg mb-2">📊</p>
+                      <p className="text-sm">Nenhum custo registrado no período</p>
+                    </div>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <RechartsPieChart>
+                      <defs>
+                        {(costsBreakdown || []).map((entry, index) => {
+                          const gradient = getGradient(index);
+                          return (
+                            <linearGradient key={index} id={`costGradient-${index}`} x1="0" y1="0" x2="1" y2="1">
+                              <stop offset="0%" stopColor={gradient.start} stopOpacity={0.9} />
+                              <stop offset="100%" stopColor={gradient.end} stopOpacity={0.7} />
+                            </linearGradient>
+                          );
+                        })}
+                      </defs>
+                      <Pie
+                        data={costsBreakdown || []}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={true}
+                        label={({ name, percent }) => {
+                          return `${name}: ${(percent * 100).toFixed(1)}%`;
+                        }}
+                        outerRadius={80}
+                        innerRadius={50}
+                        fill="#8884d8"
+                        dataKey="value"
+                        stroke="hsl(var(--background))"
+                        strokeWidth={2}
+                      >
+                        {(costsBreakdown || []).map((entry, index) => {
+                          return (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={`url(#costGradient-${index})`}
+                            />
+                          );
+                        })}
+                      </Pie>
+                      <EnhancedTooltip valueFormatter={(value: number) => formatCurrency(value)} />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Despesas por Categoria */}
+            <Card className="bg-gradient-to-br from-card to-card/50 border-border">
+              <CardHeader>
+                <CardTitle className="text-foreground">Despesas por Categoria</CardTitle>
+                <CardDescription>Distribuição do mês atual</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {!expensesByCategory || expensesByCategory.length === 0 ? (
+                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                    <div className="text-center">
+                      <p className="text-lg mb-2">📊</p>
+                      <p className="text-sm">Nenhuma despesa registrada no mês atual</p>
+                    </div>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={expensesByCategory || []} layout="vertical" margin={{ left: 0, right: 30, top: 0, bottom: 0 }}>
+                      <defs>
+                        {(expensesByCategory || []).map((entry, index) => {
+                          const gradient = getGradient(index);
+                          return (
+                            <linearGradient key={index} id={`expenseGradient-${index}`} x1="0" y1="0" x2="1" y2="0">
+                              <stop offset="0%" stopColor={gradient.start} stopOpacity={0.9} />
+                              <stop offset="100%" stopColor={gradient.end} stopOpacity={0.7} />
+                            </linearGradient>
+                          );
+                        })}
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} horizontal={false} />
+                      <XAxis type="number" stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} tickLine={false} axisLine={false} tickFormatter={(value: number) => formatCurrencyShort(value)} />
+                      <YAxis type="category" dataKey="name" width={100} stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} tickLine={false} axisLine={false} />
+                      <EnhancedTooltip valueFormatter={(value: number) => formatCurrency(value)} />
+                      <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={32}>
+                        {(expensesByCategory || []).map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={`url(#expenseGradient-${index})`} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Fluxo de Caixa com Previsão */}
+          <Card className="bg-gradient-to-br from-card to-card/50 border-border">
+            <CardHeader>
+              <CardTitle className="text-foreground">Fluxo de Caixa e Previsão</CardTitle>
+              <CardDescription>Saldo acumulado com projeção dos próximos 2 meses</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={cashFlowProjection || []}>
+                  <defs>
+                    <linearGradient id="cashFlowGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.05} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
+                  <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} tickLine={false} axisLine={false} />
+                  <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} tickLine={false} axisLine={false} tickFormatter={(value: number) => formatCurrencyShort(value)} />
+                  <EnhancedTooltip valueFormatter={(value: number) => formatCurrency(value)} />
+                  <Line
+                    type="monotone"
+                    dataKey="saldo"
+                    stroke="#3b82f6"
+                    strokeWidth={3}
+                    dot={{ fill: '#3b82f6', r: 5 }}
+                    activeDot={{ r: 7 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+              <div className="flex items-center justify-center gap-4 mt-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                  <span className="text-xs text-muted-foreground">Saldo Real</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-0.5 bg-blue-500 border-dashed"></div>
+                  <span className="text-xs text-muted-foreground">Previsão</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Transações Recentes */}
+          <Card className="bg-gradient-to-br from-card to-card/50 border-border">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-foreground">Transações Recentes</CardTitle>
+                  <CardDescription>Últimas 5 movimentações financeiras</CardDescription>
+                </div>
+                <Button variant="outline" size="sm">
+                  <Eye className="w-4 h-4 mr-2" />
+                  Ver Todas
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Descrição</TableHead>
+                    <TableHead>Categoria</TableHead>
+                    <TableHead>Conta</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead className="text-center">Custos</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recentTransactions.map((transaction) => (
+                    <TableRow key={transaction.id}>
+                      <TableCell className="text-muted-foreground">
+                        {format(new Date(transaction.transaction_date), 'dd/MM/yyyy')}
+                      </TableCell>
+                      <TableCell className="font-medium">{transaction.description}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">
+                          {transaction.category?.name || 'Sem categoria'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">{transaction.account?.name || '-'}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {transaction.type === 'entrada' ? (
+                            <>
+                              <ArrowUpRight className="w-4 h-4 text-emerald-500" />
+                              <span className="text-xs text-emerald-500">Entrada</span>
+                            </>
+                          ) : (
+                            <>
+                              <ArrowDownLeft className="w-4 h-4 text-red-500" />
+                              <span className="text-xs text-red-500">Saída</span>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className={`text-right font-semibold ${transaction.type === 'entrada' ? 'text-emerald-500' : 'text-red-500'}`}>
+                        {transaction.type === 'entrada' ? '+' : '-'} {formatCurrency(transaction.amount)}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {transaction.type === 'entrada' && transaction.has_costs ? (
+                          <Badge variant="outline" className="text-xs text-orange-500 border-orange-500/20">
+                            R$ {formatCurrency(transaction.total_costs || 0)}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
+                          {transaction.status || 'concluída'}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {/* Cards de Navegação Rápida */}
+          <Card className="bg-gradient-to-br from-card to-card/50 border-border">
+            <CardHeader>
+              <CardTitle className="text-foreground">Acesso Rápido</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+                {[
+                  { icon: Receipt, label: 'Transações', color: 'blue', path: '/financeiro/transacoes' },
+                  { icon: DollarSign, label: 'Sinais', color: 'yellow', path: '/financeiro/sinais' },
+                  { icon: Building2, label: 'Contas', color: 'emerald', path: null, action: 'openAccounts' },
+                  { icon: ShoppingCart, label: 'Categorias', color: 'purple', path: '/financeiro/categorias' },
+                  { icon: Zap, label: 'Recorrências', color: 'orange', path: '/financeiro/recorrencias' },
+                  { icon: BarChart3, label: 'Relatórios', color: 'pink', path: '/financeiro/relatorios' },
+                  { icon: FileText, label: 'Orçamentos', color: 'indigo', path: '/financeiro/orcamentos' },
+                  { icon: TrendingUp, label: 'Previsões', color: 'cyan', path: '/financeiro/previsoes' },
+                ].map((item, index) => (
+                  <button
+                    key={index}
+                    onClick={() => {
+                      if (item.action === 'openAccounts') {
+                        setIsAccountFormOpen(true);
+                      } else if (item.path) {
+                        navigate(item.path);
+                      }
+                    }}
+                    className="flex flex-col items-center justify-center p-6 bg-muted/20 hover:bg-muted/40 rounded-xl border border-border transition-all hover:scale-105 hover:shadow-lg"
+                  >
+                    <div className={`p-3 bg-${item.color}-500/10 rounded-xl mb-3`}>
+                      <item.icon className={`w-6 h-6 text-${item.color}-500`} />
+                    </div>
+                    <span className="text-sm font-medium text-foreground">{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+        </TabsContent>
+
+        <TabsContent value="transacoes" className="mt-6">
+          <FinancialTransactions embedded />
+        </TabsContent>
+
+        <TabsContent value="sinais" className="mt-6">
+          <SinalTab />
+        </TabsContent>
+
+        <TabsContent value="contas" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Contas Bancárias</CardTitle>
+              <CardDescription>Gerencie suas contas bancárias</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8 text-muted-foreground">
+                <Building2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>Gestão detalhada de contas em desenvolvimento. Utilize o Dashboard para visualizar o resumo.</p>
+                <Button variant="link" onClick={() => setActiveTab('dashboard')}>
+                  Voltar ao Dashboard
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="categorias" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Categorias</CardTitle>
+              <CardDescription>Organize suas transações por categoria</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8 text-muted-foreground">
+                <ShoppingCart className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>Gestão de categorias em desenvolvimento</p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="recorrencias" className="mt-6">
+          <RecurringTransactionsManager />
+        </TabsContent>
+
+        <TabsContent value="relatorios" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Relatórios Financeiros</CardTitle>
+              <CardDescription>Análise completa da sua situação financeira</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">Conteúdo da aba Relatórios em desenvolvimento...</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="orcamentos" className="mt-6">
+          <FinancialBudgets />
+        </TabsContent>
+
+        <TabsContent value="previsoes" className="mt-6">
+          <FinancialForecasts />
+        </TabsContent>
+      </Tabs>
 
       <AlertDialog open={!!accountToDelete} onOpenChange={(open) => !open && setAccountToDelete(null)}>
         <AlertDialogContent>

@@ -7,8 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase, CURRENT_PROJECT_REF } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Eye, EyeOff, LogIn, UserPlus, Loader2, RefreshCw } from 'lucide-react';
+import { Eye, EyeOff, LogIn, UserPlus, Loader2, RefreshCw, Lock } from 'lucide-react';
 import dashmedLogo from "@/assets/dashmed-logo.png";
+
+// CONFIGURAÇÃO: Definir como false para reabilitar o registro de contas
+const REGISTRATION_DISABLED = true;
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -365,7 +368,7 @@ const Login = () => {
               <Tabs defaultValue="login" className="space-y-4">
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="login">Login</TabsTrigger>
-                  <TabsTrigger value="signup">Cadastro</TabsTrigger>
+                  <TabsTrigger value="signup" disabled={REGISTRATION_DISABLED}>Cadastro</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="login">
@@ -430,89 +433,100 @@ const Login = () => {
                 </TabsContent>
 
                 <TabsContent value="signup">
-                  <form onSubmit={handleSignUp} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-name">Nome Completo</Label>
-                      <Input
-                        id="signup-name"
-                        type="text"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        placeholder="Seu nome completo"
-                      />
+                  {REGISTRATION_DISABLED ? (
+                    <div className="space-y-4 text-center py-8">
+                      <Lock className="h-12 w-12 mx-auto text-muted-foreground" />
+                      <h3 className="text-lg font-medium">Cadastro Temporariamente Indisponível</h3>
+                      <p className="text-sm text-muted-foreground">
+                        O registro de novas contas está temporariamente desabilitado.
+                        Entre em contato com o administrador para obter acesso.
+                      </p>
                     </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-email">Email</Label>
-                      <Input
-                        id="signup-email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="seu@email.com"
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-password">Senha</Label>
-                      <div className="relative">
+                  ) : (
+                    <form onSubmit={handleSignUp} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="signup-name">Nome Completo</Label>
                         <Input
-                          id="signup-password"
-                          type={showPassword ? 'text' : 'password'}
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="Mínimo 6 caracteres"
+                          id="signup-name"
+                          type="text"
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          placeholder="Seu nome completo"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="signup-email">Email</Label>
+                        <Input
+                          id="signup-email"
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="seu@email.com"
                           required
                         />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                          onClick={() => setShowPassword(!showPassword)}
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
                       </div>
-                    </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="confirm-password">Confirmar Senha</Label>
-                      <div className="relative">
-                        <Input
-                          id="confirm-password"
-                          type={showConfirmPassword ? 'text' : 'password'}
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          placeholder="Confirme sua senha"
-                          required
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        >
-                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
+                      <div className="space-y-2">
+                        <Label htmlFor="signup-password">Senha</Label>
+                        <div className="relative">
+                          <Input
+                            id="signup-password"
+                            type={showPassword ? 'text' : 'password'}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Mínimo 6 caracteres"
+                            required
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                        </div>
                       </div>
-                    </div>
 
-                    <Button
-                      type="submit"
-                      className="w-full"
-                      disabled={loading}
-                    >
-                      {loading ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <UserPlus className="mr-2 h-4 w-4" />
-                      )}
-                      Criar Conta
-                    </Button>
-                  </form>
+                      <div className="space-y-2">
+                        <Label htmlFor="confirm-password">Confirmar Senha</Label>
+                        <div className="relative">
+                          <Input
+                            id="confirm-password"
+                            type={showConfirmPassword ? 'text' : 'password'}
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            placeholder="Confirme sua senha"
+                            required
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          >
+                            {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </div>
+
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={loading}
+                      >
+                        {loading ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <UserPlus className="mr-2 h-4 w-4" />
+                        )}
+                        Criar Conta
+                      </Button>
+                    </form>
+                  )}
                 </TabsContent>
               </Tabs>
             </CardContent>

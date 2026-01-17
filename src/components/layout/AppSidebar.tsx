@@ -27,7 +27,10 @@ import {
   Megaphone,
   Receipt,
   MessageCircle,
-  Phone
+  Phone,
+  Building2,
+  Zap,
+  CircleDollarSign
 } from "lucide-react"
 import { NavLink, useLocation, useNavigate } from "react-router-dom"
 import {
@@ -112,7 +115,22 @@ const navigationGroups: Array<{
     {
       label: "Ferramentas",
       items: [
-        { title: "Financeiro", url: "/financeiro", icon: PieChart },
+        {
+          title: "Financeiro",
+          url: "/financeiro",
+          icon: PieChart,
+          subItems: [
+            { title: "Dashboard", url: "/financeiro?tab=dashboard", icon: BarChart3 },
+            { title: "Transações", url: "/financeiro?tab=transacoes", icon: Receipt },
+            { title: "Sinais", url: "/financeiro?tab=sinais", icon: CircleDollarSign },
+            { title: "Contas", url: "/financeiro?tab=contas", icon: Building2 },
+            { title: "Categorias", url: "/financeiro?tab=categorias", icon: ShoppingCart },
+            { title: "Recorrências", url: "/financeiro?tab=recorrencias", icon: Zap },
+            { title: "Relatórios", url: "/financeiro?tab=relatorios", icon: BarChart3 },
+            { title: "Orçamentos", url: "/financeiro?tab=orcamentos", icon: FileText },
+            { title: "Previsões", url: "/financeiro?tab=previsoes", icon: TrendingUp },
+          ]
+        },
         // { title: "E-mail Marketing", url: "/email-marketing", icon: Mail }, // Ocultado - placeholder
         // { title: "Landing Pages", url: "/landing-pages", icon: FileText }, // Ocultado - placeholder
         { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
@@ -148,6 +166,9 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
   useEffect(() => {
     if (currentPath.startsWith('/comercial')) {
       setExpandedItems(prev => prev.includes('CRM') ? prev : [...prev, 'CRM'])
+    }
+    if (currentPath.startsWith('/financeiro')) {
+      setExpandedItems(prev => prev.includes('Financeiro') ? prev : [...prev, 'Financeiro'])
     }
   }, [currentPath])
 

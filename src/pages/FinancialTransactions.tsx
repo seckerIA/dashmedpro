@@ -6,11 +6,11 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { 
-  Plus, 
-  Search, 
-  Edit, 
-  Trash2, 
+import {
+  Plus,
+  Search,
+  Edit,
+  Trash2,
   Eye,
   ArrowUpRight,
   ArrowDownLeft,
@@ -27,12 +27,16 @@ import { ptBR } from "date-fns/locale"
 import { FinancialTransactionWithDetails } from "@/types/financial"
 import { formatCurrency } from "@/lib/currency"
 
-const FinancialTransactions = () => {
+interface FinancialTransactionsProps {
+  embedded?: boolean;
+}
+
+const FinancialTransactions = ({ embedded = false }: FinancialTransactionsProps) => {
   const navigate = useNavigate()
   const { transactions, isLoading } = useFinancialTransactions()
   const deleteTransaction = useDeleteFinancialTransaction()
   const { isAdmin } = useUserProfile()
-  
+
   const [searchTerm, setSearchTerm] = useState("")
   const [filterType, setFilterType] = useState<"all" | "entrada" | "saida">("all")
   const [selectedTransaction, setSelectedTransaction] = useState<FinancialTransactionWithDetails | null>(null)
@@ -45,12 +49,12 @@ const FinancialTransactions = () => {
   // Filtrar transações
   const filteredTransactions = transactions?.filter(transaction => {
     const matchesSearch = transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         transaction.category?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         transaction.account?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-    
+      transaction.category?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      transaction.account?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+
     const matchesType = filterType === "all" || transaction.type === filterType
-    
-    return matchesSearch && matchesType
+
+    return matchesType && matchesSearch
   }) || []
 
   const handleDelete = async (id: string) => {
@@ -72,14 +76,16 @@ const FinancialTransactions = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Transações Financeiras</h1>
-              <p className="text-muted-foreground">Gerencie todas as transações financeiras</p>
+      <div className={embedded ? "py-8" : "min-h-screen bg-background p-6"}>
+        <div className={embedded ? "" : "max-w-7xl mx-auto space-y-6"}>
+          {!embedded && (
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-foreground">Transações Financeiras</h1>
+                <p className="text-muted-foreground">Gerencie todas as transações financeiras</p>
+              </div>
             </div>
-          </div>
+          )}
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
@@ -89,20 +95,21 @@ const FinancialTransactions = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Transações Financeiras</h1>
-            <p className="text-muted-foreground">Gerencie todas as transações financeiras</p>
+    <div className={embedded ? "space-y-6" : "min-h-screen bg-background p-6"}>
+      <div className={embedded ? "space-y-6" : "max-w-7xl mx-auto space-y-6"}>
+        {/* Header - Apenas mostrar se NÃO for embedded */}
+        {!embedded && (
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Transações Financeiras</h1>
+              <p className="text-muted-foreground">Gerencie todas as transações financeiras</p>
+            </div>
+            <Button onClick={() => navigate('/financeiro/nova-transacao')}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nova Transação
+            </Button>
           </div>
-          <Button onClick={() => navigate('/financeiro/nova-transacao')}>
-            <Plus className="w-4 h-4 mr-2" />
-            Nova Transação
-          </Button>
-        </div>
-
+        )}
         {/* Filtros */}
         <Card>
           <CardHeader>
@@ -157,8 +164,8 @@ const FinancialTransactions = () => {
               <div>
                 <CardTitle>Transações ({filteredTransactions.length})</CardTitle>
                 <CardDescription>
-                  {filterType === "all" ? "Todas as transações" : 
-                   filterType === "entrada" ? "Apenas receitas" : "Apenas despesas"}
+                  {filterType === "all" ? "Todas as transações" :
+                    filterType === "entrada" ? "Apenas receitas" : "Apenas despesas"}
                 </CardDescription>
               </div>
               <Button variant="outline" size="sm">
@@ -235,9 +242,8 @@ const FinancialTransactions = () => {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className={`font-semibold ${
-                            transaction.type === 'entrada' ? 'text-emerald-500' : 'text-red-500'
-                          }`}>
+                          <div className={`font-semibold ${transaction.type === 'entrada' ? 'text-emerald-500' : 'text-red-500'
+                            }`}>
                             {transaction.type === 'entrada' ? '+' : '-'} {formatCurrency(transaction.amount)}
                           </div>
                         </TableCell>
@@ -310,9 +316,8 @@ const FinancialTransactions = () => {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Valor</label>
-                    <p className={`text-sm font-semibold ${
-                      selectedTransaction.type === 'entrada' ? 'text-emerald-500' : 'text-red-500'
-                    }`}>
+                    <p className={`text-sm font-semibold ${selectedTransaction.type === 'entrada' ? 'text-emerald-500' : 'text-red-500'
+                      }`}>
                       {formatCurrency(selectedTransaction.amount)}
                     </p>
                   </div>

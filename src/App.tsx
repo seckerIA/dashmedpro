@@ -308,14 +308,7 @@ const AppRoutes = () => {
               </RoleProtectedRoute>
             }
           />
-          <Route
-            path="/financeiro/transacoes"
-            element={
-              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'vendedor', 'gestor_trafego', 'medico']}>
-                <FinancialTransactions />
-              </RoleProtectedRoute>
-            }
-          />
+
           <Route
             path="/financeiro/nova-transacao"
             element={
@@ -332,14 +325,7 @@ const AppRoutes = () => {
               </RoleProtectedRoute>
             }
           />
-          <Route
-            path="/financeiro/sinais"
-            element={
-              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'medico', 'secretaria']}>
-                <FinancialSinais />
-              </RoleProtectedRoute>
-            }
-          />
+
           <Route
             path="/financeiro/categorias"
             element={
