@@ -191,15 +191,92 @@ const fetchTeamMetrics = async (
   userId: string,
   isAdminOrDono: boolean,
   selectedUserIds?: string[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  isMedico?: boolean // Novo parâmetro
 ): Promise<ConsolidatedTeamMetrics> => {
-  // Se não for admin/dono, retornar apenas dados do próprio usuário
+  // Se for médico (não admin), buscar métricas próprias + secretárias vinculadas
+  if (isMedico && !isAdminOrDono) {
+    // Buscar IDs de secretárias vinculadas ao médico
+    const { data: links } = await supabase
+      .from('secretary_doctor_links')
+      .select('secretary_id')
+      .eq('doctor_id', userId);
+
+    const linkedSecretaryIds = links?.map(l => l.secretary_id) || [];
+    const allUserIds = [userId, ...linkedSecretaryIds];
+
+    // Buscar dados para o médico e suas secretárias
+    const dealsQuery = supabase
+      .from('crm_deals')
+      .select(`id, title, value, stage, user_id, assigned_to, created_at, updated_at, contact:crm_contacts(id, full_name)`)
+      .or(allUserIds.map(id => `user_id.eq.${id}`).join(',') + ',' + allUserIds.map(id => `assigned_to.eq.${id}`).join(','))
+      .limit(500);
+
+    const contactsQuery = supabase
+      .from('crm_contacts')
+      .select('*')
+      .in('user_id', allUserIds);
+
+    const leadsQuery = supabase
+      .from('commercial_leads')
+      .select('*')
+      .in('user_id', allUserIds);
+
+    const profilesQuery = supabase
+      .from('profiles')
+      .select('id, email, full_name, role')
+      .in('id', allUserIds);
+
+    const [dealsResult, contactsResult, leadsResult, profilesResult] = await Promise.all([
+      supabaseQueryWithTimeout(dealsQuery, 60000, signal),
+      supabaseQueryWithTimeout(contactsQuery, 60000, signal),
+      supabaseQueryWithTimeout(leadsQuery, 60000, signal),
+      supabaseQueryWithTimeout(profilesQuery, 60000, signal),
+    ]);
+
+    if (dealsResult.error) throw new Error(`Erro ao buscar deals: ${dealsResult.error.message}`);
+    if (contactsResult.error) throw new Error(`Erro ao buscar contatos: ${contactsResult.error.message}`);
+
+    const deals = dealsResult.data || [];
+    const contacts = contactsResult.data || [];
+    const leads = leadsResult.data || [];
+    const profiles = profilesResult.data || [];
+
+    const profilesMap = new Map(profiles.map(p => [p.id, p]));
+
+    // Calcular métricas por usuário (médico + secretárias)
+    const teamMetrics: TeamMetrics[] = allUserIds.map(targetUserId => {
+      const userDeals = deals.filter(d => d.user_id === targetUserId || d.assigned_to === targetUserId);
+      const userContacts = contacts.filter(c => c.user_id === targetUserId);
+      const userLeads = leads.filter(l => l.user_id === targetUserId);
+      const profile = profilesMap.get(targetUserId);
+
+      return calculateUserMetricsFromData(targetUserId, userDeals, userContacts, userLeads, profile);
+    });
+
+    // Calcular métricas consolidadas
+    return {
+      totalPipeline: teamMetrics.reduce((sum, tm) => sum + tm.totalPipeline, 0),
+      totalRevenue: teamMetrics.reduce((sum, tm) => sum + tm.totalRevenue, 0),
+      totalActiveDeals: teamMetrics.reduce((sum, tm) => sum + tm.activeDeals, 0),
+      totalWonDeals: teamMetrics.reduce((sum, tm) => sum + tm.wonDeals, 0),
+      totalLostDeals: teamMetrics.reduce((sum, tm) => sum + tm.lostDeals, 0),
+      averageConversionRate: teamMetrics.length > 0
+        ? teamMetrics.reduce((sum, tm) => sum + tm.conversionRate, 0) / teamMetrics.length
+        : 0,
+      totalContacts: teamMetrics.reduce((sum, tm) => sum + tm.totalContacts, 0),
+      totalLeads: teamMetrics.reduce((sum, tm) => sum + tm.totalLeads, 0),
+      teamMetrics,
+    };
+  }
+
+  // Se não for admin/dono E não for médico, retornar apenas dados do próprio usuário
   if (!isAdminOrDono) {
     const dealsQuery = supabase
       .from('crm_deals')
       .select(`id, title, value, stage, user_id, assigned_to, created_at, updated_at, contact:crm_contacts(id, full_name)`)
       .or(`user_id.eq.${userId},assigned_to.eq.${userId}`)
-      .limit(500); // Limite para usuários individuais também
+      .limit(500);
 
     const contactsQuery = supabase
       .from('crm_contacts')
@@ -495,19 +572,19 @@ function calculateUserMetricsFromData(
 
 export function useTeamMetrics(selectedUserIds?: string[]) {
   const { user, loading: authLoading } = useAuth();
-  const { isAdmin, isSecretaria, isLoading: isLoadingProfile } = useUserProfile();
+  const { isAdmin, isSecretaria, isMedico, isLoading: isLoadingProfile } = useUserProfile();
 
-  // Query para metricas de equipe (admins/vendedores)
+  // Query para metricas de equipe (admins/vendedores/medicos)
   const {
     data: metrics,
     isLoading,
     error,
   } = useQuery({
-    queryKey: ['team-metrics', user?.id, selectedUserIds?.join(',')],
+    queryKey: ['team-metrics', user?.id, selectedUserIds?.join(','), isMedico],
     queryFn: async ({ signal }) => {
       if (!user?.id) return emptyMetrics;
       try {
-        return await fetchTeamMetrics(user.id, isAdmin, selectedUserIds, signal);
+        return await fetchTeamMetrics(user.id, isAdmin, selectedUserIds, signal, isMedico);
       } catch (error: any) {
         // Ignorar erros de cancelamento/timeout para evitar logs desnecessários
         if (error?.message?.includes('cancelada') ||

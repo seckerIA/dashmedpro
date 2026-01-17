@@ -88,6 +88,7 @@ import FinancialTransactions from "./FinancialTransactions"
 import { SinalTab } from "@/components/financial/SinalTab"
 import FinancialBudgets from "./FinancialBudgets"
 import FinancialForecasts from "./FinancialForecasts"
+import FinancialCategories from "./FinancialCategories"
 
 const Financial = () => {
   const navigate = useNavigate();
@@ -935,18 +936,7 @@ const Financial = () => {
         </TabsContent>
 
         <TabsContent value="categorias" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Categorias</CardTitle>
-              <CardDescription>Organize suas transações por categoria</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                <ShoppingCart className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>Gestão de categorias em desenvolvimento</p>
-              </div>
-            </CardContent>
-          </Card>
+          <FinancialCategories />
         </TabsContent>
 
         <TabsContent value="recorrencias" className="mt-6">

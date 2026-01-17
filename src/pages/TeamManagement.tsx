@@ -49,9 +49,24 @@ const TeamManagement = () => {
         .from('profiles')
         .select('id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by, doctor_id, consultation_value');
 
-      // Médicos veem apenas os usuários que eles criaram
+      // Médicos veem secretárias vinculadas a eles, não apenas usuários que criaram
       if (isMedicoOnly && user?.id) {
-        query = query.eq('invited_by', user.id);
+        // Buscar IDs de secretárias vinculadas ao médico
+        const { data: links } = await supabase
+          .from('secretary_doctor_links')
+          .select('secretary_id')
+          .eq('doctor_id', user.id);
+
+        const linkedSecretaryIds = links?.map(l => l.secretary_id) || [];
+
+        if (linkedSecretaryIds.length > 0) {
+          // Buscar secretárias vinculadas
+          query = query.in('id', linkedSecretaryIds);
+        } else {
+          // Se não tem secretárias vinculadas, retorna lista vazia
+          setProfiles([]);
+          return;
+        }
       }
 
       const { data, error } = await query.order('created_at', { ascending: false });
