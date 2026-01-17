@@ -51,16 +51,38 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Verificar se usuário alvo foi criado pelo médico (quando é médico)
+    // Verificar se usuário alvo foi criado pelo médico (quando é médico)
     if (profile.role === 'medico') {
       const { data: targetUser } = await supabaseAdmin
         .from('profiles')
-        .select('invited_by')
+        .select('invited_by, role')
         .eq('id', userId)
         .single();
 
-      if (!targetUser || targetUser.invited_by !== profile.id) {
+      let hasPermission = false;
+
+      // 1. Check if invited by doctor
+      if (targetUser && targetUser.invited_by === profile.id) {
+        hasPermission = true;
+      }
+
+      // 2. If not invited by doctor, check if is linked secretary
+      if (!hasPermission && targetUser?.role === 'secretaria') {
+        const { data: link } = await supabaseAdmin
+          .from('secretary_doctor_links')
+          .select('id')
+          .eq('secretary_id', userId)
+          .eq('doctor_id', profile.id)
+          .single();
+
+        if (link) {
+          hasPermission = true;
+        }
+      }
+
+      if (!hasPermission) {
         return new Response(
-          JSON.stringify({ error: 'Médicos só podem editar usuários que eles criaram' }),
+          JSON.stringify({ error: 'Médicos só podem editar usuários que eles criaram ou secretárias vinculadas' }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -75,22 +97,8 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Validate: secretaria must have doctor_id
-    if (role === 'secretaria' && doctor_id === undefined) {
-      // Se está mudando para secretaria mas não forneceu doctor_id, verificar se já tem
-      // Se não tiver, retornar erro
-      const { data: currentProfile } = await supabaseAdmin
-        .from('profiles')
-        .select('role, doctor_id')
-        .eq('id', userId)
-        .single();
-
-      if (currentProfile?.role !== 'secretaria' && !doctor_id) {
-        return new Response(
-          JSON.stringify({ error: 'Secretária deve ser vinculada a um médico (doctor_id obrigatório)' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
+    // Validation removed to support multi-doctor linking via secretary_doctor_links table
+    // if (role === 'secretaria' && doctor_id === undefined) { ... }
 
     // Check if target user exists
     const { data: targetProfile, error: profileError } = await supabaseAdmin.from('profiles').select('role').eq('id', userId).single();
@@ -114,12 +122,13 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Update doctor_id if provided
     if (doctor_id !== undefined) {
-      if (role === 'secretaria' && !doctor_id) {
-        return new Response(
-          JSON.stringify({ error: 'Secretária deve ser vinculada a um médico (doctor_id obrigatório)' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+      // Legacy: If provided, usage it. If not, rely on secretary_doctor_links table managed by frontend.
+      // if (role === 'secretaria' && !doctor_id) {
+      // return new Response(
+      //   JSON.stringify({ error: 'Secretária deve ser vinculada a um médico (doctor_id obrigatório)' }),
+      //   { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      // );
+      // }
       // Se não for secretária, garantir que doctor_id seja NULL
       updateData.doctor_id = (role === 'secretaria' && doctor_id) ? doctor_id : null;
     } else if (role !== undefined && role !== 'secretaria') {

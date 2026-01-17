@@ -10,12 +10,16 @@ import type {
   FinancialAccountUpdate,
   AccountSummary
 } from "@/types/financial";
+import { useSecretaryDoctorLinks } from "./useSecretaryDoctors";
 
 export const useFinancialAccounts = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
   const { profile } = useUserProfile();
+  const { getLinksForSecretary } = useSecretaryDoctorLinks();
+  const isSecretaria = profile?.role === 'secretaria';
 
   // Buscar todas as contas
   const { data: accounts, isLoading, error } = useQuery({
@@ -33,9 +37,18 @@ export const useFinancialAccounts = () => {
         .order("created_at", { ascending: false })
         .limit(100); // Limitar para performance
 
-      // Se não for admin/dono, filtrar apenas pelo user_id
+      // Se não for admin/dono, filtrar pelo user_id ou contas dos médicos vinculados (se secretária)
       if (!isAdminOrDono) {
-        query = query.eq("user_id", user.id);
+        if (isSecretaria) {
+          // Buscar IDs dos médicos vinculados
+          const links = getLinksForSecretary(user.id);
+          const doctorIds = links.map(l => l.doctor_id);
+          // Incluir o próprio ID e os IDs dos médicos
+          const targetIds = [user.id, ...doctorIds];
+          query = query.in("user_id", targetIds);
+        } else {
+          query = query.eq("user_id", user.id);
+        }
       }
 
       const result = await supabaseQueryWithTimeout(query as any, 15000); // Timeout reduzido

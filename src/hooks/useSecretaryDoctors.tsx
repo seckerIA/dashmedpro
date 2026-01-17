@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useUserProfile } from './useUserProfile';
@@ -182,9 +183,10 @@ export function useSecretaryDoctorLinks() {
     await refetch();
   };
 
-  const getLinksForSecretary = (secretaryId: string) => {
+  /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  const getLinksForSecretary = useCallback((secretaryId: string) => {
     return allLinks?.filter(link => link.secretary_id === secretaryId) || [];
-  };
+  }, [allLinks]);
 
   return {
     allLinks: allLinks || [],

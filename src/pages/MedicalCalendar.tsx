@@ -306,8 +306,8 @@ export default function MedicalCalendar() {
   };
 
   const handleMarkCompleted = async (appointment: MedicalAppointmentWithRelations) => {
-    // Verificar se existe conta bancária antes de prosseguir
-    if (accounts && accounts.length === 0) {
+    // Verificar se existe conta bancária antes de prosseguir (exceto para secretárias que usam conta do médico)
+    if (!isSecretaria && accounts && accounts.length === 0) {
       setShowFinancialRequirement(true);
       return;
     }
@@ -318,8 +318,8 @@ export default function MedicalCalendar() {
   };
 
   const handleMarkAttended = async (appointment: MedicalAppointmentWithRelations) => {
-    // Verificar se existe conta bancária antes de prosseguir
-    if (accounts && accounts.length === 0) {
+    // Verificar se existe conta bancária antes de prosseguir (exceto para secretárias que usam conta do médico)
+    if (!isSecretaria && accounts && accounts.length === 0) {
       setShowFinancialRequirement(true);
       return;
     }
