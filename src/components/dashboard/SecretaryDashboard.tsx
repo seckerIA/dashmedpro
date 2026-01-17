@@ -257,31 +257,31 @@ const SecretaryDashboard = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Acesso Rápido</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <QuickActionCard
                 title="Calendário"
-                description="Ver agenda completa"
+                description="Ver agenda"
                 variant="red"
                 icon={Calendar}
                 onClick={() => navigate('/calendar')}
               />
               <QuickActionCard
                 title="WhatsApp"
-                description="Conversas ativas"
+                description="Conversas"
                 variant="green"
                 icon={MessageSquare}
                 onClick={() => navigate('/whatsapp')}
               />
               <QuickActionCard
                 title="Médicos"
-                description="Ver disponibilidade"
+                description="Disponibilidade"
                 variant="cyan"
                 icon={Stethoscope}
                 onClick={() => navigate('/calendar')}
               />
               <QuickActionCard
                 title="Pagamentos"
-                description="Sinais e recebimentos"
+                description="Recebimentos"
                 variant="yellow"
                 icon={DollarSign}
                 onClick={() => navigate('/financeiro')}
@@ -357,7 +357,7 @@ const SecretaryDashboard = () => {
             title="Sinais e Pagamentos"
             icon={DollarSign}
             badge={sinalMetrics.pendingSinais + sinalMetrics.receivedSinais}
-            defaultOpen={false}
+            defaultOpen={true}
           >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
@@ -411,7 +411,7 @@ const SecretaryDashboard = () => {
             title="Métricas de Produtividade"
             icon={Activity}
             badge={`Score: ${productivityMetrics.performanceScore}/100`}
-            defaultOpen={false}
+            defaultOpen={true}
           >
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {/* Tempo de Resposta */}
@@ -484,7 +484,7 @@ const SecretaryDashboard = () => {
             title="Médicos Disponíveis"
             icon={Stethoscope}
             badge={metrics.availableDoctors.length}
-            defaultOpen={false}
+            defaultOpen={true}
           >
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {metrics.availableDoctors.map((doctor: any, index: number) => (
@@ -518,7 +518,7 @@ const SecretaryDashboard = () => {
           title="Contatos Recentes"
           icon={UserPlus}
           badge={`${metrics?.newContactsToday || 0} hoje`}
-          defaultOpen={false}
+          defaultOpen={true}
         >
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
