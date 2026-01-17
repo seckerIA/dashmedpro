@@ -19,7 +19,9 @@ const fetchTasks = async (userId: string, signal?: AbortSignal): Promise<TaskWit
   const { data, error } = await supabaseQueryWithTimeout<TaskWithCRM[]>(queryPromise as any, undefined, signal);
 
   if (error) {
-    console.error('Erro ao buscar tarefas:', error);
+    if (!error.message?.includes('AbortError') && (error as any).code !== '20') {
+      console.error('Erro ao buscar tarefas:', error);
+    }
     throw new Error(`Erro ao buscar tarefas: ${error.message}`);
   }
 

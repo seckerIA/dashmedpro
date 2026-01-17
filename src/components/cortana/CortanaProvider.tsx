@@ -77,7 +77,7 @@ export function CortanaProvider({ children }: { children: React.ReactNode }) {
   // Hook do ElevenLabs
   const conversation = useConversation({
     onConnect: () => {
-      console.log('[Cortana] Conectada ao ElevenLabs');
+      // console.log('[Cortana] Conectada ao ElevenLabs');
       setShowModal(true);
       setState(prev => ({
         ...prev,
@@ -97,7 +97,7 @@ export function CortanaProvider({ children }: { children: React.ReactNode }) {
       // NÃO fecha o modal imediatamente - deixa o usuário decidir
     },
     onMessage: (message) => {
-      console.log('[Cortana] Mensagem:', message);
+      // console.log('[Cortana] Mensagem:', message);
       if (message.source === 'user') {
         setState(prev => ({
           ...prev,

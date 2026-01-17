@@ -204,7 +204,9 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       const { data: transactions, error: transactionsError } = transactionsResult as { data: any[], error: any };
 
       if (transactionsError) {
-        console.error('❌ [useCommercialMetrics] Erro transactions:', transactionsError);
+        if (!transactionsError.message?.includes('AbortError') && transactionsError.name !== 'AbortError') {
+          console.error('❌ [useCommercialMetrics] Erro transactions:', transactionsError);
+        }
         throw transactionsError;
       }
       // console.log(`✅ [useCommercialMetrics] ${transactions?.length || 0} transactions encontradas.`);
@@ -258,7 +260,9 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
 
       if (costsError) throw costsError;
       if (leadsError) {
-        console.error('❌ Erro ao buscar leads comerciais:', leadsError);
+        if (!leadsError.message?.includes('AbortError') && leadsError.name !== 'AbortError') {
+          console.error('❌ Erro ao buscar leads comerciais:', leadsError);
+        }
         throw leadsError;
       }
       if (campaignsError) throw campaignsError;

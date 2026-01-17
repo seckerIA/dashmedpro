@@ -117,7 +117,9 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
       }
 
       if (error) {
-        console.error('❌ useCommercialLeads - Error:', error);
+        if (!error.message?.includes('AbortError') && (error as any).code !== '20') {
+          console.error('❌ useCommercialLeads - Error:', error);
+        }
         throw error;
       }
 

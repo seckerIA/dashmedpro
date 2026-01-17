@@ -43,8 +43,8 @@ const FinancialTransactions = ({ embedded = false }: FinancialTransactionsProps)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
 
   // Debug logs
-  console.log('FinancialTransactions - transactions:', transactions)
-  console.log('FinancialTransactions - isLoading:', isLoading)
+  // console.log('FinancialTransactions - transactions:', transactions)
+  // console.log('FinancialTransactions - isLoading:', isLoading)
 
   // Filtrar transações
   const filteredTransactions = transactions?.filter(transaction => {

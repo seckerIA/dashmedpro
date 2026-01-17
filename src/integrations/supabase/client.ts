@@ -34,12 +34,12 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
       const externalSignal = options.signal;
       if (externalSignal) {
         if (externalSignal.aborted) {
-          console.log(`🛑 [Supabase Fetch] Já abortado externamente: ${urlStr}`);
+          // console.log(`🛑 [Supabase Fetch] Já abortado externamente: ${urlStr}`);
           clearTimeout(timeoutId);
           timeoutController.abort();
         } else {
           externalSignal.addEventListener('abort', () => {
-            console.log(`🛑 [Supabase Fetch] Abortado externamente via signal: ${urlStr}`);
+            // console.log(`🛑 [Supabase Fetch] Abortado externamente via signal: ${urlStr}`);
             timeoutController.abort();
           }, { once: true });
         }
@@ -57,12 +57,9 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
         .catch((error) => {
           clearTimeout(timeoutId);
           if (error.name === 'AbortError') {
-            const isInternalTimeout = (timeoutController.signal as any).isTimeout;
-            if (isInternalTimeout) {
-              // Já logado
-            } else {
-              console.log(`ℹ️ [Supabase Fetch] Cancelado: ${urlStr}`);
-            }
+            // Ignorar erros de cancelamento intencional (AbortError)
+            // Isso acontece frequentemente com React Query cancelando requests antigos
+            return Promise.reject(error);
           } else {
             console.error(`❌ [Supabase Fetch] ERRO em ${urlStr}:`, error);
           }
