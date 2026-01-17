@@ -28,3 +28,6 @@ dist-ssr
 
 # Windows reserved names
 nul
+
+# Security - never commit scripts with secrets
+scripts/
