@@ -400,7 +400,7 @@ const Financial = () => {
 
         <TabsContent value="dashboard" className="space-y-6">
           {/* Cards de Métricas Principais */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
             {/* Modal de Configuração de Distribuição */}
             <FinancialDistributionConfig
               open={isDistributionConfigOpen}
@@ -408,25 +408,29 @@ const Financial = () => {
             />
 
             {/* Modal de Nova Conta */}
-            <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 border-none text-white">
+            <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 border-none text-white overflow-hidden">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm text-emerald-100">{isSecretaria ? "Total de Sinais" : "Saldo Total"}</p>
                   <Wallet className="w-5 h-5 text-emerald-100" />
                 </div>
-                <p className="text-3xl font-bold mb-1">{formatCurrency(metrics?.totalBalance || 0)}</p>
+                <p className="text-2xl font-bold mb-1 truncate" title={formatCurrency(metrics?.totalBalance || 0)}>
+                  {formatCurrency(metrics?.totalBalance || 0)}
+                </p>
                 <p className="text-xs text-emerald-100">{isSecretaria ? "Acumulado" : "Todas as contas"}</p>
               </CardContent>
             </Card>
 
             {/* Receitas do Mês */}
-            <Card className="bg-gradient-to-br from-card to-card/50 border-border">
+            <Card className="bg-gradient-to-br from-card to-card/50 border-border overflow-hidden">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm text-muted-foreground">{isSecretaria ? "Sinais do Mês" : "Receitas do Mês"}</p>
                   <ArrowUpRight className="w-5 h-5 text-emerald-500" />
                 </div>
-                <p className="text-3xl font-bold text-emerald-500 mb-1">{formatCurrency(metrics?.monthRevenue || 0)}</p>
+                <p className="text-2xl font-bold text-emerald-500 mb-1 truncate" title={formatCurrency(metrics?.monthRevenue || 0)}>
+                  {formatCurrency(metrics?.monthRevenue || 0)}
+                </p>
                 <div className="flex items-center gap-1">
                   <TrendingUp className="w-3 h-3 text-emerald-500" />
                   <span className="text-xs text-muted-foreground">+12.5% vs mês anterior</span>
@@ -438,13 +442,15 @@ const Financial = () => {
             {!isSecretaria && (
               <>
                 {/* Despesas do Mês */}
-                <Card className="bg-gradient-to-br from-card to-card/50 border-border">
+                <Card className="bg-gradient-to-br from-card to-card/50 border-border overflow-hidden">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-sm text-muted-foreground">Despesas do Mês</p>
                       <ArrowDownLeft className="w-5 h-5 text-red-500" />
                     </div>
-                    <p className="text-3xl font-bold text-red-500 mb-1">{formatCurrency((metrics?.monthExpenses || 0) + (metrics?.monthTotalCosts || 0))}</p>
+                    <p className="text-2xl font-bold text-red-500 mb-1 truncate" title={formatCurrency((metrics?.monthExpenses || 0) + (metrics?.monthTotalCosts || 0))}>
+                      {formatCurrency((metrics?.monthExpenses || 0) + (metrics?.monthTotalCosts || 0))}
+                    </p>
                     <div className="flex items-center gap-1">
                       <TrendingUp className="w-3 h-3 text-red-500" />
                       <span className="text-xs text-muted-foreground">+8.2% vs mês anterior</span>
@@ -453,13 +459,15 @@ const Financial = () => {
                 </Card>
 
                 {/* Custos Totais */}
-                <Card className="bg-gradient-to-br from-card to-card/50 border-border">
+                <Card className="bg-gradient-to-br from-card to-card/50 border-border overflow-hidden">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-sm text-muted-foreground">Custos Totais</p>
                       <ShoppingCart className="w-5 h-5 text-orange-500" />
                     </div>
-                    <p className="text-3xl font-bold text-orange-500 mb-1">{formatCurrency(metrics?.monthTotalCosts || 0)}</p>
+                    <p className="text-2xl font-bold text-orange-500 mb-1 truncate" title={formatCurrency(metrics?.monthTotalCosts || 0)}>
+                      {formatCurrency(metrics?.monthTotalCosts || 0)}
+                    </p>
                     <div className="flex items-center gap-1">
                       <TrendingUp className="w-3 h-3 text-orange-500" />
                       <span className="text-xs text-muted-foreground">Custos de serviços</span>
@@ -468,13 +476,15 @@ const Financial = () => {
                 </Card>
 
                 {/* Lucro Líquido */}
-                <Card className="bg-gradient-to-br from-card to-card/50 border-border">
+                <Card className="bg-gradient-to-br from-card to-card/50 border-border overflow-hidden">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-sm text-muted-foreground">Lucro Líquido</p>
                       <DollarSign className="w-5 h-5 text-blue-500" />
                     </div>
-                    <p className="text-3xl font-bold text-blue-500 mb-1">{formatCurrency(metrics?.monthNetProfit || 0)}</p>
+                    <p className="text-2xl font-bold text-blue-500 mb-1 truncate" title={formatCurrency(metrics?.monthNetProfit || 0)}>
+                      {formatCurrency(metrics?.monthNetProfit || 0)}
+                    </p>
                     <div className="flex items-center gap-1">
                       <TrendingUp className="w-3 h-3 text-blue-500" />
                       <span className="text-xs text-muted-foreground">{metrics?.netProfitMargin.toFixed(2)}% margem</span>

@@ -148,14 +148,17 @@ const SecretaryDashboard = () => {
                   {metrics?.confirmedToday || 0} ✓
                 </Badge>
               </div>
-              <p className="text-3xl font-bold text-foreground tracking-tight mb-1">
+              <p
+                className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight mb-1 truncate"
+                title={`${metrics?.todayAppointments || 0}`}
+              >
                 {metrics?.todayAppointments || 0}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground truncate">
                 consultas agendadas
               </p>
               <div className="pt-3 mt-3 border-t border-border/50">
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground truncate">
                   💡 {metrics?.todayAppointments === 0
                     ? "Sem consultas para hoje"
                     : `${metrics?.confirmedToday || 0} confirmadas, ${pendingCount} pendentes`}
@@ -190,14 +193,21 @@ const SecretaryDashboard = () => {
                 </div>
                 <ArrowRight className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-3xl font-bold text-foreground tracking-tight mb-1">
+              <p
+                className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight mb-1 truncate"
+                title={`${pendingCount}`}
+              >
                 {pendingCount}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground truncate">
                 pacientes para contatar
               </p>
               <div className="pt-3 mt-3 border-t border-border/50">
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground truncate" title={dayStatus === "success"
+                  ? "✅ Todas as consultas confirmadas!"
+                  : dayStatus === "warning"
+                    ? "⚠️ Alguns pacientes precisam confirmar"
+                    : "🔔 Vários pacientes aguardam confirmação"}>
                   {dayStatus === "success"
                     ? "✅ Todas as consultas confirmadas!"
                     : dayStatus === "warning"
@@ -231,7 +241,10 @@ const SecretaryDashboard = () => {
                   </span>
                 </div>
               </div>
-              <p className="text-3xl font-bold text-foreground tracking-tight mb-1">
+              <p
+                className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight mb-1 truncate"
+                title={`${confirmationRate.toFixed(0)}%`}
+              >
                 {confirmationRate.toFixed(0)}%
               </p>
               <Progress value={confirmationRate} className="h-2 mt-2" />

@@ -280,11 +280,14 @@ export function HeroMetrics({ className }: HeroMetricsProps) {
 
                             {/* Value */}
                             <div className="mb-3">
-                                <p className="text-3xl font-bold text-foreground tracking-tight">
+                                <p
+                                    className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight truncate"
+                                    title={typeof metric.value === 'string' ? metric.value : metric.value.toString()}
+                                >
                                     {metric.value}
                                 </p>
                                 {metric.trend && (
-                                    <p className="text-xs text-muted-foreground mt-1">
+                                    <p className="text-xs text-muted-foreground mt-1 truncate">
                                         {metric.trend.label}
                                     </p>
                                 )}

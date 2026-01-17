@@ -23,7 +23,7 @@ const getVariantColors = (variant: CardVariant) => {
   // Group 1: green, red -> Scheme 1 (slate)
   // Group 2: cyan, yellow -> Scheme 2 (zinc)
   const isGroup1 = variant === 'green' || variant === 'red';
-  
+
   if (isGroup1) {
     // Scheme 1 - Slate tones
     return {
@@ -91,7 +91,10 @@ export function MetricCard({
         </div>
 
         {/* Value */}
-        <h3 className="text-xl sm:text-2xl lg:text-3xl font-semibold mb-2 sm:mb-3 text-foreground">
+        <h3
+          className="text-xl sm:text-2xl lg:text-3xl font-semibold mb-2 sm:mb-3 text-foreground truncate"
+          title={value.toString()}
+        >
           {value}
         </h3>
 
