@@ -146,7 +146,7 @@ supabase/functions/
 ├── whatsapp-webhook/        # Recebe mensagens do Meta (verify_jwt: false)
 ├── whatsapp-send-message/   # Envia mensagens via Graph API v18.0
 ├── whatsapp-config-validate/ # Valida tokens e configura webhook
-└── whatsapp-ai-analyze/     # Análise de conversas com GPT-3.5 (pendente deploy)
+├── whatsapp-ai-analyze/     # Análise de conversas com GPT-3.5 (pendente deploy)
 ```
 
 ### Pendências de Deploy
@@ -185,3 +185,9 @@ supabase/functions/
   - **Sidebar**: Corrigido "travamento" (jank) na animação de recolhimento prevenindo quebra de linha de texto (`whitespace-nowrap`) durante a transição CSS.
 - **Fixes**:
   - Restaurada lógica de fechamento de tags HTML perdidas em `Financial.tsx`.
+
+### Contexto Atual (17/01/2026 - Secretary Dashboard Data Fix)
+- **Correção de Dados no Dashboard da Secretária**:
+  - **Bug (NaN)**: Os badges de "Sinais e Pagamentos" e métricas de "Produtividade" mostravam `NaN` ou valores vazios.
+  - **Causa**: O componente `SecretaryDashboard.tsx` acessava propriedades inexistentes nos objetos retornados pelos hooks (ex: `pendingSinais` em vez de `pendingCount`, `totalCalls` em vez de `callsToday`).
+  - **Correção**: Atualizado `SecretaryDashboard.tsx` para usar as propriedades corretas definidas nas interfaces TypeScript (`SecretarySinalMetrics`, `ProductivityMetrics`).

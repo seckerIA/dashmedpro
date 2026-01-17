@@ -356,7 +356,7 @@ const SecretaryDashboard = () => {
             id="secretary-sinais"
             title="Sinais e Pagamentos"
             icon={DollarSign}
-            badge={sinalMetrics.pendingSinais + sinalMetrics.receivedSinais}
+            badge={sinalMetrics.pendingCount + sinalMetrics.paidCount}
             defaultOpen={true}
           >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -366,10 +366,10 @@ const SecretaryDashboard = () => {
                   <span className="text-sm font-medium text-yellow-600">Pendentes</span>
                 </div>
                 <p className="text-2xl font-bold text-yellow-600">
-                  {sinalMetrics.pendingSinais}
+                  {sinalMetrics.pendingCount}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {formatCurrency(sinalMetrics.pendingValue)}
+                  {formatCurrency(sinalMetrics.totalPending)}
                 </p>
               </div>
 
@@ -379,10 +379,10 @@ const SecretaryDashboard = () => {
                   <span className="text-sm font-medium text-green-600">Recebidos</span>
                 </div>
                 <p className="text-2xl font-bold text-green-600">
-                  {sinalMetrics.receivedSinais}
+                  {sinalMetrics.paidCount}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {formatCurrency(sinalMetrics.receivedValue)}
+                  {formatCurrency(sinalMetrics.totalPaid)}
                 </p>
               </div>
 
@@ -392,10 +392,10 @@ const SecretaryDashboard = () => {
                   <span className="text-sm font-medium text-primary">Total</span>
                 </div>
                 <p className="text-2xl font-bold text-primary">
-                  {sinalMetrics.totalSinais}
+                  {sinalMetrics.totalCount}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {formatCurrency(sinalMetrics.totalValue)}
+                  {formatCurrency(sinalMetrics.totalSinal)}
                 </p>
               </div>
             </div>
@@ -435,11 +435,11 @@ const SecretaryDashboard = () => {
                   <span className="text-sm font-medium text-green-600">Chamadas</span>
                 </div>
                 <p className="text-2xl font-bold text-green-600">
-                  {productivityMetrics.totalCalls}
+                  {productivityMetrics.callsToday}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {productivityMetrics.avgCallDurationSeconds
-                    ? `${Math.round(productivityMetrics.avgCallDurationSeconds / 60)}min média`
+                  {productivityMetrics.avgCallDuration
+                    ? `${Math.round(productivityMetrics.avgCallDuration / 60)}min média`
                     : 'Sem dados'}
                 </p>
               </div>
@@ -465,7 +465,7 @@ const SecretaryDashboard = () => {
                   <span className="text-sm font-medium text-cyan-600">Mensagens</span>
                 </div>
                 <p className="text-2xl font-bold text-cyan-600">
-                  {productivityMetrics.messagesSent}
+                  {productivityMetrics.messagesHandledToday}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   enviadas esta semana
