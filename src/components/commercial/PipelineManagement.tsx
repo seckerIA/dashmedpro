@@ -15,6 +15,7 @@ import { useCRM } from "@/hooks/useCRM";
 import { useFollowUps } from "@/hooks/useFollowUps";
 import { useMedicalAppointments } from "@/hooks/useMedicalAppointments";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { FollowUp } from "@/types/followUp";
 import { Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -24,17 +25,31 @@ import { format } from "date-fns";
 
 export function PipelineManagement() {
   const { user } = useAuth();
-  const [viewAllMode, setViewAllMode] = useState(false);
+  const { isAdmin } = useUserProfile();
+
+  // Admin/Dono inicia com viewAllMode=true por padrão
+  const [viewAllMode, setViewAllMode] = useState(() => {
+    const saved = localStorage.getItem('commercial_pipeline_view_all_mode');
+    if (saved !== null) {
+      return JSON.parse(saved);
+    }
+    // Se nunca foi definido, admin começa com true
+    return false; // Será ajustado pelo useEffect abaixo
+  });
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
 
-  // Carregar estado do localStorage ao montar
+  // Carregar estado do localStorage ao montar e ajustar para admin
   useEffect(() => {
     const savedViewAllMode = localStorage.getItem('commercial_pipeline_view_all_mode');
     const savedSelectedUserIds = localStorage.getItem('commercial_pipeline_selected_user_ids');
 
-    if (savedViewAllMode) {
+    // Se admin e nunca definiu preferência, ativar viewAllMode automaticamente
+    if (isAdmin && savedViewAllMode === null) {
+      setViewAllMode(true);
+    } else if (savedViewAllMode !== null) {
       setViewAllMode(JSON.parse(savedViewAllMode));
     }
+
     if (savedSelectedUserIds) {
       try {
         setSelectedUserIds(JSON.parse(savedSelectedUserIds));
@@ -42,7 +57,7 @@ export function PipelineManagement() {
         setSelectedUserIds([]);
       }
     }
-  }, []);
+  }, [isAdmin]);
 
   const {
     deals,

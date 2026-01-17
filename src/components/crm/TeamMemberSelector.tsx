@@ -46,6 +46,13 @@ export function TeamMemberSelector({
     }
   }, [selectedUserIds]);
 
+  // Auto-selecionar todos quando viewAllMode está ativo e nenhum membro selecionado
+  useEffect(() => {
+    if (viewAllMode && selectedUserIds.length === 0 && teamMembers.length > 0 && !isLoading) {
+      onSelectedUserIdsChange(teamMembers.map(m => m.id));
+    }
+  }, [viewAllMode, selectedUserIds.length, teamMembers, isLoading, onSelectedUserIdsChange]);
+
   // Se não é admin nem dono, não renderiza o componente
   if (!profile || (profile.role !== 'admin' && profile.role !== 'dono')) {
     return null;
@@ -54,8 +61,13 @@ export function TeamMemberSelector({
   const handleToggleChange = (checked: boolean) => {
     onViewAllModeChange(checked);
     if (checked) {
-      // Quando ativa, inclui automaticamente o usuário atual
-      onSelectedUserIdsChange([currentUserId]);
+      // Quando ativa, seleciona automaticamente TODOS os membros
+      if (teamMembers.length > 0) {
+        onSelectedUserIdsChange(teamMembers.map(m => m.id));
+      } else {
+        // Fallback se teamMembers ainda não carregou
+        onSelectedUserIdsChange([currentUserId]);
+      }
     } else {
       // Quando desativa, limpa seleção
       onSelectedUserIdsChange([]);
@@ -118,17 +130,17 @@ export function TeamMemberSelector({
             <PopoverContent className="w-[320px] p-0" align="start">
               <div className="p-4 border-b space-y-2">
                 <div className="flex gap-2">
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
+                  <Button
+                    size="sm"
+                    variant="outline"
                     className="flex-1"
                     onClick={handleSelectAll}
                   >
                     Selecionar Todos
                   </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
+                  <Button
+                    size="sm"
+                    variant="outline"
                     className="flex-1"
                     onClick={handleClearSelection}
                   >
@@ -173,15 +185,15 @@ export function TeamMemberSelector({
       {viewAllMode && selectedMembers.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {selectedMembers.map((member) => (
-            <Badge 
-              key={member.id} 
-              variant="secondary" 
+            <Badge
+              key={member.id}
+              variant="secondary"
               className="px-3 py-1 flex items-center gap-2"
             >
               <span>{member.full_name || member.email}</span>
               {member.id !== currentUserId && (
-                <X 
-                  className="w-3 h-3 cursor-pointer hover:text-destructive" 
+                <X
+                  className="w-3 h-3 cursor-pointer hover:text-destructive"
                   onClick={() => handleToggleMember(member.id)}
                 />
               )}

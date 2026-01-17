@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import { useAuth } from "./useAuth";
 import { useUserProfile } from "./useUserProfile";
 import { useSecretaryDoctors } from "./useSecretaryDoctors";
@@ -8,17 +9,52 @@ import { CommercialSale, CommercialSaleInsert, CommercialSaleUpdate } from "@/ty
 
 export function useCommercialSales(filters?: { status?: string; procedure_id?: string }) {
   const { user } = useAuth();
-  const { isSecretaria } = useUserProfile();
+  const { isSecretaria, isAdmin } = useUserProfile();
   const { doctorIds } = useSecretaryDoctors();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Estado para todos os user IDs quando admin
+  const [allActiveUserIds, setAllActiveUserIds] = useState<string[]>([]);
+
+  // Buscar todos os usuários ativos quando admin
+  useEffect(() => {
+    if (!isAdmin || !user?.id) {
+      setAllActiveUserIds([]);
+      return;
+    }
+
+    const fetchAllUsers = async () => {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('is_active', true)
+        .limit(100);
+
+      if (profiles && profiles.length > 0) {
+        setAllActiveUserIds((profiles as { id: string }[]).map(p => p.id));
+      }
+    };
+
+    fetchAllUsers();
+  }, [isAdmin, user?.id]);
+
   const { data: sales, isLoading, error } = useQuery({
-    queryKey: ["commercial-sales", user?.id, filters, isSecretaria, doctorIds],
+    queryKey: ["commercial-sales", user?.id, filters, isAdmin, isSecretaria, doctorIds, allActiveUserIds],
     queryFn: async () => {
       if (!user) throw new Error("User not authenticated");
 
-      const targetUserIds = isSecretaria ? [user.id, ...(doctorIds || [])] : [user.id];
+      // Admin: ver vendas de todos
+      // Secretária: ver vendas próprias + médicos vinculados
+      // Outros: ver apenas próprias vendas
+      let targetUserIds: string[];
+      if (isAdmin && allActiveUserIds.length > 0) {
+        targetUserIds = allActiveUserIds;
+      } else if (isSecretaria && doctorIds?.length > 0) {
+        targetUserIds = [user.id, ...doctorIds];
+      } else {
+        targetUserIds = [user.id];
+      }
 
       let query = supabase
         .from("commercial_sales" as any)
@@ -42,7 +78,8 @@ export function useCommercialSales(filters?: { status?: string; procedure_id?: s
       if (error) throw error;
       return data as CommercialSale[];
     },
-    enabled: !!user,
+    // Para admin, aguardar carregar a lista de usuários
+    enabled: !!user && (!isAdmin || allActiveUserIds.length > 0),
   });
 
   const createSale = useMutation({

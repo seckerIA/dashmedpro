@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import { useAuth } from "./useAuth";
 import { useUserProfile } from "./useUserProfile";
 import { useSecretaryDoctors } from "./useSecretaryDoctors";
@@ -10,13 +11,38 @@ import { CommercialProcedure, CommercialProcedureInsert, CommercialProcedureUpda
 
 export function useCommercialProcedures() {
   const { user } = useAuth();
-  const { profile, isSecretaria } = useUserProfile();
+  const { profile, isSecretaria, isAdmin } = useUserProfile();
   const { doctorIds, isLoading: isLoadingDoctors } = useSecretaryDoctors();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Estado para todos os user IDs quando admin
+  const [allActiveUserIds, setAllActiveUserIds] = useState<string[]>([]);
+
+  // Buscar todos os usuários ativos quando admin
+  useEffect(() => {
+    if (!isAdmin || !user?.id) {
+      setAllActiveUserIds([]);
+      return;
+    }
+
+    const fetchAllUsers = async () => {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('is_active', true)
+        .limit(100);
+
+      if (profiles && profiles.length > 0) {
+        setAllActiveUserIds((profiles as { id: string }[]).map(p => p.id));
+      }
+    };
+
+    fetchAllUsers();
+  }, [isAdmin, user?.id]);
+
   const { data: procedures, isLoading, error } = useQuery({
-    queryKey: ["commercial-procedures", user?.id, isSecretaria, doctorIds],
+    queryKey: ["commercial-procedures", user?.id, isAdmin, isSecretaria, doctorIds, allActiveUserIds],
     queryFn: async ({ signal }) => {
       if (!user) throw new Error("User not authenticated");
 
@@ -26,7 +52,17 @@ export function useCommercialProcedures() {
       // Query com join para pegar dados do médico
       let queryPromise;
 
-      if (isSecretaria && doctorIds.length > 0) {
+      if (isAdmin && allActiveUserIds.length > 0) {
+        // Admin vê procedimentos de TODOS os usuários ativos
+        queryPromise = supabase
+          .from("commercial_procedures")
+          .select(`
+            *,
+            doctor:profiles!commercial_procedures_user_id_profiles_fk (full_name, email)
+          `)
+          .in("user_id", allActiveUserIds)
+          .order("name", { ascending: true });
+      } else if (isSecretaria && doctorIds.length > 0) {
         // Secretária vê procedimentos de TODOS os médicos vinculados
         queryPromise = supabase
           .from("commercial_procedures")
@@ -41,7 +77,7 @@ export function useCommercialProcedures() {
         console.log('[useCommercialProcedures] Secretária sem médicos vinculados');
         return [];
       } else {
-        // Outros usuários veem apenas seus próprios procedimentos
+        // Médicos e outros usuários veem apenas seus próprios procedimentos
         queryPromise = supabase
           .from("commercial_procedures")
           .select(`
@@ -65,7 +101,9 @@ export function useCommercialProcedures() {
 
       return sortedProcedures;
     },
-    enabled: !!user && !!profile && (!isSecretaria || !isLoadingDoctors),
+    // Para admin, aguardar carregar a lista de usuários
+    // Para secretária, aguardar carregar doctorIds
+    enabled: !!user && !!profile && (!isSecretaria || !isLoadingDoctors) && (!isAdmin || allActiveUserIds.length > 0),
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
     refetchOnMount: false,

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useAuth } from "./useAuth";
 import { useUserProfile } from "./useUserProfile";
 import { useSecretaryDoctors } from "./useSecretaryDoctors";
@@ -79,17 +79,52 @@ function getPreviousPeriod(current: PeriodRange): PeriodRange {
 
 export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange?: PeriodRange) {
   const { user, loading } = useAuth();
-  const { isSecretaria } = useUserProfile();
+  const { isSecretaria, isAdmin } = useUserProfile();
   const { doctorIds } = useSecretaryDoctors();
   const period = getPeriodRange(filter, customRange);
   const previousPeriod = getPreviousPeriod(period);
 
+  // Estado para armazenar todos os user IDs quando admin
+  const [allActiveUserIds, setAllActiveUserIds] = useState<string[]>([]);
+
+  // Buscar todos os usuários ativos quando admin/dono
+  useEffect(() => {
+    if (!isAdmin || !user?.id) {
+      setAllActiveUserIds([]);
+      return;
+    }
+
+    const fetchAllUsers = async () => {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('is_active', true)
+        .limit(100);
+
+      if (profiles && profiles.length > 0) {
+        setAllActiveUserIds((profiles as { id: string }[]).map(p => p.id));
+      }
+    };
+
+    fetchAllUsers();
+  }, [isAdmin, user?.id]);
+
   const targetUserIds = useMemo(() => {
     if (!user?.id) return [];
-    return isSecretaria && doctorIds.length > 0
-      ? [user.id, ...doctorIds]
-      : [user.id];
-  }, [user?.id, isSecretaria, doctorIds]);
+
+    // Admin/Dono: ver dados de todos os usuários ativos
+    if (isAdmin && allActiveUserIds.length > 0) {
+      return allActiveUserIds;
+    }
+
+    // Secretária: ver dados próprios + médicos vinculados
+    if (isSecretaria && doctorIds.length > 0) {
+      return [user.id, ...doctorIds];
+    }
+
+    // Outros roles: apenas próprios dados
+    return [user.id];
+  }, [user?.id, isAdmin, isSecretaria, doctorIds, allActiveUserIds]);
 
   const queryResult = useQuery({
     queryKey: [

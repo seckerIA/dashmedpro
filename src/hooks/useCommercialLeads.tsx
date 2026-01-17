@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useAuth } from "./useAuth";
 import { useUserProfile } from "./useUserProfile";
 import { useSecretaryDoctors } from "./useSecretaryDoctors";
@@ -10,17 +10,52 @@ import { CommercialLead, CommercialLeadInsert, CommercialLeadUpdate } from "@/ty
 
 export function useCommercialLeads(filters?: { status?: string; origin?: string }) {
   const { user } = useAuth();
-  const { isSecretaria, isLoading: isLoadingProfile } = useUserProfile();
+  const { isSecretaria, isAdmin, isLoading: isLoadingProfile } = useUserProfile();
   const { doctorIds, isLoading: isLoadingDoctors } = useSecretaryDoctors();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Estado para todos os user IDs quando admin
+  const [allActiveUserIds, setAllActiveUserIds] = useState<string[]>([]);
+
+  // Buscar todos os usuários ativos quando admin
+  useEffect(() => {
+    if (!isAdmin || !user?.id) {
+      setAllActiveUserIds([]);
+      return;
+    }
+
+    const fetchAllUsers = async () => {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('is_active', true)
+        .limit(100);
+
+      if (profiles && profiles.length > 0) {
+        setAllActiveUserIds((profiles as { id: string }[]).map(p => p.id));
+      }
+    };
+
+    fetchAllUsers();
+  }, [isAdmin, user?.id]);
+
   const targetUserIds = useMemo(() => {
     if (!user?.id) return [];
-    return isSecretaria && doctorIds?.length > 0
-      ? [user.id, ...doctorIds]
-      : [user.id];
-  }, [user?.id, isSecretaria, doctorIds]);
+
+    // Admin: ver leads de todos os usuários ativos
+    if (isAdmin && allActiveUserIds.length > 0) {
+      return allActiveUserIds;
+    }
+
+    // Secretária: ver leads próprios + médicos vinculados
+    if (isSecretaria && doctorIds?.length > 0) {
+      return [user.id, ...doctorIds];
+    }
+
+    // Outros: apenas próprios leads
+    return [user.id];
+  }, [user?.id, isAdmin, isSecretaria, doctorIds, allActiveUserIds]);
 
   // Fetch leads
   const { data: leads, isLoading, error } = useQuery({
@@ -32,7 +67,7 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
 
       let queryPromise;
 
-      if (isSecretaria && (targetUserIds || []).length > 1) {
+      if ((targetUserIds || []).length > 1) {
         queryPromise = supabase
           .from("commercial_leads" as any)
           .select(`
