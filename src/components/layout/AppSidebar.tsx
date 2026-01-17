@@ -192,29 +192,8 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
     return currentSearch === `?${queryString}`
   }
 
-  // Debug: verificar permissões (remover em produção)
-  React.useEffect(() => {
-    if (profile) {
-      console.log('Sidebar Debug - Profile Loaded:', {
-        profileId: profile.id,
-        email: profile.email,
-        fullName: profile.full_name,
-        role: profile.role,
-        isActive: profile.is_active,
-        isAdmin,
-        isVendedor,
-        isGestorTrafego,
-        isLoadingProfile,
-        userId: user?.id,
-        hasAdminOnlyItems: navigationGroups.some(g => g.items.some(i => i.adminOnly === true))
-      });
-    } else if (!isLoadingProfile) {
-      console.warn('Sidebar Debug - No Profile Found:', {
-        userId: user?.id,
-        isLoadingProfile
-      });
-    }
-  }, [profile, isAdmin, isVendedor, isGestorTrafego, isLoadingProfile, user?.id]);
+  // Debug de permissões removido por segurança
+  // (expunha informações de perfil no console em produção)
 
   const handleSignOut = async () => {
     try {
