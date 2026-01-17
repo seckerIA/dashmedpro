@@ -20,6 +20,10 @@ import { PrescriptionBuilder } from './PrescriptionBuilder';
 import { TreatmentConfirmationModal } from './TreatmentConfirmationModal';
 import { updateDealToTreatment, checkAndMoveToAguardandoRetorno } from '@/hooks/useMedicalAppointments';
 import { VitalSigns, Prescription, MedicalRecordInsert } from '@/types/medicalRecords';
+import { ProductConsumption } from '@/types/inventory';
+import { useInventory } from '@/hooks/useInventory';
+import { useFinancialTransactions } from '@/hooks/useFinancialTransactions';
+import { StockConsumption } from './StockConsumption';
 import { Save, CheckCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Separator } from '@/components/ui/separator';
@@ -83,7 +87,12 @@ export function MedicalRecordForm({
   const { record, isLoading: loadingRecord } = useMedicalRecord(recordId || null);
   const [vitalSigns, setVitalSigns] = useState<VitalSigns>({});
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
+  const [consumption, setConsumption] = useState<ProductConsumption[]>([]);
   const [showTreatmentModal, setShowTreatmentModal] = useState(false);
+
+  // Hooks para Estoque e Financeiro
+  const { registerMovement } = useInventory();
+  const { createTransaction, isCreating: isCreatingTransaction } = useFinancialTransactions();
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -216,6 +225,75 @@ export function MedicalRecordForm({
       const result = await createRecord.mutateAsync(recordData);
       if (result?.id) {
         await markAsCompleted.mutateAsync(result.id);
+      }
+    }
+
+
+    // Processar Estoque e Financeiro (Apenas na finalização)
+    if (consumption.length > 0) {
+      try {
+        for (const item of consumption) {
+          // 1. Baixa no Estoque
+          await registerMovement.mutateAsync({
+            batchId: item.batchId,
+            type: 'OUT',
+            quantity: -item.quantity, // Negativo para saída
+            description: `Consumo em Consulta (Paciente: ${contactId})`
+          });
+
+          // 2. Lançamento Financeiro (Se houver preço)
+          if (item.price && item.price > 0) {
+            const amount = item.price * item.quantity;
+            createTransaction({
+              type: 'income',
+              amount: amount,
+              description: `Venda Material: ${item.itemId} (Qtd: ${item.quantity})`,
+              transaction_date: new Date().toISOString(),
+              status: 'pending', // A receber
+              category_id: null, // Usuário classifica depois
+              account_id: null,
+              user_id: user.id
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Erro ao processar estoque/financeiro", err);
+        // Não bloqueia o fluxo principal, mas poderia avisar
+      }
+    }
+
+
+    // Processar Estoque e Financeiro (Apenas na finalização)
+    if (consumption.length > 0) {
+      try {
+        // Precisamos processar um por um
+        for (const item of consumption) {
+          // 1. Baixa no Estoque (registerMovement lida com a lógica no banco ou hook)
+          // Nota: registerMovement espera batchCount, type, quantity.
+          // O hook useInventory.registerMovement que escrevi espera: { batchId, type, quantity, description }
+          await registerMovement.mutateAsync({
+            batchId: item.batchId,
+            type: 'OUT',
+            quantity: -item.quantity, // Enviar negativo pois é saída
+            description: `Consumo em Consulta`
+          });
+
+          // 2. Lançamento Financeiro (Se houver preço)
+          if (item.price && item.price > 0) {
+            createTransaction({
+              type: 'income',
+              amount: item.price * item.quantity,
+              description: `Venda Material: ${item.itemId} (Qtd: ${item.quantity})`,
+              transaction_date: new Date().toISOString(),
+              status: 'pending', // A receber
+              category_id: null,
+              account_id: null,
+              user_id: user.id
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Erro ao processar estoque/financeiro", err);
       }
     }
 
@@ -533,6 +611,14 @@ export function MedicalRecordForm({
               )}
             />
           </div>
+        </div>
+
+        <Separator />
+
+        {/* Section: Stock Consumption */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Consumo de Materiais</h3>
+          <StockConsumption value={consumption} onChange={setConsumption} />
         </div>
 
         <Separator />

@@ -41,6 +41,7 @@ import Marketing from "./pages/Marketing";
 import MedicalRecords from "./pages/MedicalRecords";
 import WhatsAppInbox from "./pages/WhatsAppInbox";
 import WhatsAppSettings from "./pages/WhatsAppSettings";
+import InventoryPage from "./pages/Inventory";
 import {
   TrendingUp,
   Target,
@@ -408,6 +409,11 @@ const AppRoutes = () => {
             }
           />
           <Route path="/calendar" element={<MedicalCalendar />} />
+          <Route path="/inventory" element={
+            <RoleProtectedRoute allowedRoles={['admin', 'dono', 'medico', 'secretaria']}>
+              <InventoryPage />
+            </RoleProtectedRoute>
+          } />
           <Route path="/follow-ups" element={<FollowUps />} />
           <Route
             path="/prontuarios"

@@ -30,7 +30,8 @@ import {
   Phone,
   Building2,
   Zap,
-  CircleDollarSign
+  CircleDollarSign,
+  Package
 } from "lucide-react"
 import { NavLink, useLocation, useNavigate } from "react-router-dom"
 import {
@@ -63,6 +64,7 @@ type NavigationItem = {
   medicoOnly?: boolean;
   secretariaOnly?: boolean;
   subItems?: NavigationItem[];
+  hidden?: boolean;
 };
 
 const navigationGroups: Array<{
@@ -74,6 +76,7 @@ const navigationGroups: Array<{
       items: [
         { title: "Dashboard", url: "/", icon: Home },
         { title: "Tarefas", url: "/tarefas", icon: CheckSquare2 },
+        { title: "Estoque", url: "/inventory", icon: Package, badge: "Beta", hidden: true },
       ]
     },
     {
@@ -253,6 +256,9 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
               {navigationGroups.map((group, groupIndex) => {
                 // Filtrar itens do grupo baseado nas permissões
                 const filteredItems = group.items.filter(item => {
+                  // Se marcado como hidden, não mostrar
+                  if (item.hidden) return false;
+
                   // Abas ocultas temporariamente (não exibir para nenhum cargo)
                   const hiddenUrls = [
                     '/comercial/guia-prospeccao', // Guia de Prospecção

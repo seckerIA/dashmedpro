@@ -186,6 +186,114 @@ export interface Database {
           updated_at?: string
         }
       }
+      inventory_items: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          unit: string
+          category: string
+          min_stock: number
+          sell_price: number | null
+          description: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          unit?: string
+          category?: string
+          min_stock?: number
+          sell_price?: number | null
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          unit?: string
+          category?: string
+          min_stock?: number
+          sell_price?: number | null
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      inventory_batches: {
+        Row: {
+          id: string
+          item_id: string
+          batch_number: string
+          expiration_date: string | null
+          quantity: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          item_id: string
+          batch_number: string
+          expiration_date?: string | null
+          quantity?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          item_id?: string
+          batch_number?: string
+          expiration_date?: string | null
+          quantity?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      inventory_movements: {
+        Row: {
+          id: string
+          batch_id: string
+          type: 'IN' | 'OUT' | 'ADJUST' | 'LOSS'
+          quantity: number
+          previous_balance: number | null
+          new_balance: number | null
+          reference_id: string | null
+          description: string | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          batch_id: string
+          type: 'IN' | 'OUT' | 'ADJUST' | 'LOSS'
+          quantity: number
+          previous_balance?: number | null
+          new_balance?: number | null
+          reference_id?: string | null
+          description?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          batch_id?: string
+          type?: 'IN' | 'OUT' | 'ADJUST' | 'LOSS'
+          quantity?: number
+          previous_balance?: number | null
+          new_balance?: number | null
+          reference_id?: string | null
+          description?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+      }
     }
     Enums: {
       crm_pipeline_stage: 'lead_novo' | 'qualificado' | 'apresentacao' | 'proposta' | 'negociacao' | 'fechado_ganho' | 'fechado_perdido' | 'agendado' | 'em_tratamento' | 'inadimplente' | 'follow_up' | 'aguardando_retorno'
