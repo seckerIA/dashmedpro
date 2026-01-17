@@ -191,3 +191,16 @@ supabase/functions/
   - **Bug (NaN)**: Os badges de "Sinais e Pagamentos" e métricas de "Produtividade" mostravam `NaN` ou valores vazios.
   - **Causa**: O componente `SecretaryDashboard.tsx` acessava propriedades inexistentes nos objetos retornados pelos hooks (ex: `pendingSinais` em vez de `pendingCount`, `totalCalls` em vez de `callsToday`).
   - **Correção**: Atualizado `SecretaryDashboard.tsx` para usar as propriedades corretas definidas nas interfaces TypeScript (`SecretarySinalMetrics`, `ProductivityMetrics`).
+
+### Contexto Atual (17/01/2026 - Secretary Permissions & Calendar Fix)
+- **Bug Fix (Pipeline Visibility):** Secretárias não viam o pipeline dos médicos.
+  - Correção na Edge Function `update-team-user` para permitir que médicos editem secretárias vinculadas (resolvendo erro 403).
+  - Aplicação de nova política RLS em `secretary_doctor_links` permitindo que médicos gerenciem vínculos.
+  - Correção no frontend (`TeamManagement.tsx`) para usar a nova lógica de vínculos.
+- **Bug Fix (Checkbox Loop):** Checkbox de seleção de médicos em `TeamManagement` não funcionava.
+  - Causa: Loop infinito no `useEffect` devido a função `getLinksForSecretary` não memoizada.
+  - Correção: Uso de `useCallback` no hook `useSecretaryDoctors`.
+- **Bug Fix (Medical Calendar):** Secretária travava ao marcar "Compareceu" por não ter conta bancária própria.
+  - Backend Logic: `useFinancialAccounts` agora retorna contas dos médicos vinculados quando o usuário é secretária.
+  - Frontend Logic: `MedicalCalendar` não bloqueia mais a ação se a secretária não tiver conta pessoal, permitindo selecionar o banco do médico no modal de pagamento.
+- **Status:** Testado e aprovado pelo usuário. Pipeline visível e fluxo de calendário funcional.
