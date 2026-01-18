@@ -43,11 +43,14 @@ const handler = async (req: Request): Promise<Response> => {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
+      console.error("Auth error:", authError);
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log("Requesting user:", user.id);
 
     // Check if user has admin, dono or medico role
     const { data: profile } = await supabase
@@ -57,21 +60,36 @@ const handler = async (req: Request): Promise<Response> => {
       .single();
 
     if (!profile || !['admin', 'dono', 'medico'].includes(profile.role)) {
+      console.error("Insufficient permissions. Role:", profile?.role);
       return new Response(
         JSON.stringify({ error: 'Insufficient permissions' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const { userId }: DeleteUserRequest = await req.json();
+    let userId: string;
+    try {
+      const body = await req.json();
+      console.log("Request body:", body);
+      userId = body.userId;
+    } catch (e) {
+      console.error("JSON parse error:", e);
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON body' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Validate required fields
     if (!userId) {
+      console.error("Missing userId in request");
       return new Response(
         JSON.stringify({ error: 'User ID is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log("Attempting to delete user:", userId);
 
     // Prevent self-deletion
     if (userId === user.id) {
@@ -89,6 +107,7 @@ const handler = async (req: Request): Promise<Response> => {
       .single();
 
     if (profileError || !targetProfile) {
+      console.error("Target user profile not found or error:", profileError);
       return new Response(
         JSON.stringify({ error: 'User not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -116,11 +135,14 @@ const handler = async (req: Request): Promise<Response> => {
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
     if (deleteError) {
+      console.error("Error deleting user:", deleteError);
       return new Response(
         JSON.stringify({ error: deleteError.message }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log("User deleted successfully:", userId);
 
     return new Response(
       JSON.stringify({

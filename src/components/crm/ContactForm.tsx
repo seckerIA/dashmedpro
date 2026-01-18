@@ -11,6 +11,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Form,
   FormControl,
@@ -414,6 +415,43 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
               exact: false
             });
 
+            // -------------------------------------------------------------
+            // Criar registro em commercial_leads para aparecer na aba "Leads & Conversões"
+            // -------------------------------------------------------------
+            try {
+              console.log('🔄 Criando registro espelho em commercial_leads...');
+
+              // Preparar dados para commercial_leads
+              const leadData: any = {
+                user_id: user.id || newContact.user_id,
+                name: newContact.full_name,
+                email: newContact.email || null,
+                phone: newContact.phone || null,
+                origin: (customFields.origin || 'other') as any,
+                status: 'new', // Status inicial padrão
+                contact_id: newContact.id,
+                estimated_value: serviceValue || null,
+                procedure_id: customFields.procedure_id || null,
+                notes: customFields.notes || null,
+                created_at: newContact.created_at || new Date().toISOString()
+              };
+
+              const { error: leadError } = await supabase
+                .from('commercial_leads')
+                .insert(leadData);
+
+              if (leadError) {
+                console.error('⚠️ Erro ao criar commercial_lead espelho:', leadError);
+              } else {
+                console.log('✅ commercial_lead espelho criado com sucesso.');
+                queryClient.invalidateQueries({ queryKey: ["commercial-leads"] });
+                queryClient.invalidateQueries({ queryKey: ["commercial-metrics"] });
+              }
+            } catch (err) {
+              console.error('⚠️ Erro não bloqueante ao criar commercial_lead:', err);
+            }
+            // -------------------------------------------------------------
+
             toast({
               title: "Contato e Contrato criados",
               description: `O contato foi criado e adicionado ao pipeline.`,
@@ -452,6 +490,42 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
           }
         } else {
           console.log('ℹ️ Deal não será criado (create_deal:', create_deal, ')');
+
+          // Se não criou deal, ainda assim criar commercial_lead se for novo contato
+          if (newContact) {
+            try {
+              console.log('🔄 Criando registro espelho em commercial_leads (sem deal)...');
+
+              const leadData: any = {
+                user_id: user.id || newContact.user_id,
+                name: newContact.full_name,
+                email: newContact.email || null,
+                phone: newContact.phone || null,
+                origin: (customFields.origin || 'other') as any,
+                status: 'new',
+                contact_id: newContact.id,
+                estimated_value: serviceValue || null,
+                procedure_id: customFields.procedure_id || null,
+                notes: customFields.notes || null,
+                created_at: newContact.created_at || new Date().toISOString()
+              };
+
+              const { error: leadError } = await supabase
+                .from('commercial_leads')
+                .insert(leadData);
+
+              if (leadError) {
+                console.error('⚠️ Erro ao criar commercial_lead espelho:', leadError);
+              } else {
+                console.log('✅ commercial_lead espelho criado com sucesso.');
+                queryClient.invalidateQueries({ queryKey: ["commercial-leads"] });
+                queryClient.invalidateQueries({ queryKey: ["commercial-metrics"] });
+              }
+            } catch (err) {
+              console.error('⚠️ Erro não bloqueante ao criar commercial_lead:', err);
+            }
+          }
+
           toast({
             title: "Contato criado",
             description: "O contato foi criado com sucesso.",

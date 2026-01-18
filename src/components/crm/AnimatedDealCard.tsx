@@ -200,19 +200,14 @@ export function AnimatedDealCard({
               Inadimplente
             </Badge>
           )}
-          {deal.needs_follow_up && (
-            <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-orange-500/10 text-orange-600 border-orange-500/20">
-              <Clock className="w-3 h-3 mr-1" />
-              Follow-up
-            </Badge>
-          )}
+          {/* Badge de Follow-up removido (campo legacy) */}
           {showOwnerBadge && deal.owner_profile && (
             <Badge
               variant="outline"
               className="text-xs px-2 py-0.5 bg-primary/5 border-primary/20 text-primary"
               title={`Responsável: ${ownerName}`}
             >
-              {ownerInitials}
+              {ownerName}
             </Badge>
           )}
         </div>
@@ -323,20 +318,7 @@ export function AnimatedDealCard({
           </div>
         )}
 
-        {/* Follow-up Action */}
-        {onToggleFollowUp && (
-          <div
-            className="pt-2 border-t border-border/50"
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-            <FollowUpAction
-              dealId={deal.id}
-              dealTitle={deal.title}
-              onToggleFollowUp={onToggleFollowUp}
-              needsFollowUp={deal.needs_follow_up}
-            />
-          </div>
-        )}
+        {/* Follow-up Action - Removed legacy needs_follow_up logic */}
 
         {/* Footer: Expected Close Date */}
         {deal.expected_close_date && (

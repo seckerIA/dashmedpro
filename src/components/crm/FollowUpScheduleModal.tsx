@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Calendar as CalendarIcon, Clock } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFollowUps } from '@/hooks/useFollowUps';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -14,6 +15,12 @@ import { FollowUp } from '@/types/followUp';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+
+const TIME_SLOTS = [
+  "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+  "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
+  "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00"
+];
 
 interface FollowUpScheduleModalProps {
   dealId: string;
@@ -134,7 +141,7 @@ export function FollowUpScheduleModal({ dealId, dealTitle, open, onOpenChange, f
             {dealTitle}
           </p>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div className="space-y-2">
             <Label>
@@ -154,7 +161,7 @@ export function FollowUpScheduleModal({ dealId, dealTitle, open, onOpenChange, f
                   {selectedDate ? format(selectedDate, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
+              <PopoverContent className="w-auto p-0 z-[200]" align="start">
                 <Calendar
                   mode="single"
                   selected={selectedDate}
@@ -172,13 +179,18 @@ export function FollowUpScheduleModal({ dealId, dealTitle, open, onOpenChange, f
               <Clock className="w-4 h-4 inline mr-1" />
               Horário *
             </Label>
-            <Input
-              id="time"
-              type="time"
-              value={scheduledTime}
-              onChange={(e) => setScheduledTime(e.target.value)}
-              required
-            />
+            <Select value={scheduledTime} onValueChange={setScheduledTime}>
+              <SelectTrigger id="time" className="w-full">
+                <SelectValue placeholder="Selecione o horário" />
+              </SelectTrigger>
+              <SelectContent className="z-[200] max-h-[200px]">
+                {TIME_SLOTS.map((time) => (
+                  <SelectItem key={time} value={time}>
+                    {time}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
@@ -202,8 +214,8 @@ export function FollowUpScheduleModal({ dealId, dealTitle, open, onOpenChange, f
               Cancelar
             </Button>
             <Button type="submit" disabled={isLoading}>
-              {isLoading 
-                ? (isEditing ? 'Atualizando...' : 'Agendando...') 
+              {isLoading
+                ? (isEditing ? 'Atualizando...' : 'Agendando...')
                 : (isEditing ? 'Atualizar Follow-up' : 'Agendar Follow-up')
               }
             </Button>

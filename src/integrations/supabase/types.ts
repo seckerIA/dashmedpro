@@ -411,7 +411,7 @@ export interface Database {
       }
     }
     Enums: {
-      crm_pipeline_stage: 'lead_novo' | 'qualificado' | 'apresentacao' | 'proposta' | 'negociacao' | 'fechado_ganho' | 'fechado_perdido' | 'agendado' | 'em_tratamento' | 'inadimplente' | 'follow_up' | 'aguardando_retorno'
+      crm_pipeline_stage: 'lead_novo' | 'qualificado' | 'apresentacao' | 'proposta' | 'negociacao' | 'fechado_ganho' | 'fechado_perdido' | 'agendado' | 'em_tratamento' | 'inadimplente' | 'follow_up' | 'aguardando_retorno' | 'em_contato' | 'avaliacao' | 'finalizado'
       crm_activity_type: 'call' | 'email' | 'meeting' | 'task' | 'note' | 'whatsapp'
     }
   }

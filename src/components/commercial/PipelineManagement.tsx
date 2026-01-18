@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { CRMDealWithContact } from "@/types/crm";
 import { format } from "date-fns";
+import { PipelineHelp } from "@/components/crm/PipelineHelp";
 
 export function PipelineManagement() {
   const { user } = useAuth();
@@ -192,8 +193,7 @@ export function PipelineManagement() {
       await updateFollowUp({
         id: followUpId,
         data: {
-          status: 'concluido',
-          completed_notes: 'Concluído manualmente'
+          completed: true
         }
       });
       toast({
@@ -338,6 +338,8 @@ export function PipelineManagement() {
         </div>
       </div>
 
+
+
       {/* Global Search and Filters */}
       <div className="flex items-center gap-4">
         <div className="flex-1">
@@ -350,6 +352,7 @@ export function PipelineManagement() {
             }}
           />
         </div>
+        <PipelineHelp />
         <Button variant="outline">
           <Filter className="w-4 h-4 mr-2" />
           Filtros

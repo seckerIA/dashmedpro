@@ -12,8 +12,10 @@ import { ConversationList } from '@/components/whatsapp/inbox/ConversationList';
 import { ConversationFilters } from '@/components/whatsapp/inbox/ConversationFilters';
 import { ChatWindow } from '@/components/whatsapp/chat/ChatWindow';
 import { ConversationSidebar } from '@/components/whatsapp/sidebar/ConversationSidebar';
+import { InboxSourceSelector } from '@/components/whatsapp/inbox/InboxSourceSelector';
 import { useWhatsAppConfig } from '@/hooks/useWhatsAppConfig';
 import { useWhatsAppConversations } from '@/hooks/useWhatsAppConversations';
+import { useDoctorSecretaries } from '@/hooks/useDoctorSecretaries';
 import { useWhatsAppRealtime } from '@/hooks/useWhatsAppRealtime';
 import type {
   WhatsAppConversationWithRelations,
@@ -26,11 +28,17 @@ export default function WhatsAppInbox() {
 
   // Config check
   const { isConfigured, isActive, isLoading: isLoadingConfig } = useWhatsAppConfig();
+  const { secretaryIds, isLoading: isLoadingSecretaries } = useDoctorSecretaries();
 
   // Filters state
   const [filters, setFilters] = useState<WhatsAppConversationFilters>({});
 
-  // Conversations query
+  // handleOwnerChange
+  const handleOwnerChange = useCallback((ownerId: string | 'all' | undefined) => {
+    setFilters(prev => ({ ...prev, ownerId }));
+  }, []);
+
+  // ... (conversations query remains same) ...
   const {
     conversations,
     stats,
@@ -138,7 +146,7 @@ export default function WhatsAppInbox() {
   }, [selectedConversation?.id, selectedConversation?.unread_count, markAsRead, isMarkingAsRead]);
 
   // Loading state
-  if (isLoadingConfig) {
+  if (isLoadingConfig || isLoadingSecretaries) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -146,8 +154,10 @@ export default function WhatsAppInbox() {
     );
   }
 
-  // Not configured - redirect to settings
-  if (!isConfigured) {
+  // Not configured - redirect to settings (Bypass if user has linked secretaries)
+  const hasLinkedSecretaries = secretaryIds && secretaryIds.length > 0;
+
+  if (!isConfigured && !hasLinkedSecretaries) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-6 p-4">
         <div className="p-6 rounded-full bg-green-500/10">
@@ -168,8 +178,8 @@ export default function WhatsAppInbox() {
     );
   }
 
-  // Configured but inactive
-  if (!isActive) {
+  // Configured but inactive (Only check strictly if it IS configured for self, otherwise ignore for doctor view)
+  if (isConfigured && !isActive) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-6 p-4">
         <div className="p-6 rounded-full bg-yellow-500/10">
@@ -193,6 +203,16 @@ export default function WhatsAppInbox() {
   // Inbox content
   const inboxContent = (
     <div className="flex flex-col h-full">
+      {/* Seletor de Secretária (apenas para médicos) */}
+      {hasLinkedSecretaries && (
+        <div className="p-2 border-b">
+          <InboxSourceSelector
+            currentOwnerId={filters.ownerId}
+            onOwnerChange={handleOwnerChange}
+          />
+        </div>
+      )}
+
       {/* Filtros */}
       <ConversationFilters
         filters={filters}

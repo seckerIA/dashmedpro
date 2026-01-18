@@ -46,11 +46,11 @@ interface SortableDealCardProps {
   showOwnerBadge?: boolean;
 }
 
-function SortableDealCard({ 
-  deal, 
-  onClick, 
-  onEdit, 
-  onDelete, 
+function SortableDealCard({
+  deal,
+  onClick,
+  onEdit,
+  onDelete,
   onScheduleCall,
   isDeleting,
   isHighlighted,
@@ -64,7 +64,7 @@ function SortableDealCard({
     transform,
     transition,
     isDragging,
-  } = useSortable({ 
+  } = useSortable({
     id: deal.id,
     data: {
       type: 'deal',
@@ -135,10 +135,10 @@ export interface PipelineBoardProps {
   onDealMovedToAgendado?: (deal: CRMDealWithContact) => void;
 }
 
-export function PipelineBoard({ 
-  deals, 
+export function PipelineBoard({
+  deals,
   followUps = [],
-  onDealClick, 
+  onDealClick,
   onStageClick,
   onUpdateDeal,
   onReorderDealsInStage,
@@ -159,7 +159,7 @@ export function PipelineBoard({
 }: PipelineBoardProps) {
   const { isSecretaria } = useUserProfile();
   const [activeDeal, setActiveDeal] = useState<CRMDealWithContact | null>(null);
-  
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -174,18 +174,18 @@ export function PipelineBoard({
     PIPELINE_STAGES.forEach(stage => {
       grouped[stage.value] = [];
     });
-    
+
     deals.forEach(deal => {
       if (grouped[deal.stage]) {
         grouped[deal.stage].push(deal);
       }
     });
-    
+
     // Ordenar cada grupo por position
     Object.keys(grouped).forEach(stage => {
       grouped[stage].sort((a, b) => (a.position || 0) - (b.position || 0));
     });
-    
+
     return grouped;
   }, [deals]);
 
@@ -241,9 +241,9 @@ export function PipelineBoard({
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
-    
+
     setActiveDeal(null);
-    
+
     if (!over || active.id === over.id || !onUpdateDeal) {
       return;
     }
@@ -253,12 +253,12 @@ export function PipelineBoard({
     if (!activeDeal) {
       return;
     }
-    
+
     // Verificar se foi solto em uma coluna (stage)
     const overIsStage = PIPELINE_STAGES.some(s => s.value === over.id);
-    
+
     let targetStage: string;
-    
+
     if (overIsStage) {
       // Solto diretamente em uma coluna: usar o stage da coluna
       targetStage = over.id as string;
@@ -270,17 +270,17 @@ export function PipelineBoard({
       }
       targetStage = overDeal.stage;
     }
-    
+
     // Se não mudou de stage, reordenar dentro do mesmo stage
     if (activeDeal.stage === targetStage) {
       const stageDeals = getDealsByStage(targetStage);
       const oldIndex = stageDeals.findIndex(d => d.id === activeId);
       const newIndex = stageDeals.findIndex(d => d.id === over.id);
-      
+
       if (oldIndex !== newIndex && oldIndex >= 0 && newIndex >= 0) {
         // Reordenar usando arrayMove
         const reordered = arrayMove(stageDeals, oldIndex, newIndex);
-        
+
         // Atualizar todas as posições
         if (onReorderDealsInStage) {
           const reorderedIds = reordered.map(d => d.id);
@@ -289,12 +289,12 @@ export function PipelineBoard({
       }
       return;
     }
-    
+
     // Mudou de stage: atualizar apenas o stage (como FunnelBoard faz)
     // A posição será gerenciada automaticamente pela query
     try {
       await onUpdateDeal(activeId, targetStage);
-      
+
       // Se mudou para "agendado", chamar callback
       if (targetStage === 'agendado' && activeDeal) {
         // Buscar deal atualizado da lista
@@ -318,14 +318,13 @@ export function PipelineBoard({
       }
     });
     return (
-      <Card 
+      <Card
         ref={setNodeRef}
-        className={`flex-shrink-0 w-80 bg-gradient-to-br from-card to-card/50 border-2 shadow-card transition-all duration-150 ${
-          isOver 
-            ? 'border-primary shadow-glow ring-2 ring-primary/20 scale-[1.02]' 
+        className={`flex-shrink-0 w-80 bg-gradient-to-br from-card to-card/50 border-2 shadow-card transition-all duration-150 ${isOver
+            ? 'border-primary shadow-glow ring-2 ring-primary/20 scale-[1.02]'
             : 'border-border hover:shadow-lg'
-        }`}
-        style={{ 
+          }`}
+        style={{
           width: '320px',
           maxWidth: '320px',
           minWidth: '320px',
@@ -349,87 +348,87 @@ export function PipelineBoard({
       <div className="flex gap-4 overflow-x-auto pb-4">
         {PIPELINE_STAGES.map((stage) => {
           const stageDeals = getDealsByStage(stage.value);
-          
+
           return (
             <DroppableColumn key={stage.value} stage={stage}>
-            <CardHeader className="pb-3 bg-gradient-to-r from-transparent to-primary/5 rounded-t-lg">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`flex items-center justify-center w-12 h-12 rounded-xl ${stage.bgColor} border border-border/50 shadow-sm`}>
-                    <stage.icon className={`w-6 h-6 ${stage.textColor}`} />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base font-semibold text-foreground">
-                      {stage.label}
-                    </CardTitle>
-                    {/* Valor total do estágio - oculto para secretária */}
-                    {!isSecretaria && (
-                      <p className="text-sm text-muted-foreground mt-0.5 font-medium">
-                        {getTotalValueByStage(stage.value)}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-3 mt-1">
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Users className="w-3 h-3" />
-                        <span>{getUniqueContactsByStage(stage.value)} contatos</span>
+              <CardHeader className="pb-3 bg-gradient-to-r from-transparent to-primary/5 rounded-t-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`flex items-center justify-center w-12 h-12 rounded-xl ${stage.bgColor} border border-border/50 shadow-sm`}>
+                      <stage.icon className={`w-6 h-6 ${stage.textColor}`} />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base font-semibold text-foreground h-12 flex items-center leading-tight">
+                        {stage.label}
+                      </CardTitle>
+                      {/* Valor total do estágio - oculto para secretária */}
+                      {!isSecretaria && (
+                        <p className="text-sm text-muted-foreground mt-0.5 font-medium">
+                          {getTotalValueByStage(stage.value)}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-3 mt-1">
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Users className="w-3 h-3" />
+                          <span>{getUniqueContactsByStage(stage.value)} contatos</span>
+                        </div>
                       </div>
                     </div>
                   </div>
+                  <Badge
+                    variant="secondary"
+                    className={`text-sm ${stage.bgColor} ${stage.textColor} border-0 font-semibold px-3 py-1.5 rounded-lg`}
+                  >
+                    {stageDeals.length}
+                  </Badge>
                 </div>
-                <Badge 
-                  variant="secondary" 
-                  className={`text-sm ${stage.bgColor} ${stage.textColor} border-0 font-semibold px-3 py-1.5 rounded-lg`}
-                >
-                  {stageDeals.length}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="p-2 pt-0" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'visible' }}>
-              <ScrollArea className="h-[calc(100vh-300px)] w-full" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
-                <SortableContext items={stageDeals.map(deal => deal.id)} strategy={verticalListSortingStrategy}>
-                  <div className="space-y-3 w-full px-1" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'visible' }}>
-                    {stageDeals.map((deal) => (
-                      <SortableDealCard
-                        key={`${deal.id}-${deal.contact?.service_value || 0}-${deal.contact?.updated_at || ''}`}
-                        deal={deal} 
-                        onClick={() => onDealClick?.(deal)}
-                        onEdit={onEditDeal}
-                        onDelete={onDeleteDeal}
-                        onScheduleCall={onScheduleCall}
-                        isDeleting={isDeletingDeal}
-                        isHighlighted={highlightedDealId === deal.id}
-                        onToggleFollowUp={onToggleFollowUp}
-                        showOwnerBadge={showOwnerBadge}
-                      />
-                    ))}
-                    
-                    {stageDeals.length === 0 && (
-                      <div className="text-center py-8 text-sm text-muted-foreground">
-                        Nenhum contato nesta etapa
-                      </div>
-                    )}
-                  </div>
-                </SortableContext>
-              </ScrollArea>
-              
-              <ContactActionSelector
-                stage={stage.value}
-                stageConfig={{
-                  bgColor: stage.bgColor,
-                  textColor: stage.textColor,
-                  label: stage.label
-                }}
-                onContactAdded={onContactAdded}
-                onExistingContactSelected={(contactId, selectedStage) => {
-                  // Este callback será implementado no ContactActionSelector
-                  console.log('Contato existente selecionado:', contactId, selectedStage);
-                }}
-              />
-            </CardContent>
-          </DroppableColumn>
-        );
-      })}
-      
+              </CardHeader>
+              <CardContent className="p-2 pt-0" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'visible' }}>
+                <ScrollArea className="h-[calc(100vh-300px)] w-full" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+                  <SortableContext items={stageDeals.map(deal => deal.id)} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-3 w-full px-1" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'visible' }}>
+                      {stageDeals.map((deal) => (
+                        <SortableDealCard
+                          key={`${deal.id}-${deal.contact?.service_value || 0}-${deal.contact?.updated_at || ''}`}
+                          deal={deal}
+                          onClick={() => onDealClick?.(deal)}
+                          onEdit={onEditDeal}
+                          onDelete={onDeleteDeal}
+                          onScheduleCall={onScheduleCall}
+                          isDeleting={isDeletingDeal}
+                          isHighlighted={highlightedDealId === deal.id}
+                          onToggleFollowUp={onToggleFollowUp}
+                          showOwnerBadge={showOwnerBadge}
+                        />
+                      ))}
+
+                      {stageDeals.length === 0 && (
+                        <div className="text-center py-8 text-sm text-muted-foreground">
+                          Nenhum contato nesta etapa
+                        </div>
+                      )}
+                    </div>
+                  </SortableContext>
+                </ScrollArea>
+
+                <ContactActionSelector
+                  stage={stage.value}
+                  stageConfig={{
+                    bgColor: stage.bgColor,
+                    textColor: stage.textColor,
+                    label: stage.label
+                  }}
+                  onContactAdded={onContactAdded}
+                  onExistingContactSelected={(contactId, selectedStage) => {
+                    // Este callback será implementado no ContactActionSelector
+                    console.log('Contato existente selecionado:', contactId, selectedStage);
+                  }}
+                />
+              </CardContent>
+            </DroppableColumn>
+          );
+        })}
+
         {/* Seção de Follow-ups */}
         <FollowUpSection
           deals={deals}
@@ -439,8 +438,8 @@ export function PipelineBoard({
           onEditFollowUp={onEditFollowUp}
         />
       </div>
-      
-      <DragOverlay 
+
+      <DragOverlay
         dropAnimation={{
           duration: 200,
           easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
@@ -450,7 +449,7 @@ export function PipelineBoard({
         }}
       >
         {activeDeal ? (
-          <div 
+          <div
             className="rotate-2 opacity-100"
             style={{
               transform: 'scale(1.08) translateZ(0)',
@@ -460,11 +459,11 @@ export function PipelineBoard({
               willChange: 'transform',
             }}
           >
-            <AnimatedDealCard 
-              deal={activeDeal} 
-              onClick={() => {}}
-              onEdit={() => {}}
-              onDelete={() => {}}
+            <AnimatedDealCard
+              deal={activeDeal}
+              onClick={() => { }}
+              onEdit={() => { }}
+              onDelete={() => { }}
               isDeleting={false}
               isHighlighted={true}
               showOwnerBadge={showOwnerBadge}

@@ -77,7 +77,7 @@ function getPreviousPeriod(current: PeriodRange): PeriodRange {
   };
 }
 
-export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange?: PeriodRange) {
+export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange?: PeriodRange, viewAsUserIds?: string[]) {
   const { user, loading } = useAuth();
   const { isSecretaria, isAdmin } = useUserProfile();
   const { doctorIds } = useSecretaryDoctors();
@@ -112,6 +112,11 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
   const targetUserIds = useMemo(() => {
     if (!user?.id) return [];
 
+    // Se viewAsUserIds for fornecido (filtro manual)
+    if (viewAsUserIds && viewAsUserIds.length > 0) {
+      return viewAsUserIds;
+    }
+
     // Admin/Dono: ver dados de todos os usuários ativos
     if (isAdmin && allActiveUserIds.length > 0) {
       return allActiveUserIds;
@@ -124,7 +129,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
 
     // Outros roles: apenas próprios dados
     return [user.id];
-  }, [user?.id, isAdmin, isSecretaria, doctorIds, allActiveUserIds]);
+  }, [user?.id, isAdmin, isSecretaria, doctorIds, allActiveUserIds, viewAsUserIds]);
 
   const queryResult = useQuery({
     queryKey: [
@@ -527,21 +532,40 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
 
       // Taxa de conversão
       const totalLeads = leads?.length || 0;
+
+      console.log('📊 [Conversion Debug]', {
+        totalLeads,
+        statuses: leads?.map(l => l.status),
+        salesCount: sales?.length || 0
+      });
+
+      const convertedLeadsCount = leads?.filter(l =>
+        l.status === 'converted' ||
+        l.status === 'won' ||
+        l.status === 'fechado_ganho' ||
+        l.status === 'em_tratamento' ||
+        l.status === 'finalizado'
+      ).length || 0;
+
       const leadsToAppointments = totalLeads > 0
         ? (completedAppointments.length / totalLeads) * 100
         : 0;
       const appointmentsToSales = completedAppointments.length > 0
         ? ((sales?.length || 0) / completedAppointments.length) * 100
         : 0;
+
+      // Use status do lead para conversão geral se não houver registros na tabela de vendas
       const overallConversion = totalLeads > 0
-        ? ((sales?.length || 0) / totalLeads) * 100
+        ? (sales?.length && sales.length > 0)
+          ? (sales.length / totalLeads) * 100
+          : (convertedLeadsCount / totalLeads) * 100
         : 0;
 
       // Buscar procedimentos do catálogo (total de procedimentos ativos cadastrados) - MOVER PARA ANTES DO LOG
       const proceduresQuery = supabase
         .from("commercial_procedures")
         .select("id, name")
-        .eq("user_id", user.id)
+        .in("user_id", targetUserIds)
         .eq("is_active", true);
 
       const proceduresResult = await supabaseQueryWithTimeout(proceduresQuery as any, 60000, signal);
@@ -631,7 +655,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       const newContactsQuery = supabase
         .from("crm_contacts")
         .select("id")
-        .eq("user_id", user.id)
+        .in("user_id", targetUserIds)
         .gte("created_at", periodStartISO)
         .lte("created_at", periodEndISO);
 

@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MetricCard } from "./MetricCard";
@@ -15,12 +16,51 @@ import { motion } from "framer-motion";
 import { useCommercialLeads } from "@/hooks/useCommercialLeads";
 import { LeadScoreBadge } from "./LeadScoreBadge";
 import { getScoreLevel } from "@/types/leadScoring";
+import { TeamMemberSelector } from "@/components/crm/TeamMemberSelector";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 export function CommercialDashboard() {
   const navigate = useNavigate();
-  const { metrics, isLoading, error } = useCommercialMetrics();
+  const { user } = useAuth();
+  const { isAdmin } = useUserProfile();
+
+  // Admin/Dono inicia com viewAllMode=true por padrão
+  const [viewAllMode, setViewAllMode] = useState(() => {
+    const saved = localStorage.getItem('commercial_dashboard_view_all_mode');
+    if (saved !== null) {
+      return JSON.parse(saved);
+    }
+    return false;
+  });
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+
+  // Carregar estado do localStorage detalhado
+  useEffect(() => {
+    const savedViewAllMode = localStorage.getItem('commercial_dashboard_view_all_mode');
+    const savedSelectedUserIds = localStorage.getItem('commercial_dashboard_selected_user_ids');
+
+    if (isAdmin && savedViewAllMode === null) {
+      setViewAllMode(true);
+    } else if (savedViewAllMode !== null) {
+      setViewAllMode(JSON.parse(savedViewAllMode));
+    }
+
+    if (savedSelectedUserIds) {
+      try {
+        setSelectedUserIds(JSON.parse(savedSelectedUserIds));
+      } catch {
+        setSelectedUserIds([]);
+      }
+    }
+  }, [isAdmin]);
+
+  const viewAsUserIds = viewAllMode && selectedUserIds.length > 0 ? selectedUserIds : undefined;
+
+  const { metrics, isLoading, error } = useCommercialMetrics('month', undefined, viewAsUserIds);
   const { data: bottlenecks, isLoading: isLoadingBottlenecks } = useBottleneckMetrics();
-  const { leads } = useCommercialLeads();
+  // Passar viewAsUserIds para useCommercialLeads também para filtrar os leads prioritários
+  const { leads } = useCommercialLeads(undefined, viewAsUserIds);
 
   // Filtrar leads prioritários (score alto)
   const priorityLeads = leads
@@ -63,6 +103,25 @@ export function CommercialDashboard() {
           </motion.div>
         </div>
       </AnimatedWrapper>
+
+      {/* Team Filter for Admin */}
+      <TeamMemberSelector
+        viewAllMode={viewAllMode}
+        selectedUserIds={selectedUserIds}
+        currentUserId={user?.id || ''}
+        onViewAllModeChange={(enabled) => {
+          setViewAllMode(enabled);
+          localStorage.setItem('commercial_dashboard_view_all_mode', JSON.stringify(enabled));
+        }}
+        onSelectedUserIdsChange={(ids) => {
+          setSelectedUserIds(ids);
+          if (ids.length > 0) {
+            localStorage.setItem('commercial_dashboard_selected_user_ids', JSON.stringify(ids));
+          } else {
+            localStorage.removeItem('commercial_dashboard_selected_user_ids');
+          }
+        }}
+      />
 
       {/* Leads Prioritários */}
       {priorityLeads.length > 0 && (

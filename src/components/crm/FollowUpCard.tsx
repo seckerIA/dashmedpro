@@ -30,11 +30,11 @@ export function FollowUpCard({ deal, followUp, onClick, onCompleteFollowUp, onEd
   // Calcular se está atrasado
   let isOverdue = false;
   let isScheduledToday = false;
-  
+
   if (followUp) {
     // Se tem follow-up agendado, verificar a data/hora
-    const scheduledDateTime = parseISO(`${followUp.scheduled_date}T${followUp.scheduled_time}`);
-    isOverdue = isBefore(scheduledDateTime, new Date());
+    const scheduledDateTime = new Date(followUp.scheduled_date);
+    isOverdue = isBefore(scheduledDateTime, new Date()) && !followUp.completed;
     isScheduledToday = isToday(scheduledDateTime);
   } else if (deal.contact?.last_contact_at) {
     // Se não tem follow-up mas tem último contato, usar lógica antiga (3 dias)
@@ -45,7 +45,7 @@ export function FollowUpCard({ deal, followUp, onClick, onCompleteFollowUp, onEd
   }
 
   return (
-    <Card 
+    <Card
       onClick={onClick}
       className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg bg-gradient-to-br from-card/80 to-card/40 backdrop-blur-sm border cursor-pointer hover:border-primary/30"
     >
@@ -59,7 +59,7 @@ export function FollowUpCard({ deal, followUp, onClick, onCompleteFollowUp, onEd
       ) : isOverdue ? (
         <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
       ) : null}
-      
+
       <CardContent className="p-3 space-y-2">
         {/* Header */}
         <div className="flex items-start justify-between">
@@ -84,29 +84,28 @@ export function FollowUpCard({ deal, followUp, onClick, onCompleteFollowUp, onEd
             <div className="flex items-center gap-1 text-xs">
               <Calendar className="w-3 h-3 text-primary" />
               <span className={`font-medium ${isOverdue ? 'text-red-500' : isScheduledToday ? 'text-blue-600' : 'text-muted-foreground'}`}>
-                {format(parseISO(followUp.scheduled_date), "dd/MM/yyyy", { locale: ptBR })} às {followUp.scheduled_time}
+                {format(new Date(followUp.scheduled_date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
               </span>
             </div>
-            
-            {followUp.description && (
+
+            {followUp.notes && (
               <p className="text-xs text-muted-foreground line-clamp-2 pl-4 border-l-2 border-primary/30">
-                {followUp.description}
+                {followUp.notes}
               </p>
             )}
 
             {/* Badge de Status e Ações */}
             <div className="flex items-center justify-between">
-              <Badge 
-                variant={followUp.status === 'concluido' ? 'default' : 'secondary'}
+              <Badge
+                variant={followUp.completed ? 'default' : 'secondary'}
                 className="text-xs"
               >
-                {followUp.status === 'pendente' && <Clock className="w-3 h-3 mr-1" />}
-                {followUp.status === 'concluido' && <CheckCircle2 className="w-3 h-3 mr-1" />}
-                {followUp.status === 'cancelado' && <AlertCircle className="w-3 h-3 mr-1" />}
-                {followUp.status === 'pendente' ? 'Pendente' : followUp.status === 'concluido' ? 'Concluído' : 'Cancelado'}
+                {!followUp.completed && <Clock className="w-3 h-3 mr-1" />}
+                {followUp.completed && <CheckCircle2 className="w-3 h-3 mr-1" />}
+                {followUp.completed ? 'Concluído' : 'Pendente'}
               </Badge>
 
-              {followUp.status === 'pendente' && (
+              {!followUp.completed && (
                 <div className="flex gap-1">
                   {onEditFollowUp && (
                     <Button

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
@@ -8,10 +8,46 @@ import { ProcedureForm } from "./ProcedureForm";
 import { Loader2 } from "lucide-react";
 import { CommercialProcedure } from "@/types/commercial";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { TeamMemberSelector } from "@/components/crm/TeamMemberSelector";
+import { useAuth } from "@/hooks/useAuth";
 
 export function ProceduresCatalog() {
-  const { isSecretaria } = useUserProfile();
-  const { procedures, isLoading, deleteProcedure } = useCommercialProcedures();
+  const { user } = useAuth();
+  const { isSecretaria, isAdmin } = useUserProfile();
+
+  // Admin/Dono inicia com viewAllMode=true por padrão
+  const [viewAllMode, setViewAllMode] = useState(() => {
+    const saved = localStorage.getItem('commercial_procedures_view_all_mode');
+    if (saved !== null) {
+      return JSON.parse(saved);
+    }
+    return false;
+  });
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+
+  // Carregar estado do localStorage detalhado
+  useEffect(() => {
+    const savedViewAllMode = localStorage.getItem('commercial_procedures_view_all_mode');
+    const savedSelectedUserIds = localStorage.getItem('commercial_procedures_selected_user_ids');
+
+    if (isAdmin && savedViewAllMode === null) {
+      setViewAllMode(true);
+    } else if (savedViewAllMode !== null) {
+      setViewAllMode(JSON.parse(savedViewAllMode));
+    }
+
+    if (savedSelectedUserIds) {
+      try {
+        setSelectedUserIds(JSON.parse(savedSelectedUserIds));
+      } catch {
+        setSelectedUserIds([]);
+      }
+    }
+  }, [isAdmin]);
+
+  const viewAsUserIds = viewAllMode && selectedUserIds.length > 0 ? selectedUserIds : undefined;
+
+  const { procedures, isLoading, deleteProcedure } = useCommercialProcedures(viewAsUserIds);
   const [showForm, setShowForm] = useState(false);
   const [editingProcedure, setEditingProcedure] = useState<CommercialProcedure | null>(null);
 
@@ -50,6 +86,24 @@ export function ProceduresCatalog() {
         </Button>
       </div>
 
+      <TeamMemberSelector
+        viewAllMode={viewAllMode}
+        selectedUserIds={selectedUserIds}
+        currentUserId={user?.id || ''}
+        onViewAllModeChange={(enabled) => {
+          setViewAllMode(enabled);
+          localStorage.setItem('commercial_procedures_view_all_mode', JSON.stringify(enabled));
+        }}
+        onSelectedUserIdsChange={(ids) => {
+          setSelectedUserIds(ids);
+          if (ids.length > 0) {
+            localStorage.setItem('commercial_procedures_selected_user_ids', JSON.stringify(ids));
+          } else {
+            localStorage.removeItem('commercial_procedures_selected_user_ids');
+          }
+        }}
+      />
+
       {procedures.length === 0 ? (
         <Card className="bg-gradient-card shadow-card border-border">
           <CardContent className="p-8 text-center">
@@ -64,7 +118,7 @@ export function ProceduresCatalog() {
               procedure={procedure}
               onEdit={() => handleEdit(procedure)}
               onDelete={() => handleDelete(procedure.id)}
-              showDoctor={isSecretaria}
+              showDoctor={isSecretaria || isAdmin}
             />
           ))}
         </div>

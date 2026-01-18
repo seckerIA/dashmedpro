@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabaseQueryWithTimeout } from "@/utils/supabaseQuery";
 import { CommercialLead, CommercialLeadInsert, CommercialLeadUpdate } from "@/types/commercial";
 
-export function useCommercialLeads(filters?: { status?: string; origin?: string }) {
+export function useCommercialLeads(filters?: { status?: string; origin?: string }, viewAsUserIds?: string[]) {
   const { user } = useAuth();
   const { isSecretaria, isAdmin, isLoading: isLoadingProfile } = useUserProfile();
   const { doctorIds, isLoading: isLoadingDoctors } = useSecretaryDoctors();
@@ -43,7 +43,12 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
   const targetUserIds = useMemo(() => {
     if (!user?.id) return [];
 
-    // Admin: ver leads de todos os usuários ativos
+    // Se viewAsUserIds for fornecido (filtro manual)
+    if (viewAsUserIds && viewAsUserIds.length > 0) {
+      return viewAsUserIds;
+    }
+
+    // Admin padrão: ver leads de todos os usuários ativos
     if (isAdmin && allActiveUserIds.length > 0) {
       return allActiveUserIds;
     }
@@ -55,7 +60,7 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
 
     // Outros: apenas próprios leads
     return [user.id];
-  }, [user?.id, isAdmin, isSecretaria, doctorIds, allActiveUserIds]);
+  }, [user?.id, isAdmin, isSecretaria, doctorIds, allActiveUserIds, viewAsUserIds]);
 
   // Fetch leads
   const { data: leads, isLoading, error } = useQuery({

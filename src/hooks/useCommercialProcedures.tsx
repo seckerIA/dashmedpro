@@ -9,7 +9,7 @@ import { supabaseQueryWithTimeout } from "@/utils/supabaseQuery";
 import { ensureValidSession } from "@/utils/supabaseHelpers";
 import { CommercialProcedure, CommercialProcedureInsert, CommercialProcedureUpdate } from "@/types/commercial";
 
-export function useCommercialProcedures() {
+export function useCommercialProcedures(viewAsUserIds?: string[]) {
   const { user } = useAuth();
   const { profile, isSecretaria, isAdmin } = useUserProfile();
   const { doctorIds, isLoading: isLoadingDoctors } = useSecretaryDoctors();
@@ -42,7 +42,7 @@ export function useCommercialProcedures() {
   }, [isAdmin, user?.id]);
 
   const { data: procedures, isLoading, error } = useQuery({
-    queryKey: ["commercial-procedures", user?.id, isAdmin, isSecretaria, doctorIds, allActiveUserIds],
+    queryKey: ["commercial-procedures", user?.id, isAdmin, isSecretaria, doctorIds, allActiveUserIds, viewAsUserIds],
     queryFn: async ({ signal }) => {
       if (!user) throw new Error("User not authenticated");
 
@@ -52,8 +52,18 @@ export function useCommercialProcedures() {
       // Query com join para pegar dados do médico
       let queryPromise;
 
-      if (isAdmin && allActiveUserIds.length > 0) {
-        // Admin vê procedimentos de TODOS os usuários ativos
+      if (viewAsUserIds && viewAsUserIds.length > 0) {
+        // Filtro manual selecionado (para admin visualizar equipe)
+        queryPromise = supabase
+          .from("commercial_procedures")
+          .select(`
+            *,
+            doctor:profiles!commercial_procedures_user_id_profiles_fk (full_name, email)
+          `)
+          .in("user_id", viewAsUserIds)
+          .order("name", { ascending: true });
+      } else if (isAdmin && allActiveUserIds.length > 0) {
+        // Admin vê procedimentos de TODOS os usuários ativos (padrão)
         queryPromise = supabase
           .from("commercial_procedures")
           .select(`

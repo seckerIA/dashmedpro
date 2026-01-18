@@ -22,6 +22,33 @@ export function useDoctorSecretaries() {
     queryFn: async (): Promise<string[]> => {
       if (!user?.id) return [];
 
+      // 1. Buscar role do usuário
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle(); // Changed to maybeSingle to handle null gracefully
+
+      const role = profile?.role;
+      const isOwnerOrAdmin = role === 'dono' || role === 'admin';
+
+      // 2. Se for Dono ou Admin, retorna TODAS as secretárias
+      if (isOwnerOrAdmin) {
+        const { data: secretaries, error } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('role', 'secretaria')
+          .eq('is_active', true);
+
+        if (error) {
+          console.error('[useDoctorSecretaries] Error fetching all secretaries:', error);
+          // Fallback
+        } else {
+          return (secretaries as any[])?.map(s => s.id) || [];
+        }
+      }
+
+      // 3. Comportamento padrão (Médicos): Apenas vinculadas
       const { data, error } = await supabase
         .from('secretary_doctor_links')
         .select('secretary_id')
@@ -32,7 +59,7 @@ export function useDoctorSecretaries() {
         throw error;
       }
 
-      return data?.map(link => link.secretary_id) || [];
+      return (data as any[])?.map(link => link.secretary_id) || [];
     },
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000, // 5 minutos

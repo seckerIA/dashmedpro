@@ -4,11 +4,10 @@ export interface FollowUp {
   deal_id: string;
   user_id: string;
   scheduled_date: string;
-  scheduled_time: string;
-  description: string | null;
-  status: 'pendente' | 'concluido' | 'cancelado';
+  scheduled_time: string; // This might be virtual if DB has timestamp, but let's keep for now if front uses it. DB has `scheduled_date` as timestamp.
+  notes: string | null;
+  completed: boolean;
   completed_at: string | null;
-  completed_notes: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -16,14 +15,11 @@ export interface FollowUp {
 export interface CreateFollowUpData {
   deal_id: string;
   scheduled_date: string;
-  scheduled_time: string;
-  description?: string;
+  notes?: string;
 }
 
 export interface UpdateFollowUpData {
   scheduled_date?: string;
-  scheduled_time?: string;
-  description?: string;
-  status?: 'pendente' | 'concluido' | 'cancelado';
-  completed_notes?: string;
+  notes?: string;
+  completed?: boolean;
 }

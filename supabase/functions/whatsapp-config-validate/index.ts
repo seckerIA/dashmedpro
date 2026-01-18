@@ -79,8 +79,8 @@ serve(async (req: Request) => {
 
     if (!phone_number_id || !access_token) {
       return new Response(
-        JSON.stringify({ error: 'phone_number_id and access_token are required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, error: 'phone_number_id and access_token are required' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -98,11 +98,12 @@ serve(async (req: Request) => {
       console.error('[WhatsApp Config] Meta API Error:', metaData.error);
       return new Response(
         JSON.stringify({
-          error: 'Invalid WhatsApp credentials',
-          details: metaData.error.message,
+          success: false,
+          error: 'Credenciais inválidas ou erro na Meta API',
+          details: metaData.error.message, // Detalhes técnicos
           code: metaData.error.code,
         }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -171,47 +172,70 @@ serve(async (req: Request) => {
     if (configError) {
       console.error('[WhatsApp Config] Failed to save config:', configError);
       return new Response(
-        JSON.stringify({ error: 'Failed to save configuration', details: configError.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, error: 'Falha ao salvar configuração', details: configError.message }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // =========================================
-    // 5. Configurar webhook automaticamente na Meta API
+    // 5. Configurar webhook automaticamente na Meta API (Fallback Logic)
     // =========================================
     const webhookUrl = `${supabaseUrl}/functions/v1/whatsapp-webhook`;
     let webhookConfigured = false;
-    let webhookError = null;
+    let webhookError: string | null = null;
 
     try {
-      // Configurar callback URL e verify token
-      const webhookConfigUrl = `https://graph.facebook.com/v18.0/${waba_id || business_account_id}/subscribed_apps`;
+      const targetsToTry: { id: string; type: string }[] = [];
+      if (waba_id) targetsToTry.push({ id: waba_id, type: 'WABA ID' });
+      if (business_account_id && business_account_id !== waba_id) targetsToTry.push({ id: business_account_id, type: 'Business Account ID' });
 
-      const webhookConfigResponse = await fetch(webhookConfigUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          access_token: access_token,
-          override_callback_uri: webhookUrl,
-          verify_token: webhookVerifyToken,
-          subscribed_fields: ['messages', 'message_status'],
-        }),
-      });
+      // Se nenhum ID extra foi passado, tenta usar o phone_number_id (não ideal para subscribe, mas...)
+      // Na verdade, a assinatura é no WABA ou BM. O phone_number_id não aceita subscribed_apps na v18 geralmente, mas vale checar doc se necessário.
+      // Mas vamos focar nos que temos.
 
-      const webhookConfigData = await webhookConfigResponse.json();
-
-      if (webhookConfigData.success) {
-        webhookConfigured = true;
-        console.log('[WhatsApp Config] Webhook configured automatically');
-      } else {
-        webhookError = webhookConfigData.error?.message || 'Failed to configure webhook';
-        console.warn('[WhatsApp Config] Webhook auto-config failed:', webhookError);
+      if (targetsToTry.length === 0) {
+        webhookError = "Nenhum WABA ID ou Business Account ID fornecido para configuração automática.";
       }
+
+      for (const target of targetsToTry) {
+        console.log(`[WhatsApp Config] Attempting webhook subscription for ${target.type}: ${target.id}`);
+
+        try {
+          const webhookConfigUrl = `https://graph.facebook.com/v18.0/${target.id}/subscribed_apps`;
+
+          const webhookConfigResponse = await fetch(webhookConfigUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              access_token: access_token,
+              override_callback_uri: webhookUrl,
+              verify_token: webhookVerifyToken,
+              subscribed_fields: ['messages', 'message_status'],
+            }),
+          });
+
+          const webhookConfigData = await webhookConfigResponse.json();
+
+          if (webhookConfigData.success) {
+            webhookConfigured = true;
+            console.log(`[WhatsApp Config] Webhook configured successfully on ${target.type}`);
+            break; // Sucesso! Parar tentativas.
+          } else {
+            console.warn(`[WhatsApp Config] Failed on ${target.type}:`, webhookConfigData.error?.message);
+            // Guarda o último erro, mas continua tentando
+            webhookError = webhookConfigData.error?.message;
+          }
+        } catch (innerErr) {
+          console.warn(`[WhatsApp Config] Network error on ${target.type}:`, innerErr);
+          webhookError = innerErr instanceof Error ? innerErr.message : 'Unknown network error';
+        }
+      }
+
     } catch (error) {
-      webhookError = error.message;
-      console.warn('[WhatsApp Config] Webhook auto-config error:', error);
+      webhookError = error instanceof Error ? error.message : 'Unknown error';
+      console.warn('[WhatsApp Config] Webhook auto-config crash:', error);
     }
 
     // =========================================
@@ -255,8 +279,8 @@ serve(async (req: Request) => {
   } catch (error) {
     console.error('[WhatsApp Config] Unexpected error:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: false, error: 'Erro interno no servidor', details: error instanceof Error ? error.message : 'Unknown' }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

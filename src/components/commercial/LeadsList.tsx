@@ -14,9 +14,10 @@ import { useAuth } from "@/hooks/useAuth";
 
 interface LeadsListProps {
   searchTerm: string;
+  viewAsUserIds?: string[];
 }
 
-export function LeadsList({ searchTerm }: LeadsListProps) {
+export function LeadsList({ searchTerm, viewAsUserIds }: LeadsListProps) {
   const { user } = useAuth();
   const { isSecretaria } = useUserProfile();
   const { doctorIds } = useSecretaryDoctors();
@@ -31,7 +32,7 @@ export function LeadsList({ searchTerm }: LeadsListProps) {
     origin: originFilter !== "all" ? originFilter : undefined,
   };
 
-  const { leads, isLoading, error } = useCommercialLeads(filters);
+  const { leads, isLoading, error } = useCommercialLeads(filters, viewAsUserIds);
 
   const filteredAndSortedLeads = useMemo(() => {
     let filtered = leads.filter(lead => {

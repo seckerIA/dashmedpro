@@ -90,7 +90,9 @@ export function useWhatsAppConfig() {
       }
 
       if (!response.data.success) {
-        throw new Error(response.data.error || 'Credenciais inválidas');
+        const errorMsg = response.data.error || 'Credenciais inválidas';
+        const details = response.data.details ? ` -> ${response.data.details}` : '';
+        throw new Error(`${errorMsg}${details}`);
       }
 
       return response.data as ValidateCredentialsResponse;

@@ -44,12 +44,17 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
   const userIds = useMemo(() => {
     if (!user?.id) return [];
 
+    // Se houver um filtro de proprietário específico, retorna apenas ele
+    if (filters?.ownerId && filters.ownerId !== 'all') {
+      return [filters.ownerId];
+    }
+
     return [
       user.id,
       ...(doctorIds || []),
       ...(secretaryIds || [])
     ];
-  }, [user?.id, doctorIds, secretaryIds]);
+  }, [user?.id, doctorIds, secretaryIds, filters?.ownerId]);
 
 
   // =========================================

@@ -373,6 +373,7 @@ export interface WhatsAppConversationFilters {
     start: string;
     end: string;
   };
+  ownerId?: string | 'all';
 }
 
 export interface WhatsAppInboxStats {

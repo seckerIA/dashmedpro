@@ -23,10 +23,13 @@ const fetchFollowUps = async (userId: string, signal?: AbortSignal): Promise<Fol
 };
 
 // Criar follow-up
-const createFollowUp = async (data: CreateFollowUpData & { user_id: string }): Promise<FollowUp> => {
+const createFollowUp = async (data: CreateFollowUpData & { user_id: string; type: string }): Promise<FollowUp> => {
   const { data: followUp, error } = await supabase
     .from('crm_follow_ups')
-    .insert(data)
+    .insert({
+      ...data,
+      completed: false // Default new to false
+    })
     .select()
     .single();
 
@@ -35,18 +38,20 @@ const createFollowUp = async (data: CreateFollowUpData & { user_id: string }): P
 };
 
 // Atualizar follow-up
-const updateFollowUp = async ({ 
-  id, 
-  data 
-}: { 
-  id: string; 
-  data: UpdateFollowUpData 
+const updateFollowUp = async ({
+  id,
+  data
+}: {
+  id: string;
+  data: UpdateFollowUpData
 }): Promise<FollowUp> => {
   const updateData: any = { ...data };
-  
+
   // Se está marcando como concluído, adicionar timestamp
-  if (data.status === 'concluido' && !data.completed_notes) {
+  if (data.completed === true) {
     updateData.completed_at = new Date().toISOString();
+  } else if (data.completed === false) {
+    updateData.completed_at = null;
   }
 
   const { data: followUp, error } = await supabase

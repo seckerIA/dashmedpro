@@ -64,7 +64,18 @@ export function useTaskCategories() {
                 throw error;
             }
 
-            return data as TaskCategory[];
+            // Deduplicar categorias pelo nome
+            const uniqueCategoriesMap = new Map();
+            if (data) {
+                data.forEach((cat: TaskCategory) => {
+                    const normalizedName = cat.name.trim();
+                    if (!uniqueCategoriesMap.has(normalizedName)) {
+                        uniqueCategoriesMap.set(normalizedName, cat);
+                    }
+                });
+            }
+
+            return Array.from(uniqueCategoriesMap.values()) as TaskCategory[];
         },
         enabled: !!user?.id,
     });

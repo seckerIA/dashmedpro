@@ -340,6 +340,8 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                     if (item.url === '/marketing') return false;
                     // - Página Financeiro
                     if (item.url === '/financeiro') return false;
+                    // - Estoque
+                    if (item.url === '/inventory') return false;
                   }
 
                   return true;
