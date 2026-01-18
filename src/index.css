@@ -210,6 +210,39 @@ All colors MUST be HSL.
     -webkit-overflow-scrolling: touch;
   }
 
+  /* Global Focus Styles - More subtle for dark mode */
+  *:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  /* Remove default focus outline, use ring instead */
+  *:focus {
+    outline: none;
+  }
+
+  /* Dark mode focus - use primary color with low opacity */
+  .dark *:focus-visible {
+    outline: 2px solid hsl(var(--primary) / 0.7);
+    outline-offset: 2px;
+  }
+
+  /* Buttons and interactive elements - subtle focus */
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 1px;
+  }
+
+  /* Dialog/Modal focus - prevent white border */
+  [role="dialog"]:focus-visible,
+  [data-state="open"]:focus-visible {
+    outline: none;
+  }
+
   html {
     scroll-behavior: smooth !important;
     -webkit-overflow-scrolling: touch;

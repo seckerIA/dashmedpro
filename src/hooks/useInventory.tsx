@@ -38,9 +38,11 @@ export const useInventory = () => {
     // Criar Item
     const createItem = useMutation({
         mutationFn: async (newItem: InventoryItemInsert) => {
+            if (!user?.id) throw new Error("Usuário não autenticado");
+
             const { data, error } = await supabase
                 .from("inventory_items")
-                .insert([newItem as any])
+                .insert([{ ...newItem, user_id: user.id } as any])
                 .select()
                 .single();
             if (error) throw error;
@@ -145,11 +147,30 @@ export const useInventory = () => {
         }
     });
 
+    // Excluir Item
+    const deleteItem = useMutation({
+        mutationFn: async (id: string) => {
+            const { error } = await supabase
+                .from("inventory_items")
+                .delete()
+                .eq("id", id);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["inventory-items"] });
+            toast({ title: "Produto excluído com sucesso" });
+        },
+        onError: (error) => {
+            toast({ title: "Erro ao excluir produto", description: error.message, variant: "destructive" });
+        }
+    });
+
     return {
         items,
         isLoading,
         createItem,
         updateItem,
+        deleteItem,
         addBatch,
         registerMovement
     };

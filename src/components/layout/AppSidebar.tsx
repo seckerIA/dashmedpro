@@ -53,6 +53,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import dashmedLogo from "@/assets/imgdashmed-logo.png"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
+import { useInventoryAlerts } from "@/hooks/useInventoryAlerts"
 
 type NavigationItem = {
   title: string;
@@ -65,6 +66,8 @@ type NavigationItem = {
   secretariaOnly?: boolean;
   subItems?: NavigationItem[];
   hidden?: boolean;
+  beta?: boolean;
+  alertBadge?: boolean; // Se true, usará badge dinâmico de alertas
 };
 
 const navigationGroups: Array<{
@@ -76,7 +79,7 @@ const navigationGroups: Array<{
       items: [
         { title: "Dashboard", url: "/", icon: Home },
         { title: "Tarefas", url: "/tarefas", icon: CheckSquare2 },
-        { title: "Estoque", url: "/inventory", icon: Package, badge: "Beta", hidden: true },
+        { title: "Estoque", url: "/inventory", icon: Package, alertBadge: true },
       ]
     },
     {
@@ -158,9 +161,11 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
   const { signOut, user } = useAuth()
   const { toast } = useToast()
   const { isAdmin, isVendedor, isGestorTrafego, isSecretaria, isMedico, profile, isLoading: isLoadingProfile } = useUserProfile()
+  const { criticalCount, hasCritical, totalCount } = useInventoryAlerts()
 
   const currentPath = location.pathname
   const currentSearch = location.search
+
 
   // Estado para controlar itens expandidos
   const [expandedItems, setExpandedItems] = useState<string[]>([])
@@ -553,6 +558,21 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                               `}
                             >
                               {item.badge}
+                            </Badge>
+                          )}
+                          {/* Badge dinâmico de alertas de estoque */}
+                          {!isCollapsed && item.alertBadge && totalCount > 0 && (
+                            <Badge
+                              variant="destructive"
+                              className={`
+                                text-[10px] px-2 h-5 rounded-full font-bold
+                                ${hasCritical
+                                  ? 'bg-red-500 text-white animate-pulse'
+                                  : 'bg-orange-500 text-white'
+                                }
+                              `}
+                            >
+                              {totalCount}
                             </Badge>
                           )}
                         </div>

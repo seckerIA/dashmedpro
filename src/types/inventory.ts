@@ -9,6 +9,7 @@ export interface InventoryItem {
     category: InventoryItemCategory | string;
     min_stock: number;
     sell_price: number | null;
+    cost_price: number | null;
     description: string | null;
     created_at: string;
     updated_at: string;

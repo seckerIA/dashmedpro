@@ -141,7 +141,8 @@ const fetchEnhancedMetrics = async (
   const procedureTickets: Record<string, { total: number; count: number }> = {};
 
   dealsData.forEach((deal: any) => {
-    if ((deal.stage === 'fechado_ganho' || deal.stage === 'agendado') && deal.value) {
+    // Incluir qualquer deal que tenha valor, independente do estágio (para mostrar potencial)
+    if (deal.value && deal.value > 0) {
       const service = deal.service || deal.title || 'Outros';
       const value = typeof deal.value === 'string' ? parseFloat(deal.value) : deal.value;
 

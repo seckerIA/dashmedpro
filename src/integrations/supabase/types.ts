@@ -293,6 +293,121 @@ export interface Database {
           created_by?: string | null
           created_at?: string
         }
+      },
+      inventory_suppliers: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          cnpj: string | null
+          email: string | null
+          phone: string | null
+          contact_person: string | null
+          address: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          cnpj?: string | null
+          email?: string | null
+          phone?: string | null
+          contact_person?: string | null
+          address?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          cnpj?: string | null
+          email?: string | null
+          phone?: string | null
+          contact_person?: string | null
+          address?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      },
+      inventory_transactions: {
+        Row: {
+          id: string
+          user_id: string
+          supplier_id: string | null
+          type: 'INBOUND_INVOICE' | 'OUTBOUND_SALE' | 'INTERNAL_USE' | 'ADJUSTMENT' | 'LOSS'
+          invoice_number: string | null
+          transaction_date: string
+          total_amount: number | null
+          status: 'DRAFT' | 'COMPLETED' | 'CANCELLED'
+          financial_transaction_id: string | null
+          description: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          supplier_id?: string | null
+          type: 'INBOUND_INVOICE' | 'OUTBOUND_SALE' | 'INTERNAL_USE' | 'ADJUSTMENT' | 'LOSS'
+          invoice_number?: string | null
+          transaction_date?: string
+          total_amount?: number | null
+          status?: 'DRAFT' | 'COMPLETED' | 'CANCELLED'
+          financial_transaction_id?: string | null
+          description?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          supplier_id?: string | null
+          type?: 'INBOUND_INVOICE' | 'OUTBOUND_SALE' | 'INTERNAL_USE' | 'ADJUSTMENT' | 'LOSS'
+          invoice_number?: string | null
+          transaction_date?: string
+          total_amount?: number | null
+          status?: 'DRAFT' | 'COMPLETED' | 'CANCELLED'
+          financial_transaction_id?: string | null
+          description?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      },
+      inventory_transaction_items: {
+        Row: {
+          id: string
+          transaction_id: string
+          item_id: string
+          batch_id: string | null
+          quantity: number
+          unit_price: number | null
+          total_price: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          transaction_id: string
+          item_id: string
+          batch_id?: string | null
+          quantity: number
+          unit_price?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          transaction_id?: string
+          item_id?: string
+          batch_id?: string | null
+          quantity?: number
+          unit_price?: number | null
+          created_at?: string
+        }
       }
     }
     Enums: {
