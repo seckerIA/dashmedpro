@@ -237,7 +237,10 @@ export function MessageList({
  * Separador de data entre mensagens
  */
 function DateSeparator({ date }: { date: string }) {
-  const dateObj = new Date(date);
+  // Adicionar horário zerado para garantir que o navegador interprete como data LOCAL e não UTC
+  // "2024-01-01" -> UTC (pode virar dia anterior no Brasil)
+  // "2024-01-01T00:00:00" -> Local
+  const dateObj = new Date(`${date}T00:00:00`);
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);

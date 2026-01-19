@@ -344,7 +344,30 @@ async function processIncomingMessage(
   const aiUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/whatsapp-ai-analyze`;
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
-  try {
+  console.log('[Webhook] Triggering AI Analysis in background...');
+
+  // Usar EdgeRuntime.waitUntil para garantir que o fetch complete mesmo após retornar response ao Meta
+  // @ts-ignore
+  if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+    // @ts-ignore
+    EdgeRuntime.waitUntil(
+      fetch(aiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${serviceKey}`
+        },
+        body: JSON.stringify({ conversation_id: conversationId })
+      }).then(res => {
+        console.log(`[Webhook] AI Invocation Status: ${res.status}`);
+        return res.text(); // Consume body to ensuring completion
+      }).catch(err => {
+        console.error('[Webhook] AI Invocation Error:', err);
+      })
+    );
+  } else {
+    // Fallback: tentar sem await (pode falhar) ou usar invoke background se fosse cliente
+    // Mas como estamos aqui, vamos tentar sem await mas logando
     fetch(aiUrl, {
       method: 'POST',
       headers: {
@@ -352,9 +375,7 @@ async function processIncomingMessage(
         'Authorization': `Bearer ${serviceKey}`
       },
       body: JSON.stringify({ conversation_id: conversationId })
-    });
-  } catch (error) {
-    console.error('[Webhook] Error triggering AI:', error);
+    }).catch(err => console.error('[Webhook] AI Fire-and-forget error:', err));
   }
 
   console.log(`[Webhook] Finished process for message: ${savedMessage.id}`);

@@ -72,7 +72,6 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Verificar se a conversa existe (USANDO ADMIN PARA EVITAR RLS ERROR)
-    // O webhook pode criar a conversa, e se usarmos client anon sem user, não achamos.
     const { data: conversation, error: convError } = await supabaseAdmin
       .from('whatsapp_conversations')
       .select('id, contact_name, phone_number, user_id, status')
@@ -87,14 +86,12 @@ const handler = async (req: Request): Promise<Response> => {
     // DEBOUNCE / BUFFER STEP
     // ==========================================
     if (!force_reanalyze) {
-      const BUFFER_SECONDS = 15; // Espera 15s (reduzido para evitar timeout)
+      const BUFFER_SECONDS = 15;
       const checkTime = new Date().toISOString();
 
       console.log(`[AI-DEBOUNCE] Waiting ${BUFFER_SECONDS}s buffer...`);
-      // Delay para aguardar mais mensagens
       await new Promise(resolve => setTimeout(resolve, BUFFER_SECONDS * 1000));
 
-      // Verificar se chegaram novas mensagens INBOUND
       const { count } = await supabaseAdmin
         .from('whatsapp_messages')
         .select('*', { count: 'exact', head: true })
@@ -128,13 +125,27 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('No messages found in conversation');
     }
 
+    // List of user IDs to fetch procedures/config for
+    const targetUserIds = [conversation.user_id];
+
+    // Check for linked doctors (if user is a secretary)
+    const { data: linkedDoctors } = await supabaseAdmin
+      .from('secretary_doctor_links')
+      .select('doctor_id')
+      .eq('secretary_id', conversation.user_id);
+
+    if (linkedDoctors && linkedDoctors.length > 0) {
+      targetUserIds.push(...linkedDoctors.map(l => l.doctor_id));
+      console.log(`[AI] Found linked doctors for secretary ${conversation.user_id}:`, linkedDoctors.map(l => l.doctor_id));
+    }
+
     // Buscar procedimentos
     const { data: procedures } = await supabaseAdmin
       .from('commercial_procedures')
-      .select('id, name, category, price')
-      .eq('user_id', conversation.user_id)
+      .select('id, name, category, price, user_id')
+      .in('user_id', targetUserIds)
       .eq('is_active', true)
-      .limit(20);
+      .limit(30);
 
     // Buscar configuração IA
     const { data: aiConfig } = await supabaseAdmin
@@ -143,40 +154,99 @@ const handler = async (req: Request): Promise<Response> => {
       .eq('user_id', conversation.user_id)
       .maybeSingle();
 
-    console.log('[AI] Config for user', conversation.user_id, ':', {
-      exists: !!aiConfig,
-      auto_reply_enabled: aiConfig?.auto_reply_enabled
-    });
-
     // --- AGENDA DO MÉDICO ---
     const now = new Date();
+    const brazilTime = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+
     const next5Days = new Date();
     next5Days.setDate(now.getDate() + 5);
 
     const { data: appointments } = await supabaseAdmin
       .from('medical_appointments')
       .select('start_time, end_time, status')
-      .eq('doctor_id', conversation.user_id)
+      .in('doctor_id', targetUserIds)
+      .gte('start_time', now.toISOString())
+      .lte('start_time', next5Days.toISOString())
+      .neq('status', 'cancelled')
+      .order('start_time', { ascending: true });
+
+    const { data: meetings } = await supabaseAdmin
+      .from('general_meetings')
+      .select('start_time, end_time, title, is_busy')
+      .in('user_id', targetUserIds)
+      .eq('is_busy', true)
       .gte('start_time', now.toISOString())
       .lte('start_time', next5Days.toISOString())
       .neq('status', 'cancelled')
       .order('start_time', { ascending: true });
 
     const formatAgenda = () => {
-      if (!appointments || appointments.length === 0) return "Agenda totalmente livre para os próximos 5 dias.";
-      const agendaByDay: Record<string, string[]> = {};
-      appointments.forEach(appt => {
-        const date = new Date(appt.start_time).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' });
-        const time = new Date(appt.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-        if (!agendaByDay[date]) agendaByDay[date] = [];
-        agendaByDay[date].push(time);
-      });
-      return Object.entries(agendaByDay)
-        .map(([day, times]) => `${day}: Ocupado em ${times.join(', ')}`)
-        .join('\n');
+      const allEvents = [
+        ...(appointments || []).map(a => ({ start: new Date(a.start_time).getTime(), end: new Date(a.end_time).getTime() })),
+        ...(meetings || []).map(m => ({ start: new Date(m.start_time).getTime(), end: new Date(m.end_time).getTime() }))
+      ].sort((a, b) => a.start - b.start);
+
+      const daysContext: string[] = [];
+      const startHour = 8;
+      const endHour = 18;
+
+      // Pegar a hora atual convertida para o "mundo" de Brasília para comparação
+      const nowInBrStr = new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' });
+      const nowInBrDate = new Date(nowInBrStr);
+      const bridgeTime = nowInBrDate.getTime();
+
+      for (let i = 0; i < 5; i++) {
+        const d = new Date(nowInBrDate);
+        d.setDate(d.getDate() + i);
+        d.setHours(0, 0, 0, 0);
+
+        const dateLabel = d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: '2-digit' });
+        if (d.getDay() === 0 || d.getDay() === 6) continue;
+
+        const freeSlots: string[] = [];
+        for (let hour = startHour; hour < endHour; hour++) {
+          for (let min of [0, 30]) {
+            // SP é UTC-3 fixo. HH:mm SP = (HH+3):mm UTC
+            const slotUtc = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), hour + 3, min, 0));
+            const slotStamp = slotUtc.getTime();
+
+            if (slotStamp < bridgeTime) continue;
+
+            const isBusy = allEvents.some(evt => slotStamp >= evt.start && slotStamp < evt.end);
+            if (!isBusy) {
+              freeSlots.push(`${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`);
+            }
+          }
+        }
+
+        if (freeSlots.length > 0) {
+          const morning = freeSlots.filter(s => parseInt(s.split(':')[0]) < 12);
+          const afternoon = freeSlots.filter(s => parseInt(s.split(':')[0]) >= 12);
+          let summary = "";
+          if (morning.length > 0) summary += `Manhã: ${morning[0]} às ${morning[morning.length - 1]}. `;
+          if (afternoon.length > 0) summary += `Tarde: ${afternoon[0]} às ${afternoon[afternoon.length - 1]}.`;
+          daysContext.push(`${dateLabel}: ${summary}`);
+        } else {
+          daysContext.push(`${dateLabel}: Sem horários disponíveis.`);
+        }
+      }
+      return daysContext.join('\n');
     };
 
-    const agendaContext = `HORÁRIOS OCUPADOS (PRÓXIMOS 5 DIAS):\n${formatAgenda()}\n(A clínica funciona de Seg-Sex, das 08h às 18h. Se o horário não estiver na lista de ocupados acima, ele está disponível.)`;
+    const agendaContext = `ESTES SÃO OS ÚNICOS HORÁRIOS DISPONÍVEIS:
+${formatAgenda()}
+NUNCA ofereça horários fora desses intervalos. Seja resumida e natural ao falar da disponibilidade.`;
+
+    await supabaseAdmin.from('debug_logs').insert({
+      function_name: 'whatsapp-ai-analyze',
+      message: 'AI Context Debug',
+      data: {
+        agendaContext,
+        brazilTime,
+        messageCount: messages.length,
+        config: aiConfig
+      }
+    });
 
     // Montar contexto
     const messagesContext = messages
@@ -197,12 +267,13 @@ const handler = async (req: Request): Promise<Response> => {
 
     const systemPrompt = `Você é uma SECRETÁRIA VIRTUAL experiente de uma clínica médica. Seu trabalho é atender pacientes via WhatsApp de forma natural, simpática e EFICIENTE.
 
-REGRAS FUNDAMENTAIS:
-1. RESPONDA DIRETAMENTE às perguntas. Se perguntaram sobre procedimentos, LISTE os procedimentos. Se perguntaram preço, DIGA o preço.
-2. Seja NATURAL e HUMANA - evite frases genéricas. Fale como uma pessoa real.
-3. Seja OBJETIVA - não enrole.
-4. Use EMOJIS com moderação (máximo 1-2).
-5. Sempre termine com algo que FACILITE a próxima ação (ex: "Qual horário prefere?").
+DATA E HORA ATUAL: ${brazilTime} (Dia de hoje).
+
+INTERPRETAÇÃO DA AGENDA (CRÍTICO):
+Dê ao paciente APENAS horários que estão explicitamente listados como "DISPONÍVEIS" abaixo.
+Se o paciente pedir um horário que NÃO está na lista, diga que já está ocupado e sugira os mais próximos da lista.
+NUNCA invente horários fora dessa lista.
+Sempre ofereça pelo menos 1 opção de manhã e 1 de tarde se houver disponibilidade.
 
 ${aiConfig?.knowledge_base ? `SOBRE A CLÍNICA:\n${aiConfig.knowledge_base}\n` : ''}
 ${aiConfig?.already_known_info ? `INFORMAÇÕES QUE JÁ TEMOS: ${aiConfig.already_known_info}\n` : ''}
@@ -214,10 +285,8 @@ ${proceduresContext}
 ${agendaContext}
 
 COMO RESPONDER:
-- "Quais procedimentos?" → Liste principais
+- "Quais horários?" → Use a lista de "HORÁRIOS DISPONÍVEIS". Ofereça alguns horários de forma natural.
 - "Quanto custa X?" → Diga o preço
-- "Quais horários?" → Ofereça 2-3 horários livres
-- "Endereço?" → Endereço completo
 - Dúvidas técnicas → Explique breve e sugira avaliação
 
 FORMATO DE RESPOSTA (JSON):
@@ -262,7 +331,7 @@ Analise a conversa e gere respostas naturais. Responda diretamente.`;
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        temperature: 0.7,
+        temperature: 0.2,
         max_tokens: 1200,
         response_format: { "type": "json_object" }
       }),
@@ -338,33 +407,14 @@ Analise a conversa e gere respostas naturais. Responda diretamente.`;
 
     const { data: savedSuggestions } = await supabaseAdmin.from('whatsapp_ai_suggestions').insert(suggestionsToInsert).select();
 
-    // Debug: Log config status
-    console.log('[AI] Auto-reply config:', {
-      auto_reply_enabled: aiConfig?.auto_reply_enabled,
-      configExists: !!aiConfig,
-      userId: conversation.user_id
-    });
-
-    // Auto-Reply - Só executa se auto_reply_enabled for EXPLICITAMENTE true
-    // ==========================================
-    // AUTO-REPLY LOGIC
-    // ==========================================
-    let autoReplySent = false;
-
-    console.log(`[AI-DEBUG] Starting Auto-Reply check. Config enabled: ${aiConfig?.auto_reply_enabled}, Suggestions detected: ${suggestionsToInsert.length}`);
-
+    // Auto-Reply
     if (aiConfig?.auto_reply_enabled === true) {
-      const bestSuggestion = suggestionsToInsert[0]; // Assume first is best due to our prompt instruction
+      const bestSuggestion = suggestionsToInsert[0];
       const CONFIDENCE_THRESHOLD = 0.85;
 
-      console.log(`[AI-DEBUG] Best suggestion confidence: ${bestSuggestion?.confidence}`);
-
       if (bestSuggestion && bestSuggestion.confidence >= CONFIDENCE_THRESHOLD) {
-        console.log(`[AI-DEBUG] Auto-reply TRIGGERED. Confidence: ${(bestSuggestion.confidence * 100).toFixed(0)}%`);
-
         try {
-          // 1. Insert message in DB first
-          const { data: newMessage, error: insertError } = await supabaseAdmin
+          const { data: newMessage } = await supabaseAdmin
             .from('whatsapp_messages')
             .insert({
               user_id: conversation.user_id,
@@ -380,13 +430,7 @@ Analise a conversa e gere respostas naturais. Responda diretamente.`;
             .select('id')
             .single();
 
-          if (insertError) {
-            console.error('[AI-DEBUG] Failed to insert pending message:', insertError);
-          }
-
           if (newMessage) {
-            console.log('[AI-DEBUG] Pending message inserted, sending to Meta...');
-            // 2. Send via WhatsApp API
             const { data: waConfig } = await supabaseAdmin
               .from('whatsapp_config')
               .select('phone_number_id, access_token')
@@ -412,44 +456,24 @@ Analise a conversa e gere respostas naturais. Responda diretamente.`;
                 }
               );
 
-              const waResData = await waRes.json();
-              console.log('[AI-DEBUG] Meta API response:', JSON.stringify(waResData));
-
               if (waRes.ok) {
+                const waResData = await waRes.json();
                 await supabaseAdmin
                   .from('whatsapp_messages')
                   .update({ status: 'sent', message_id: waResData.messages?.[0]?.id })
                   .eq('id', newMessage.id);
 
-                // Mark suggestion as used
-                if (bestSuggestion) {
-                  await supabaseAdmin.from('whatsapp_ai_suggestions')
-                    .update({ was_used: true, used_at: new Date().toISOString() })
-                    .eq('conversation_id', conversation_id)
-                    .eq('content', bestSuggestion.content);
-                }
-
-                autoReplySent = true;
-              } else {
-                console.error('[AI-DEBUG] WhatsApp API Error:', waResData);
-                await supabaseAdmin.from('whatsapp_messages').update({ status: 'failed', error_code: waResData?.error?.code }).eq('id', newMessage.id);
+                await supabaseAdmin.from('whatsapp_ai_suggestions')
+                  .update({ was_used: true, used_at: new Date().toISOString() })
+                  .eq('conversation_id', conversation_id)
+                  .eq('content', bestSuggestion.content);
               }
-            } else {
-              console.error('[AI-DEBUG] WhatsApp Config not found for auto-reply');
             }
           }
-        } catch (autoReplyError) {
-          console.error('[AI-DEBUG] Auto-reply exception:', autoReplyError);
+        } catch (e) {
+          console.error('[AutoReply] Error:', e);
         }
-      } else {
-        console.log(`[AI-DEBUG] Auto-reply SKIPPED. Confidence ${(bestSuggestion?.confidence * 100).toFixed(0)}% < ${CONFIDENCE_THRESHOLD * 100}%`);
       }
-    } else {
-      console.log('[AI-DEBUG] Auto-reply DISABLED in config.');
-    }
-
-    if (aiResponse.lead_status === 'quente' && !savedAnalysis.deal_created) {
-      // Logica de criar deal se necessario
     }
 
     return new Response(
@@ -464,7 +488,6 @@ Analise a conversa e gere respostas naturais. Responda diretamente.`;
 
   } catch (error: any) {
     console.error('[whatsapp-ai-analyze] Error:', error.message);
-
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

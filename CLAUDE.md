@@ -204,3 +204,11 @@ supabase/functions/
   - Backend Logic: `useFinancialAccounts` agora retorna contas dos médicos vinculados quando o usuário é secretária.
   - Frontend Logic: `MedicalCalendar` não bloqueia mais a ação se a secretária não tiver conta pessoal, permitindo selecionar o banco do médico no modal de pagamento.
 - **Status:** Testado e aprovado pelo usuário. Pipeline visível e fluxo de calendário funcional.
+
+### Contexto Atual (19/01/2026 - Debugging AI Schedule Logic)
+- **WhatsApp AI Analyze Fixes**:
+  - Debug e resolução de alucinações de horários na agenda via GPT-3.5.
+  - Identificados bugs de fuso horário (UTC vs UTC-3) e de sumarização ("Gap Mismatch").
+  - Versão 49 implementou agrupamento por intervalos contíguos para evitar buracos na agenda.
+  - **Status Atual**: Rollback para a **Versão 48** realizado a pedido do usuário (mantém análise completa de leads, mas possui o bug conhecido de sugerir horários ocupados em blocos resumidos).
+  - Melhora nos logs de debug salvando `agendaContext` e `brazilTime` na tabela `debug_logs`.
