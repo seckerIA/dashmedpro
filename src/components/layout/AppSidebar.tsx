@@ -68,6 +68,7 @@ type NavigationItem = {
   hidden?: boolean;
   beta?: boolean;
   alertBadge?: boolean; // Se true, usará badge dinâmico de alertas
+  iconImage?: string; // URL da imagem 3D (opcional)
 };
 
 const navigationGroups: Array<{
@@ -384,18 +385,28 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                                   p-2.5 rounded-2xl text-base font-medium
                                   transition-all duration-200
                                   ${active
-                                    ? 'bg-primary text-white shadow-sm'
-                                    : 'text-white/70 hover:bg-white/5 hover:text-white'
+                                    ? 'bg-primary/15 text-primary border border-primary/20 shadow-[0_0_15px_rgba(37,99,235,0.15)]'
+                                    : 'text-muted-foreground hover:bg-white/5 hover:text-white border border-transparent'
                                   }
                                 `}
                               >
-                                <item.icon
-                                  className={`
-                                    w-7 h-7 transition-all duration-200
-                                    ${active ? 'text-white' : 'text-white/70 group-hover:text-white'}
-                                    group-hover:scale-105
-                                  `}
-                                />
+                                {item.iconImage ? (
+                                  <img
+                                    src={item.iconImage}
+                                    alt={item.title}
+                                    className="w-9 h-9 object-contain drop-shadow-[0_4px_6px_rgba(0,0,0,0.3)] transition-transform duration-200 group-hover:scale-110"
+                                  />
+                                ) : (
+                                  <item.icon
+                                    className={`
+                                      w-8 h-8 transition-all duration-300
+                                      ${active
+                                        ? 'text-primary fill-primary/20 drop-shadow-[0_0_12px_rgba(37,99,235,0.8)] scale-110 rotate-3'
+                                        : 'text-muted-foreground group-hover:text-primary group-hover:drop-shadow-[0_0_8px_rgba(37,99,235,0.5)] group-hover:scale-105'
+                                      }
+                                    `}
+                                  />
+                                )}
                               </button>
                             </PopoverTrigger>
                             <PopoverContent
@@ -414,25 +425,25 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                                     return true;
                                   })
                                   .map((subItem) => {
-                                  const subActive = isSubItemActive(subItem.url)
-                                  return (
-                                    <NavLink
-                                      key={subItem.title}
-                                      to={subItem.url}
-                                      className={`
+                                    const subActive = isSubItemActive(subItem.url)
+                                    return (
+                                      <NavLink
+                                        key={subItem.title}
+                                        to={subItem.url}
+                                        className={`
                                         flex items-center gap-3 px-3 py-2 rounded-xl
                                         text-sm font-medium transition-all duration-200
                                         ${subActive
-                                          ? 'bg-primary text-white'
-                                          : 'text-white/70 hover:bg-white/10 hover:text-white'
-                                        }
+                                            ? 'bg-primary text-white'
+                                            : 'text-white/70 hover:bg-white/10 hover:text-white'
+                                          }
                                       `}
-                                    >
-                                      <subItem.icon className="w-4 h-4" />
-                                      {subItem.title}
-                                    </NavLink>
-                                  )
-                                })}
+                                      >
+                                        <subItem.icon className="w-4 h-4" />
+                                        {subItem.title}
+                                      </NavLink>
+                                    )
+                                  })}
                               </div>
                             </PopoverContent>
                           </Popover>
@@ -457,19 +468,29 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                                 px-4 py-3.5 rounded-2xl text-base font-medium
                                 transition-all duration-200
                                 ${active
-                                  ? 'bg-primary/20 text-white'
-                                  : 'text-white/70 hover:bg-white/5 hover:text-white'
+                                  ? 'bg-primary/15 text-primary border border-primary/20 shadow-[0_0_15px_rgba(37,99,235,0.15)]'
+                                  : 'text-muted-foreground hover:bg-white/5 hover:text-white border border-transparent'
                                 }
                               `}
                             >
                               <div className="flex items-center gap-4">
-                                <item.icon
-                                  className={`
-                                    w-7 h-7 transition-all duration-200
-                                    ${active ? 'text-white' : 'text-white/70 group-hover:text-white'}
-                                    group-hover:scale-105
-                                  `}
-                                />
+                                {item.iconImage ? (
+                                  <img
+                                    src={item.iconImage}
+                                    alt={item.title}
+                                    className="w-8 h-8 object-contain drop-shadow-[0_4px_6px_rgba(0,0,0,0.3)] transition-transform duration-200 group-hover:scale-110"
+                                  />
+                                ) : (
+                                  <item.icon
+                                    className={`
+                                      w-7 h-7 transition-all duration-300
+                                      ${active
+                                        ? 'text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] scale-110'
+                                        : 'text-white/70 group-hover:text-white group-hover:drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]'
+                                      }
+                                    `}
+                                  />
+                                )}
                                 <span
                                   className={`
                                     text-lg font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden
@@ -509,30 +530,30 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                                     return true;
                                   })
                                   .map((subItem) => {
-                                  const subActive = isSubItemActive(subItem.url)
-                                  return (
-                                    <NavLink
-                                      key={subItem.title}
-                                      to={subItem.url}
-                                      className={`
+                                    const subActive = isSubItemActive(subItem.url)
+                                    return (
+                                      <NavLink
+                                        key={subItem.title}
+                                        to={subItem.url}
+                                        className={`
                                         group flex items-center gap-3 px-4 py-2.5 rounded-xl
                                         text-sm font-medium transition-all duration-200
                                         ${subActive
-                                          ? 'bg-primary text-white shadow-sm'
-                                          : 'text-white/60 hover:bg-white/5 hover:text-white'
-                                        }
+                                            ? 'bg-primary text-white shadow-sm'
+                                            : 'text-white/60 hover:bg-white/5 hover:text-white'
+                                          }
                                       `}
-                                    >
-                                      <subItem.icon
-                                        className={`
+                                      >
+                                        <subItem.icon
+                                          className={`
                                           w-5 h-5 transition-all duration-200
                                           ${subActive ? 'text-white' : 'text-white/50 group-hover:text-white'}
                                         `}
-                                      />
-                                      <span className="whitespace-nowrap overflow-hidden text-ellipsis">{subItem.title}</span>
-                                    </NavLink>
-                                  )
-                                })}
+                                        />
+                                        <span className="whitespace-nowrap overflow-hidden text-ellipsis">{subItem.title}</span>
+                                      </NavLink>
+                                    )
+                                  })}
                               </div>
                             </div>
                           </div>
@@ -543,13 +564,23 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                       const linkContent = (
                         <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} w-full`}>
                           <div className={`flex items-center ${isCollapsed ? '' : 'gap-4'}`}>
-                            <item.icon
-                              className={`
-                                w-7 h-7 transition-all duration-200
-                                ${active ? 'text-white' : 'text-white/70 group-hover:text-white'}
-                                group-hover:scale-105
-                              `}
-                            />
+                            {item.iconImage ? (
+                              <img
+                                src={item.iconImage}
+                                alt={item.title}
+                                className="w-8 h-8 object-contain drop-shadow-md transition-transform duration-200 group-hover:scale-110"
+                              />
+                            ) : (
+                              <item.icon
+                                className={`
+                                  w-7 h-7 transition-all duration-300
+                                  ${active
+                                    ? 'text-primary fill-primary/20 drop-shadow-[0_0_12px_rgba(37,99,235,0.8)] scale-110 rotate-3'
+                                    : 'text-muted-foreground group-hover:text-primary group-hover:drop-shadow-[0_0_8px_rgba(37,99,235,0.5)] group-hover:scale-105'
+                                  }
+                                `}
+                              />
+                            )}
                             {!isCollapsed && (
                               <span
                                 className={`
@@ -605,8 +636,8 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                                 rounded-2xl text-base font-medium
                                 transition-all duration-200
                                 ${active
-                                  ? 'bg-primary text-white shadow-sm'
-                                  : 'text-white/70 hover:bg-white/5 hover:text-white'
+                                  ? 'bg-primary/15 text-primary border border-primary/20 shadow-[0_0_15px_rgba(37,99,235,0.15)]'
+                                  : 'text-muted-foreground hover:bg-white/5 hover:text-white border border-transparent'
                                 }
                               `}
                             >

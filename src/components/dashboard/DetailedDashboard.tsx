@@ -22,7 +22,12 @@ import {
 } from "@/components/ui/select";
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
 
-export function DetailedDashboard() {
+interface ViewModeProps {
+    viewMode?: 'vision' | 'detailed';
+    onViewModeChange?: (mode: 'vision' | 'detailed') => void;
+}
+
+export function DetailedDashboard({ viewMode, onViewModeChange }: ViewModeProps) {
     const { toast } = useToast();
     const [isExporting, setIsExporting] = useState(false);
     const [filterPeriod, setFilterPeriod] = useState("30");
@@ -116,6 +121,27 @@ export function DetailedDashboard() {
                     <p className="text-muted-foreground">Visão profunda de performance e tendências.</p>
                 </div>
                 <div className="flex items-center gap-2">
+                    {/* View Toggle */}
+                    {onViewModeChange && (
+                        <div className="flex items-center gap-1 bg-muted/20 p-1 rounded-lg border border-border/50 mr-2">
+                            <Button
+                                variant={viewMode === 'vision' ? 'default' : 'ghost'}
+                                size="sm"
+                                onClick={() => onViewModeChange('vision')}
+                                className={`text-xs h-8 px-3 rounded-md ${viewMode === 'vision' ? 'shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                            >
+                                Visão Geral
+                            </Button>
+                            <Button
+                                variant={viewMode === 'detailed' ? 'default' : 'ghost'}
+                                size="sm"
+                                onClick={() => onViewModeChange('detailed')}
+                                className={`text-xs h-8 px-3 rounded-md ${viewMode === 'detailed' ? 'shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                            >
+                                Detalhada
+                            </Button>
+                        </div>
+                    )}
                     <Popover open={showFilters} onOpenChange={setShowFilters}>
                         <PopoverTrigger asChild>
                             <Button variant="outline" size="sm" className="hidden sm:flex">

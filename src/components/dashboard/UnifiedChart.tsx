@@ -167,10 +167,10 @@ export function UnifiedChart({ className }: UnifiedChartProps) {
 
     const getChartColor = () => {
         switch (activeChart) {
-            case "receita": return "#10b981"; // green
-            case "pacientes": return "#6366f1"; // indigo
-            case "conversao": return "#f59e0b"; // amber
-            default: return "#8b5cf6"; // purple
+            case "receita": return "#12c87c"; // emerald-500+ (boosted 90% sat)
+            case "pacientes": return "#0db4f5"; // sky-500+ (boosted 95% sat)
+            case "conversao": return "#0db4f5"; // sky-500+ (boosted 95% sat)
+            default: return "#0db4f5"; // sky-500+ (Primary default)
         }
     };
 

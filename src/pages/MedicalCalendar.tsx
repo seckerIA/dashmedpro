@@ -166,10 +166,10 @@ export default function MedicalCalendar() {
 
   const isLoading = isLoadingAppointments || isLoadingMeetings;
 
-  // Loading skeleton
-  if (isLoading) {
-    return <MedicalCalendarPageSkeleton />;
-  }
+  // Loading skeleton moved to prevent hook errors
+  // if (isLoading) {
+  //   return <MedicalCalendarPageSkeleton />;
+  // }
 
   // Detectar query params de conversão e abrir formulário
   useEffect(() => {
@@ -514,6 +514,10 @@ export default function MedicalCalendar() {
       }
     }
   };
+
+  if (isLoading) {
+    return <MedicalCalendarPageSkeleton />;
+  }
 
   return (
     <div className="min-h-screen space-y-6 bg-background pb-20">
