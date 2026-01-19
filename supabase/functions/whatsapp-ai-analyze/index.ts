@@ -346,16 +346,24 @@ Analise a conversa e gere respostas naturais. Responda diretamente.`;
     });
 
     // Auto-Reply - Só executa se auto_reply_enabled for EXPLICITAMENTE true
-    if (aiConfig?.auto_reply_enabled === true) {
-      const bestSuggestion = (aiResponse.suggestions || [])
-        .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))[0];
+    // ==========================================
+    // AUTO-REPLY LOGIC
+    // ==========================================
+    let autoReplySent = false;
 
-      // Threshold de 85% conforme UI (AISettingsDialog)
+    console.log(`[AI-DEBUG] Starting Auto-Reply check. Config enabled: ${aiConfig?.auto_reply_enabled}, Suggestions detected: ${suggestionsToInsert.length}`);
+
+    if (aiConfig?.auto_reply_enabled === true) {
+      const bestSuggestion = suggestionsToInsert[0]; // Assume first is best due to our prompt instruction
       const CONFIDENCE_THRESHOLD = 0.85;
+
+      console.log(`[AI-DEBUG] Best suggestion confidence: ${bestSuggestion?.confidence}`);
+
       if (bestSuggestion && bestSuggestion.confidence >= CONFIDENCE_THRESHOLD) {
-        console.log(`[AI] Auto-reply triggered with confidence: ${(bestSuggestion.confidence * 100).toFixed(0)}% (threshold: ${CONFIDENCE_THRESHOLD * 100}%)`);
+        console.log(`[AI-DEBUG] Auto-reply TRIGGERED. Confidence: ${(bestSuggestion.confidence * 100).toFixed(0)}%`);
 
         try {
+          // 1. Insert message in DB first
           const { data: newMessage, error: insertError } = await supabaseAdmin
             .from('whatsapp_messages')
             .insert({
@@ -363,16 +371,22 @@ Analise a conversa e gere respostas naturais. Responda diretamente.`;
               conversation_id: conversation_id,
               phone_number: conversation.phone_number,
               content: bestSuggestion.content,
-              direction: 'outbound', // ENVIADO PELA CLINICA
+              direction: 'outbound',
               message_type: 'text',
-              status: 'sent',
+              status: 'pending',
               sent_at: new Date().toISOString(),
-              metadata: { auto_reply: true, confidence: bestSuggestion.confidence }
+              metadata: { auto_reply: true, confidence: bestSuggestion.confidence, ai_generated: true }
             })
             .select('id')
             .single();
 
-          if (!insertError && newMessage) {
+          if (insertError) {
+            console.error('[AI-DEBUG] Failed to insert pending message:', insertError);
+          }
+
+          if (newMessage) {
+            console.log('[AI-DEBUG] Pending message inserted, sending to Meta...');
+            // 2. Send via WhatsApp API
             const { data: waConfig } = await supabaseAdmin
               .from('whatsapp_config')
               .select('phone_number_id, access_token')
@@ -380,79 +394,58 @@ Analise a conversa e gere respostas naturais. Responda diretamente.`;
               .eq('is_active', true)
               .maybeSingle();
 
-            if (waConfig && waConfig.access_token) {
-              // Retry logic para falhas de rede
-              let retries = 2;
-              let waResponse: Response | null = null;
-              let waData: any = null;
-
-              while (retries >= 0) {
-                try {
-                  waResponse = await fetch(
-                    `https://graph.facebook.com/v18.0/${waConfig.phone_number_id}/messages`,
-                    {
-                      method: 'POST',
-                      headers: {
-                        'Authorization': `Bearer ${waConfig.access_token}`,
-                        'Content-Type': 'application/json',
-                      },
-                      body: JSON.stringify({
-                        messaging_product: 'whatsapp',
-                        to: conversation.phone_number,
-                        type: 'text',
-                        text: { body: bestSuggestion.content }
-                      }),
-                    }
-                  );
-                  waData = await waResponse.json();
-                  break; // Success, exit retry loop
-                } catch (fetchError: any) {
-                  console.error(`[AI] WhatsApp API fetch error (retries left: ${retries}):`, fetchError.message);
-                  retries--;
-                  if (retries >= 0) await new Promise(r => setTimeout(r, 1000)); // Wait 1s before retry
+            if (waConfig) {
+              const waRes = await fetch(
+                `https://graph.facebook.com/v18.0/${waConfig.phone_number_id}/messages`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${waConfig.access_token}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    messaging_product: 'whatsapp',
+                    to: conversation.phone_number,
+                    type: 'text',
+                    text: { body: bestSuggestion.content }
+                  }),
                 }
-              }
+              );
 
-              if (waResponse?.ok && waData) {
-                const waMessageId = waData.messages?.[0]?.id;
-                console.log('[AI] ✅ Auto-reply sent! WA ID:', waMessageId);
+              const waResData = await waRes.json();
+              console.log('[AI-DEBUG] Meta API response:', JSON.stringify(waResData));
+
+              if (waRes.ok) {
                 await supabaseAdmin
                   .from('whatsapp_messages')
-                  .update({
-                    message_id: waMessageId,
-                    status: 'sent',
-                    metadata: { auto_reply: true, confidence: bestSuggestion.confidence, ai_generated: true }
-                  })
+                  .update({ status: 'sent', message_id: waResData.messages?.[0]?.id })
                   .eq('id', newMessage.id);
 
-                await supabaseAdmin.from('whatsapp_conversations').update({
-                  last_message_at: new Date().toISOString(),
-                  last_message_preview: `🤖 ${bestSuggestion.content.substring(0, 90)}`,
-                  last_message_direction: 'outbound',
-                  updated_at: new Date().toISOString()
-                }).eq('id', conversation_id);
-              } else if (waData?.error) {
-                console.error('[AI] ❌ WhatsApp API error:', waData.error);
-                // Mark message as failed
-                await supabaseAdmin
-                  .from('whatsapp_messages')
-                  .update({ status: 'failed', error_code: waData.error?.code?.toString() })
-                  .eq('id', newMessage.id);
+                // Mark suggestion as used
+                if (bestSuggestion) {
+                  await supabaseAdmin.from('whatsapp_ai_suggestions')
+                    .update({ was_used: true, used_at: new Date().toISOString() })
+                    .eq('conversation_id', conversation_id)
+                    .eq('content', bestSuggestion.content);
+                }
+
+                autoReplySent = true;
+              } else {
+                console.error('[AI-DEBUG] WhatsApp API Error:', waResData);
+                await supabaseAdmin.from('whatsapp_messages').update({ status: 'failed', error_code: waResData?.error?.code }).eq('id', newMessage.id);
               }
             } else {
-              console.warn('[AI] WhatsApp config not found or inactive for user:', conversation.user_id);
-            }
-
-            // Marcar sugestão usada
-            if (savedSuggestions) {
-              const usedSugg = savedSuggestions.find(s => s.content === bestSuggestion.content);
-              if (usedSugg) await supabaseAdmin.from('whatsapp_ai_suggestions').update({ was_used: true }).eq('id', usedSugg.id);
+              console.error('[AI-DEBUG] WhatsApp Config not found for auto-reply');
             }
           }
-        } catch (e) {
-          console.error('[AI] Auto-reply failed:', e);
+        } catch (autoReplyError) {
+          console.error('[AI-DEBUG] Auto-reply exception:', autoReplyError);
         }
+      } else {
+        console.log(`[AI-DEBUG] Auto-reply SKIPPED. Confidence ${(bestSuggestion?.confidence * 100).toFixed(0)}% < ${CONFIDENCE_THRESHOLD * 100}%`);
       }
+    } else {
+      console.log('[AI-DEBUG] Auto-reply DISABLED in config.');
     }
 
     if (aiResponse.lead_status === 'quente' && !savedAnalysis.deal_created) {

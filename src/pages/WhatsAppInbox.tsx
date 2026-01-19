@@ -13,6 +13,7 @@ import { ConversationFilters } from '@/components/whatsapp/inbox/ConversationFil
 import { ChatWindow } from '@/components/whatsapp/chat/ChatWindow';
 import { ConversationSidebar } from '@/components/whatsapp/sidebar/ConversationSidebar';
 import { InboxSourceSelector } from '@/components/whatsapp/inbox/InboxSourceSelector';
+import { AISettingsToggle } from '@/components/whatsapp/ai/AISettingsToggle';
 import { useWhatsAppConfig } from '@/hooks/useWhatsAppConfig';
 import { useWhatsAppConversations } from '@/hooks/useWhatsAppConversations';
 import { useDoctorSecretaries } from '@/hooks/useDoctorSecretaries';
@@ -212,6 +213,11 @@ export default function WhatsAppInbox() {
           />
         </div>
       )}
+
+      {/* AI Toggle for Secretaries/Owners */}
+      <div className="p-2 border-b">
+        <AISettingsToggle />
+      </div>
 
       {/* Filtros */}
       <ConversationFilters
