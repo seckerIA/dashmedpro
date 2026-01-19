@@ -18,6 +18,8 @@ interface AppointmentDetailsModalProps {
   onMarkNoShow?: () => void;
   onCancel?: () => void;
   onViewMedicalRecord?: () => void;
+  /** Se false, oculta botões de Editar e Excluir (para secretárias) */
+  canEdit?: boolean;
 }
 
 export function AppointmentDetailsModal({
@@ -30,6 +32,7 @@ export function AppointmentDetailsModal({
   onMarkNoShow,
   onCancel,
   onViewMedicalRecord,
+  canEdit = true,
 }: AppointmentDetailsModalProps) {
   if (!appointment) return null;
 
@@ -113,7 +116,7 @@ export function AppointmentDetailsModal({
 
           {/* Actions */}
           <div className="flex flex-wrap gap-2 pt-4 border-t">
-            {onEdit && (
+            {canEdit && onEdit && (
               <Button variant="outline" size="sm" onClick={onEdit}>
                 <Edit className="h-4 w-4 mr-2" />
                 Editar
@@ -143,7 +146,7 @@ export function AppointmentDetailsModal({
                 Cancelar Consulta
               </Button>
             )}
-            {onDelete && (
+            {canEdit && onDelete && (
               <Button variant="destructive" size="sm" onClick={onDelete}>
                 <Trash2 className="h-4 w-4 mr-2" />
                 Excluir

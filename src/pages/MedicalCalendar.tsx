@@ -21,6 +21,7 @@ import { AttendanceChecklist } from '@/components/medical-calendar/AttendanceChe
 import { PaymentConfirmationModal } from '@/components/medical-calendar/PaymentConfirmationModal';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { MedicalCalendarPageSkeleton } from '@/components/ui/LoadingSkeletons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useDoctors } from '@/hooks/useDoctors';
@@ -164,6 +165,11 @@ export default function MedicalCalendar() {
   });
 
   const isLoading = isLoadingAppointments || isLoadingMeetings;
+
+  // Loading skeleton
+  if (isLoading) {
+    return <MedicalCalendarPageSkeleton />;
+  }
 
   // Detectar query params de conversão e abrir formulário
   useEffect(() => {
@@ -713,6 +719,7 @@ export default function MedicalCalendar() {
               onCancel={handleCancel}
               onMarkAttended={handleMarkAttended}
               onMarkNoShow={handleMarkNoShow}
+              canEdit={!isSecretaria}
             />
           </div>
         </div>
@@ -797,6 +804,7 @@ export default function MedicalCalendar() {
         onMarkNoShow={handleDetailsMarkNoShow}
         onCancel={handleDetailsCancel}
         onViewMedicalRecord={handleViewMedicalRecord}
+        canEdit={!isSecretaria}
       />
 
       <MeetingDetailsModal

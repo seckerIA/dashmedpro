@@ -10,10 +10,12 @@ import { CommercialReports } from "@/components/commercial/CommercialReports";
 import { PipelineManagement } from "@/components/commercial/PipelineManagement";
 import { ContactForm } from "@/components/crm/ContactForm";
 import { AIInsightsDashboard } from "@/components/commercial/AIInsightsDashboard";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 
 export default function Commercial() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { isSecretaria } = useUserProfile();
   const tabFromUrl = searchParams.get("tab") || "dashboard";
   const actionFromUrl = searchParams.get("action");
   const [activeTab, setActiveTab] = useState(tabFromUrl);
@@ -24,6 +26,18 @@ export default function Commercial() {
       setActiveTab(tabFromUrl);
     }
   }, [tabFromUrl]);
+
+  // Redireciona secretária se tentar acessar a tab de inteligência
+  useEffect(() => {
+    if (isSecretaria && activeTab === 'intelligence') {
+      setActiveTab('dashboard');
+      setSearchParams((prev) => {
+        const params = new URLSearchParams(prev);
+        params.set("tab", "dashboard");
+        return params;
+      });
+    }
+  }, [isSecretaria, activeTab, setSearchParams]);
 
   useEffect(() => {
     setIsContactFormOpen(actionFromUrl === "new");
@@ -94,13 +108,15 @@ export default function Commercial() {
             <TrendingUp className="w-4 h-4 mr-2" />
             Leads & Conversões
           </TabsTrigger>
-          <TabsTrigger
-            value="intelligence"
-            className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-border/50 transition-all duration-200 font-medium py-3"
-          >
-            <Brain className="w-4 h-4 mr-2" />
-            Inteligência
-          </TabsTrigger>
+          {!isSecretaria && (
+            <TabsTrigger
+              value="intelligence"
+              className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-border/50 transition-all duration-200 font-medium py-3"
+            >
+              <Brain className="w-4 h-4 mr-2" />
+              Inteligência
+            </TabsTrigger>
+          )}
           <TabsTrigger
             value="sales"
             className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-border/50 transition-all duration-200 font-medium py-3"
@@ -136,9 +152,11 @@ export default function Commercial() {
           <LeadsManagement />
         </TabsContent>
 
-        <TabsContent value="intelligence" className="mt-6">
-          <AIInsightsDashboard />
-        </TabsContent>
+        {!isSecretaria && (
+          <TabsContent value="intelligence" className="mt-6">
+            <AIInsightsDashboard />
+          </TabsContent>
+        )}
 
         <TabsContent value="sales" className="mt-6">
           <SalesManagement />

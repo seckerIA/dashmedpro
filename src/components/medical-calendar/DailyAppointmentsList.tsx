@@ -15,6 +15,8 @@ interface DailyAppointmentsListProps {
   onCancel?: (appointment: MedicalAppointmentWithRelations) => void;
   onMarkAttended?: (appointment: MedicalAppointmentWithRelations) => void;
   onMarkNoShow?: (appointment: MedicalAppointmentWithRelations) => void;
+  /** Se false, oculta opções de Editar e Excluir (para secretárias) */
+  canEdit?: boolean;
 }
 
 export function DailyAppointmentsList({
@@ -26,6 +28,7 @@ export function DailyAppointmentsList({
   onCancel,
   onMarkAttended,
   onMarkNoShow,
+  canEdit = true,
 }: DailyAppointmentsListProps) {
   // Filtrar consultas do dia selecionado
   const dailyAppointments = appointments.filter(appt => {
@@ -83,6 +86,7 @@ export function DailyAppointmentsList({
                 onCancel={() => onCancel?.(appointment)}
                 onMarkAttended={() => onMarkAttended?.(appointment)}
                 onMarkNoShow={() => onMarkNoShow?.(appointment)}
+                canEdit={canEdit}
               />
             ))}
           </div>

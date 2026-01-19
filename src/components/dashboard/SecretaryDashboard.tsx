@@ -13,7 +13,6 @@ import { HotLeadsCard } from "@/components/dashboard/HotLeadsCard";
 import { AnimatedWrapper } from "@/components/shared/AnimatedWrapper";
 import { CollapsibleSection } from "@/components/dashboard/CollapsibleSection";
 import { useSecretaryMetrics } from "@/hooks/useSecretaryMetrics";
-import { useSecretarySinalMetrics } from "@/hooks/useSecretarySinalMetrics";
 import { useSecretaryProductivityMetrics } from "@/hooks/useSecretaryProductivityMetrics";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -28,7 +27,6 @@ import {
   CalendarCheck,
   Stethoscope,
   MessageSquare,
-  DollarSign,
   Timer,
   PhoneCall,
   Activity,
@@ -38,13 +36,11 @@ import {
 import { useNavigate } from "react-router-dom";
 import { format, isToday, isTomorrow, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { formatCurrency } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 
 const SecretaryDashboard = () => {
   const navigate = useNavigate();
   const { data: metrics, isLoading, error } = useSecretaryMetrics();
-  const { data: sinalMetrics, isLoading: isLoadingSinal } = useSecretarySinalMetrics();
   const { data: productivityMetrics, isLoading: isLoadingProductivity } = useSecretaryProductivityMetrics();
 
   if (isLoading) {
@@ -292,13 +288,6 @@ const SecretaryDashboard = () => {
                 icon={Stethoscope}
                 onClick={() => navigate('/calendar')}
               />
-              <QuickActionCard
-                title="Pagamentos"
-                description="Recebimentos"
-                variant="yellow"
-                icon={DollarSign}
-                onClick={() => navigate('/financeiro')}
-              />
             </CardContent>
           </Card>
         </AnimatedWrapper>
@@ -362,59 +351,6 @@ const SecretaryDashboard = () => {
         </AnimatedWrapper>
       </div>
 
-      {/* Métricas de Sinais (Colapsável) */}
-      {!isLoadingSinal && sinalMetrics && (
-        <AnimatedWrapper animationType="slideUp" delay={0.2}>
-          <CollapsibleSection
-            id="secretary-sinais"
-            title="Sinais e Pagamentos"
-            icon={DollarSign}
-            badge={sinalMetrics.pendingCount + sinalMetrics.paidCount}
-            defaultOpen={true}
-          >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                <div className="flex items-center gap-2 mb-2">
-                  <Clock className="h-4 w-4 text-yellow-600" />
-                  <span className="text-sm font-medium text-yellow-600">Pendentes</span>
-                </div>
-                <p className="text-2xl font-bold text-yellow-600">
-                  {sinalMetrics.pendingCount}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {formatCurrency(sinalMetrics.totalPending)}
-                </p>
-              </div>
-
-              <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-                <div className="flex items-center gap-2 mb-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  <span className="text-sm font-medium text-green-600">Recebidos</span>
-                </div>
-                <p className="text-2xl font-bold text-green-600">
-                  {sinalMetrics.paidCount}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {formatCurrency(sinalMetrics.totalPaid)}
-                </p>
-              </div>
-
-              <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
-                <div className="flex items-center gap-2 mb-2">
-                  <DollarSign className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium text-primary">Total</span>
-                </div>
-                <p className="text-2xl font-bold text-primary">
-                  {sinalMetrics.totalCount}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {formatCurrency(sinalMetrics.totalSinal)}
-                </p>
-              </div>
-            </div>
-          </CollapsibleSection>
-        </AnimatedWrapper>
-      )}
 
       {/* Métricas de Produtividade (Colapsável) */}
       {!isLoadingProductivity && productivityMetrics && (

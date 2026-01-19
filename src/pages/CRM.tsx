@@ -7,7 +7,8 @@ import { TeamMetricsChart } from "@/components/crm/TeamMetricsChart";
 import { useTeamMetrics } from "@/hooks/useTeamMetrics";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import { Users, Calendar, UserPlus, CheckCircle2, Clock, Loader2 } from "lucide-react";
+import { Users, Calendar, UserPlus, CheckCircle2, Clock } from "lucide-react";
+import { CRMPageSkeleton } from "@/components/ui/LoadingSkeletons";
 
 const CRM = () => {
   const { user } = useAuth();
@@ -69,9 +70,7 @@ const CRM = () => {
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
+          <CRMPageSkeleton />
         ) : (
           <>
             {/* Cards de Metricas da Secretaria */}

@@ -170,21 +170,20 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
   // Estado para controlar itens expandidos
   const [expandedItems, setExpandedItems] = useState<string[]>([])
 
-  // Auto-expandir se URL atual corresponde a um item com subItems
+  // Auto-expandir se URL atual corresponde a um item com subItems (accordion - apenas um por vez)
   useEffect(() => {
     if (currentPath.startsWith('/comercial')) {
-      setExpandedItems(prev => prev.includes('CRM') ? prev : [...prev, 'CRM'])
-    }
-    if (currentPath.startsWith('/financeiro')) {
-      setExpandedItems(prev => prev.includes('Financeiro') ? prev : [...prev, 'Financeiro'])
+      setExpandedItems(['CRM'])
+    } else if (currentPath.startsWith('/financeiro')) {
+      setExpandedItems(['Financeiro'])
     }
   }, [currentPath])
 
   const toggleExpanded = (title: string) => {
     setExpandedItems(prev =>
       prev.includes(title)
-        ? prev.filter(item => item !== title)
-        : [...prev, title]
+        ? [] // Fecha se clicar no mesmo item
+        : [title] // Abre apenas este item (fecha todos os outros)
     )
   }
 
@@ -342,6 +341,8 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                     if (item.url === '/financeiro') return false;
                     // - Estoque
                     if (item.url === '/inventory') return false;
+                    // - Métricas de Equipe (apenas para líderes)
+                    if (item.url === '/crm') return false;
                   }
 
                   return true;
@@ -406,7 +407,13 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                                 <div className="px-2 py-1.5 text-sm font-semibold text-white/50">
                                   {item.title}
                                 </div>
-                                {item.subItems?.map((subItem) => {
+                                {item.subItems
+                                  ?.filter(subItem => {
+                                    // Secretária não pode ver Inteligência
+                                    if (isSecretaria && subItem.url === '/comercial?tab=intelligence') return false;
+                                    return true;
+                                  })
+                                  .map((subItem) => {
                                   const subActive = isSubItemActive(subItem.url)
                                   return (
                                     <NavLink
@@ -495,7 +502,13 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                               `}
                             >
                               <div className="pl-4 space-y-0.5 pt-1">
-                                {item.subItems?.map((subItem) => {
+                                {item.subItems
+                                  ?.filter(subItem => {
+                                    // Secretária não pode ver Inteligência
+                                    if (isSecretaria && subItem.url === '/comercial?tab=intelligence') return false;
+                                    return true;
+                                  })
+                                  .map((subItem) => {
                                   const subActive = isSubItemActive(subItem.url)
                                   return (
                                     <NavLink

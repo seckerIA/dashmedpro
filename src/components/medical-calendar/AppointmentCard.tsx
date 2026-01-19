@@ -22,6 +22,8 @@ interface AppointmentCardProps {
   onCancel?: () => void;
   onMarkAttended?: () => void;
   onMarkNoShow?: () => void;
+  /** Se false, oculta opções de Editar e Excluir (para secretárias) */
+  canEdit?: boolean;
 }
 
 export function AppointmentCard({
@@ -32,6 +34,7 @@ export function AppointmentCard({
   onCancel,
   onMarkAttended,
   onMarkNoShow,
+  canEdit = true,
 }: AppointmentCardProps) {
   const startTime = format(parseISO(appointment.start_time), 'HH:mm', { locale: ptBR });
   const patientName = appointment.contact?.full_name || 'Sem paciente';
@@ -139,7 +142,7 @@ export function AppointmentCard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {onEdit && (
+              {canEdit && onEdit && (
                 <DropdownMenuItem onClick={onEdit}>
                   <Edit className="h-4 w-4 mr-2" />
                   Editar
@@ -175,7 +178,7 @@ export function AppointmentCard({
                   Cancelar
                 </DropdownMenuItem>
               )}
-              {onDelete && (
+              {canEdit && onDelete && (
                 <DropdownMenuItem
                   onClick={onDelete}
                   className="text-destructive focus:text-destructive"

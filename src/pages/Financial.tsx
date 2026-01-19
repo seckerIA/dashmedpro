@@ -62,6 +62,7 @@ import { getGradient, CHART_COLORS } from "@/lib/chart-colors"
 
 import { AccountForm } from "@/components/financial/AccountForm"
 import { FinancialRequirementModal } from "@/components/financial/FinancialRequirementModal"
+import { FinancialPageSkeleton } from "@/components/ui/LoadingSkeletons"
 import { useState, useEffect } from "react"
 import {
   DropdownMenu,
@@ -174,14 +175,7 @@ const Financial = () => {
   }
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Carregando dados financeiros...</p>
-        </div>
-      </div>
-    );
+    return <FinancialPageSkeleton />;
   }
 
   // Pegar últimas 5 transações
