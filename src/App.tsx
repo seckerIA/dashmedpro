@@ -42,6 +42,8 @@ import MedicalRecords from "./pages/MedicalRecords";
 import WhatsAppInbox from "./pages/WhatsAppInbox";
 import WhatsAppSettings from "./pages/WhatsAppSettings";
 import InventoryPage from "./pages/Inventory";
+import SuperAdminDashboard from "./pages/SuperAdminDashboard";
+import { SuperAdminLayout } from "./components/admin/SuperAdminLayout";
 import {
   TrendingUp,
   Target,
@@ -84,15 +86,15 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: (failureCount, error: any) => {
-        // Máximo de 2 tentativas (original + 1 retry) para evitar sobrecarga
-        if (failureCount >= 2) return false;
+        // Máximo de 3 retries para robustez
+        if (failureCount >= 3) return false;
 
-        // Se for timeout, tentamos apenas uma vez com delay longo
+        // Se for timeout, agora permitimos retries também (o detector de stuck vai matar se travar)
         if (error?.message?.includes('timeout') || error?.message?.includes('Query timeout')) {
-          return failureCount < 1;
+          return failureCount < 3;
         }
 
-        return failureCount < 1;
+        return true;
       },
       retryDelay: (attemptIndex) => {
         // Backoff exponencial para dar tempo ao servidor/banco de se recuperar
@@ -158,13 +160,15 @@ const StuckQueryDetector = () => {
 
           if (fetchStartTime) {
             const timeSinceStart = now - fetchStartTime;
-            // Timeout de detecção aumentado para 300s (deve ser maior que o timeout de 120s do fetch)
-            const stuckThreshold = 300000;
+
+            // Timeout de detecção ajustado para 10s (fail-fast como solicitado)
+            const stuckThreshold = 10000;
 
             if (timeSinceStart > stuckThreshold) {
               stuckQueries.push(query);
               const queryKeyStr = query.queryKey.join('/');
-              console.warn(`⚠️ [StuckQueryDetector] Cancelando query travada: ${queryKeyStr} (${Math.round(timeSinceStart / 1000)}s)`);
+              console.warn(`⚠️ [StuckQueryDetector] Cancelando query travada (>10s): ${queryKeyStr}`);
+              // Cancelar força o retry se configurado
               queryClient.cancelQueries({ queryKey: query.queryKey });
               fetchStartTimes.delete(queryKeyStr);
             }
@@ -178,8 +182,8 @@ const StuckQueryDetector = () => {
 
       if (stuckQueries.length > 0) {
         stuckCount += stuckQueries.length;
-        if (stuckCount >= 5) {
-          console.warn('⚠️ Múltiplas queries travando. Tentando recuperar estado...');
+        if (stuckCount >= 3) {
+          console.warn('⚠️ Múltiplas queries travando. Resetando queries...');
           queryClient.cancelQueries();
           stuckCount = 0;
         }
@@ -245,7 +249,7 @@ const RoleProtectedRoute = ({
 };
 
 const AppRoutes = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, isSuperAdmin } = useAuth();
 
   if (loading) {
     return (
@@ -264,6 +268,22 @@ const AppRoutes = () => {
       </Routes>
     );
   }
+
+  // Super Admin Redirection Logic - Use Custom Layout
+  if (isSuperAdmin) {
+    return (
+      <SuperAdminLayout>
+        <Routes>
+          <Route path="/admin" element={<SuperAdminDashboard />} />
+          <Route path="/admin/*" element={<SuperAdminDashboard />} />
+          <Route path="/" element={<Navigate to="/admin" replace />} />
+          <Route path="*" element={<Navigate to="/admin" replace />} />
+        </Routes>
+      </SuperAdminLayout>
+    );
+  }
+
+
 
   return (
     <CortanaProvider>
@@ -470,6 +490,7 @@ const AppRoutes = () => {
             path="/configuracoes"
             element={<Settings />}
           />
+
           <Route path="*" element={<NotFound />} />
         </Routes>
       </AppLayout>

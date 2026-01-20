@@ -23,9 +23,10 @@ import { CortanaButtonCompact } from "@/components/cortana"
 
 interface AppLayoutProps {
   children: ReactNode
+  hideSidebar?: boolean
 }
 
-export function AppLayout({ children }: AppLayoutProps) {
+export function AppLayout({ children, hideSidebar = false }: AppLayoutProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [showOverdueList, setShowOverdueList] = useState(false)
   const sidebarRef = useRef<ImperativePanelHandle>(null)
@@ -60,48 +61,55 @@ export function AppLayout({ children }: AppLayoutProps) {
             document.cookie = `react-resizable-panels:layout=${JSON.stringify(sizes)}`
           }}
         >
-          <ResizablePanel
-            ref={sidebarRef}
-            defaultSize={20}
-            collapsedSize={5}
-            collapsible={true}
-            minSize={5}
-            maxSize={20}
-            onCollapse={() => {
-              setIsCollapsed(true)
-              document.cookie = `react-resizable-panels:collapsed=${JSON.stringify(true)}`
-            }}
-            onExpand={() => {
-              setIsCollapsed(false)
-              document.cookie = `react-resizable-panels:collapsed=${JSON.stringify(false)}`
-            }}
-            className="transition-all duration-300 ease-in-out"
-          >
-            <AppSidebar isCollapsed={isCollapsed} />
-          </ResizablePanel>
+          {/* Sidebar Panel - Only show if not hidden */}
+          {!hideSidebar && (
+            <>
+              <ResizablePanel
+                ref={sidebarRef}
+                defaultSize={20}
+                collapsedSize={5}
+                collapsible={true}
+                minSize={5}
+                maxSize={20}
+                onCollapse={() => {
+                  setIsCollapsed(true)
+                  document.cookie = `react-resizable-panels:collapsed=${JSON.stringify(true)}`
+                }}
+                onExpand={() => {
+                  setIsCollapsed(false)
+                  document.cookie = `react-resizable-panels:collapsed=${JSON.stringify(false)}`
+                }}
+                className="transition-all duration-300 ease-in-out"
+              >
+                <AppSidebar isCollapsed={isCollapsed} />
+              </ResizablePanel>
 
-          <ResizableHandle withHandle />
+              <ResizableHandle withHandle />
+            </>
+          )}
 
           <ResizablePanel defaultSize={80}>
             <div className="flex-1 flex flex-col h-full bg-background">
               {/* Header - estilo Dabang */}
               <header className="h-20 flex items-center justify-between px-8 bg-card border-b border-border shadow-card">
                 <div className="flex items-center gap-6 flex-1">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        onClick={toggleSidebar}
-                        className="p-2 hover:bg-muted rounded-xl transition-all duration-200"
-                        variant="ghost"
-                        size="icon"
-                      >
-                        <AlignJustify className="w-5 h-5 text-foreground" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <p>{isCollapsed ? "Expandir Menu" : "Recolher Menu"}</p>
-                    </TooltipContent>
-                  </Tooltip>
+                  {!hideSidebar && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          onClick={toggleSidebar}
+                          className="p-2 hover:bg-muted rounded-xl transition-all duration-200"
+                          variant="ghost"
+                          size="icon"
+                        >
+                          <AlignJustify className="w-5 h-5 text-foreground" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">
+                        <p>{isCollapsed ? "Expandir Menu" : "Recolher Menu"}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
 
                   <div className="flex flex-col">
                     <h1 className="text-2xl font-semibold text-foreground tracking-tight">

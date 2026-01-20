@@ -26,8 +26,10 @@ import { ptBR } from 'date-fns/locale';
 import { CalendarIcon, Loader2, MapPin, Users, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { parseISO } from 'date-fns';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import { useDoctors } from '@/hooks/useDoctors';
 
 const locale = ptBR || undefined;
 
@@ -43,6 +45,7 @@ const meetingSchema = z.object({
   attendees: z.string().optional(),
   notes: z.string().optional(),
   status: z.enum(['scheduled', 'completed', 'cancelled']),
+  user_id: z.string().optional(),
 });
 
 type MeetingFormData = z.infer<typeof meetingSchema>;
@@ -54,6 +57,7 @@ interface MeetingFormProps {
   meeting?: GeneralMeeting | null;
   prefilledStart?: Date;
   prefilledEnd?: Date;
+  prefilledUserId?: string;
 }
 
 export function MeetingForm({
@@ -63,37 +67,36 @@ export function MeetingForm({
   meeting,
   prefilledStart,
   prefilledEnd,
+  prefilledUserId,
 }: MeetingFormProps) {
   const { user } = useAuth();
+  const { isAdmin, isSecretaria } = useUserProfile();
+  const { doctors } = useDoctors();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [attendeesInput, setAttendeesInput] = useState<string>('');
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(prefilledStart || new Date());
 
-  // Passar a data selecionada para o hook carregar os dados do mês correto
-  // Passar a data selecionada para o hook carregar os dados do mês correto
-  const { checkAvailability, busySlots, isLoading: checkingAvailability } = useAvailability(selectedDate, selectedDate);
-
-  const timeSlots = generateTimeSlots();
-
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    formState: { errors },
-    reset,
-  } = useForm<MeetingFormData>({
+  const { register, control, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<MeetingFormData>({
     resolver: zodResolver(meetingSchema),
     defaultValues: {
       meeting_type: 'meeting',
-      status: 'scheduled',
       duration_minutes: 30,
       is_busy: true,
       start_date: prefilledStart || new Date(),
       start_time: prefilledStart ? format(prefilledStart, 'HH:mm') : '09:00',
+      user_id: prefilledUserId || user?.id,
     },
   });
+
+  const canAssignToOthers = isAdmin || isSecretaria;
+
+  const targetUserId = watch('user_id') || user?.id;
+
+  // Passar a data selecionada e o usuário alvo para o hook carregar os dados corretos
+  const { checkAvailability, busySlots, isLoading: checkingAvailability } = useAvailability(selectedDate, selectedDate, targetUserId);
+
+  const timeSlots = generateTimeSlots();
 
   // Populate form when editing
   useEffect(() => {
@@ -114,6 +117,7 @@ export function MeetingForm({
         attendees: attendeesStr,
         notes: meeting.notes || '',
         status: meeting.status,
+        user_id: meeting.user_id,
       });
     } else if (!meeting && open) {
       const initialDate = prefilledStart || new Date();
@@ -131,9 +135,10 @@ export function MeetingForm({
         location: '',
         attendees: '',
         notes: '',
+        user_id: prefilledUserId || user?.id,
       });
     }
-  }, [meeting, open, prefilledStart, reset]);
+  }, [meeting, open, prefilledStart, reset, user?.id, prefilledUserId]);
 
   const handleFormSubmit = async (data: MeetingFormData) => {
     setIsSubmitting(true);
@@ -190,7 +195,7 @@ export function MeetingForm({
         .filter((a) => a.length > 0);
 
       const submitData = {
-        user_id: user?.id,
+        user_id: data.user_id || user?.id,
         title: data.title,
         description: data.description || null,
         start_time: startDateTime.toISOString(),
@@ -247,6 +252,32 @@ export function MeetingForm({
             />
             {errors.title && <p className="text-sm text-destructive">{errors.title.message}</p>}
           </div>
+
+          {/* User Selection (for Admin/Secretary) */}
+          {canAssignToOthers && (
+            <div className="space-y-2">
+              <Label htmlFor="user_id">Responsável / Agenda de *</Label>
+              <Select
+                value={watch('user_id')}
+                onValueChange={(value) => setValue('user_id', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o responsável" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  <SelectItem value={user?.id || ''}>Eu mesmo</SelectItem>
+                  {doctors.map((doctor) => (
+                    <SelectItem key={doctor.id} value={doctor.id}>
+                      {doctor.full_name?.startsWith('Dr') ? doctor.full_name : `Dr(a). ${doctor.full_name}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                A reunião será adicionada à agenda deste usuário e bloqueará seus horários se "Indisponível" estiver ativo.
+              </p>
+            </div>
+          )}
 
           {/* Meeting Type and Status */}
           <div className="grid grid-cols-2 gap-4">

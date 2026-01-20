@@ -159,7 +159,7 @@ interface AppSidebarProps {
 export function AppSidebar({ isCollapsed }: AppSidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
-  const { signOut, user } = useAuth()
+  const { signOut, user, organization } = useAuth()
   const { toast } = useToast()
   const { isAdmin, isVendedor, isGestorTrafego, isSecretaria, isMedico, profile, isLoading: isLoadingProfile } = useUserProfile()
   const { criticalCount, hasCritical, totalCount } = useInventoryAlerts()
@@ -246,11 +246,11 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
               />
               {!isCollapsed && (
                 <div className="flex flex-col">
-                  <span className="text-white font-semibold text-xl tracking-wide whitespace-nowrap overflow-hidden">
-                    DASHMED PRO
+                  <span className="text-foreground font-semibold text-xl tracking-wide whitespace-nowrap overflow-hidden">
+                    {organization?.name || "DASHMED PRO"}
                   </span>
-                  <span className="text-white/60 text-sm whitespace-nowrap overflow-hidden">
-                    Dashboard
+                  <span className="text-muted-foreground text-sm whitespace-nowrap overflow-hidden">
+                    {organization ? "DASHMED PRO" : "Dashboard"}
                   </span>
                 </div>
               )}
@@ -357,7 +357,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                     {/* Group Label */}
                     {!isCollapsed && (
                       <div className="px-3 mb-1.5">
-                        <span className="text-xs font-semibold text-white/35 uppercase tracking-[0.18em] whitespace-nowrap overflow-hidden text-ellipsis">
+                        <span className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-[0.18em] whitespace-nowrap overflow-hidden text-ellipsis">
                           {group.label}
                         </span>
                       </div>
@@ -386,7 +386,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                                   transition-all duration-200
                                   ${active
                                     ? 'bg-primary/15 text-primary border border-primary/20 shadow-[0_0_15px_rgba(37,99,235,0.15)]'
-                                    : 'text-muted-foreground hover:bg-white/5 hover:text-white border border-transparent'
+                                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground border border-transparent'
                                   }
                                 `}
                               >
@@ -415,7 +415,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                               className="w-56 p-2 bg-sidebar border-white/10"
                             >
                               <div className="space-y-1">
-                                <div className="px-2 py-1.5 text-sm font-semibold text-white/50">
+                                <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
                                   {item.title}
                                 </div>
                                 {item.subItems
@@ -434,8 +434,8 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                                         flex items-center gap-3 px-3 py-2 rounded-xl
                                         text-sm font-medium transition-all duration-200
                                         ${subActive
-                                            ? 'bg-primary text-white'
-                                            : 'text-white/70 hover:bg-white/10 hover:text-white'
+                                            ? 'bg-primary text-primary-foreground'
+                                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                                           }
                                       `}
                                       >
@@ -469,7 +469,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                                 transition-all duration-200
                                 ${active
                                   ? 'bg-primary/15 text-primary border border-primary/20 shadow-[0_0_15px_rgba(37,99,235,0.15)]'
-                                  : 'text-muted-foreground hover:bg-white/5 hover:text-white border border-transparent'
+                                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground border border-transparent'
                                 }
                               `}
                             >
@@ -485,8 +485,8 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                                     className={`
                                       w-7 h-7 transition-all duration-300
                                       ${active
-                                        ? 'text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] scale-110'
-                                        : 'text-white/70 group-hover:text-white group-hover:drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]'
+                                        ? 'text-foreground drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] scale-110'
+                                        : 'text-muted-foreground group-hover:text-foreground group-hover:drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]'
                                       }
                                     `}
                                   />
@@ -494,7 +494,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                                 <span
                                   className={`
                                     text-lg font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden
-                                    ${active ? 'text-white' : 'text-white/70 group-hover:text-white'}
+                                    ${active ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}
                                   `}
                                 >
                                   {item.title}
@@ -508,9 +508,9 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                                 className="p-1 hover:bg-white/10 rounded-lg"
                               >
                                 {expanded ? (
-                                  <ChevronDown className="w-5 h-5 text-white/50 transition-transform duration-200" />
+                                  <ChevronDown className="w-5 h-5 text-muted-foreground transition-transform duration-200" />
                                 ) : (
-                                  <ChevronRight className="w-5 h-5 text-white/50 transition-transform duration-200" />
+                                  <ChevronRight className="w-5 h-5 text-muted-foreground transition-transform duration-200" />
                                 )}
                               </div>
                             </button>
@@ -539,15 +539,15 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                                         group flex items-center gap-3 px-4 py-2.5 rounded-xl
                                         text-sm font-medium transition-all duration-200
                                         ${subActive
-                                            ? 'bg-primary text-white shadow-sm'
-                                            : 'text-white/60 hover:bg-white/5 hover:text-white'
+                                            ? 'bg-primary text-primary-foreground shadow-sm'
+                                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                                           }
                                       `}
                                       >
                                         <subItem.icon
                                           className={`
                                           w-5 h-5 transition-all duration-200
-                                          ${subActive ? 'text-white' : 'text-white/50 group-hover:text-white'}
+                                          ${subActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-accent-foreground'}
                                         `}
                                         />
                                         <span className="whitespace-nowrap overflow-hidden text-ellipsis">{subItem.title}</span>
@@ -585,7 +585,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                               <span
                                 className={`
                                   text-lg font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden
-                                  ${active ? 'text-white' : 'text-white/70 group-hover:text-white'}
+                                  ${active ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}
                                 `}
                               >
                                 {item.title}
@@ -599,7 +599,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                                 text-[10px] px-2 h-5 rounded-full border
                                 ${item.variant === 'new'
                                   ? 'bg-primary/15 text-primary border-primary/30'
-                                  : 'bg-white/10 text-white border-white/20'
+                                  : 'bg-accent/50 text-foreground border-border'
                                 }
                               `}
                             >
@@ -637,7 +637,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                                 transition-all duration-200
                                 ${active
                                   ? 'bg-primary/15 text-primary border border-primary/20 shadow-[0_0_15px_rgba(37,99,235,0.15)]'
-                                  : 'text-muted-foreground hover:bg-white/5 hover:text-white border border-transparent'
+                                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground border border-transparent'
                                 }
                               `}
                             >
@@ -667,7 +667,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
         </ScrollArea>
 
         {/* Settings and User Section - Bottom - Fixed at bottom */}
-        <div className={`flex-shrink-0 border-t border-white/10 ${isCollapsed ? 'p-1 space-y-2.5' : 'p-4 space-y-2.5'}`}>
+        <div className={`flex-shrink-0 border-t border-border ${isCollapsed ? 'p-1 space-y-2.5' : 'p-4 space-y-2.5'}`}>
           {/* Theme Toggle */}
           <ThemeToggle isCollapsed={isCollapsed} />
 
@@ -680,7 +680,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                   <Settings
                     className={`
                       w-7 h-7 transition-all duration-200
-                      ${active ? 'text-white' : 'text-white/70 group-hover:text-white'}
+                      ${active ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}
                       group-hover:scale-105
                     `}
                   />
@@ -688,7 +688,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                     <span
                       className={`
                         text-lg font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden
-                        ${active ? 'text-white' : 'text-white/70 group-hover:text-white'}
+                        ${active ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}
                       `}
                     >
                       Configurações
@@ -709,8 +709,8 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                       rounded-2xl text-base font-medium
                       transition-all duration-200
                       ${active
-                        ? 'bg-primary text-white shadow-sm'
-                        : 'text-white/70 hover:bg-white/5 hover:text-white'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                       }
                     `}
                   >
@@ -729,14 +729,14 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
           {/* User info and logout */}
           {!isCollapsed && (
             <div className="mt-3 px-3 py-2.5 bg-white/5 rounded-2xl">
-              <div className="text-sm text-white/60 mb-2 truncate">
+              <div className="text-sm text-muted-foreground mb-2 truncate">
                 {user?.email}
               </div>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleSignOut}
-                className="w-full justify-start px-2.5 py-2 h-9 rounded-2xl text-base text-white/70 hover:text-white hover:bg-white/10"
+                className="w-full justify-start px-2.5 py-2 h-9 rounded-2xl text-base text-muted-foreground hover:text-foreground hover:bg-accent"
               >
                 <LogOut className="mr-2 h-5 w-5" />
                 Sair

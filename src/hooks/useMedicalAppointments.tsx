@@ -25,6 +25,7 @@ interface UseMedicalAppointmentsFilters {
   paymentStatus?: PaymentStatus | 'all';
   contactId?: string;
   isSecretaria?: boolean; // Se true, busca TODOS os agendamentos (de todos os médicos)
+  doctorIds?: string[]; // IDs dos médicos para filtrar explicitamente
 }
 
 // Tipos de estágio do pipeline para clínica médica
@@ -332,12 +333,14 @@ const fetchAppointments = async (
   userId: string,
   filters?: UseMedicalAppointmentsFilters,
   signal?: AbortSignal,
-  doctorIds?: string[] // Agora aceita array de IDs de médicos
+  doctorIds?: string[], // Agora aceita array de IDs de médicos
+  canViewAll: boolean = false // Nova flag para indicar se pode ver tudo
 ): Promise<MedicalAppointmentWithRelations[]> => {
   // Verificar e garantir sessão válida
   const { ensureValidSession } = await import('@/utils/supabaseHelpers');
   await ensureValidSession();
 
+  // INÍCIO DA QUERY
   let query = supabase
     .from('medical_appointments')
     .select(`
@@ -347,13 +350,18 @@ const fetchAppointments = async (
       doctor:profiles!medical_appointments_doctor_id_profiles_fk(id, full_name, email)
     `);
 
-  // Secretária vê consultas de todos os médicos vinculados
+  // Lógica de Filtragem:
+  // 1. Se passarmos doctorIds (filtro manual ou secretaria vinculada), filtramos.
+  // 2. Se NÃO passarmos doctorIds, mas for user privilegiado (canViewAll), NÃO filtramos por user/doctor (vê tudo da organização).
+  // 3. Se usuário comum, vê apenas suas próprias.
+
   if (doctorIds && doctorIds.length > 0) {
     query = query.in('doctor_id', doctorIds);
-  } else if (!filters?.isSecretaria && userId) {
-    // Outros usuários veem apenas suas próprias consultas
+  } else if (!canViewAll && userId) {
+    // Usuário Comum: Só vê o que é seu (owner) ou onde é médico (doctor)
     query = query.or(`user_id.eq.${userId},doctor_id.eq.${userId}`);
   }
+  // Se canViewAll=true e !doctorIds, não aplica filtro => Vê TUDO.
 
   query = query.order('start_time', { ascending: true });
 
@@ -536,6 +544,7 @@ const serializeFilters = (filters?: UseMedicalAppointmentsFilters): string => {
   if (filters.paymentStatus && filters.paymentStatus !== 'all') parts.push(`payment:${filters.paymentStatus}`);
   if (filters.contactId) parts.push(`contact:${filters.contactId}`);
   if (filters.isSecretaria) parts.push('secretaria:true');
+  if (filters.doctorIds && filters.doctorIds.length > 0) parts.push(`doctors:${filters.doctorIds.join(',')}`);
 
   return parts.length > 0 ? parts.join('|') : 'no-filters';
 };
@@ -548,8 +557,10 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // Secretária usa lista de médicos vinculados
-  const doctorIdsToUse = isSecretaria ? doctorIds : [];
+  // Secretária usa lista de médicos vinculados se não houver filtro explícito
+  const doctorIdsToUse = filters?.doctorIds && filters.doctorIds.length > 0
+    ? filters.doctorIds
+    : (isSecretaria ? doctorIds : []);
 
   const queryKey = ['medical-appointments', user?.id, doctorIdsToUse, serializeFilters(filters)];
 
@@ -564,6 +575,9 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
     }
   }, [user?.id, queryClient]);
 
+  // Verificar permissão para ver tudo
+  const canViewAll = isSecretaria || profile?.role === 'admin' || profile?.role === 'dono';
+
   // Query: List appointments with relations
   const {
     data: appointments = [],
@@ -572,7 +586,13 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
     refetch,
   } = useQuery({
     queryKey,
-    queryFn: ({ signal }) => fetchAppointments(user?.id || '', filters, signal, doctorIdsToUse.length > 0 ? doctorIdsToUse : undefined),
+    queryFn: ({ signal }) => fetchAppointments(
+      user?.id || '',
+      filters,
+      signal,
+      doctorIdsToUse.length > 0 ? doctorIdsToUse : undefined,
+      canViewAll // Passando a flag correta
+    ),
     enabled: !!user?.id && !authLoading && (!isSecretaria || !isLoadingDoctors),
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,

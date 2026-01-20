@@ -150,6 +150,21 @@ export default function MedicalCalendar() {
     return appointments;
   }, [appointments, searchFilter]);
 
+  // Determinar quais reuniões visualizar
+  const meetingsViewAsUserIds = useMemo(() => {
+    if (searchFilter.startsWith('doctor:')) {
+      return [searchFilter.replace('doctor:', '')];
+    }
+    return undefined;
+  }, [searchFilter]);
+
+  const prefilledMeetingUserId = useMemo(() => {
+    if (searchFilter.startsWith('doctor:')) {
+      return searchFilter.replace('doctor:', '');
+    }
+    return undefined;
+  }, [searchFilter]);
+
   // Buscar reuniões do mesmo período
   const {
     meetings,
@@ -162,6 +177,7 @@ export default function MedicalCalendar() {
   } = useGeneralMeetings({
     startDate: monthStart,
     endDate: monthEnd,
+    viewAsUserIds: meetingsViewAsUserIds,
   });
 
   const isLoading = isLoadingAppointments || isLoadingMeetings;
@@ -795,6 +811,7 @@ export default function MedicalCalendar() {
         onSubmit={handleMeetingFormSubmit}
         prefilledStart={prefilledDates.start}
         prefilledEnd={prefilledDates.end}
+        prefilledUserId={prefilledMeetingUserId}
         meeting={selectedMeeting}
       />
 

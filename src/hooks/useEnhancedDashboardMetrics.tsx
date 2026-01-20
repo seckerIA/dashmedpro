@@ -45,24 +45,16 @@ const fetchEnhancedMetrics = async (
   // 1. Buscar deals com tratamento defensivo
   let dealsData: any[] = [];
   try {
-    // Removido 'service' e 'service_value' do select pois estão causando erro 400
+    // RLS handles organization filtering automatically
     const dealsQuery = supabase
       .from('crm_deals')
       .select('*, contact:crm_contacts(id, full_name, email, phone)');
 
-    let filteredDealsQuery = dealsQuery;
-
-    if (!isAdminOrDono) {
-      const orCondition = `user_id.in.${idsString},assigned_to.in.${idsString}`;
-      filteredDealsQuery = (dealsQuery as any).or(orCondition);
-    }
-
-    const dealsResult = await supabaseQueryWithTimeout(filteredDealsQuery as any, 30000, signal);
+    const dealsResult = await supabaseQueryWithTimeout(dealsQuery as any, 30000, signal);
     dealsData = (dealsResult.data || []) as any[];
   } catch (err) {
     console.error('⚠️ Erro ao buscar deals no dashboard:', err);
     const fallbackQuery = supabase.from('crm_deals').select('*');
-    if (!isAdminOrDono) (fallbackQuery as any).or(`user_id.in.${idsString},assigned_to.in.${idsString}`);
     const fallbackResult = await supabaseQueryWithTimeout(fallbackQuery as any, 30000, signal);
     dealsData = (fallbackResult.data || []) as any[];
   }
@@ -98,15 +90,12 @@ const fetchEnhancedMetrics = async (
   // 2. Follow-ups pendentes (Ajustado para usar somente 'activity_type' que é o correto no banco)
   let pendingFollowUps = 0;
   try {
+    // RLS handles organization filtering
     const followUpsQuery = supabase
       .from('crm_activities')
       .select('id')
       .eq('completed', false)
       .eq('activity_type' as any, 'call');
-
-    if (!isAdminOrDono) {
-      (followUpsQuery as any).in('user_id', targetIds);
-    }
 
     const followUpsResult = await supabaseQueryWithTimeout(followUpsQuery as any, 30000, signal);
     pendingFollowUps = ((followUpsResult.data || []) as any[]).length;
@@ -119,14 +108,11 @@ const fetchEnhancedMetrics = async (
   currentMonth.setDate(1);
   currentMonth.setHours(0, 0, 0, 0);
 
+  // RLS handles organization filtering
   const appointmentsQuery = supabase
     .from('medical_appointments')
     .select('id, status')
     .gte('start_time', currentMonth.toISOString());
-
-  if (!isAdminOrDono) {
-    (appointmentsQuery as any).in('doctor_id', targetIds);
-  }
 
   const appointmentsResult = await supabaseQueryWithTimeout(appointmentsQuery as any, 30000, signal);
   const appointmentsData = (appointmentsResult.data || []) as any[];
@@ -188,13 +174,10 @@ const fetchEnhancedMetrics = async (
   const receitaDespesas: ReceitaDespesasData[] = [];
 
   try {
+    // RLS handles organization filtering
     const transactionsQuery = supabase
       .from('financial_transactions' as any)
       .select('amount, type, status, transaction_date');
-
-    if (!isAdminOrDono) {
-      (transactionsQuery as any).in('user_id', targetIds);
-    }
 
     const transactionsResult = await supabaseQueryWithTimeout(transactionsQuery as any, 30000, signal);
     const transactionsData = (transactionsResult.data || []) as any[];

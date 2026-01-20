@@ -47,23 +47,39 @@ const fetchDeals = async (
   userId: string,
   viewAsUserIds?: string[],
   signal?: AbortSignal,
-  doctorIds?: string[]
+  doctorIds?: string[],
+  fetchAll?: boolean
 ): Promise<CRMDealWithContact[]> => {
-  if (!userId && (!doctorIds || doctorIds.length === 0)) return [];
-  const targetUserIds = doctorIds && doctorIds.length > 0 ? [userId, ...doctorIds] : (viewAsUserIds || [userId]);
-  const validIds = targetUserIds.filter(id => id && typeof id === 'string');
-  if (validIds.length === 0) return [];
+  // Se fetchAll for true (Admin/Secretaria), ignoramos filtros de usuário e confiamos no RLS (por organização)
+  // Apenas se viewAsUserIds for explicitamente passado (filtro da UI), nós o respeitamos.
+  const shouldFilterByUser = !fetchAll && (!viewAsUserIds || viewAsUserIds.length === 0);
 
-  const idsString = `(${validIds.join(',')})`;
-  const orCondition = `user_id.in.${idsString},assigned_to.in.${idsString}`;
+  let orCondition = '';
+
+  if (viewAsUserIds && viewAsUserIds.length > 0) {
+    const validIds = viewAsUserIds.filter(Boolean);
+    const idsString = `(${validIds.join(',')})`;
+    orCondition = `user_id.in.${idsString},assigned_to.in.${idsString}`;
+  } else if (!fetchAll) {
+    // Comportamento restrito (apenas próprios + doctors vinculados se houver)
+    const targetUserIds = doctorIds && doctorIds.length > 0 ? [userId, ...doctorIds] : [userId];
+    const validIds = targetUserIds.filter(Boolean);
+    const idsString = `(${validIds.join(',')})`;
+    orCondition = `user_id.in.${idsString},assigned_to.in.${idsString}`;
+  }
 
   // Removido 'service' e 'service_value' do select pois estão causando erro 400 no banco (colunas inexistentes)
   const queryPromise = supabase
     .from('crm_deals')
     .select(`*, contact:crm_contacts(id, full_name, email, phone, company)`);
 
+  // Se tivermos uma condição OR (filtro de usuário), aplicamos. Se não, traz TUDO (respeitando RLS)
+  if (orCondition) {
+    (queryPromise as any).or(orCondition);
+  }
+
   const { data, error } = await supabaseQueryWithTimeout(
-    (queryPromise as any).or(orCondition).order('position', { ascending: true }).limit(500),
+    (queryPromise as any).order('position', { ascending: true }).limit(500),
     undefined,
     signal
   );
@@ -71,7 +87,13 @@ const fetchDeals = async (
   if (error) {
     console.error('❌ Erro no PostgREST crm_deals:', error);
     // Fallback absoluto sem subquery
-    const fallback = await supabaseQueryWithTimeout(supabase.from('crm_deals').select('*').or(orCondition).limit(500) as any, undefined, signal);
+    // Se não tiver orCondition, é fetchAll -> sem filtro .or()
+    let fallbackQuery = supabase.from('crm_deals').select('*');
+    if (orCondition) {
+      fallbackQuery = (fallbackQuery as any).or(orCondition);
+    }
+
+    const fallback = await supabaseQueryWithTimeout(fallbackQuery.limit(500) as any, undefined, signal);
     if (fallback.error) throw new Error(`Erro ao buscar deals: ${fallback.error.message}`);
     return (fallback.data || []) as CRMDealWithContact[];
   }
@@ -92,7 +114,8 @@ const fetchDeals = async (
   return (dealsData || []).map(deal => ({ ...deal, owner_profile: null, assigned_to_profile: null })) as CRMDealWithContact[];
 };
 
-// Mutations logic
+// ... mutations ...
+
 const createRecord = async (table: string, payload: any) => {
   const { data, error } = await (supabase.from(table as any).insert(payload) as any).select().single();
   if (error) throw error;
@@ -115,7 +138,13 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
   const { profile, isSecretaria, isLoading: isLoadingProfile } = useUserProfile();
   const { doctorIds, isLoading: isLoadingDoctors } = useSecretaryDoctors();
   const queryClient = useQueryClient();
+
+  // Se for secretaria, passamos doctorIds, mas AGORA vamos usar fetchAll=true também
+  // O comportamento antigo era filtrar apenas pelos doctorIds.
   const doctorIdsToUse = isSecretaria ? doctorIds : [];
+
+  // Check permission to view all
+  const canViewAll = profile?.role === 'admin' || profile?.role === 'dono' || isSecretaria;
 
   const { data: contacts = [], isLoading: isLoadingContacts, refetch: refetchContacts } = useQuery({
     queryKey: ['crm-contacts', user?.id, fetchAllContacts, doctorIdsToUse],
@@ -124,8 +153,8 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
   });
 
   const { data: deals = [], isLoading: isLoadingDeals } = useQuery({
-    queryKey: ['crm-deals', user?.id, viewAsUserIds?.join(','), doctorIdsToUse],
-    queryFn: ({ signal }) => fetchDeals(user?.id || '', viewAsUserIds, signal, doctorIdsToUse),
+    queryKey: ['crm-deals', user?.id, viewAsUserIds?.join(','), doctorIdsToUse, canViewAll],
+    queryFn: ({ signal }) => fetchDeals(user?.id || '', viewAsUserIds, signal, doctorIdsToUse, canViewAll),
     enabled: !!user?.id || doctorIdsToUse.length > 0,
   });
 
