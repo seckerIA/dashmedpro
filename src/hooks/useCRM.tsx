@@ -35,7 +35,7 @@ const fetchContacts = async (
   // Ordenar por nome alfabeticamente
   const { data, error } = await supabaseQueryWithTimeout(
     (queryPromise as any).order('full_name', { ascending: true }).limit(1000),
-    undefined,
+    15000,
     signal
   );
   if (error) throw new Error(`Erro ao buscar contatos: ${error.message}`);
@@ -80,7 +80,7 @@ const fetchDeals = async (
 
   const { data, error } = await supabaseQueryWithTimeout(
     (queryPromise as any).order('position', { ascending: true }).limit(500),
-    undefined,
+    15000,
     signal
   );
 
@@ -93,7 +93,7 @@ const fetchDeals = async (
       fallbackQuery = (fallbackQuery as any).or(orCondition);
     }
 
-    const fallback = await supabaseQueryWithTimeout(fallbackQuery.limit(500) as any, undefined, signal);
+    const fallback = await supabaseQueryWithTimeout(fallbackQuery.limit(500) as any, 15000, signal);
     if (fallback.error) throw new Error(`Erro ao buscar deals: ${fallback.error.message}`);
     return (fallback.data || []) as CRMDealWithContact[];
   }

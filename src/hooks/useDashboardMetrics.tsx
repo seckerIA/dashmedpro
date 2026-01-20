@@ -52,7 +52,7 @@ const fetchDashboardMetrics = async (
   // Admin/Dono: ver todos os deals (sem filtro)
 
   // Passar o query builder (não executado) para permitir abortSignal
-  const dealsResult = await supabaseQueryWithTimeout(dealsQuery as any, 30000, signal);
+  const dealsResult = await supabaseQueryWithTimeout(dealsQuery as any, 15000, signal);
   const { data: deals, error: dealsError } = dealsResult;
 
   if (dealsError) throw new Error(`Erro ao buscar deals: ${dealsError.message}`);
@@ -75,7 +75,7 @@ const fetchDashboardMetrics = async (
   // Admin/Dono: ver todos os contatos (sem filtro)
 
   // Passar o query builder (não executado) para permitir abortSignal
-  const contactsResult = await supabaseQueryWithTimeout(contactsQuery as any, 30000, signal);
+  const contactsResult = await supabaseQueryWithTimeout(contactsQuery as any, 15000, signal);
   const { data: contacts, error: contactsError } = contactsResult;
 
   if (contactsError) throw new Error(`Erro ao buscar contatos: ${contactsError.message}`);
@@ -184,10 +184,14 @@ const fetchDashboardMetrics = async (
   // Buscar nomes dos procedimentos do banco de dados
   let procedureNames: Record<string, string> = {};
   if (procedureIds.size > 0) {
-    const { data: procedures } = await supabase
-      .from('commercial_procedures')
-      .select('id, name')
-      .in('id', Array.from(procedureIds));
+    const { data: procedures } = await supabaseQueryWithTimeout(
+      supabase
+        .from('commercial_procedures')
+        .select('id, name')
+        .in('id', Array.from(procedureIds)) as any,
+      15000,
+      signal
+    );
 
     if (procedures) {
       procedures.forEach((proc: any) => {

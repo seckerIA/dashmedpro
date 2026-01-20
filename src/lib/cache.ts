@@ -39,12 +39,33 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
         });
 
         if (error) {
+            // Verifica se é erro de auth (401/403) ou erro da Edge Function
+            // A propriedade 'status' ou 'context.status' muitas vezes existe no FunctionsHttpError,
+            // mas fazemos uma verificação ampla para garantir.
+            const errorString = String(error);
+            const isAuthError =
+                errorString.includes('401') ||
+                errorString.includes('403') ||
+                (error as any)?.status === 401 ||
+                (error as any)?.context?.status === 401;
+
+            if (isAuthError) {
+                // Debug apenas, para não poluir console do usuário
+                // console.debug('[Cache] Auth error (token expirado ou inválido), ignorando cache.', error);
+                return null;
+            }
+
             console.warn('[Cache] Get error:', error);
             return null;
         }
 
         return data?.value ?? null;
-    } catch (err) {
+    } catch (err: any) {
+        // Ignorar erros de HttpError (comuns em falha de edge function)
+        if (err?.message?.includes('functions_http_error') || err?.context?.status === 401) {
+            console.warn('[Cache] Auth exception (ignorando cache):', err.message);
+            return null;
+        }
         console.warn('[Cache] Get exception:', err);
         return null;
     }
@@ -64,12 +85,28 @@ export async function cacheSet<T>(
         });
 
         if (error) {
+            const errorString = String(error);
+            const isAuthError =
+                errorString.includes('401') ||
+                errorString.includes('403') ||
+                (error as any)?.status === 401 ||
+                (error as any)?.context?.status === 401;
+
+            if (isAuthError) {
+                // Silencioso no set também
+                return false;
+            }
+
             console.warn('[Cache] Set error:', error);
             return false;
         }
 
         return true;
-    } catch (err) {
+    } catch (err: any) {
+        if (err?.message?.includes('functions_http_error') || err?.context?.status === 401) {
+            console.warn('[Cache] Set Auth exception (ignorando):', err.message);
+            return false;
+        }
         console.warn('[Cache] Set exception:', err);
         return false;
     }

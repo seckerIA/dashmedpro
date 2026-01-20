@@ -60,11 +60,81 @@ import { IncomingCallModal } from "@/components/voip/IncomingCallModal";
 import CallsPage from "@/pages/Calls";
 import VOIPSettings from "@/pages/VOIPSettings";
 
-// Configuração do QueryClient com tratamento global de timeouts e retries resilientes
+import { focusManager } from "@tanstack/react-query";
+import { checkToken } from "@/integrations/supabase/client";
+
+// Configuração customizada de Foco da Janela
+// Cancela queries pendentes e verifica token ANTES de permitir novas queries
+focusManager.setEventListener((handleFocus) => {
+  if (typeof window !== "undefined" && window.addEventListener) {
+
+    let isProcessing = false;
+
+    const onVisibilityChange = async () => {
+      // Ignore if not becoming visible or already processing
+      if (document.visibilityState !== 'visible' || isProcessing) return;
+
+      isProcessing = true;
+      console.log('👁️ [FocusManager] Tab visível. Cancelando queries pendentes e verificando token...');
+
+      try {
+        // STEP 1: Cancel ALL currently fetching queries to prevent stuck state
+        queryClient.cancelQueries();
+
+        // STEP 2: Check and refresh token if needed
+        // This will force page reload if token expired too long ago
+        const isValid = await checkToken();
+
+        if (isValid) {
+          console.log('✅ [FocusManager] Token OK. Invalidando queries para refetch limpo.');
+          // STEP 3: Invalidate to trigger fresh fetches with valid token
+          queryClient.invalidateQueries();
+          handleFocus();
+        } else {
+          console.log('⚠️ [FocusManager] Token inválido. Aguardando redirect...');
+          // checkToken will handle redirect/reload
+        }
+      } catch (e) {
+        console.error('❌ [FocusManager] Erro:', e);
+        // On error, still allow focus to prevent complete lockup
+        handleFocus();
+      } finally {
+        isProcessing = false;
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange, false);
+    window.addEventListener("focus", onVisibilityChange, false);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", onVisibilityChange);
+    };
+  }
+  return () => { };
+});
+
+// Configuração do QueryClient com tratamento global de timeouts, retries e 401 handling
 const queryClient = new QueryClient({
   queryCache: new QueryCache({
-    onError: (error: any, query) => {
-      // Log global de erros de query
+    onError: async (error: any, query) => {
+      // Handle 401 Unauthorized errors - trigger token refresh
+      if (error?.message?.includes('401') ||
+        error?.message?.includes('Unauthorized') ||
+        error?.message?.includes('JWT') ||
+        error?.message?.includes('invalid_token') ||
+        error?.status === 401) {
+        console.log('🔒 [QueryCache] Erro 401 detectado. Forçando refresh do token...');
+        const isValid = await checkToken();
+        if (isValid) {
+          // Token refreshed - retry the query automatically
+          console.log('🔄 [QueryCache] Token atualizado. Retentando query:', query.queryKey.join('/'));
+          queryClient.invalidateQueries({ queryKey: query.queryKey });
+        }
+        return;
+      }
+
+      // Log timeout errors
       if (error?.message?.includes('timeout') || error?.message?.includes('Query timeout')) {
         console.error(`❌ Query timeout: ${query.queryKey.join('/')}`);
 
@@ -77,7 +147,15 @@ const queryClient = new QueryClient({
     },
   }),
   mutationCache: new MutationCache({
-    onError: (error: any) => {
+    onError: async (error: any) => {
+      // Handle 401 in mutations too
+      if (error?.message?.includes('401') ||
+        error?.message?.includes('Unauthorized') ||
+        error?.status === 401) {
+        console.log('🔒 [MutationCache] Erro 401 em mutation. Forçando refresh...');
+        await checkToken();
+      }
+
       if (error?.message?.includes('timeout') || error?.message?.includes('Query timeout')) {
         console.error('❌ Mutation timeout:', error);
       }
@@ -94,6 +172,11 @@ const queryClient = new QueryClient({
           return false;
         }
 
+        // Se for 401, não retenta aqui (será tratado pelo onError acima)
+        if (error?.message?.includes('401') || error?.status === 401) {
+          return false;
+        }
+
         return true;
       },
       retryDelay: (attemptIndex) => {
@@ -102,7 +185,7 @@ const queryClient = new QueryClient({
       },
       staleTime: 5 * 60 * 1000, // 5 minutos - usar cache mais agressivamente
       gcTime: 10 * 60 * 1000, // 10 minutos - manter em cache por mais tempo
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: false, // Handled by our custom focusManager
       refetchOnMount: false, // Não refetch se dados estão frescos
       refetchOnReconnect: true,
       networkMode: 'online',
@@ -136,6 +219,7 @@ const StuckQueryDetector = () => {
           }
         }
 
+        // Se query terminou ou pausou (network offline, window hidden), remove timer
         if (state.fetchStatus === 'idle' || state.fetchStatus === 'paused') {
           const queryKey = query.queryKey.join('/');
           fetchStartTimes.delete(queryKey);
@@ -147,19 +231,15 @@ const StuckQueryDetector = () => {
       }
     });
 
-    // Resetar timers quando a página volta a ficar visível
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        // console.log('👁️ [StuckQueryDetector] App visível novamente. Resetando timers de query.');
-        fetchStartTimes.clear();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
+    // Monitoramento Periódico
     const checkInterval = setInterval(async () => {
-      // Se a página estiver oculta, não verificamos (evita falsos positivos ao voltar de suspensão/sleep)
-      if (document.hidden) {
-        fetchStartTimes.clear();
+      // Importante: Se a página está oculta ou o QueryClient está pausado, 
+      // NÃO aplicamos timeout, pois o navegador pode ter trottled a CPU/Network.
+      if (typeof document !== 'undefined' && document.hidden) {
+        fetchStartTimes.clear(); // Limpa para evitar falso-positivo ao acordar
+        return;
+      }
+      if (typeof window !== 'undefined' && !window.navigator.onLine) {
         return;
       }
 
@@ -168,39 +248,45 @@ const StuckQueryDetector = () => {
       const now = Date.now();
 
       for (const query of allQueries) {
-        const state = query.state;
         const queryKey = query.queryKey.join('/');
+        const state = query.state;
 
+        // Só considera queries ATIVAS (fetching)
         if (state.fetchStatus === 'fetching') {
-          const fetchStartTime = fetchStartTimes.get(queryKey);
 
-          if (fetchStartTime) {
-            const timeSinceStart = now - fetchStartTime;
-
-            // Timeout de detecção ajustado para 20s (tolerante a redes instáveis)
-            const stuckThreshold = 20000;
-
-            if (timeSinceStart > stuckThreshold) {
-              stuckQueries.push(query);
-              const queryKeyStr = query.queryKey.join('/');
-              console.warn(`⚠️ [StuckQueryDetector] Cancelando query travada (>20s): ${queryKeyStr}`);
-              // Cancelar força o retry se configurado
-              queryClient.cancelQueries({ queryKey: query.queryKey });
-              fetchStartTimes.delete(queryKeyStr);
-            }
-          } else {
+          let fetchStartTime = fetchStartTimes.get(queryKey);
+          if (!fetchStartTime) {
+            fetchStartTime = now;
             fetchStartTimes.set(queryKey, now);
           }
+
+          const timeSinceStart = now - fetchStartTime;
+
+          // Timeout de detecção ajustado para 20s (tolerante a redes instáveis)
+          const stuckThreshold = 20000;
+
+          if (timeSinceStart > stuckThreshold) {
+            stuckQueries.push(query);
+            const queryKeyStr = query.queryKey.join('/');
+            console.warn(`⚠️ [StuckQueryDetector] Cancelando query travada (>20s): ${queryKeyStr}`);
+
+            // Forçar cancelamento - isso deve disparar o fallback/erro da query
+            queryClient.cancelQueries({ queryKey: query.queryKey });
+            fetchStartTimes.delete(queryKeyStr);
+          }
         } else {
+          // Se não está fetching, remove do tracking
           fetchStartTimes.delete(queryKey);
         }
       }
 
+      // Reset global se muitas queries estiverem travando (sinal de problema sistêmico ou rede caindo)
       if (stuckQueries.length > 0) {
         stuckCount += stuckQueries.length;
         if (stuckCount >= 3) {
-          console.warn('⚠️ Múltiplas queries travando. Resetando queries...');
+          console.warn('⚠️ Múltiplas queries travando. Resetando queries e limpando tracking...');
           queryClient.cancelQueries();
+          fetchStartTimes.clear();
           stuckCount = 0;
         }
       }
@@ -209,9 +295,8 @@ const StuckQueryDetector = () => {
     return () => {
       clearInterval(checkInterval);
       unsubscribe();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [queryClient]); // Apenas queryClient como dependência
+  }, [queryClient]);
 
   return null;
 };

@@ -170,7 +170,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .lte("start_time", periodEndISO);
 
       // console.log('📡 [useCommercialMetrics] Buscando appointments...');
-      const appointmentsResult = await supabaseQueryWithTimeout(appointmentsQuery as any, 90000, signal);
+      const appointmentsResult = await supabaseQueryWithTimeout(appointmentsQuery as any, 25000, signal);
       const { data: appointments, error: appointmentsError } = appointmentsResult as { data: any[], error: any };
 
       if (appointmentsError) {
@@ -205,7 +205,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .lte("transaction_date", format(period.end, "yyyy-MM-dd"));
 
       // console.log('📡 [useCommercialMetrics] Buscando transactions...');
-      const transactionsResult = await supabaseQueryWithTimeout(transactionsQuery as any, 90000, signal);
+      const transactionsResult = await supabaseQueryWithTimeout(transactionsQuery as any, 25000, signal);
       const { data: transactions, error: transactionsError } = transactionsResult as { data: any[], error: any };
 
       if (transactionsError) {
@@ -232,7 +232,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
               .from("transaction_costs")
               .select("*")
               .in("transaction_id", allTransactionIds) as any,
-            30000,
+            25000,
             signal
           )
           : Promise.resolve({ data: [], error: null }),
@@ -244,7 +244,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
             .in("user_id", targetUserIds)
             .gte("created_at", periodStartISO)
             .lte("created_at", periodEndISO) as any,
-          30000,
+          25000,
           signal
         ),
 
@@ -254,7 +254,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
             .from("commercial_campaigns")
             .select("*")
             .in("user_id", targetUserIds) as any,
-          30000,
+          25000,
           signal
         ),
       ]);
@@ -294,7 +294,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
             .in("user_id", targetUserIds)
             .gte("sale_date", format(period.start, "yyyy-MM-dd"))
             .lte("sale_date", format(period.end, "yyyy-MM-dd")) as any,
-          30000,
+          25000,
           signal
         ),
 
@@ -314,7 +314,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
             .in("user_id", targetUserIds)
             .gte("created_at", periodStartISO)
             .lte("created_at", periodEndISO) as any,
-          30000,
+          25000,
           signal
         ),
 
@@ -328,7 +328,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
             .eq("status", "concluida")
             .gte("transaction_date", format(previousPeriod.start, "yyyy-MM-dd"))
             .lte("transaction_date", format(previousPeriod.end, "yyyy-MM-dd")) as any,
-          30000,
+          25000,
           signal
         ),
 
@@ -340,7 +340,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
             .in("user_id", targetUserIds)
             .gte("start_time", prevStartISO)
             .lte("start_time", prevEndISO) as any,
-          30000,
+          25000,
           signal
         ),
       ]);

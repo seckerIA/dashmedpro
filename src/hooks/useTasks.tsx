@@ -12,11 +12,11 @@ const fetchTasks = async (userId: string, signal?: AbortSignal): Promise<TaskWit
   await ensureValidSession();
 
   const queryPromise = supabase
-    .from('tasks')
+    .from('tasks' as any)
     .select('*')
     .order('created_at', { ascending: false });
 
-  const { data, error } = await supabaseQueryWithTimeout<TaskWithCRM[]>(queryPromise as any, undefined, signal);
+  const { data, error } = await supabaseQueryWithTimeout<TaskWithCRM[]>(queryPromise as any, 20000, signal);
 
   if (error) {
     if (!error.message?.includes('AbortError') && (error as any).code !== '20') {
@@ -36,7 +36,7 @@ const fetchTasks = async (userId: string, signal?: AbortSignal): Promise<TaskWit
 // Função para buscar uma única tarefa
 const fetchTaskById = async (taskId: string): Promise<TaskWithCRM | null> => {
   const { data, error } = await supabase
-    .from('tasks')
+    .from('tasks' as any)
     .select('*')
     .eq('id', taskId)
     .single();
@@ -45,6 +45,8 @@ const fetchTaskById = async (taskId: string): Promise<TaskWithCRM | null> => {
     console.error('Erro ao buscar tarefa:', error);
     return null;
   }
+
+  if (!data) return null;
 
   return {
     ...data,
@@ -82,7 +84,7 @@ export function useTasks() {
   const createTaskMutation = useMutation({
     mutationFn: async (taskData: CreateTaskData) => {
       const { data, error } = await supabase
-        .from('tasks')
+        .from('tasks' as any)
         .insert({
           title: taskData.title,
           description: taskData.description || null,
@@ -112,7 +114,7 @@ export function useTasks() {
   const updateTaskMutation = useMutation({
     mutationFn: async ({ taskId, data }: { taskId: string; data: UpdateTaskData }) => {
       const { data: updated, error } = await supabase
-        .from('tasks')
+        .from('tasks' as any)
         .update({
           ...data,
           updated_at: new Date().toISOString(),
@@ -133,7 +135,7 @@ export function useTasks() {
   const deleteTaskMutation = useMutation({
     mutationFn: async (taskId: string) => {
       const { error } = await supabase
-        .from('tasks')
+        .from('tasks' as any)
         .delete()
         .eq('id', taskId);
 
@@ -148,7 +150,7 @@ export function useTasks() {
   const completeTaskMutation = useMutation({
     mutationFn: async (taskId: string) => {
       const { data, error } = await supabase
-        .from('tasks')
+        .from('tasks' as any)
         .update({
           status: 'concluida',
           completed_at: new Date().toISOString(),
@@ -169,7 +171,7 @@ export function useTasks() {
   const reopenTaskMutation = useMutation({
     mutationFn: async (taskId: string) => {
       const { data, error } = await supabase
-        .from('tasks')
+        .from('tasks' as any)
         .update({
           status: 'pendente',
           completed_at: null,

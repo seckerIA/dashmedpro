@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
 
 export interface TaskCategory {
     id: string;
@@ -50,16 +51,26 @@ export function useTaskCategories() {
         error,
     } = useQuery({
         queryKey: ['task-categories', user?.id],
-        queryFn: async () => {
+        queryFn: async ({ signal }) => {
             if (!user?.id) return [];
 
-            const { data, error } = await (supabase
+            const queryPromise = supabase
                 .from('task_categories' as any)
                 .select('*')
                 .order('is_default', { ascending: false })
-                .order('name', { ascending: true }) as any);
+                .order('name', { ascending: true }) as any;
+
+            const { data, error } = await supabaseQueryWithTimeout(
+                queryPromise,
+                20000, // 20s
+                signal
+            );
 
             if (error) {
+                if (error.message?.includes('AbortError')) {
+                    // Ignore aborts
+                    return [];
+                }
                 console.error('Erro ao buscar categorias:', error);
                 throw error;
             }
@@ -78,6 +89,8 @@ export function useTaskCategories() {
             return Array.from(uniqueCategoriesMap.values()) as TaskCategory[];
         },
         enabled: !!user?.id,
+        staleTime: 5 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
     });
 
     // Criar categoria

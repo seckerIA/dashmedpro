@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -44,16 +45,23 @@ export function useTaskAttachments(taskId?: string) {
         error,
     } = useQuery({
         queryKey: ['task-attachments', taskId],
-        queryFn: async () => {
+        queryFn: async ({ signal }) => {
             if (!taskId) return [];
 
-            const { data, error } = await (supabase
+            const queryPromise = supabase
                 .from('task_attachments' as any)
                 .select('*')
                 .eq('task_id', taskId)
-                .order('created_at', { ascending: false }) as any);
+                .order('created_at', { ascending: false }) as any;
+
+            const { data, error } = await supabaseQueryWithTimeout(
+                queryPromise,
+                20000,
+                signal
+            );
 
             if (error) {
+                if (error.message?.includes('AbortError')) return [];
                 console.error('Erro ao buscar anexos:', error);
                 throw error;
             }
@@ -61,6 +69,8 @@ export function useTaskAttachments(taskId?: string) {
             return data as TaskAttachment[];
         },
         enabled: !!taskId,
+        staleTime: 5 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
     });
 
     // Upload de arquivo
