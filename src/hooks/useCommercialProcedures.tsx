@@ -50,55 +50,27 @@ export function useCommercialProcedures(viewAsUserIds?: string[]) {
       await ensureValidSession();
 
       // Query com join para pegar dados do médico
-      let queryPromise;
+      let queryPromise = supabase
+        .from("commercial_procedures")
+        .select(`
+          *,
+          doctor:profiles!commercial_procedures_user_id_profiles_fk (full_name, email)
+        `);
 
       if (viewAsUserIds && viewAsUserIds.length > 0) {
-        // Filtro manual selecionado (para admin visualizar equipe)
-        queryPromise = supabase
-          .from("commercial_procedures")
-          .select(`
-            *,
-            doctor:profiles!commercial_procedures_user_id_profiles_fk (full_name, email)
-          `)
-          .in("user_id", viewAsUserIds)
-          .order("name", { ascending: true });
-      } else if (isAdmin && allActiveUserIds.length > 0) {
-        // Admin vê procedimentos de TODOS os usuários ativos (padrão)
-        queryPromise = supabase
-          .from("commercial_procedures")
-          .select(`
-            *,
-            doctor:profiles!commercial_procedures_user_id_profiles_fk (full_name, email)
-          `)
-          .in("user_id", allActiveUserIds)
-          .order("name", { ascending: true });
-      } else if (isSecretaria && doctorIds.length > 0) {
-        // Secretária vê procedimentos de TODOS os médicos vinculados
-        queryPromise = supabase
-          .from("commercial_procedures")
-          .select(`
-            *,
-            doctor:profiles!commercial_procedures_user_id_profiles_fk (full_name, email)
-          `)
-          .in("user_id", doctorIds)
-          .order("name", { ascending: true });
-      } else if (isSecretaria && doctorIds.length === 0) {
-        // Secretária sem médicos vinculados - não mostra procedimentos
-        console.log('[useCommercialProcedures] Secretária sem médicos vinculados');
-        return [];
+        // Filtro manual selecionado
+        (queryPromise as any).in("user_id", viewAsUserIds);
+      } else if (isAdmin || isSecretaria) {
+        // Admin e Secretária veem TUDO da organização (RLS cuida do resto)
+        // Não filtramos por ID, deixamos o banco retornar tudo que o usuário pode ver
       } else {
         // Médicos e outros usuários veem apenas seus próprios procedimentos
-        queryPromise = supabase
-          .from("commercial_procedures")
-          .select(`
-            *,
-            doctor:profiles!commercial_procedures_user_id_profiles_fk (full_name, email)
-          `)
-          .eq("user_id", user.id)
-          .order("name", { ascending: true });
+        (queryPromise as any).eq("user_id", user.id);
       }
 
-      const { data, error } = await supabaseQueryWithTimeout(queryPromise, 30000, signal);
+      (queryPromise as any).order("name", { ascending: true });
+
+      const { data, error } = await supabaseQueryWithTimeout(queryPromise as any, 30000, signal);
 
       if (error) throw error;
 

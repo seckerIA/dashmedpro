@@ -68,29 +68,36 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
     queryFn: async ({ signal }) => {
       if (!user) throw new Error("User not authenticated");
 
-      // console.log('🔍 useCommercialLeads - Fetching leads for:', { isSecretaria, targetUserIds, userId: user.id });
+      // Otimização: Application-Side Join
+      // Removemos o JOIN com profiles na query principal para evitar timeout.
 
       let queryPromise;
 
-      if ((targetUserIds || []).length > 1) {
-        queryPromise = supabase
-          .from("commercial_leads" as any)
-          .select(`
-            *,
-            doctor:profiles!commercial_leads_user_id_profiles_fk (full_name, email)
-          `)
-          .in("user_id", targetUserIds)
-          .order("created_at", { ascending: false });
-      } else {
-        queryPromise = supabase
-          .from("commercial_leads" as any)
-          .select(`
-            *,
-            doctor:profiles!commercial_leads_user_id_profiles_fk (full_name, email)
-          `)
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
+      const canViewAll = isAdmin || isSecretaria;
+
+      // Se temos targetUserIds (filtro manual ou admin escolhendo usuários), usamos.
+      // MAS, se for Secretária ou Admin sem filtro explícito, NÃO aplicamos filtro de user_id (deixa o RLS trazer tudo da org).
+      const shouldFilterByUser = !canViewAll && (!filters?.status && !filters?.origin);
+      // OBS: filters não afeta user. A lógica correta é: 
+      // Se viewAsUserIds foi passado -> usa ele.
+      // Se não, e canViewAll -> traz tudo.
+      // Se não canViewAll -> traz current user ou linked doctors.
+
+      queryPromise = supabase.from("commercial_leads" as any).select('*');
+
+      if (viewAsUserIds && viewAsUserIds.length > 0) {
+        queryPromise = (queryPromise as any).in("user_id", viewAsUserIds);
+      } else if (!canViewAll) {
+        // Comportamento restrito
+        if (targetUserIds && targetUserIds.length > 1) {
+          queryPromise = (queryPromise as any).in("user_id", targetUserIds);
+        } else {
+          queryPromise = (queryPromise as any).eq("user_id", user.id);
+        }
       }
+      // Se canViewAll && !viewAsUserIds, não filtramos user_id. RLS cuida disso.
+
+      queryPromise = (queryPromise as any).order("created_at", { ascending: false });
 
       if (filters?.status) {
         queryPromise = (queryPromise as any).eq("status", filters.status);
@@ -100,36 +107,40 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
         queryPromise = (queryPromise as any).eq("origin", filters.origin);
       }
 
-      let data, error;
+      // Timeout reduzido para segurança (60s), já que deve ser muito mais rápido agora
+      const result = await supabaseQueryWithTimeout(queryPromise as any, 60000, signal);
 
-      try {
-        const result = await supabaseQueryWithTimeout(queryPromise as any, 120000, signal);
-        data = result.data;
-        error = result.error;
-      } catch (err: any) {
-        console.warn('⚠️ useCommercialLeads - Timeout ou erro na query principal, tentando fallback sem join...');
-
-        // Fallback sem o join com profiles para ser mais rápido
-        const fallbackQuery = supabase
-          .from("commercial_leads" as any)
-          .select("*")
-          .in("user_id", targetUserIds)
-          .order("created_at", { ascending: false });
-
-        const result = await supabaseQueryWithTimeout(fallbackQuery as any, undefined, signal);
-        data = result.data;
-        error = result.error;
-      }
-
-      if (error) {
-        if (!error.message?.includes('AbortError') && (error as any).code !== '20') {
-          console.error('❌ useCommercialLeads - Error:', error);
+      if (result.error) {
+        if (!result.error.message?.includes('AbortError') && (result.error as any).code !== '20') {
+          console.error('❌ useCommercialLeads - Error:', result.error);
         }
-        throw error;
+        throw result.error;
       }
 
-      // console.log(`✅ useCommercialLeads - Found ${data?.length || 0} leads para IDs:`, targetUserIds);
-      return data as CommercialLead[];
+      const rawLeads = result.data as any[];
+
+      // 2. Buscar os nomes dos médicos (Profiles) separadamente
+      // Coletar user_ids únicos que precisamos buscar
+      const userIdsToFetch = [...new Set(rawLeads.map(l => l.user_id).filter(Boolean))];
+
+      if (userIdsToFetch.length > 0) {
+        // Busca leve apenas IDs e nomes
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', userIdsToFetch);
+
+        // Criar mapa para lookup rápido
+        const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+
+        // 3. Merge em memória
+        return rawLeads.map(lead => ({
+          ...lead,
+          doctor: profileMap.get(lead.user_id) || null
+        })) as CommercialLead[];
+      }
+
+      return rawLeads as CommercialLead[];
     },
     enabled: !!user && (!isSecretaria || !isLoadingDoctors),
     staleTime: 10 * 60 * 1000,

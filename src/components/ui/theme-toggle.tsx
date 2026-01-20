@@ -29,19 +29,19 @@ export function ThemeToggle({ isCollapsed = false }: ThemeToggleProps) {
   }
 
   const Icon = theme === "light" ? Moon : Sun
-  
+
   const linkContent = (
     <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} w-full`}>
       <div className={`flex items-center ${isCollapsed ? '' : 'gap-4'}`}>
         <Icon className={`
           w-7 h-7 transition-all duration-200
-          text-white/70 group-hover:text-white
+          text-muted-foreground group-hover:text-foreground
           group-hover:scale-105
         `} />
         {!isCollapsed && (
           <span className={`
             text-lg font-medium transition-colors duration-200
-            text-white/70 group-hover:text-white
+            text-muted-foreground group-hover:text-foreground
           `}>
             Tema {theme === "light" ? "Escuro" : "Claro"}
           </span>
@@ -55,7 +55,7 @@ export function ThemeToggle({ isCollapsed = false }: ThemeToggleProps) {
       onClick={toggleTheme}
       className={`
         block ${isCollapsed ? 'p-3.5' : 'px-4 py-3.5'} rounded-2xl transition-all duration-200 group relative w-full
-        text-white/70 hover:bg-white/5 hover:text-white
+        text-muted-foreground hover:bg-accent hover:text-accent-foreground
       `}
     >
       {linkContent}

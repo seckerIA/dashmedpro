@@ -17,6 +17,7 @@ interface UseGeneralMeetingsFilters {
   meetingType?: MeetingType | 'all';
   status?: MeetingStatus | 'all';
   isBusy?: boolean | 'all';
+  viewAsUserIds?: string[];
 }
 
 // Fetch meetings
@@ -32,8 +33,13 @@ const fetchMeetings = async (
   let query = supabase
     .from('general_meetings')
     .select('*')
-    .eq('user_id', userId)
     .order('start_time', { ascending: true });
+
+  if (filters?.viewAsUserIds && filters.viewAsUserIds.length > 0) {
+    query = query.in('user_id', filters.viewAsUserIds);
+  } else if (userId) {
+    query = query.eq('user_id', userId);
+  }
 
   // Apply filters
   if (filters?.startDate) {
@@ -58,7 +64,7 @@ const fetchMeetings = async (
 
   // Usar wrapper com timeout
   const { supabaseQueryWithTimeout } = await import('@/utils/supabaseQuery');
-  const { data, error } = await supabaseQueryWithTimeout(query, 30000, signal);
+  const { data, error } = await supabaseQueryWithTimeout(query as any, 30000, signal);
 
   if (error) throw new Error(`Erro ao buscar reuniões: ${error.message}`);
   return (data as GeneralMeeting[]) || [];
@@ -68,7 +74,7 @@ const fetchMeetings = async (
 const createMeeting = async (meetingData: GeneralMeetingInsert): Promise<GeneralMeeting> => {
   const { data, error } = await supabase
     .from('general_meetings')
-    .insert(meetingData)
+    .insert(meetingData as any)
     .select()
     .single();
 
@@ -86,7 +92,7 @@ const updateMeeting = async ({
 }): Promise<GeneralMeeting> => {
   const { data, error } = await supabase
     .from('general_meetings')
-    .update(updates)
+    .update(updates as any)
     .eq('id', id)
     .select()
     .single();
@@ -105,14 +111,15 @@ const deleteMeeting = async (id: string): Promise<void> => {
 // Helper para serializar filtros em uma query key estável
 const serializeFilters = (filters?: UseGeneralMeetingsFilters): string => {
   if (!filters) return 'no-filters';
-  
+
   const parts: string[] = [];
   if (filters.startDate) parts.push(`start:${filters.startDate.toISOString()}`);
   if (filters.endDate) parts.push(`end:${filters.endDate.toISOString()}`);
   if (filters.meetingType && filters.meetingType !== 'all') parts.push(`type:${filters.meetingType}`);
   if (filters.status && filters.status !== 'all') parts.push(`status:${filters.status}`);
   if (filters.isBusy !== undefined && filters.isBusy !== 'all') parts.push(`busy:${filters.isBusy}`);
-  
+  if (filters.viewAsUserIds && filters.viewAsUserIds.length > 0) parts.push(`viewUsers:${filters.viewAsUserIds.join(',')}`);
+
   return parts.length > 0 ? parts.join('|') : 'no-filters';
 };
 
@@ -206,6 +213,7 @@ export function useGeneralMeetings(filters?: UseGeneralMeetingsFilters) {
       return updateMutation.mutateAsync({
         id,
         updates: {
+          id,
           status: 'completed',
         },
       });
@@ -224,6 +232,7 @@ export function useGeneralMeetings(filters?: UseGeneralMeetingsFilters) {
       return updateMutation.mutateAsync({
         id,
         updates: {
+          id,
           status: 'cancelled',
         },
       });

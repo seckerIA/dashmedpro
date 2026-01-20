@@ -22,8 +22,9 @@ export interface AvailabilityCheck {
  * Hook para verificar disponibilidade de horários
  * Verifica conflitos entre consultas médicas e reuniões com is_busy = true
  */
-export function useAvailability(startDate?: Date, endDate?: Date) {
+export function useAvailability(startDate?: Date, endDate?: Date, targetUserId?: string) {
   const { user } = useAuth();
+  const userIdToUse = targetUserId || user?.id;
 
   // Calcular range do mês se não fornecido
   const monthStart = startDate ? startOfMonth(startDate) : startOfMonth(new Date());
@@ -33,6 +34,7 @@ export function useAvailability(startDate?: Date, endDate?: Date) {
   const { appointments = [], isLoading: isLoadingAppointments } = useMedicalAppointments({
     startDate: monthStart,
     endDate: monthEnd,
+    doctorIds: userIdToUse ? [userIdToUse] : undefined,
   });
 
   // Buscar reuniões ocupadas do período
@@ -41,6 +43,7 @@ export function useAvailability(startDate?: Date, endDate?: Date) {
     endDate: monthEnd,
     isBusy: true,
     status: 'scheduled',
+    viewAsUserIds: userIdToUse ? [userIdToUse] : undefined,
   });
 
   // Cache de períodos ocupados
