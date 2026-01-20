@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useMemo, useState, useEffect } from "react";
 import { useAuth } from "./useAuth";
 import { useUserProfile } from "./useUserProfile";
@@ -944,6 +944,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
     gcTime: 15 * 60 * 1000,
     refetchOnWindowFocus: false,
     retry: 2,
+    placeholderData: keepPreviousData, // Manter dados anteriores durante refetch
   });
 
   return {

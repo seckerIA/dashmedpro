@@ -86,24 +86,24 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: (failureCount, error: any) => {
-        // Máximo de 3 retries para robustez
-        if (failureCount >= 3) return false;
+        // Máximo de 2 retries para fail-fast
+        if (failureCount >= 2) return false;
 
-        // Se for timeout, agora permitimos retries também (o detector de stuck vai matar se travar)
+        // Se for timeout, não retenta - fail fast
         if (error?.message?.includes('timeout') || error?.message?.includes('Query timeout')) {
-          return failureCount < 3;
+          return false;
         }
 
         return true;
       },
       retryDelay: (attemptIndex) => {
-        // Backoff exponencial para dar tempo ao servidor/banco de se recuperar
-        return Math.min(1000 * 2 ** attemptIndex, 10000);
+        // Backoff mais rápido para fail-fast
+        return Math.min(1000 * 2 ** attemptIndex, 5000);
       },
-      staleTime: 2 * 60 * 1000,
-      gcTime: 5 * 60 * 1000,
+      staleTime: 5 * 60 * 1000, // 5 minutos - usar cache mais agressivamente
+      gcTime: 10 * 60 * 1000, // 10 minutos - manter em cache por mais tempo
       refetchOnWindowFocus: false,
-      refetchOnMount: true,
+      refetchOnMount: false, // Não refetch se dados estão frescos
       refetchOnReconnect: true,
       networkMode: 'online',
     },
@@ -161,13 +161,13 @@ const StuckQueryDetector = () => {
           if (fetchStartTime) {
             const timeSinceStart = now - fetchStartTime;
 
-            // Timeout de detecção ajustado para 10s (fail-fast como solicitado)
-            const stuckThreshold = 10000;
+            // Timeout de detecção ajustado para 8s (menos agressivo para cold starts)
+            const stuckThreshold = 8000;
 
             if (timeSinceStart > stuckThreshold) {
               stuckQueries.push(query);
               const queryKeyStr = query.queryKey.join('/');
-              console.warn(`⚠️ [StuckQueryDetector] Cancelando query travada (>10s): ${queryKeyStr}`);
+              console.warn(`⚠️ [StuckQueryDetector] Cancelando query travada (>8s): ${queryKeyStr}`);
               // Cancelar força o retry se configurado
               queryClient.cancelQueries({ queryKey: query.queryKey });
               fetchStartTimes.delete(queryKeyStr);

@@ -137,10 +137,10 @@ export function TaskCard({ task, onEdit, onDelete, onToggleComplete, onToggleAss
         onClick?.();
       }}
       className={cn(
-        "border border-border shadow-sm rounded-2xl transition-all duration-200 hover:shadow-md cursor-pointer group",
-        isDragging && "opacity-50 scale-105 border-primary",
-        isCompleted && "opacity-60",
-        isOverdue && "border-red-500 bg-red-500/5"
+        "bg-white dark:bg-card border border-gray-200 dark:border-border shadow-sm hover:shadow-md rounded-2xl transition-all duration-200 cursor-pointer group",
+        isDragging && "opacity-50 scale-105 border-primary shadow-lg",
+        isCompleted && "opacity-60 bg-gray-50/50 dark:bg-card/50",
+        isOverdue && "border-red-500 bg-red-50 dark:bg-red-500/10"
       )}
     >
       <CardContent className="p-4">
@@ -166,7 +166,7 @@ export function TaskCard({ task, onEdit, onDelete, onToggleComplete, onToggleAss
           <div className="flex-1 min-w-0">
             {/* Categoria Badge */}
             {categoryLabel && (
-              <Badge variant="outline" className={cn("mb-2 text-xs", categoryColor)}>
+              <Badge variant="outline" className={cn("mb-2 text-xs font-medium", categoryColor)}>
                 {categoryLabel}
               </Badge>
             )}
@@ -176,7 +176,7 @@ export function TaskCard({ task, onEdit, onDelete, onToggleComplete, onToggleAss
 
             <div className="flex items-start justify-between gap-2 mb-2">
               <h3 className={cn(
-                "font-semibold text-foreground text-sm leading-tight",
+                "font-bold text-gray-900 dark:text-foreground text-base leading-tight",
                 isCompleted && "line-through text-muted-foreground"
               )}>
                 {task.title}
@@ -209,7 +209,7 @@ export function TaskCard({ task, onEdit, onDelete, onToggleComplete, onToggleAss
             {/* Description */}
             {task.description && (
               <p className={cn(
-                "text-sm text-muted-foreground mb-3 line-clamp-2",
+                "text-sm text-gray-600 dark:text-muted-foreground mb-3 line-clamp-2",
                 isCompleted && "line-through"
               )}>
                 {task.description}
@@ -221,7 +221,7 @@ export function TaskCard({ task, onEdit, onDelete, onToggleComplete, onToggleAss
               <div className="mb-3 space-y-2">
                 {/* Deal Information */}
                 {task.deal && (
-                  <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
+                  <div className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-muted/50 border border-gray-100 dark:border-border rounded-lg">
                     <Target className="h-4 w-4 text-primary" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">
@@ -243,7 +243,7 @@ export function TaskCard({ task, onEdit, onDelete, onToggleComplete, onToggleAss
 
                 {/* Contact Information */}
                 {task.contact && (
-                  <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
+                  <div className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-muted/50 border border-gray-100 dark:border-border rounded-lg">
                     <Building2 className="h-4 w-4 text-primary" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">

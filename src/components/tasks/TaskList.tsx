@@ -252,7 +252,7 @@ export function TaskList({
       </div>
 
       {/* Tarefas Pendentes */}
-      <Card className="border border-border shadow-sm rounded-2xl">
+      <Card className="bg-white dark:bg-card border border-gray-200 dark:border-border shadow-sm rounded-2xl">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-xl font-bold text-foreground tracking-tight flex items-center gap-3">
@@ -319,7 +319,7 @@ export function TaskList({
 
       {/* Tarefas Concluídas */}
       {completedTasks.length > 0 && (
-        <Card className="border border-border shadow-sm rounded-2xl">
+        <Card className="bg-white dark:bg-card border border-gray-200 dark:border-border shadow-sm rounded-2xl">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-xl font-bold text-foreground tracking-tight flex items-center gap-3">
