@@ -508,7 +508,7 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
                 Deal Relacionado
               </label>
               <Select
-                value={watchedDealId}
+                value={watchedDealId || 'none'}
                 onValueChange={(value) => setValue('deal_id', value === 'none' ? '' : value)}
               >
                 <SelectTrigger className="bg-card text-foreground border-border text-base font-medium h-12 rounded-xl transition-all">
@@ -546,7 +546,7 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
                 Contato Relacionado
               </label>
               <Select
-                value={watchedContactId}
+                value={watchedContactId || 'none'}
                 onValueChange={(value) => setValue('contact_id', value === 'none' ? '' : value)}
               >
                 <SelectTrigger className="bg-card text-foreground border-border text-base font-medium h-12 rounded-xl transition-all">
