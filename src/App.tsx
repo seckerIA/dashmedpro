@@ -122,7 +122,9 @@ const StuckQueryDetector = () => {
     const fetchStartTimes = new Map<string, number>();
     let stuckCount = 0;
 
-    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+    const queryCache = queryClient.getQueryCache();
+
+    const unsubscribe = queryCache.subscribe((event) => {
       if (event?.type === 'updated') {
         const query = event.query;
         const state = query.state;
@@ -145,8 +147,22 @@ const StuckQueryDetector = () => {
       }
     });
 
+    // Resetar timers quando a página volta a ficar visível
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // console.log('👁️ [StuckQueryDetector] App visível novamente. Resetando timers de query.');
+        fetchStartTimes.clear();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     const checkInterval = setInterval(async () => {
-      const queryCache = queryClient.getQueryCache();
+      // Se a página estiver oculta, não verificamos (evita falsos positivos ao voltar de suspensão/sleep)
+      if (document.hidden) {
+        fetchStartTimes.clear();
+        return;
+      }
+
       const allQueries = queryCache.getAll();
       const stuckQueries: any[] = [];
       const now = Date.now();
@@ -188,13 +204,14 @@ const StuckQueryDetector = () => {
           stuckCount = 0;
         }
       }
-    }, 5000);
+    }, 5000); // Check every 5 seconds
 
     return () => {
       clearInterval(checkInterval);
       unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [queryClient]);
+  }, [queryClient]); // Apenas queryClient como dependência
 
   return null;
 };

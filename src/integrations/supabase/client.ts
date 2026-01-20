@@ -37,7 +37,15 @@ if (typeof window !== 'undefined') {
 
       if (expiresAt > 0 && (expiresAt - now) < 300) { // 5 min
         console.log('⏰ [Auth] Token perto de expirar, forçando refresh...');
-        await supabase.auth.refreshSession();
+        const { error } = await supabase.auth.refreshSession();
+        if (error) {
+          console.error('❌ [Auth] Erro ao atualizar token:', error);
+          if (error.message.includes('Refresh Token Not Found')) {
+            // Token inválido, forçar logout limpo
+            localStorage.removeItem(`sb-${CURRENT_PROJECT_REF}-auth-token`);
+            window.location.reload();
+          }
+        }
       }
     } catch (e) {
       console.error('❌ [Auth] Erro no check de token:', e);
