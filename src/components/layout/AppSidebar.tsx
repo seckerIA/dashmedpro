@@ -630,6 +630,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                             <NavLink
                               to={item.url}
                               end={item.url === "/"}
+                              onClick={() => setExpandedItems([])}
                               className={`
                                 group relative w-full block
                                 ${isCollapsed ? 'p-2.5' : 'px-4 py-3.5'}
