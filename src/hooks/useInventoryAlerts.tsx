@@ -169,7 +169,7 @@ export function useInventoryAlerts() {
                     lowStock: lowStockCount,
                     alerts,
                 };
-            }, 5000); // 5s timeout
+            }, 15000); // 15s timeout
         },
         enabled: !!user,
         refetchInterval: 60000, // Reduzido de 30s para 60s - menos agressivo

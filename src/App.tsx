@@ -161,13 +161,13 @@ const StuckQueryDetector = () => {
           if (fetchStartTime) {
             const timeSinceStart = now - fetchStartTime;
 
-            // Timeout de detecção ajustado para 8s (menos agressivo para cold starts)
-            const stuckThreshold = 8000;
+            // Timeout de detecção ajustado para 20s (tolerante a redes instáveis)
+            const stuckThreshold = 20000;
 
             if (timeSinceStart > stuckThreshold) {
               stuckQueries.push(query);
               const queryKeyStr = query.queryKey.join('/');
-              console.warn(`⚠️ [StuckQueryDetector] Cancelando query travada (>8s): ${queryKeyStr}`);
+              console.warn(`⚠️ [StuckQueryDetector] Cancelando query travada (>20s): ${queryKeyStr}`);
               // Cancelar força o retry se configurado
               queryClient.cancelQueries({ queryKey: query.queryKey });
               fetchStartTimes.delete(queryKeyStr);

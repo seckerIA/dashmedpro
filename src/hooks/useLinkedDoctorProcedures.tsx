@@ -38,7 +38,7 @@ export function useLinkedDoctorProcedures() {
                     .in('user_id', targetUserIds)
                     .eq('is_active', true)
                     .order('name')) as any,
-                30000
+                15000
             );
 
             if (error) {
@@ -63,6 +63,7 @@ export function useLinkedDoctorProcedures() {
         },
         enabled: !!user?.id && targetUserIds.length > 0,
         staleTime: 5 * 60 * 1000, // 5 minutos
+        placeholderData: (previousData: any) => previousData, // Manter dados anteriores enquanto carrega
     });
 
     return {

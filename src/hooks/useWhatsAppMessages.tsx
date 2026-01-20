@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/components/ui/use-toast';
 import { WHATSAPP_CONVERSATIONS_KEY, WHATSAPP_INBOX_STATS_KEY } from './useWhatsAppConversations';
+import { withQueryTimeout } from '@/lib/queryUtils';
 import type {
   WhatsAppMessage,
   WhatsAppMessageWithRelations,
@@ -38,25 +39,27 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
   const messagesQuery = useInfiniteQuery({
     queryKey: [WHATSAPP_MESSAGES_KEY, conversationId],
     queryFn: async ({ pageParam = 0 }): Promise<WhatsAppMessageWithRelations[]> => {
-      if (!conversationId) return [];
+      return withQueryTimeout(async () => {
+        if (!conversationId) return [];
 
-      const { data, error } = await supabase
-        .from('whatsapp_messages')
-        .select(`
+        const { data, error } = await supabase
+          .from('whatsapp_messages')
+          .select(`
           *,
           media:whatsapp_media(*)
         `)
-        .eq('conversation_id', conversationId)
-        .order('sent_at', { ascending: false })
-        .range(pageParam, pageParam + limit - 1);
+          .eq('conversation_id', conversationId)
+          .order('sent_at', { ascending: false })
+          .range(pageParam, pageParam + limit - 1);
 
-      if (error) {
-        console.error('[useWhatsAppMessages] Error:', error);
-        throw error;
-      }
+        if (error) {
+          console.error('[useWhatsAppMessages] Error:', error);
+          throw error;
+        }
 
-      // Reverter ordem para exibição (mais antigas primeiro)
-      return (data || []).reverse() as WhatsAppMessageWithRelations[];
+        // Reverter ordem para exibição (mais antigas primeiro)
+        return (data || []).reverse() as WhatsAppMessageWithRelations[];
+      }, 15000); // 15s timeout
     },
     getNextPageParam: (lastPage, allPages) => {
       if (lastPage.length < limit) return undefined;
@@ -64,8 +67,8 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
     },
     initialPageParam: 0,
     enabled: enabled && !!conversationId,
-    staleTime: 0, // Mensagens sempre consideradas obsoletas para garantir refetch instantâneo via Realtime
-    refetchInterval: 1000, // Polling a cada 1s para sensação de tempo real
+    staleTime: Infinity, // Mensagens são atualizadas via Realtime ou Mutação
+    refetchOnWindowFocus: false, // Evitar refetch ao trocar de aba
   });
 
   // Flatten all pages into single array in chronological order
