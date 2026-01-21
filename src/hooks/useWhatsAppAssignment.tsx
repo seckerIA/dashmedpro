@@ -86,7 +86,7 @@ export function useWhatsAppAssignment() {
                 .from('whatsapp_assignment_config')
                 .select('*')
                 .eq('user_id', ownerId)
-                .single();
+                .maybeSingle();
 
             if (error && error.code !== 'PGRST116') {
                 console.error('[useWhatsAppAssignment] Config error:', error);
@@ -382,16 +382,17 @@ export function useAssignmentMetrics(secretaryId?: string) {
                 .select('id, status, created_at, updated_at')
                 .eq('assigned_to', targetId);
 
-            const total = conversations?.length || 0;
-            const open = conversations?.filter(c => c.status === 'open').length || 0;
-            const resolved = conversations?.filter(c => c.status === 'resolved').length || 0;
+            const convs = (conversations || []) as any[];
+            const total = convs.length;
+            const open = convs.filter(c => c.status === 'open').length;
+            const resolved = convs.filter(c => c.status === 'resolved').length;
 
             // Buscar do pool para métricas históricas
             const { data: poolEntry } = await supabase
                 .from('whatsapp_assignment_pool')
                 .select('total_assigned, total_resolved, avg_response_time_seconds')
                 .eq('secretary_id', targetId)
-                .single();
+                .maybeSingle();
 
             return {
                 currentOpen: open,
