@@ -37,7 +37,7 @@ export function useUserProfile() {
 
         const { data: profileData, error: profileError } = await supabaseQueryWithTimeout(
           profileQuery as any,
-          15000, // 15 segundos
+          45000, // 45 segundos - mais tempo após idle longo
           signal
         );
 

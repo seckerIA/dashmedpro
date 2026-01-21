@@ -51,7 +51,7 @@ export const useFinancialAccounts = () => {
         }
       }
 
-      const result = await supabaseQueryWithTimeout(query as any, 15000); // Timeout reduzido
+      const result = await supabaseQueryWithTimeout(query as any, 45000); // Timeout aumentado para 45s
       const { data, error } = result;
 
       if (error) throw error;

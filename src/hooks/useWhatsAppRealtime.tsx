@@ -114,11 +114,31 @@ export function useWhatsAppRealtime(options: UseWhatsAppRealtimeOptions = {}) {
 
     // Função para iniciar canal com verificação de token
     const startChannel = async () => {
-      // Double check token antes de conectar
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.warn('[WhatsApp Realtime] No session found, skipping connection.');
-        return;
+      // Double check token antes de conectar - COM TIMEOUT para evitar travamento
+      let session = null;
+      try {
+        const sessionResult = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('getSession timeout')), 5000)
+          ),
+        ]);
+        session = sessionResult.data?.session;
+      } catch (err) {
+        console.warn('[WhatsApp Realtime] getSession timeout/error, proceeding anyway:', err);
+        // Proceed anyway - if token is invalid, the channel will just fail to connect
+        // which is better than hanging forever
+      }
+
+      // Se explicitamente não há sessão (não timeout), não conectar
+      if (session === null) {
+        // Only skip if we got a definitive "no session" answer, not a timeout
+        const { data } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+        if (!data?.session) {
+          console.warn('[WhatsApp Realtime] No session found, skipping connection.');
+          return;
+        }
+        session = data.session;
       }
 
       // Se já existe e está conectado/conectando, não recria

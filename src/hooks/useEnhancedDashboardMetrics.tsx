@@ -248,7 +248,11 @@ export function useEnhancedDashboardMetrics() {
       );
     },
     enabled: !!user?.id && !!profile && !authLoading && !isLoadingProfile && (!isSecretaria || !isLoadingDoctors),
-    staleTime: 2 * 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes - data is fresh for longer
+    gcTime: 15 * 60 * 1000, // 15 minutes in cache
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     retry: 1,
   });
 }

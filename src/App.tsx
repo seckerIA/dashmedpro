@@ -80,6 +80,13 @@ focusManager.setEventListener((handleFocus) => {
     if (document.visibilityState === 'visible') {
       console.log('👁️ [App] Janela focada. Liberando queries imediatamente...');
 
+      // CRITICAL: Resetar contador de concorrência para evitar deadlocks
+      // Se o browser matou conexões no background, o contador pode estar errado.
+      import("@/lib/queryUtils").then(({ resetFetchTracking }) => {
+        resetFetchTracking();
+        console.log('🔓 [App] Travas de concorrência resetadas.');
+      });
+
       // CRITICAL: Liberar queries IMEDIATAMENTE sem nenhuma verificação
       // Após 3h parado, qualquer check pode demorar. Queries que falharem
       // por token inválido serão tratadas pelo error handler global.
@@ -209,17 +216,32 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Route Change Handler - Cancels all queries on navigation to prevent connection pool exhaustion
+// Route Change Handler - Gracefully handles navigation and data refresh
 const RouteChangeHandler = ({ queryClient }: { queryClient: QueryClient }) => {
   const location = useLocation();
   const [prevLocation, setPrevLocation] = React.useState(location.pathname);
 
   React.useEffect(() => {
     if (location.pathname !== prevLocation) {
-      console.log(`🔄 [RouteChange] Navegando de ${prevLocation} para ${location.pathname}. Cancelando todas as queries...`);
+      // Get idle time from idleDetector
+      const now = Date.now();
+      const lastActivity = (window as any).lastActivityTime || now;
+      const idleTime = now - lastActivity;
+      const idleMinutes = Math.floor(idleTime / 60000);
 
-      // Cancel ALL pending queries to free up HTTP connections
+      console.log(`🔄 [RouteChange] Navegando de ${prevLocation} para ${location.pathname}. Idle: ${idleMinutes} min`);
+
+      // REMOVED: Aggressive reload after 30s idle
+      // Instead, cancel pending queries and invalidate all data to get fresh results
+      // This provides a better UX while still ensuring fresh data
+
       queryClient.cancelQueries();
+
+      // If idle for more than 2 minutes, invalidate all queries to get fresh data
+      if (idleTime > 120000) {
+        console.log('📊 [RouteChange] Invalidating stale queries after idle...');
+        queryClient.invalidateQueries();
+      }
 
       setPrevLocation(location.pathname);
     }

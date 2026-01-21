@@ -87,10 +87,10 @@ export const useFinancialTransactions = (filters?: TransactionFilters) => {
       // Usar wrapper com timeout de 30 segundos
       const queryStartTime = Date.now();
       const queryPromise = query;
-      
+
       let data, error;
       try {
-        const result = await supabaseQueryWithTimeout(queryPromise, 15000); // Timeout reduzido
+        const result = await supabaseQueryWithTimeout(queryPromise, 45000); // Timeout aumentado para 45s
         data = result.data;
         error = result.error;
       } catch (err: any) {
@@ -225,7 +225,7 @@ export const useFinancialTransactions = (filters?: TransactionFilters) => {
     mutationFn: async (id: string) => {
       if (!user) throw new Error("Usuário não autenticado");
 
-      const { data, error} = await supabase
+      const { data, error } = await supabase
         .from("financial_transactions")
         .delete()
         .eq("id", id)

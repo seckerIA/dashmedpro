@@ -93,8 +93,8 @@ export function createVisibilityAwareInterval(intervalMs: number): (query: any) 
  * Default query options for better cache utilization and performance
  */
 export const defaultQueryOptions = {
-    staleTime: 5 * 60 * 1000, // 5 minutes - use cached data
-    gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache
+    staleTime: 30 * 60 * 1000, // 30 minutes - use cached data
+    gcTime: 120 * 60 * 1000, // 2 hours - keep in cache
     retry: 2, // Only retry twice for faster failure
     retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 5000),
     refetchOnWindowFocus: false,
@@ -106,8 +106,8 @@ export const defaultQueryOptions = {
  * Query options for real-time/frequently updating data
  */
 export const realtimeQueryOptions = {
-    staleTime: 30 * 1000, // 30 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 60 * 60 * 1000, // 1 hour
     retry: 1, // Fail fast for real-time data
     retryDelay: 1000,
     refetchOnWindowFocus: false,
@@ -119,8 +119,8 @@ export const realtimeQueryOptions = {
  * Query options for static/rarely changing data
  */
 export const staticQueryOptions = {
-    staleTime: 15 * 60 * 1000, // 15 minutes
-    gcTime: 30 * 60 * 1000, // 30 minutes
+    staleTime: 60 * 60 * 1000, // 60 minutes
+    gcTime: 4 * 60 * 60 * 1000, // 4 hours
     retry: 2,
     retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 5000),
     refetchOnWindowFocus: false,

@@ -11,13 +11,10 @@ const FETCH_TIMEOUT_MS = 40000; // 40 seconds
 const fetchWithTimeout: typeof fetch = async (url, options = {}) => {
   const requestId = Math.random().toString(36).substring(7);
   const urlStr = typeof url === 'string' ? url : 'request';
-  const shortUrl = urlStr.split('?')[0].split('/').pop();
-
-  // console.log(`📡 [Fetch:${requestId}] start: ${shortUrl}`); // Uncomment for verbose debug
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => {
-    console.warn(`⏳ [Fetch:${requestId}] Timeout de ${FETCH_TIMEOUT_MS}ms em: ${urlStr}`);
+    // console.warn(`⏳ [Fetch:${requestId}] Timeout de ${FETCH_TIMEOUT_MS}ms`);
     controller.abort();
   }, FETCH_TIMEOUT_MS);
 
@@ -27,50 +24,61 @@ const fetchWithTimeout: typeof fetch = async (url, options = {}) => {
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
-    // console.log(`✅ [Fetch:${requestId}] done: ${shortUrl} (${response.status})`);
     return response;
   } catch (error: any) {
     clearTimeout(timeoutId);
     if (error.name === 'AbortError') {
-      console.error(`❌ [Fetch:${requestId}] Abortado (timeout)`);
       throw new Error(`Timeout de ${FETCH_TIMEOUT_MS}ms excedido`);
     }
-    console.error(`❌ [Fetch:${requestId}] Erro de rede:`, error);
     throw error;
   }
 };
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true, // Re-enabled - the timeout fix should handle slow refreshes
-    storageKey: `sb-${CURRENT_PROJECT_REF}-auth-token`,
-    detectSessionInUrl: false,
-    flowType: 'pkce',
-  },
-  global: {
-    headers: {
-      'apikey': SUPABASE_PUBLISHABLE_KEY,
-    },
-    fetch: fetchWithTimeout, // Use custom fetch with timeout
-  },
-});
+const SUPABASE_CLIENT_KEY = '__SUPABASE_CLIENT__';
 
-// Simple state tracking
+let supabase: ReturnType<typeof createClient<Database>>;
+
+if (typeof window !== 'undefined' && (window as any)[SUPABASE_CLIENT_KEY]) {
+  console.log('♻️ [Supabase] Reusing existing client instance');
+  supabase = (window as any)[SUPABASE_CLIENT_KEY];
+} else {
+  supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    auth: {
+      storage: localStorage,
+      persistSession: true,
+      autoRefreshToken: true,
+      storageKey: `sb-${CURRENT_PROJECT_REF}-auth-token`,
+      detectSessionInUrl: false,
+      flowType: 'pkce',
+    },
+    global: {
+      headers: {
+        'apikey': SUPABASE_PUBLISHABLE_KEY,
+        'Connection': 'close', // FORCE FRESH CONNECTION
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+      fetch: fetchWithTimeout,
+    },
+  });
+
+  if (typeof window !== 'undefined') {
+    (window as any)[SUPABASE_CLIENT_KEY] = supabase;
+  }
+}
+
+export { supabase };
+
 let lastSuccessfulCheck = Date.now();
 
 /**
  * Check token validity and refresh if needed.
  * Returns true if session is valid, false if needs re-login.
- * 
- * CRITICAL: This function has a built-in timeout and will force reload
- * if the refresh takes too long or if the token has been expired for a while.
  */
 export const checkToken = async (): Promise<boolean> => {
   try {
-    // Race between getSession and timeout to prevent hanging after idle
-    // CRITICAL: Reduced from 45s to 5s - if auth is slow, queries should proceed anyway
+    // Race between getSession and timeout
     const sessionResult = await Promise.race([
       supabase.auth.getSession(),
       new Promise<never>((_, reject) =>
@@ -80,7 +88,6 @@ export const checkToken = async (): Promise<boolean> => {
 
     const { data: { session } } = sessionResult;
 
-    // No session = not logged in, redirect to login
     if (!session) {
       console.log('⚠️ [Auth] Sem sessão. Redirecionando para login...');
       forceLoginRedirect();
@@ -91,71 +98,61 @@ export const checkToken = async (): Promise<boolean> => {
     const now = Math.floor(Date.now() / 1000);
     const timeUntilExpiry = expiresAt - now;
 
-    // Token has been expired for MORE than 5 minutes - PREVIOUSLY FORCED RELOAD
-    // UPDATED: Try to refresh first to avoid page reload (User Requirement: "without refreshing")
+    // Token has been expired for MORE than 5 minutes
     if (timeUntilExpiry < -300) {
-      console.log(`🚨 [Auth] Token expirado há ${Math.abs(timeUntilExpiry)}s (>5min). Tentando recuperar sessão...`);
+      console.log(`🚨 [Auth] Token expirado há ${Math.abs(timeUntilExpiry)}s. Tentando recuperar...`);
 
       const refreshResult = await Promise.race([
         refreshSessionSafe(),
-        timeoutPromise(15000, 'Refresh timeout'), // More generous timeout for long idle
+        timeoutPromise(15000, 'Refresh timeout'),
       ]);
 
       if (refreshResult && refreshResult !== 'timeout') {
-        console.log('✅ [Auth] Sessão recuperada com sucesso após longo período inativo.');
         lastSuccessfulCheck = Date.now();
         return true;
       }
 
-      console.warn('❌ [Auth] Falha na recuperação de longo prazo. Agora sim, redirecionando...');
-      // Only force reload if recovery fails completely
-      forcePageReload();
+      console.warn('❌ [Auth] Falha na recuperação. Redirect login.');
+      forceLoginRedirect();
       return false;
     }
 
-    // Token is expired or about to expire - try to refresh with timeout
-    if (timeUntilExpiry < 60) {
-      console.log(`⏰ [Auth] Token ${timeUntilExpiry < 0 ? 'expirado' : 'expirando'}. Tentando refresh...`);
+    // CRITICAL UPDATE: Renew 5 minutes BEFORE expiry
+    if (timeUntilExpiry < 300) {
+      console.log(`⏰ [Auth] Token expirando em ${timeUntilExpiry}s. Renovando...`);
 
-      // Race between refresh and timeout
       const refreshResult = await Promise.race([
         refreshSessionSafe(),
         timeoutPromise(10000, 'Refresh timeout'),
       ]);
 
       if (refreshResult === 'timeout') {
-        // Instead of reloading immediately, try one last check
-        console.warn('⚠️ [Auth] Refresh demorou. Permitindo queries tentarem (fail-soft)...');
+        console.warn('⚠️ [Auth] Refresh demorou (fail-soft)...');
         return true;
       }
 
       if (!refreshResult) {
-        // If refresh explicitly failed (refresh token invalid), then we must redirect
-        console.log('❌ [Auth] Refresh falhou. Redirecionando para login...');
-        forceLoginRedirect();
+        console.log('❌ [Auth] Refresh falhou. Redirecionando...');
+        // O redirecionamento real acontece dentro de refreshSessionSafe se for erro 400
+        // Aqui é fallback
+        if (!window.location.href.includes('/login')) {
+          forceLoginRedirect();
+        }
         return false;
       }
 
-      console.log('✅ [Auth] Token atualizado com sucesso.');
+      console.log('✅ [Auth] Token renovado.');
     }
 
-    // Token is valid
     lastSuccessfulCheck = Date.now();
     return true;
 
   } catch (e) {
-    // CRITICAL FIX: Se getSession timeout (rede lenta após idle),
-    // retornar TRUE para permitir que queries prossigam.
-    // Se o token realmente estiver inválido, as queries falharão com 401
-    // e serão tratadas pelo error handler global do QueryClient.
-    console.warn('⚠️ [Auth] getSession timeout - permitindo queries (fail-soft):', e);
-    return true; // Changed from false to true
+    console.warn('⚠️ [Auth] Check error:', e);
+    return true; // Fail-soft
   }
 };
 
-/**
- * Safe session refresh that won't hang
- */
 const refreshSessionSafe = async (): Promise<boolean> => {
   try {
     const { data, error } = await supabase.auth.refreshSession();
@@ -163,11 +160,17 @@ const refreshSessionSafe = async (): Promise<boolean> => {
     if (error) {
       console.error('❌ [Auth] Erro no refresh:', error.message);
 
-      // If refresh token is invalid, clear and redirect
+      // CRITICAL CHROME FIX: Handle Invalid Refresh Token aggressively
+      // This happens when Chrome sends a stale token after idle
       if (error.message.includes('Refresh Token') ||
         error.message.includes('refresh_token') ||
-        error.message.includes('Invalid')) {
+        error.message.includes('Invalid') ||
+        error.message.includes('not found') ||
+        (error as any).status === 400) {
+
+        console.error('🔥 [Auth] Token revogado/inválido. Limpando sessão e redirecionando...');
         localStorage.removeItem(`sb-${CURRENT_PROJECT_REF}-auth-token`);
+        window.location.href = '/login?reason=session_expired';
         return false;
       }
       return false;
@@ -175,71 +178,40 @@ const refreshSessionSafe = async (): Promise<boolean> => {
 
     return !!data.session;
   } catch (e) {
-    console.error('❌ [Auth] Exceção no refresh:', e);
+    console.error('❌ [Auth] Exceção refresh:', e);
     return false;
   }
 };
 
-/**
- * Create a promise that rejects after timeout
- */
 const timeoutPromise = (ms: number, message: string): Promise<'timeout'> => {
   return new Promise((resolve) => {
     setTimeout(() => resolve('timeout'), ms);
   });
 };
 
-/**
- * Cleanup all Supabase realtime channels
- * CRITICAL: Must be called before reload/redirect to prevent hanging connections
- */
 export const cleanupAllChannels = async (): Promise<void> => {
   try {
     const channels = supabase.getChannels();
-    console.log(`🧹 [Auth] Limpando ${channels.length} canais realtime...`);
-
-    // Remove all channels in parallel with timeout
-    await Promise.race([
-      supabase.removeAllChannels(),
-      new Promise(resolve => setTimeout(resolve, 2000)), // Max 2s para cleanup
-    ]);
-
-    console.log('✅ [Auth] Canais realtime limpos.');
+    if (channels.length > 0) {
+      await Promise.race([
+        supabase.removeAllChannels(),
+        new Promise(resolve => setTimeout(resolve, 2000)),
+      ]);
+      console.log('✅ [Auth] Canais realtime limpos.');
+    }
   } catch (e) {
     console.error('⚠️ [Auth] Erro ao limpar canais:', e);
-    // Continue even if cleanup fails
   }
 };
 
-/**
- * Force page reload - this clears all hanging queries and React state
- */
-const forcePageReload = async () => {
-  if (typeof window !== 'undefined') {
-    console.log('🔄 [Auth] Preparando reload...');
-    await cleanupAllChannels();
-    window.location.reload();
-  }
-};
-
-/**
- * Redirect to login page
- */
 const forceLoginRedirect = async () => {
   if (typeof window !== 'undefined') {
-    console.log('🔒 [Auth] Preparando redirect para login...');
     await cleanupAllChannels();
     localStorage.removeItem(`sb-${CURRENT_PROJECT_REF}-auth-token`);
     window.location.href = '/login';
   }
 };
 
-/**
- * Check if we've been successfully authenticated recently
- */
 export const wasRecentlyAuthenticated = (): boolean => {
-  return (Date.now() - lastSuccessfulCheck) < 60000; // Within last minute
+  return (Date.now() - lastSuccessfulCheck) < 60000;
 };
-
-// NOTA: O auto-refresh de token é gerenciado pelo FocusManager em App.tsx
-// Não duplicar aqui para evitar comportamento inesperado
