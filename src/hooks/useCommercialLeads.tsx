@@ -160,7 +160,11 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
       // 1. Criar no commercial_leads (tabela original deste hook)
       const { data: createdLead, error } = await (supabase
         .from("commercial_leads" as any) as any)
-        .insert({ ...lead, user_id: user.id } as any)
+        .insert({ 
+          ...lead, 
+          user_id: user.id,
+          organization_id: profile?.organization_id
+        } as any)
         .select()
         .single();
 
@@ -198,6 +202,7 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
               email: lead.email || null,
               phone: lead.phone || null,
               user_id: user.id,
+              organization_id: profile?.organization_id,
               origin: lead.origin // Se houver campo origin no contacts, senão ignora
               // notes: lead.notes // Se quiser levar as notas para o contato
             } as any)
@@ -220,6 +225,7 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
               title: lead.name, // Nome do deal geralmente é o nome da pessoa ou "Interesse X"
               contact_id: contactId,
               user_id: user.id,
+              organization_id: profile?.organization_id,
               stage: 'lead_novo', // Forçar entrada no início do pipeline
               value: lead.estimated_value || null,
               description: lead.notes || `Criado via Novo Paciente (Origem: ${lead.origin})`,

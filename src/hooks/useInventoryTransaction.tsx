@@ -2,6 +2,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { useUserProfile } from "./useUserProfile";
 
 export type TransactionType = 'INBOUND_INVOICE' | 'OUTBOUND_SALE' | 'INTERNAL_USE' | 'ADJUSTMENT' | 'LOSS';
 
@@ -26,6 +27,7 @@ export type CreateTransactionParams = {
 
 export function useInventoryTransaction() {
     const { user } = useAuth();
+    const { profile } = useUserProfile();
     const queryClient = useQueryClient();
 
     const createTransaction = useMutation({
@@ -44,7 +46,8 @@ export function useInventoryTransaction() {
                     description: params.description,
                     total_amount: params.items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0),
                     status: 'COMPLETED',
-                    created_by: user.id
+                    created_by: user.id,
+                    organization_id: profile?.organization_id
                 }])
                 .select()
                 .single();
@@ -64,7 +67,8 @@ export function useInventoryTransaction() {
                             batch_number: item.batch_number,
                             expiration_date: item.expiration_date?.toISOString().split('T')[0],
                             quantity: 0, // Será incrementado pelo trigger de movement
-                            is_active: true
+                            is_active: true,
+                            organization_id: profile?.organization_id
                         }])
                         .select()
                         .single();
@@ -85,7 +89,8 @@ export function useInventoryTransaction() {
                         item_id: item.item_id,
                         batch_id: targetBatchId,
                         quantity: item.quantity,
-                        unit_price: item.unit_price
+                        unit_price: item.unit_price,
+                        organization_id: profile?.organization_id
                     }]);
 
                 if (itemError) throw itemError;
@@ -107,7 +112,8 @@ export function useInventoryTransaction() {
                         type: movementType,
                         quantity: Math.abs(item.quantity) * multiplier,
                         description: `Transação #${transaction.invoice_number || transaction.id.slice(0, 8)}`,
-                        created_by: user.id
+                        created_by: user.id,
+                        organization_id: profile?.organization_id
                     }]);
 
                 if (movementError) throw movementError;
@@ -126,6 +132,7 @@ export function useInventoryTransaction() {
                         description: `${isExpense ? 'Compra de Estoque' : 'Venda de Estoque'} - Nota ${params.invoice_number || ''}`,
                         status: 'pendente', // Deixar pendente para confirmação
                         transaction_date: params.transaction_date.toISOString(),
+                        organization_id: profile?.organization_id
                         // category_id: idealmente buscar categoria "Estoque" ou "Custo de Mercadoria"
                     }]);
 

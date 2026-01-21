@@ -160,6 +160,7 @@ export const useFinancialTransactions = (filters?: TransactionFilters) => {
         .insert({
           ...transaction,
           user_id: user.id,
+          organization_id: profile?.organization_id,
         })
         .select()
         .single();

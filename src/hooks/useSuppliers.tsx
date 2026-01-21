@@ -2,6 +2,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { useUserProfile } from "./useUserProfile";
 
 export type Supplier = {
     id: string;
@@ -21,6 +22,7 @@ export type SupplierUpdate = Partial<SupplierInsert>;
 
 export function useSuppliers() {
     const { user } = useAuth();
+    const { profile } = useUserProfile();
     const queryClient = useQueryClient();
 
     const suppliersQuery = useQuery({
@@ -41,7 +43,10 @@ export function useSuppliers() {
         mutationFn: async (supplier: SupplierInsert) => {
             const { data, error } = await supabase
                 .from("inventory_suppliers")
-                .insert([supplier])
+                .insert([{
+                    ...supplier,
+                    organization_id: profile?.organization_id
+                }])
                 .select()
                 .single();
 

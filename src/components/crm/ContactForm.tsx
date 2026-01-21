@@ -107,7 +107,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { createContact, updateContact, createDeal } = useCRM();
-  const { isSecretaria, isAdmin } = useUserProfile();
+  const { profile, isSecretaria, isAdmin } = useUserProfile();
   const { procedures, isLoading: isLoadingProcedures } = useCommercialProcedures();
   const { createLead } = useCommercialLeads();
   const { toast } = useToast();
@@ -241,37 +241,40 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
 
     console.log('📝 ContactForm onSubmit chamado com data:', data);
 
-    // Função auxiliar para criar timeout em promises
-    const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> => {
-      return Promise.race([
-        promise,
-        new Promise<T>((_, reject) =>
-          setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
-        ),
-      ]);
-    };
-
     try {
-      // Forçar refresh da sessão antes de salvar (evita stale connection após idle)
-      await supabase.auth.refreshSession().catch(() => {});
+      console.log('🔄 ContactForm - Iniciando processo de salvamento');
+      
+      // Tentar refresh em background sem bloquear o salvamento
+      supabase.auth.refreshSession().catch(err => console.warn('⚠️ Erro ao atualizar sessão em background:', err));
 
       // Verificar se procedures carregaram
+      console.log('🔍 ContactForm - Status procedures:', { 
+        isLoadingProcedures, 
+        hasProcedures: !!procedures, 
+        count: procedures?.length,
+        hasConsultationProcedure 
+      });
+
       if (isLoadingProcedures) {
+        console.log('⏳ ContactForm - Aguardando carregamento de procedimentos');
         toast({
           variant: "destructive",
           title: "Aguarde",
           description: "Carregando procedimentos...",
         });
+        setIsSubmitting(false);
         return;
       }
 
       // Validação: verificar se há procedimento CONSULTA para novos contatos
       if (!contact && !hasConsultationProcedure) {
+        console.warn('❌ ContactForm - Procedimento "CONSULTA" não encontrado. Bloqueando criação.');
         toast({
           variant: "destructive",
           title: "Valor da consulta não cadastrado",
-          description: "É necessário cadastrar o valor da consulta antes de criar um novo paciente.",
+          description: "É necessário cadastrar o valor da consulta (Procedimento com nome 'CONSULTA') antes de criar um novo paciente.",
         });
+        setIsSubmitting(false);
         return;
       }
 
@@ -351,14 +354,11 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
         };
 
         try {
-          await withTimeout(
-            updateContact({
-              contactId: contact.id,
-              data: updateData,
-            }),
-            30000, // 30 segundos de timeout
-            "Timeout ao atualizar contato. Tente novamente."
-          );
+          console.log('📤 ContactForm - Chamando updateContact');
+          await updateContact({
+            contactId: contact.id,
+            data: updateData,
+          });
 
           toast({
             title: "Contato atualizado",
@@ -391,17 +391,18 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
         let newContact: CRMContact | null = null;
 
         try {
-          // Criar contato com timeout
-          newContact = await withTimeout(
-            createContact(createData as any),
-            30000, // 30 segundos de timeout
-            "Timeout ao criar contato. Tente novamente."
-          );
+          console.log('📤 ContactForm - Chamando createContact:', {
+            hasOrganization: !!profile?.organization_id,
+            organizationId: profile?.organization_id,
+            createData
+          });
 
-          console.log('✅ Contato criado:', {
-            id: newContact.id,
-            custom_fields: newContact.custom_fields,
-            custom_fields_type: typeof newContact.custom_fields,
+          // Chamada direta sem withTimeout para identificar o erro real
+          newContact = await createContact(createData as any);
+
+          console.log('✅ ContactForm - Contato criado com sucesso:', {
+            id: newContact?.id,
+            full_name: newContact?.full_name
           });
 
           // NOTA: Não criamos commercial_lead aqui para evitar duplicação
@@ -421,20 +422,17 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
           const dealStage = "lead_novo";
 
           try {
-            // Criar deal com timeout
-            const newDeal = await withTimeout(
-              createDeal({
-                contact_id: newContact.id,
-                title: contactData.full_name,
-                description: `Contato adicionado automaticamente ao estágio`,
-                stage: dealStage,
-                value: serviceValue || null,
-                probability: 0,
-                assigned_to: data.assigned_to || user.id, // Pass assigned_to
-              }),
-              30000, // 30 segundos de timeout
-              "Timeout ao criar contrato. O contato foi criado, mas o contrato não pôde ser adicionado ao pipeline."
-            );
+            console.log('📤 ContactForm - Chamando createDeal para novo contato');
+            // Criar deal sem withTimeout
+            const newDeal = await createDeal({
+              contact_id: newContact.id,
+              title: contactData.full_name,
+              description: `Contato adicionado automaticamente ao estágio`,
+              stage: dealStage,
+              value: serviceValue || null,
+              probability: 0,
+              assigned_to: data.assigned_to || user?.id, // Pass assigned_to
+            });
 
             console.log('✅ Deal criado:', newDeal);
 
@@ -453,11 +451,11 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
               // Preparar dados para commercial_leads
               // IMPORTANTE: user_id deve ser o DOUTOR RESPONSÁVEL (assigned_to) se houver,
               // caso contrário o criador (user.id). Se o lead ficar com ID da secretária, o médico não vê.
-              const leadOwnerId = data.assigned_to || user.id || newContact.user_id;
+              const leadOwnerId = data.assigned_to || user?.id || newContact.user_id;
 
               const leadData: any = {
                 user_id: leadOwnerId,
-                organization_id: newContact.organization_id, // Add organization_id from contact
+                organization_id: profile?.organization_id || newContact.organization_id,
                 name: newContact.full_name,
                 email: newContact.email || null,
                 phone: newContact.phone || null,
@@ -530,11 +528,11 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
             try {
               console.log('🔄 Criando registro espelho em commercial_leads (sem deal)...');
 
-              const leadOwnerId = data.assigned_to || user.id || newContact.user_id;
+              const leadOwnerId = data.assigned_to || user?.id || newContact.user_id;
 
               const leadData: any = {
                 user_id: leadOwnerId,
-                organization_id: newContact.organization_id, // Add organization_id from contact
+                organization_id: profile?.organization_id || newContact.organization_id,
                 name: newContact.full_name,
                 email: newContact.email || null,
                 phone: newContact.phone || null,
@@ -581,18 +579,17 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
         onSuccess?.();
       }
     } catch (error) {
-      console.error('❌ Erro no onSubmit:', error);
-
-      // Garantir que o formulário sempre feche mesmo em caso de erro
-      // para não travar a UI
-      setOpen(false);
-      form.reset();
+      console.error('❌ ContactForm - Erro fatal no onSubmit:', error);
 
       toast({
         variant: "destructive",
-        title: "Erro",
-        description: error instanceof Error ? error.message : "Erro ao salvar contato",
+        title: "Erro ao salvar",
+        description: error instanceof Error ? error.message : "Erro inesperado ao salvar contato",
       });
+      
+      // NÃO resetar nem fechar o formulário em caso de erro para permitir que o usuário veja os dados e tente novamente
+      // setOpen(false);
+      // form.reset();
     } finally {
       setIsSubmitting(false);
     }

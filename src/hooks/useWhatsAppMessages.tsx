@@ -7,6 +7,7 @@ import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import { toast } from '@/components/ui/use-toast';
 import { WHATSAPP_CONVERSATIONS_KEY, WHATSAPP_INBOX_STATS_KEY } from './useWhatsAppConversations';
 import { withQueryTimeout } from '@/lib/queryUtils';
@@ -32,6 +33,7 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
   const { conversationId, limit = 50, enabled = true } = options;
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { profile } = useUserProfile();
 
   // =========================================
   // Query: Lista de mensagens (paginada)
@@ -118,6 +120,7 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
       // Criar mensagem no banco (status: sending)
       const messageData: WhatsAppMessageInsert = {
         user_id: conversation.user_id,
+        organization_id: profile?.organization_id,
         conversation_id: payload.conversation_id,
         phone_number: conversation.phone_number,
         content: payload.content,
@@ -211,6 +214,7 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
         .from('whatsapp_messages' as any)
         .insert({
           user_id: conversation.user_id,
+          organization_id: profile?.organization_id,
           conversation_id: payload.conversation_id,
           phone_number: conversation.phone_number,
           content: payload.caption || `[${payload.media_type}]`,
@@ -332,6 +336,7 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
         .from('whatsapp_messages' as any)
         .insert({
           user_id: conversation.user_id,
+          organization_id: profile?.organization_id,
           conversation_id: payload.conversation_id,
           phone_number: conversation.phone_number,
           content: preview,

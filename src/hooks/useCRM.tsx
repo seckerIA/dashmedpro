@@ -50,7 +50,6 @@ const fetchDeals = async (
   doctorIds?: string[],
   fetchAll?: boolean
 ): Promise<CRMDealWithContact[]> => {
-  // ... (unchanged code) ...
   const shouldFilterByUser = !fetchAll && (!viewAsUserIds || viewAsUserIds.length === 0);
 
   let orCondition = '';
@@ -117,23 +116,63 @@ const fetchDeals = async (
   return (dealsData || []).map(deal => ({ ...deal, owner_profile: null, assigned_to_profile: null })) as CRMDealWithContact[];
 };
 
-// ... mutations ...
-
 const createRecord = async (table: string, payload: any) => {
-  const { data, error } = await (supabase.from(table as any).insert(payload) as any).select().single();
-  if (error) throw error;
+  console.log(`📥 [createRecord] Inserindo em ${table}:`, payload);
+
+  const insertPromise = (supabase.from(table as any).insert(payload) as any).select().single();
+
+  // Timeout de 30 segundos para evitar travamento
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(`Timeout ao inserir em ${table} (30s)`)), 30000)
+  );
+
+  const { data, error } = await Promise.race([insertPromise, timeoutPromise]) as any;
+
+  if (error) {
+    console.error(`❌ [createRecord] Erro ao inserir em ${table}:`, error);
+    throw error;
+  }
+  console.log(`✅ [createRecord] Inserido com sucesso em ${table}:`, data);
   return data;
 };
 
 const updateRecord = async (table: string, id: string, payload: any) => {
-  const { data, error } = await (supabase.from(table as any).update(payload).eq('id', id) as any).select().single();
-  if (error) throw error;
+  console.log(`📝 [updateRecord] Atualizando ${table} id=${id}:`, payload);
+
+  const updatePromise = (supabase.from(table as any).update(payload).eq('id', id) as any).select().single();
+
+  // Timeout de 30 segundos
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(`Timeout ao atualizar ${table} (30s)`)), 30000)
+  );
+
+  const { data, error } = await Promise.race([updatePromise, timeoutPromise]) as any;
+
+  if (error) {
+    console.error(`❌ [updateRecord] Erro ao atualizar ${table}:`, error);
+    throw error;
+  }
+  console.log(`✅ [updateRecord] Atualizado com sucesso ${table}:`, data);
   return data;
 };
 
 const deleteRecord = async (table: string, id: string) => {
-  const { error } = await supabase.from(table as any).delete().eq('id', id);
-  if (error) throw error;
+  console.log(`🗑️ [deleteRecord] Deletando ${table} id=${id}`);
+
+  const deletePromise = supabase.from(table as any).delete().eq('id', id);
+
+  // Timeout de 30 segundos
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(`Timeout ao deletar ${table} (30s)`)), 30000)
+  );
+
+  const { error } = await Promise.race([deletePromise, timeoutPromise]) as any;
+
+  if (error) {
+    console.error(`❌ [deleteRecord] Erro ao deletar ${table}:`, error);
+    throw error;
+  }
+  console.log(`✅ [deleteRecord] Deletado com sucesso ${table} id=${id}`);
 };
 
 export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = false) {
@@ -143,21 +182,17 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
   const queryClient = useQueryClient();
 
   // Se for secretaria, passamos doctorIds, mas AGORA vamos usar fetchAll=true também
-  // O comportamento antigo era filtrar apenas pelos doctorIds.
   const doctorIdsToUse = isSecretaria ? doctorIds : [];
 
   // Check permission to view all
   const canViewAll = profile?.role === 'admin' || profile?.role === 'dono' || isSecretaria;
 
-  // Get organization from useAuth to include in creations
-  const { organization } = useAuth();
-
   const { data: contacts = [], isLoading: isLoadingContacts, refetch: refetchContacts } = useQuery({
     queryKey: ['crm-contacts', user?.id, fetchAllContacts, doctorIdsToUse],
     queryFn: ({ signal }) => fetchContacts(user?.id || '', fetchAllContacts, signal, doctorIdsToUse),
     enabled: !!user?.id || fetchAllContacts || doctorIdsToUse.length > 0,
-    staleTime: 5 * 60 * 1000, // 5 minutes - use cached data
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
   });
@@ -166,28 +201,37 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
     queryKey: ['crm-deals', user?.id, viewAsUserIds?.join(','), doctorIdsToUse, canViewAll],
     queryFn: ({ signal }) => fetchDeals(user?.id || '', viewAsUserIds, signal, doctorIdsToUse, canViewAll),
     enabled: !!user?.id || doctorIdsToUse.length > 0,
-    staleTime: 5 * 60 * 1000, // 5 minutes - use cached data
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
   });
 
   const createContactMutation = useMutation({
-    mutationFn: (data: any) => createRecord('crm_contacts', {
-      ...data,
-      user_id: user?.id,
-      organization_id: organization?.id // Add organization_id
-    }),
+    mutationFn: (data: any) => {
+      const payload = {
+        ...data,
+        user_id: user?.id,
+        organization_id: profile?.organization_id
+      };
+      console.log('🚀 useCRM - Executando createContactMutation com payload:', payload);
+      return createRecord('crm_contacts', payload);
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['crm-contacts'] }),
+    onError: (error) => console.error('❌ createContactMutation error:', error),
   });
 
   const createDealMutation = useMutation({
-    mutationFn: (data: any) => createRecord('crm_deals', {
-      ...data,
-      user_id: user?.id,
-      organization_id: organization?.id // Add organization_id
-    }),
+    mutationFn: (data: any) => {
+      console.log('🚀 useCRM - Executando createDealMutation com payload:', data);
+      return createRecord('crm_deals', {
+        ...data,
+        user_id: user?.id,
+        organization_id: profile?.organization_id
+      });
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['crm-deals'] }),
+    onError: (error) => console.error('❌ createDealMutation error:', error),
   });
 
   const updateDealMutation = useMutation({
@@ -230,11 +274,11 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
     if (existing?.length > 0) {
       contact = existing[0];
     } else {
-      contact = await createRecord('crm_contacts', {
-        user_id: user.id,
-        full_name: contactName || `WhatsApp ${phoneNumber}`,
-        phone: phoneNumber,
-        organization_id: organization?.id // Add organization_id
+      contact = await createRecord('crm_contacts', { 
+        user_id: user.id, 
+        organization_id: profile?.organization_id,
+        full_name: contactName || `WhatsApp ${phoneNumber}`, 
+        phone: phoneNumber 
       });
     }
 
@@ -246,13 +290,13 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
     if (existingDeals?.length > 0) {
       deal = await updateRecord('crm_deals', existingDeals[0].id, { stage: targetStage, value: value || undefined });
     } else {
-      deal = await createRecord('crm_deals', {
-        user_id: user.id,
-        contact_id: contact.id,
-        title: contactName || `Lead WhatsApp ${phoneNumber}`,
-        stage: targetStage,
-        value: value || null,
-        organization_id: organization?.id // Add organization_id
+      deal = await createRecord('crm_deals', { 
+        user_id: user.id, 
+        organization_id: profile?.organization_id,
+        contact_id: contact.id, 
+        title: contactName || `Lead WhatsApp ${phoneNumber}`, 
+        stage: targetStage, 
+        value: value || null 
       });
     }
 

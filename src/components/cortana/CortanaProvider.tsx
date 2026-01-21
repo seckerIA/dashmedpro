@@ -265,10 +265,12 @@ export function CortanaProvider({ children }: { children: React.ReactNode }) {
   // Hotkey listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (!CORTANA_CONFIG.hotkey || !e.key) return;
+
       const { key, ctrlKey, shiftKey } = CORTANA_CONFIG.hotkey;
 
       if (
-        e.key.toLowerCase() === key.toLowerCase() &&
+        e.key.toLowerCase() === (key?.toLowerCase() || 'c') &&
         e.ctrlKey === ctrlKey &&
         e.shiftKey === shiftKey
       ) {

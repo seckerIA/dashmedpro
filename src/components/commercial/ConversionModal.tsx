@@ -24,6 +24,7 @@ import { Loader2, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCRM } from "@/hooks/useCRM";
 import { useCommercialLeads } from "@/hooks/useCommercialLeads";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { INSURANCE_TYPES, PATIENT_GENDERS, HealthInsuranceType, PatientGender } from "@/types/crm";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -64,6 +65,7 @@ export function ConversionModal({
   const { toast } = useToast();
   const { createContact } = useCRM();
   const { convertLead } = useCommercialLeads();
+  const { profile } = useUserProfile();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
@@ -164,6 +166,7 @@ export function ConversionModal({
           if (categories && categories.length > 0 && accounts && accounts.length > 0) {
             await supabase.from("financial_transactions").insert({
               user_id: user.id,
+              organization_id: profile?.organization_id,
               contact_id: newContact.id,
               category_id: categories[0].id,
               account_id: accounts[0].id,

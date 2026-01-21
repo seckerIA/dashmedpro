@@ -15,6 +15,7 @@ interface Profile {
   updated_at: string;
   invited_by: string | null;
   doctor_id: string | null;
+  organization_id: string | null;
 }
 
 export function useUserProfile() {

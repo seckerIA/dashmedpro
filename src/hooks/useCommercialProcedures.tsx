@@ -101,7 +101,11 @@ export function useCommercialProcedures(viewAsUserIds?: string[]) {
 
       const { data, error } = await supabase
         .from("commercial_procedures")
-        .insert({ ...procedure, user_id: procedure.user_id || user.id })
+        .insert({ 
+          ...procedure, 
+          user_id: procedure.user_id || user.id,
+          organization_id: profile?.organization_id
+        })
         .select()
         .single();
 

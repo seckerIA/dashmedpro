@@ -13,6 +13,7 @@ export interface Database {
         Row: {
           id: string
           user_id: string
+          organization_id: string | null
           full_name: string
           email: string | null
           phone: string | null
@@ -39,6 +40,7 @@ export interface Database {
         Insert: {
           id?: string
           user_id: string
+          organization_id?: string | null
           full_name: string
           email?: string | null
           phone?: string | null
@@ -65,6 +67,7 @@ export interface Database {
         Update: {
           id?: string
           user_id?: string
+          organization_id?: string | null
           full_name?: string
           email?: string | null
           phone?: string | null
@@ -93,6 +96,7 @@ export interface Database {
         Row: {
           id: string
           user_id: string
+          organization_id: string | null
           contact_id: string
           title: string
           value: number | null
@@ -110,6 +114,7 @@ export interface Database {
         Insert: {
           id?: string
           user_id: string
+          organization_id?: string | null
           contact_id: string
           title: string
           value?: number | null
@@ -127,6 +132,7 @@ export interface Database {
         Update: {
           id?: string
           user_id?: string
+          organization_id?: string | null
           contact_id?: string
           title?: string
           value?: number | null

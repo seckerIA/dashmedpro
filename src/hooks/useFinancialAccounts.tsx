@@ -82,7 +82,7 @@ export const useFinancialAccounts = () => {
 
       // Garantir que temos o organization_id do perfil
       if (!profile) throw new Error("Perfil não carregado. Tente novamente.");
-      const orgId = (profile as any).organization_id;
+      const orgId = profile.organization_id;
 
       if (!orgId) {
         console.error('❌ Erro: Profile sem organization_id', profile);
@@ -94,7 +94,7 @@ export const useFinancialAccounts = () => {
         .insert({
           ...account,
           user_id: user.id,
-          organization_id: orgId, // Adicionar organization_id para satisfazer RLS
+          organization_id: orgId,
           current_balance: account.initial_balance || 0,
         })
         .select()

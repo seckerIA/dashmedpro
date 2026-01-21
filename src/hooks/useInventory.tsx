@@ -1,11 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { useUserProfile } from "./useUserProfile";
 import { useToast } from "./use-toast";
 import { InventoryItem, InventoryItemInsert, InventoryItemUpdate, InventoryBatch, InventoryBatchInsert, InventoryMovement } from "@/types/inventory";
 
 export const useInventory = () => {
     const { user } = useAuth();
+    const { profile } = useUserProfile();
     const { toast } = useToast();
     const queryClient = useQueryClient();
 
@@ -42,7 +44,11 @@ export const useInventory = () => {
 
             const { data, error } = await supabase
                 .from("inventory_items")
-                .insert([{ ...newItem, user_id: user.id } as any])
+                .insert([{ 
+                    ...newItem, 
+                    user_id: user.id,
+                    organization_id: profile?.organization_id
+                } as any])
                 .select()
                 .single();
             if (error) throw error;
@@ -81,7 +87,10 @@ export const useInventory = () => {
             // 1. Criar Lote
             const { data: newBatch, error: batchError } = await supabase
                 .from("inventory_batches")
-                .insert([batch as any])
+                .insert([{
+                    ...batch,
+                    organization_id: profile?.organization_id
+                } as any])
                 .select()
                 .single();
 
@@ -96,6 +105,7 @@ export const useInventory = () => {
                         type: 'IN',
                         quantity: batch.quantity,
                         created_by: user?.id,
+                        organization_id: profile?.organization_id,
                         description: 'Entrada Inicial de Lote'
                     } as any]);
 
@@ -122,17 +132,9 @@ export const useInventory = () => {
                 .insert([{
                     batch_id: batchId,
                     type,
-                    quantity, // Positive or negative depending on type? 
-                    // Logic: 
-                    // IN: +qty
-                    // OUT: -qty
-                    // LOSS: -qty
-                    // ADJUST: qty (can be + or -) - actually usually adjust sets absolute value, but our table uses delta.
-                    // For logic simplicity here, caller must send signed quantity or we handle standard logic:
-                    // Here we will implement standard logic helpers if needed, but for now assuming caller sends correct signed int.
-                    // To be safe: OUT and LOSS should be negative. IN should be positive.
-
+                    quantity,
                     created_by: user?.id,
+                    organization_id: profile?.organization_id,
                     description
                 } as any]);
 
