@@ -69,6 +69,7 @@ import VOIPSettings from "@/pages/VOIPSettings";
 
 import { focusManager } from "@tanstack/react-query";
 import { checkToken, supabase, wasRecentlyAuthenticated } from "@/integrations/supabase/client";
+import { recoverStuckQueries } from "@/lib/queryUtils";
 
 // Configuração customizada de Foco da Janela (não-bloqueante mas segura)
 focusManager.setEventListener((handleFocus) => {
@@ -191,6 +192,18 @@ const queryClient = new QueryClient({
   },
 });
 
+// ============================================================
+// QUERY RECOVERY TIMER (Nível de Módulo)
+// Detecta e reseta queries travadas a cada 5 segundos
+// ============================================================
+if (typeof window !== 'undefined') {
+  setInterval(() => {
+    const recovered = recoverStuckQueries(queryClient, 5000); // 5s timeout
+    if (recovered > 0) {
+      console.log(`🔄 [QueryRecovery] Recuperadas ${recovered} queries travadas`);
+    }
+  }, 5000); // Verificar a cada 5s
+}
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {

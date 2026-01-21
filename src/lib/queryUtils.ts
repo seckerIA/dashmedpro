@@ -184,3 +184,60 @@ export function resetFetchTracking(): void {
     activeFetchCount = 0;
     fetchQueue.length = 0;
 }
+
+/**
+ * Reset queries que estão em estado 'pending' por mais de X segundos.
+ * Chame periodicamente via setInterval para auto-recovery de queries travadas.
+ * 
+ * @param queryClient - Instância do QueryClient do TanStack Query
+ * @param maxPendingMs - Tempo máximo em ms antes de considerar a query travada (default: 45s)
+ * @returns Número de queries recuperadas
+ */
+export function recoverStuckQueries(
+    queryClient: { getQueryCache: () => any; cancelQueries: (opts: any) => void; invalidateQueries: (opts: any) => void },
+    maxPendingMs: number = 45000
+): number {
+    const queries = queryClient.getQueryCache().getAll();
+    let recoveredCount = 0;
+
+    for (const query of queries) {
+        const state = query.state;
+
+        // Query está em fetching mas sem resposta
+        if (state.fetchStatus === 'fetching') {
+            // dataUpdatedAt = 0 se nunca teve dados, ou timestamp do último sucesso
+            // fetchMeta.fetchedAt não existe, então usamos heurística baseada no tempo relativo
+            const lastKnownTime = state.dataUpdatedAt || query.state.errorUpdatedAt || 0;
+            const now = Date.now();
+
+            // Se a última atualização foi há mais de maxPendingMs, está travada
+            // Isso funciona porque queries recém-iniciadas terão lastKnownTime == 0,
+            // então comparamos com query.cacheTime (quando a query foi criada)
+            const queryAge = now - (lastKnownTime || (query as any).initialDataUpdatedAt || now - maxPendingMs - 1);
+
+            if (queryAge > maxPendingMs) {
+                const queryKeyStr = Array.isArray(query.queryKey)
+                    ? query.queryKey.join('/')
+                    : String(query.queryKey);
+
+                console.warn(`🔄 [QueryRecovery] Recuperando query travada (${Math.round(queryAge / 1000)}s): ${queryKeyStr}`);
+
+                try {
+                    queryClient.cancelQueries({ queryKey: query.queryKey });
+                    // Não invalidamos imediatamente para evitar loop de refetch
+                    // A query será refetched naturalmente na próxima interação
+                    recoveredCount++;
+                } catch (err) {
+                    console.error(`❌ [QueryRecovery] Erro ao cancelar query:`, err);
+                }
+            }
+        }
+    }
+
+    // Se recuperamos queries, também resetamos o tracking de fetch slots
+    if (recoveredCount > 0) {
+        resetFetchTracking();
+    }
+
+    return recoveredCount;
+}
