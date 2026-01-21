@@ -70,8 +70,9 @@ export async function supabaseQueryWithTimeout<T>(
 
   } catch (error: any) {
     clearTimeout(timeoutId);
-    if (error.name === 'AbortError' || error.message?.includes('Timeout')) {
-      // Já logado ou esperado
+    // AbortError é comportamento normal de navegação/remontagem - não logar
+    if (error.name === 'AbortError' || error.message?.includes('AbortError') || error.message?.includes('Timeout') || error.message?.includes('cancelada')) {
+      // Silencioso - é esperado durante navegação
     } else {
       console.error(`❌ [TimeoutWrapper] ERRO em ${queryDesc}:`, error);
     }

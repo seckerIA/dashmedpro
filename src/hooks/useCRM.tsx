@@ -85,6 +85,10 @@ const fetchDeals = async (
   );
 
   if (error) {
+    // Ignorar AbortError - é comportamento normal de navegação/remontagem
+    if (error.message?.includes('AbortError') || error.code === '20') {
+      return []; // Retorna vazio silenciosamente
+    }
     console.error('❌ Erro no PostgREST crm_deals:', error);
     // Fallback absoluto sem subquery
     // Se não tiver orCondition, é fetchAll -> sem filtro .or()
