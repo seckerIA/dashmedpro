@@ -78,31 +78,26 @@ focusManager.setEventListener((handleFocus) => {
     if (document.visibilityState === 'visible') {
       console.log('👁️ [App] Janela focada. Verificando sessão antes de liberar queries...');
 
-      // Se verificou recentemente (< 1 min), libera imediatamente
+      // CRITICAL FIX: Liberar queries IMEDIATAMENTE.
+      // Não podemos esperar o checkToken pois ele pode demorar 45s em redes lentas,
+      // causando a sensação de "travamento" na UI.
+      handleFocus();
+
+      // Se verificou recentemente, não precisa checar de novo
       if (wasRecentlyAuthenticated()) {
-        console.log('⚡ [App] Sessão verificada recentemente. Liberando queries imediatamente.');
-        handleFocus();
         return;
       }
 
-      // Caso contrário, verifica token primeiro para evitar 401 ou loop
-      checkToken()
-        .then((isValid) => {
-          if (isValid) {
-            console.log('✅ [App] Token válido após check. Liberando queries.');
-          } else {
-            console.warn('⚠️ [App] Check de token falhou, mas liberando queries para evitar travamento. (Erros 401 serão capturados globalmente)');
-          }
-        })
-        .catch(err => {
-          console.error('⚠️ [App] Erro ao verificar token no focus:', err);
-        })
-        .finally(() => {
-          // SEMPRE liberar o foco. Se o token estiver inválido, as queries falharão com 401
-          // e o QueryCache global tratará isso (forcing reload/login).
-          // Não podemos deixar o app "pausado" silenciosamente.
-          handleFocus();
-        });
+      // Verifica token em background (sem travar a UI)
+      checkToken().then((isValid) => {
+        if (!isValid) {
+          console.warn('⚠️ [App] Sessão inválida detectada em background (queries podem falhar com 401).');
+        } else {
+          console.log('✅ [App] Sessão confirmada em background.');
+        }
+      }).catch(err => {
+        console.error('⚠️ [App] Erro no check de background:', err);
+      });
     }
   };
 
