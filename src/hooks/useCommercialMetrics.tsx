@@ -542,11 +542,22 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         ? ((sales?.length || 0) / completedAppointments.length) * 100
         : 0;
 
-      // Use status do lead para conversão geral se não houver registros na tabela de vendas
-      const overallConversion = totalLeads > 0
+      // Leads perdidos (status que indicam perda)
+      const lostLeadsCount = leads?.filter(l =>
+        l.status === 'lost' ||
+        l.status === 'perdido' ||
+        l.status === 'fechado_perdido' ||
+        l.status === 'cancelado' ||
+        l.status === 'desqualificado'
+      ).length || 0;
+
+      // Taxa de sucesso: leads convertidos / leads finalizados (convertidos + perdidos)
+      // Ignora leads em andamento para dar uma visão real da eficácia de fechamento
+      const totalFinalizedLeads = convertedLeadsCount + lostLeadsCount;
+      const overallConversion = totalFinalizedLeads > 0
         ? (sales?.length && sales.length > 0)
-          ? (sales.length / totalLeads) * 100
-          : (convertedLeadsCount / totalLeads) * 100
+          ? (sales.length / totalFinalizedLeads) * 100
+          : (convertedLeadsCount / totalFinalizedLeads) * 100
         : 0;
 
       // Buscar procedimentos do catálogo (total de procedimentos ativos cadastrados) - MOVER PARA ANTES DO LOG

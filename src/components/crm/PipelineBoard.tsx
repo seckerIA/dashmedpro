@@ -17,16 +17,19 @@ import {
   DragOverEvent,
   DragStartEvent,
   PointerSensor,
+  KeyboardSensor,
   useSensor,
   useSensors,
   DragOverlay,
   closestCenter,
   useDroppable,
+  MeasuringStrategy,
 } from "@dnd-kit/core";
 import {
   SortableContext,
   verticalListSortingStrategy,
   arrayMove,
+  sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
 import {
   useSortable,
@@ -74,10 +77,11 @@ function SortableDealCard({
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition: isDragging ? 'none' : (transition || 'transform 150ms cubic-bezier(0.4, 0, 0.2, 1)'),
-    opacity: isDragging ? 0.4 : 1,
+    transition: isDragging ? 'none' : (transition || 'transform 80ms ease-out'),
+    opacity: isDragging ? 0.5 : 1,
     cursor: isDragging ? 'grabbing' : 'grab',
-    zIndex: isDragging ? 1 : 'auto',
+    zIndex: isDragging ? 1000 : 'auto',
+    willChange: isDragging ? 'transform' : 'auto',
   };
 
   return (
@@ -163,10 +167,21 @@ export function PipelineBoard({
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 5, // Reduzido para melhor responsividade
+        distance: 3, // Mais responsivo
+        tolerance: 5,
       },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+
+  // Configuração de medição otimizada para fluidez
+  const measuringConfig = {
+    droppable: {
+      strategy: MeasuringStrategy.Always,
+    },
+  };
 
   // Memoizar deals por stage para evitar recálculos
   const dealsByStage = useMemo(() => {
@@ -320,9 +335,9 @@ export function PipelineBoard({
     return (
       <Card
         ref={setNodeRef}
-        className={`flex-shrink-0 w-80 bg-gradient-to-br from-card to-card/50 border-2 shadow-card transition-all duration-150 ${isOver
-            ? 'border-primary shadow-glow ring-2 ring-primary/20 scale-[1.02]'
-            : 'border-border hover:shadow-lg'
+        className={`flex-shrink-0 w-80 bg-gradient-to-br from-card to-card/50 border-2 shadow-card transition-all duration-100 ease-out ${isOver
+          ? 'border-primary shadow-glow ring-2 ring-primary/20 scale-[1.01]'
+          : 'border-border hover:shadow-lg'
           }`}
         style={{
           width: '320px',
@@ -330,6 +345,8 @@ export function PipelineBoard({
           minWidth: '320px',
           boxSizing: 'border-box',
           overflow: 'hidden',
+          transform: 'translateZ(0)', // GPU acceleration
+          willChange: isOver ? 'transform, box-shadow' : 'auto',
         }}
       >
         {children}
@@ -344,6 +361,7 @@ export function PipelineBoard({
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
+      measuring={measuringConfig}
     >
       <div className="flex gap-4 overflow-x-auto pb-4">
         {PIPELINE_STAGES.map((stage) => {
@@ -441,22 +459,24 @@ export function PipelineBoard({
 
       <DragOverlay
         dropAnimation={{
-          duration: 200,
-          easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+          duration: 150,
+          easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
         }}
         style={{
           zIndex: 9999,
         }}
+        wrapperElement="div"
       >
         {activeDeal ? (
           <div
-            className="rotate-2 opacity-100"
+            className="rotate-1"
             style={{
-              transform: 'scale(1.08) translateZ(0)',
-              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.4)',
+              transform: 'scale(1.03) translateZ(0)',
+              boxShadow: '0 15px 35px rgba(0, 0, 0, 0.25), 0 5px 15px rgba(0, 0, 0, 0.1)',
               cursor: 'grabbing',
-              transition: 'none',
+              transition: 'box-shadow 100ms ease-out',
               willChange: 'transform',
+              backfaceVisibility: 'hidden',
             }}
           >
             <AnimatedDealCard

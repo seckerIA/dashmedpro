@@ -126,10 +126,11 @@ const fetchDashboardMetrics = async (
       return sum + (value || 0);
     }, 0);
 
-  // Taxa de conversão: deals ganhos / total de deals (incluindo ativos, ganhos e perdidos)
-  // Garantir que não haja divisão por zero e que o resultado seja um número válido
-  const conversionRate = dealsData.length > 0
-    ? Math.round((wonDeals / dealsData.length) * 100 * 100) / 100 // Arredondar para 2 casas decimais
+  // Taxa de sucesso: deals ganhos / deals finalizados (ganhos + perdidos)
+  // Ignora deals em andamento para dar uma visão real da eficácia de fechamento
+  const totalFinalized = wonDeals + lostDeals;
+  const conversionRate = totalFinalized > 0
+    ? Math.round((wonDeals / totalFinalized) * 100 * 100) / 100 // Arredondar para 2 casas decimais
     : 0;
 
   // Calcular deals por estágio

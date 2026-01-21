@@ -66,7 +66,7 @@ export function AnimatedDealCard({
   };
 
   const cardClasses = `
-    relative overflow-visible transition-all duration-200 ease-out cursor-pointer border-2
+    relative overflow-visible transition-all duration-100 ease-out cursor-pointer border-2
     ${isHovered ? 'shadow-glow scale-[1.01] -translate-y-0.5 border-primary/60' : 'shadow-card hover:shadow-lg border-border/40'}
     ${isHighlighted ? 'ring-2 ring-primary shadow-glow scale-[1.01] -translate-y-0.5 bg-gradient-to-br from-primary/10 to-primary/5' : 'bg-gradient-to-br from-card/80 to-card/40'}
     ${getStageColor(deal.stage)}
@@ -105,6 +105,9 @@ export function AnimatedDealCard({
         overflow: 'hidden',
         position: 'relative',
         zIndex: isHovered ? 100 : 1,
+        transform: 'translateZ(0)', // GPU acceleration
+        willChange: isHovered ? 'transform, box-shadow' : 'auto',
+        backfaceVisibility: 'hidden',
       }}
     >
       {/* Animated background gradient */}

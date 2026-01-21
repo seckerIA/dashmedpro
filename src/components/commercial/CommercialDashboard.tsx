@@ -6,7 +6,7 @@ import { ConversionFunnel } from "./ConversionFunnel";
 import { RevenueChart } from "./RevenueChart";
 import { RevenueDistributionCard } from "./RevenueDistributionCard";
 import { Button } from "@/components/ui/button";
-import { Plus, Calendar, AlertTriangle, TrendingUp, ArrowRight } from "lucide-react";
+import { Plus, Calendar, AlertTriangle, TrendingUp, ArrowRight, ChevronDown, ChevronUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useCommercialMetrics } from "@/hooks/useCommercialMetrics";
 import { useBottleneckMetrics } from "@/hooks/useBottleneckMetrics";
@@ -34,6 +34,7 @@ export function CommercialDashboard() {
     return false;
   });
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [showAllBottlenecks, setShowAllBottlenecks] = useState(false);
 
   // Carregar estado do localStorage detalhado
   useEffect(() => {
@@ -179,33 +180,79 @@ export function CommercialDashboard() {
         </AnimatedWrapper>
       )}
 
-      {/* Alertas de Gargalo */}
+      {/* Alertas de Gargalo - Compacto */}
       {!isLoadingBottlenecks && bottlenecks && bottlenecks.bottlenecks && bottlenecks.bottlenecks.length > 0 && (
         <AnimatedWrapper animationType="slideDown" delay={0.15}>
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-lg font-semibold text-foreground">
-                <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-                Gargalos Identificados
-                <Badge variant="outline" className="ml-2">
+              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                Gargalos
+                <Badge variant="outline" className="text-xs">
                   {bottlenecks.bottlenecks.length}
                 </Badge>
               </div>
-              {bottlenecks.summary && (
-                <Badge
-                  variant={bottlenecks.summary.healthScore >= 70 ? "default" : "destructive"}
-                  className="text-sm"
-                >
-                  Saúde: {bottlenecks.summary.healthScore}/100
-                </Badge>
-              )}
+              <div className="flex items-center gap-2">
+                {bottlenecks.summary && (
+                  <Badge
+                    variant={bottlenecks.summary.healthScore >= 70 ? "default" : "destructive"}
+                    className="text-xs"
+                  >
+                    Saúde: {bottlenecks.summary.healthScore}/100
+                  </Badge>
+                )}
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {bottlenecks.bottlenecks.slice(0, 4).map((bottleneck, index) => (
-                <AnimatedWrapper key={bottleneck.id} animationType="slideUp" delay={0.2 + index * 0.05}>
-                  <BottleneckCard bottleneck={bottleneck} />
-                </AnimatedWrapper>
+            {/* Mostrar gargalos - 2 por padrão ou todos se expandido */}
+            <div className={showAllBottlenecks ? "grid grid-cols-1 md:grid-cols-2 gap-3" : "flex gap-3 overflow-x-auto pb-2"}>
+              {bottlenecks.bottlenecks.slice(0, showAllBottlenecks ? undefined : 2).map((bottleneck, index) => (
+                <div
+                  key={bottleneck.id}
+                  className={`${showAllBottlenecks ? '' : 'flex-shrink-0 min-w-[280px] max-w-[320px]'} p-3 rounded-lg border bg-card/50 hover:bg-card transition-colors cursor-pointer`}
+                  onClick={() => bottleneck.actionUrl && navigate(bottleneck.actionUrl)}
+                >
+                  <div className="flex items-start gap-2">
+                    <Badge
+                      variant={bottleneck.severity === 'high' ? 'destructive' : 'outline'}
+                      className="text-xs shrink-0"
+                    >
+                      {bottleneck.severity === 'high' ? 'Crítico' : bottleneck.severity === 'medium' ? 'Atenção' : 'Moderado'}
+                    </Badge>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{bottleneck.title}</p>
+                      <p className={`text-xs text-muted-foreground ${showAllBottlenecks ? '' : 'line-clamp-1'}`}>{bottleneck.suggestion}</p>
+                      {showAllBottlenecks && bottleneck.impact && (
+                        <p className="text-xs text-muted-foreground mt-1 italic">Impacto: {bottleneck.impact}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
               ))}
+            </div>
+
+            {/* Botão Ver mais/Ver menos - sempre visível */}
+            <div className="flex justify-center pt-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs gap-1 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowAllBottlenecks(!showAllBottlenecks)}
+              >
+                {showAllBottlenecks ? (
+                  <>
+                    <ChevronUp className="h-3 w-3" />
+                    Ver menos
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-3 w-3" />
+                    {bottlenecks.bottlenecks.length > 2
+                      ? `Ver mais (${bottlenecks.bottlenecks.length - 2} restantes)`
+                      : 'Ver detalhes'
+                    }
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </AnimatedWrapper>
@@ -289,6 +336,6 @@ export function CommercialDashboard() {
           </motion.div>
         </AnimatedWrapper>
       </div>
-    </div>
+    </div >
   );
 }
