@@ -60,7 +60,7 @@ import CallsPage from "@/pages/Calls";
 import VOIPSettings from "@/pages/VOIPSettings";
 
 import { focusManager } from "@tanstack/react-query";
-import { checkToken } from "@/integrations/supabase/client";
+import { checkToken, supabase } from "@/integrations/supabase/client";
 
 // Configuração customizada de Foco da Janela (não-bloqueante)
 // Libera queries IMEDIATAMENTE e verifica token em background para evitar travamentos
@@ -69,6 +69,8 @@ focusManager.setEventListener((handleFocus) => {
 
   const onVisibilityChange = () => {
     if (document.visibilityState === 'visible') {
+      // Força refresh da conexão Supabase para evitar stale connections após idle
+      supabase.auth.refreshSession().catch(() => {});
       // Libera queries IMEDIATAMENTE (não bloqueia UI)
       handleFocus();
       // Verifica token em background (não bloqueia navegação)

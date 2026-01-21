@@ -33,7 +33,15 @@ let lastSuccessfulCheck = Date.now();
  */
 export const checkToken = async (): Promise<boolean> => {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
+    // Race between getSession and timeout to prevent hanging after idle
+    const sessionResult = await Promise.race([
+      supabase.auth.getSession(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('getSession timeout after 5s')), 5000)
+      ),
+    ]);
+
+    const { data: { session } } = sessionResult;
 
     // No session = not logged in, redirect to login
     if (!session) {
