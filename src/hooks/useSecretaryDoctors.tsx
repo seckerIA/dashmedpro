@@ -106,12 +106,14 @@ export function useSecretaryDoctors() {
  * Hook para admins gerenciarem vinculos de secretarias
  */
 export function useSecretaryDoctorLinks() {
-  const { user } = useAuth();
+  // Obter organização atual
+  const { user, organization } = useAuth();
   const { isAdmin } = useUserProfile();
 
   const { data: allLinks, isLoading, refetch } = useQuery({
     queryKey: ['all-secretary-doctor-links'],
     queryFn: async ({ signal }) => {
+      // ... (manter query existente)
       const query = supabase
         .from('secretary_doctor_links')
         .select(`
@@ -142,7 +144,11 @@ export function useSecretaryDoctorLinks() {
   const createLink = async (secretaryId: string, doctorId: string) => {
     const { data, error } = await (supabase
       .from('secretary_doctor_links') as any)
-      .insert({ secretary_id: secretaryId, doctor_id: doctorId } as any)
+      .insert({
+        secretary_id: secretaryId,
+        doctor_id: doctorId,
+        organization_id: organization?.id // Add organization_id
+      } as any)
       .select()
       .single();
 
@@ -162,15 +168,18 @@ export function useSecretaryDoctorLinks() {
   };
 
   const updateSecretaryLinks = async (secretaryId: string, doctorIds: string[]) => {
+    // Primeiro remove APENAS os da organização atual (implícito pelo RLS)
     await supabase
       .from('secretary_doctor_links')
       .delete()
       .eq('secretary_id', secretaryId);
+    // Nota: RLS garante que só apaga da nossa org.
 
     if (doctorIds.length > 0) {
       const links = doctorIds.map(doctorId => ({
         secretary_id: secretaryId,
         doctor_id: doctorId,
+        organization_id: organization?.id // Add organization_id
       }));
 
       const { error } = await (supabase

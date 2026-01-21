@@ -11,6 +11,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useSecretaryDoctors } from '@/hooks/useSecretaryDoctors';
 import { useNavigate } from 'react-router-dom';
+import { createVisibilityAwareInterval } from '@/lib/queryUtils';
 import type { HotLead, PendingFollowup, LeadStatus } from '@/types/whatsappAI';
 
 interface UseFollowUpAlertsOptions {
@@ -62,7 +63,7 @@ export function useFollowUpAlerts(options: UseFollowUpAlertsOptions = {}) {
       return (data as any) as HotLead[];
     },
     enabled: !!user,
-    refetchInterval: checkIntervalMs,
+    refetchInterval: createVisibilityAwareInterval(checkIntervalMs),
     staleTime: 30000,
   });
 
@@ -91,7 +92,7 @@ export function useFollowUpAlerts(options: UseFollowUpAlertsOptions = {}) {
       return (data as any) as PendingFollowup[];
     },
     enabled: !!user,
-    refetchInterval: checkIntervalMs,
+    refetchInterval: createVisibilityAwareInterval(checkIntervalMs),
     staleTime: 30000,
   });
 
@@ -120,7 +121,7 @@ export function useFollowUpAlerts(options: UseFollowUpAlertsOptions = {}) {
       return conversations.reduce((sum, conv) => sum + (conv.unread_count || 0), 0);
     },
     enabled: !!user,
-    refetchInterval: checkIntervalMs,
+    refetchInterval: createVisibilityAwareInterval(checkIntervalMs),
     staleTime: 15000,
   });
 

@@ -5,10 +5,11 @@
 
 import { useEffect, useCallback, useRef, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, cleanupAllChannels } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useSecretaryDoctors } from '@/hooks/useSecretaryDoctors';
 import { toast } from '@/components/ui/use-toast';
+import { isTabVisible, isOnline } from '@/lib/queryUtils';
 import { WHATSAPP_CONVERSATIONS_KEY, WHATSAPP_INBOX_STATS_KEY } from '@/hooks/useWhatsAppConversations';
 import { WHATSAPP_MESSAGES_KEY } from '@/hooks/useWhatsAppMessages';
 
@@ -75,7 +76,15 @@ export function useWhatsAppRealtime(options: UseWhatsAppRealtimeOptions = {}) {
           channelRef.current.subscribe();
         }
       }
+
+      // CRITICAL: Se o usuário deslogou ou token expirou, limpar canais imediatamente
+      if (event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)) {
+        console.log(`[WhatsApp Realtime] Auth lost. Cleaning up channels...`);
+        await cleanupAllChannels();
+      }
     });
+
+    // Cleanup function must be robust
     return () => {
       subscription.unsubscribe();
     };
@@ -114,6 +123,12 @@ export function useWhatsAppRealtime(options: UseWhatsAppRealtimeOptions = {}) {
 
       // Se já existe e está conectado/conectando, não recria
       if (activeChannel && activeChannel.topic === `realtime:${channelName}` && (activeChannel.state === 'joined' || activeChannel.state === 'joining')) {
+        return;
+      }
+
+      // Não conectar se tab está oculta ou offline
+      if (!isTabVisible() || !isOnline()) {
+        console.log('[WhatsApp Realtime] Tab hidden or offline, skipping connection.');
         return;
       }
 

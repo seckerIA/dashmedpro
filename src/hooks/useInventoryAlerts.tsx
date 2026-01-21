@@ -3,7 +3,7 @@ import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { differenceInDays } from "date-fns";
-import { withQueryTimeout, realtimeQueryOptions } from "@/lib/queryUtils";
+import { realtimeQueryOptions, createVisibilityAwareInterval, withQueryTimeout } from "@/lib/queryUtils";
 
 export type AlertType = "expired" | "critical" | "warning" | "low_stock";
 
@@ -172,7 +172,7 @@ export function useInventoryAlerts() {
             }, 15000); // 15s timeout
         },
         enabled: !!user,
-        refetchInterval: 60000, // Reduzido de 30s para 60s - menos agressivo
+        refetchInterval: createVisibilityAwareInterval(60000), // Atualizar a cada 1 minuto (quando tab visível)
         placeholderData: keepPreviousData, // Manter dados anteriores durante refetch
         ...realtimeQueryOptions, // Aplicar configurações otimizadas
     });

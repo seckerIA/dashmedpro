@@ -1,5 +1,5 @@
 /**
- * Query utilities for timeout handling and AbortController integration
+ * Query utilities for timeout handling, visibility-aware refetching, and connection limiting
  */
 
 /**
@@ -42,6 +42,54 @@ export async function withQueryTimeout<T>(
 }
 
 /**
+ * Check if tab is currently visible
+ * Used to prevent queries from running when tab is hidden
+ */
+export function isTabVisible(): boolean {
+    if (typeof document === 'undefined') return true;
+    return document.visibilityState === 'visible';
+}
+
+/**
+ * Check if browser is online
+ */
+export function isOnline(): boolean {
+    if (typeof navigator === 'undefined') return true;
+    return navigator.onLine;
+}
+
+/**
+ * Returns a refetchInterval that respects tab visibility
+ * When tab is hidden, returns false (disables polling)
+ * When tab is visible, returns the specified interval
+ * 
+ * Use this in useQuery options like:
+ * refetchInterval: getVisibilityAwareInterval(60000)
+ */
+export function getVisibilityAwareInterval(intervalMs: number): number | false {
+    if (!isTabVisible()) return false;
+    if (!isOnline()) return false;
+    return intervalMs;
+}
+
+/**
+ * Creates a dynamic refetchInterval function that checks visibility
+ * Use this for useQuery's refetchInterval option
+ * 
+ * Example:
+ * refetchInterval: createVisibilityAwareInterval(60000)
+ */
+export function createVisibilityAwareInterval(intervalMs: number): (query: any) => number | false {
+    return (_query: any) => {
+        // Disable polling when tab is hidden or offline
+        if (!isTabVisible() || !isOnline()) {
+            return false;
+        }
+        return intervalMs;
+    };
+}
+
+/**
  * Default query options for better cache utilization and performance
  */
 export const defaultQueryOptions = {
@@ -79,3 +127,60 @@ export const staticQueryOptions = {
     refetchOnMount: false,
     refetchOnReconnect: false,
 } as const;
+
+/**
+ * Maximum concurrent fetching queries allowed
+ * Prevents browser connection limits from being exceeded
+ */
+export const MAX_CONCURRENT_QUERIES = 4;
+
+/**
+ * Tracks currently fetching queries for connection limiting
+ */
+let activeFetchCount = 0;
+const fetchQueue: Array<() => void> = [];
+
+/**
+ * Acquires a fetch slot, waiting if too many queries are in flight
+ * Call releaseFetchSlot when done
+ */
+export async function acquireFetchSlot(): Promise<void> {
+    if (activeFetchCount < MAX_CONCURRENT_QUERIES) {
+        activeFetchCount++;
+        return;
+    }
+
+    // Wait for a slot to become available
+    return new Promise((resolve) => {
+        fetchQueue.push(() => {
+            activeFetchCount++;
+            resolve();
+        });
+    });
+}
+
+/**
+ * Releases a fetch slot, allowing queued fetches to proceed
+ */
+export function releaseFetchSlot(): void {
+    activeFetchCount = Math.max(0, activeFetchCount - 1);
+    const next = fetchQueue.shift();
+    if (next) {
+        next();
+    }
+}
+
+/**
+ * Gets current active fetch count (for debugging)
+ */
+export function getActiveFetchCount(): number {
+    return activeFetchCount;
+}
+
+/**
+ * Resets fetch tracking (call on auth state change or error recovery)
+ */
+export function resetFetchTracking(): void {
+    activeFetchCount = 0;
+    fetchQueue.length = 0;
+}

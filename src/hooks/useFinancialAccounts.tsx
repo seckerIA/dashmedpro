@@ -80,17 +80,30 @@ export const useFinancialAccounts = () => {
     mutationFn: async (account: FinancialAccountInsert) => {
       if (!user) throw new Error("Usuário não autenticado");
 
+      // Garantir que temos o organization_id do perfil
+      if (!profile) throw new Error("Perfil não carregado. Tente novamente.");
+      const orgId = (profile as any).organization_id;
+
+      if (!orgId) {
+        console.error('❌ Erro: Profile sem organization_id', profile);
+        throw new Error("Erro: Sua conta não está vinculada a uma organização.");
+      }
+
       const { data, error } = await supabase
         .from("financial_accounts")
         .insert({
           ...account,
           user_id: user.id,
+          organization_id: orgId, // Adicionar organization_id para satisfazer RLS
           current_balance: account.initial_balance || 0,
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Erro ao criar conta:', error);
+        throw error;
+      }
       return data;
     },
     onSuccess: () => {

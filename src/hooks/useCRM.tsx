@@ -35,7 +35,7 @@ const fetchContacts = async (
   // Ordenar por nome alfabeticamente
   const { data, error } = await supabaseQueryWithTimeout(
     (queryPromise as any).order('full_name', { ascending: true }).limit(1000),
-    15000,
+    30000,
     signal
   );
   if (error) throw new Error(`Erro ao buscar contatos: ${error.message}`);
@@ -50,8 +50,7 @@ const fetchDeals = async (
   doctorIds?: string[],
   fetchAll?: boolean
 ): Promise<CRMDealWithContact[]> => {
-  // Se fetchAll for true (Admin/Secretaria), ignoramos filtros de usuário e confiamos no RLS (por organização)
-  // Apenas se viewAsUserIds for explicitamente passado (filtro da UI), nós o respeitamos.
+  // ... (unchanged code) ...
   const shouldFilterByUser = !fetchAll && (!viewAsUserIds || viewAsUserIds.length === 0);
 
   let orCondition = '';
@@ -80,7 +79,7 @@ const fetchDeals = async (
 
   const { data, error } = await supabaseQueryWithTimeout(
     (queryPromise as any).order('position', { ascending: true }).limit(500),
-    15000,
+    30000,
     signal
   );
 
@@ -97,7 +96,7 @@ const fetchDeals = async (
       fallbackQuery = (fallbackQuery as any).or(orCondition);
     }
 
-    const fallback = await supabaseQueryWithTimeout(fallbackQuery.limit(500) as any, 15000, signal);
+    const fallback = await supabaseQueryWithTimeout(fallbackQuery.limit(500) as any, 30000, signal);
     if (fallback.error) throw new Error(`Erro ao buscar deals: ${fallback.error.message}`);
     return (fallback.data || []) as CRMDealWithContact[];
   }
@@ -150,25 +149,44 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
   // Check permission to view all
   const canViewAll = profile?.role === 'admin' || profile?.role === 'dono' || isSecretaria;
 
+  // Get organization from useAuth to include in creations
+  const { organization } = useAuth();
+
   const { data: contacts = [], isLoading: isLoadingContacts, refetch: refetchContacts } = useQuery({
     queryKey: ['crm-contacts', user?.id, fetchAllContacts, doctorIdsToUse],
     queryFn: ({ signal }) => fetchContacts(user?.id || '', fetchAllContacts, signal, doctorIdsToUse),
     enabled: !!user?.id || fetchAllContacts || doctorIdsToUse.length > 0,
+    staleTime: 5 * 60 * 1000, // 5 minutes - use cached data
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 
   const { data: deals = [], isLoading: isLoadingDeals } = useQuery({
     queryKey: ['crm-deals', user?.id, viewAsUserIds?.join(','), doctorIdsToUse, canViewAll],
     queryFn: ({ signal }) => fetchDeals(user?.id || '', viewAsUserIds, signal, doctorIdsToUse, canViewAll),
     enabled: !!user?.id || doctorIdsToUse.length > 0,
+    staleTime: 5 * 60 * 1000, // 5 minutes - use cached data
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 
   const createContactMutation = useMutation({
-    mutationFn: (data: any) => createRecord('crm_contacts', { ...data, user_id: user?.id }),
+    mutationFn: (data: any) => createRecord('crm_contacts', {
+      ...data,
+      user_id: user?.id,
+      organization_id: organization?.id // Add organization_id
+    }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['crm-contacts'] }),
   });
 
   const createDealMutation = useMutation({
-    mutationFn: (data: any) => createRecord('crm_deals', { ...data, user_id: user?.id }),
+    mutationFn: (data: any) => createRecord('crm_deals', {
+      ...data,
+      user_id: user?.id,
+      organization_id: organization?.id // Add organization_id
+    }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['crm-deals'] }),
   });
 
@@ -212,7 +230,12 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
     if (existing?.length > 0) {
       contact = existing[0];
     } else {
-      contact = await createRecord('crm_contacts', { user_id: user.id, full_name: contactName || `WhatsApp ${phoneNumber}`, phone: phoneNumber });
+      contact = await createRecord('crm_contacts', {
+        user_id: user.id,
+        full_name: contactName || `WhatsApp ${phoneNumber}`,
+        phone: phoneNumber,
+        organization_id: organization?.id // Add organization_id
+      });
     }
 
     const { data: existingDeals } = await (supabase.from('crm_deals').select('id').eq('contact_id', contact.id).not('stage', 'in', '("fechado_ganho","fechado_perdido")').limit(1) as any);
@@ -223,7 +246,14 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
     if (existingDeals?.length > 0) {
       deal = await updateRecord('crm_deals', existingDeals[0].id, { stage: targetStage, value: value || undefined });
     } else {
-      deal = await createRecord('crm_deals', { user_id: user.id, contact_id: contact.id, title: contactName || `Lead WhatsApp ${phoneNumber}`, stage: targetStage, value: value || null });
+      deal = await createRecord('crm_deals', {
+        user_id: user.id,
+        contact_id: contact.id,
+        title: contactName || `Lead WhatsApp ${phoneNumber}`,
+        stage: targetStage,
+        value: value || null,
+        organization_id: organization?.id // Add organization_id
+      });
     }
 
     await (supabase.from('whatsapp_conversation_analysis' as any).update({ deal_created: true, deal_id: deal.id, contact_created: true, contact_id: contact.id }) as any).eq('conversation_id', conversationId);

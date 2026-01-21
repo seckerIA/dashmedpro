@@ -57,6 +57,8 @@ const fetchDashboardMetrics = async (
 
   if (dealsError) throw new Error(`Erro ao buscar deals: ${dealsError.message}`);
 
+  const dealsData = deals || [];
+
   // Buscar contatos
   let contactsQuery = supabase
     .from('crm_contacts')
@@ -68,8 +70,25 @@ const fetchDashboardMetrics = async (
       // Secretária: ver contatos dos médicos vinculados
       contactsQuery = contactsQuery.in('user_id', doctorIds);
     } else {
-      // Outros usuários: ver apenas seus próprios contatos
-      contactsQuery = contactsQuery.eq('user_id', userId);
+      // Outros usuários (Médicos/Vendedores): ver seus próprios contatos E contatos de deals atribuídos a eles
+
+      // Coletar IDs de contatos dos deals já buscados (que já respeitam assigned_to)
+      const contactIdsFromDeals = dealsData
+        .map((d: any) => d.contact_id)
+        .filter(Boolean);
+
+      // Criar filtro OR: user_id = userId OU id IN (contactIdsFromDeals)
+      let orFilter = `user_id.eq.${userId}`;
+
+      // Adicionar IDs dos deals se houver (limitando para evitar URL muito longa, embora POST resolva a maioria)
+      // Se houver muitos, o ideal seria uma view ou RPC, mas aqui resolvemos o caso comum
+      if (contactIdsFromDeals.length > 0) {
+        // Remover duplicatas
+        const uniqueContactIds = [...new Set(contactIdsFromDeals)];
+        orFilter += `,id.in.(${uniqueContactIds.join(',')})`;
+      }
+
+      contactsQuery = contactsQuery.or(orFilter);
     }
   }
   // Admin/Dono: ver todos os contatos (sem filtro)
@@ -80,11 +99,10 @@ const fetchDashboardMetrics = async (
 
   if (contactsError) throw new Error(`Erro ao buscar contatos: ${contactsError.message}`);
 
-  const dealsData = deals || [];
   const contactsData = contacts || [];
 
   // Calcular métricas básicas
-  const totalPipelineValue = dealsData.reduce((sum, deal) => {
+  const totalPipelineValue = dealsData.reduce((sum: number, deal: any) => {
     const value = typeof deal.value === 'string' ? parseFloat(deal.value) : deal.value;
     return sum + (value || 0);
   }, 0);

@@ -33,6 +33,8 @@ import { useCommercialProcedures } from "@/hooks/useCommercialProcedures";
 import { useCommercialLeads } from "@/hooks/useCommercialLeads";
 import { COMMERCIAL_LEAD_ORIGIN_LABELS } from "@/types/commercial";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useAuth } from "@/hooks/useAuth";
+import { useSecretaryDoctors } from "@/hooks/useSecretaryDoctors";
 import { ProcedureForm } from "@/components/commercial/ProcedureForm";
 import {
   formatCurrencyInput,
@@ -75,6 +77,7 @@ const contactSchema = z.object({
     ),
   tags: z.array(z.string()).default([]),
   create_deal: z.boolean().default(true),
+  assigned_to: z.string().optional(),
 });
 
 type ContactFormData = z.infer<typeof contactSchema>;
@@ -102,11 +105,21 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
   const [isSubmitting, setIsSubmitting] = useState(false);
   const forceOpenRef = useRef<boolean | undefined>(forceOpen);
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { createContact, updateContact, createDeal } = useCRM();
-  const { isSecretaria } = useUserProfile();
+  const { isSecretaria, isAdmin } = useUserProfile();
   const { procedures, isLoading: isLoadingProcedures } = useCommercialProcedures();
   const { createLead } = useCommercialLeads();
   const { toast } = useToast();
+
+  // Get linked doctors
+  const { doctors: linkedDoctors } = useSecretaryDoctors();
+
+  // Determine available assignees
+  const canAssign = isSecretaria || isAdmin;
+
+  // If secretary has only one doctor, auto-assign
+  const defaultAssignedTo = isSecretaria && linkedDoctors.length === 1 ? linkedDoctors[0].id : (user?.id || "");
 
   const form = useForm<ContactFormData>({
     resolver: zodResolver(contactSchema),
@@ -122,6 +135,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
       service_value: (contact?.service_value?.toString() || "") as any,
       tags: contact?.tags || [],
       create_deal: !contact ? true : !!initialStage, // Sempre true para novos contatos
+      assigned_to: defaultAssignedTo,
     },
   });
 
@@ -172,6 +186,17 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
       });
     }
   }, [initialData, open, contact, initialStage, form]);
+
+  // Update default assigned_to when doctors load
+  useEffect(() => {
+    if (isSecretaria && linkedDoctors.length === 1 && !contact) {
+      form.setValue('assigned_to', linkedDoctors[0].id);
+    } else if (!isSecretaria && user?.id && !contact) {
+      // Se não for secretaria (ou seja, medico/admin criando pra si), default é self
+      // Mas se for admin e quiser escolher outro, o campo select permitirá
+      // Por padrão, já inicializamos com user.id
+    }
+  }, [linkedDoctors, isSecretaria, user, contact, form]);
 
   const watchedTags = form.watch("tags");
   const watchedService = form.watch("service");
@@ -300,8 +325,8 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
       console.log('🔍 ContactForm - customFields keys:', Object.keys(customFields));
 
       // Remover campos que não existem na tabela crm_contacts
-      // service, service_value, origin e notes não são colunas diretas
-      const { service, service_value, origin, notes, ...contactDataForDB } = contactData;
+      // service, service_value, origin, notes e assigned_to não são colunas diretas
+      const { service, service_value, origin, notes, assigned_to, ...contactDataForDB } = contactData;
 
       // Adicionar service_value ao objeto de dados para salvar (esta coluna existe)
       if (serviceValue) {
@@ -316,17 +341,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
       // Adicionar custom_fields com procedure_id, origin e notes
       (contactDataForDB as any).custom_fields = customFields;
 
-      console.log('💾 ContactForm - Salvando contato com custom_fields:', {
-        customFields,
-        procedure_id: customFields.procedure_id,
-        custom_fields_to_save: contactDataForDB.custom_fields,
-        custom_fields_to_save_type: typeof contactDataForDB.custom_fields,
-        custom_fields_to_save_keys: Object.keys(contactDataForDB.custom_fields || {}),
-        full_contactDataForDB: contactDataForDB,
-      });
-
       if (contact) {
-        console.log('✏️ Atualizando contato existente:', contact.id);
         // Atualizar contato existente
         // IMPORTANTE: Garantir que custom_fields seja incluído explicitamente
         const updateData = {
@@ -334,12 +349,6 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
           custom_fields: contactDataForDB.custom_fields, // Garantir que custom_fields está presente
           updated_at: new Date().toISOString(),
         };
-        console.log('📤 ContactForm - Enviando dados para updateContact:', {
-          updateData,
-          custom_fields: updateData.custom_fields,
-          custom_fields_type: typeof updateData.custom_fields,
-          custom_fields_keys: updateData.custom_fields ? Object.keys(updateData.custom_fields) : [],
-        });
 
         try {
           await withTimeout(
@@ -364,7 +373,6 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
           throw updateError;
         }
       } else {
-        console.log('➕ Criando novo contato...');
         // Criar novo contato
         // IMPORTANTE: Garantir que custom_fields e service_value sejam incluídos explicitamente
         // A tabela crm_contacts usa 'full_name', não 'name'
@@ -422,6 +430,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
                 stage: dealStage,
                 value: serviceValue || null,
                 probability: 0,
+                assigned_to: data.assigned_to || user.id, // Pass assigned_to
               }),
               30000, // 30 segundos de timeout
               "Timeout ao criar contrato. O contato foi criado, mas o contrato não pôde ser adicionado ao pipeline."
@@ -442,8 +451,13 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
               console.log('🔄 Criando registro espelho em commercial_leads...');
 
               // Preparar dados para commercial_leads
+              // IMPORTANTE: user_id deve ser o DOUTOR RESPONSÁVEL (assigned_to) se houver,
+              // caso contrário o criador (user.id). Se o lead ficar com ID da secretária, o médico não vê.
+              const leadOwnerId = data.assigned_to || user.id || newContact.user_id;
+
               const leadData: any = {
-                user_id: user.id || newContact.user_id,
+                user_id: leadOwnerId,
+                organization_id: newContact.organization_id, // Add organization_id from contact
                 name: newContact.full_name,
                 email: newContact.email || null,
                 phone: newContact.phone || null,
@@ -463,7 +477,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
               if (leadError) {
                 console.error('⚠️ Erro ao criar commercial_lead espelho:', leadError);
               } else {
-                console.log('✅ commercial_lead espelho criado com sucesso.');
+                console.log('✅ commercial_lead espelho criado com sucesso para:', leadOwnerId);
                 queryClient.invalidateQueries({ queryKey: ["commercial-leads"] });
                 queryClient.invalidateQueries({ queryKey: ["commercial-metrics"] });
               }
@@ -516,13 +530,16 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
             try {
               console.log('🔄 Criando registro espelho em commercial_leads (sem deal)...');
 
+              const leadOwnerId = data.assigned_to || user.id || newContact.user_id;
+
               const leadData: any = {
-                user_id: user.id || newContact.user_id,
+                user_id: leadOwnerId,
+                organization_id: newContact.organization_id, // Add organization_id from contact
                 name: newContact.full_name,
                 email: newContact.email || null,
                 phone: newContact.phone || null,
                 origin: (customFields.origin || 'other') as any,
-                status: 'new',
+                status: 'new', // Status inicial padrão
                 contact_id: newContact.id,
                 estimated_value: serviceValue || null,
                 procedure_id: customFields.procedure_id || null,
@@ -537,7 +554,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
               if (leadError) {
                 console.error('⚠️ Erro ao criar commercial_lead espelho:', leadError);
               } else {
-                console.log('✅ commercial_lead espelho criado com sucesso.');
+                console.log('✅ commercial_lead espelho criado com sucesso para:', leadOwnerId);
                 queryClient.invalidateQueries({ queryKey: ["commercial-leads"] });
                 queryClient.invalidateQueries({ queryKey: ["commercial-metrics"] });
               }
@@ -671,6 +688,33 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
                 </FormItem>
               )}
             />
+
+            {(canAssign && linkedDoctors.length > 0) && (
+              <FormField
+                control={form.control}
+                name="assigned_to"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Responsável (Médico)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o médico responsável" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {linkedDoctors.map((doc) => (
+                          <SelectItem key={doc.id} value={doc.id}>
+                            {doc.full_name || doc.email}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <FormField

@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useSecretaryDoctors } from '@/hooks/useSecretaryDoctors';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { createVisibilityAwareInterval } from '@/lib/queryUtils';
 import type { VOIPCallSessionWithRelations, VOIPCallDirection } from '@/types/voip';
 
 export const VOIP_CALL_HISTORY_KEY = 'voip-call-history';
@@ -85,7 +86,7 @@ export function useCallHistory(options: UseCallHistoryOptions = {}) {
     },
     enabled: enabled && !!user?.id && (!isSecretaria || !isLoadingDoctors),
     staleTime: 30 * 1000, // 30 seconds
-    refetchInterval: 60 * 1000, // 1 minute auto-refresh
+    refetchInterval: createVisibilityAwareInterval(60 * 1000), // 1 minute auto-refresh (quando tab visível)
   });
 }
 

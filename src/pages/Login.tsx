@@ -27,35 +27,10 @@ const Login = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Clear all Supabase cache on mount to prevent cross-project issues
-  useEffect(() => {
-    const clearAllSupabaseCache = async () => {
-      try {
-        // Sign out any existing session
-        await supabase.auth.signOut();
-
-        // Clear all localStorage keys related to Supabase
-        const keysToRemove: string[] = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && (
-            key.includes('supabase') ||
-            key.startsWith('sb-') ||
-            key.includes('auth-token')
-          )) {
-            keysToRemove.push(key);
-          }
-        }
-        keysToRemove.forEach(key => localStorage.removeItem(key));
-
-        console.log('🧹 Cache do Supabase limpo na inicialização da página de login');
-      } catch (error) {
-        console.error('Erro ao limpar cache:', error);
-      }
-    };
-
-    clearAllSupabaseCache();
-  }, []);
+  // NOTE: Removed automatic cache clearing on mount - this was causing:
+  // 1. Unnecessary page reloads when tab focus changed
+  // 2. Poor UX with constant "loading" states
+  // The clearSupabaseCache() function below is still available for manual use if needed
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();

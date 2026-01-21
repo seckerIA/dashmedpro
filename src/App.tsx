@@ -43,6 +43,14 @@ import WhatsAppSettings from "./pages/WhatsAppSettings";
 import InventoryPage from "./pages/Inventory";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import { SuperAdminLayout } from "./components/admin/SuperAdminLayout";
+import AdminClinics from "./pages/admin/AdminClinics";
+import AdminUsers from "./pages/admin/AdminUsers";
+import AdminMetrics from "./pages/admin/AdminMetrics";
+import AdminFinancial from "./pages/admin/AdminFinancial";
+import AdminLogs from "./pages/admin/AdminLogs";
+import AdminDatabase from "./pages/admin/AdminDatabase";
+import AdminSecurity from "./pages/admin/AdminSecurity";
+import AdminSettings from "./pages/admin/AdminSettings";
 import {
   TrendingUp,
   Target,
@@ -65,12 +73,12 @@ import { checkToken, supabase } from "@/integrations/supabase/client";
 // Configuração customizada de Foco da Janela (não-bloqueante)
 // Libera queries IMEDIATAMENTE e verifica token em background para evitar travamentos
 focusManager.setEventListener((handleFocus) => {
-  if (typeof window === "undefined") return () => {};
+  if (typeof window === "undefined") return () => { };
 
   const onVisibilityChange = () => {
     if (document.visibilityState === 'visible') {
       // Força refresh da conexão Supabase para evitar stale connections após idle
-      supabase.auth.refreshSession().catch(() => {});
+      supabase.auth.refreshSession().catch(() => { });
       // Libera queries IMEDIATAMENTE (não bloqueia UI)
       handleFocus();
       // Verifica token em background (não bloqueia navegação)
@@ -168,6 +176,7 @@ const queryClient = new QueryClient({
   },
 });
 
+
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -244,7 +253,14 @@ const AppRoutes = () => {
       <SuperAdminLayout>
         <Routes>
           <Route path="/admin" element={<SuperAdminDashboard />} />
-          <Route path="/admin/*" element={<SuperAdminDashboard />} />
+          <Route path="/admin/clinicas" element={<AdminClinics />} />
+          <Route path="/admin/usuarios" element={<AdminUsers />} />
+          <Route path="/admin/financeiro" element={<AdminFinancial />} />
+          <Route path="/admin/metricas" element={<AdminMetrics />} />
+          <Route path="/admin/logs" element={<AdminLogs />} />
+          <Route path="/admin/database" element={<AdminDatabase />} />
+          <Route path="/admin/seguranca" element={<AdminSecurity />} />
+          <Route path="/admin/configuracoes" element={<AdminSettings />} />
           <Route path="/" element={<Navigate to="/admin" replace />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
@@ -480,6 +496,7 @@ const App = () => (
       <SupabaseProjectValidator>
         <AuthProvider>
           <TooltipProvider>
+
             <Toaster />
             <Sonner />
             <BrowserRouter>

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { addDays, differenceInDays, startOfMonth, endOfMonth } from "date-fns";
+import { createVisibilityAwareInterval } from "@/lib/queryUtils";
 
 export type InventoryAlert = {
     id: string;
@@ -194,7 +195,7 @@ export function useInventoryDashboard() {
             };
         },
         enabled: !!user,
-        refetchInterval: 60000, // Atualizar a cada 1 minuto
+        refetchInterval: createVisibilityAwareInterval(60000), // Atualizar a cada 1 minuto (quando tab visível)
     });
 
     return {

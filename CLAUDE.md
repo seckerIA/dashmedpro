@@ -212,3 +212,13 @@ supabase/functions/
   - Versão 49 implementou agrupamento por intervalos contíguos para evitar buracos na agenda.
   - **Status Atual**: Rollback para a **Versão 48** realizado a pedido do usuário (mantém análise completa de leads, mas possui o bug conhecido de sugerir horários ocupados em blocos resumidos).
   - Melhora nos logs de debug salvando `agendaContext` e `brazilTime` na tabela `debug_logs`.
+
+### Contexto Atual (21/01/2026 - Data Reset e Seeding)
+- **Data Reset & Seeding**:
+  - Implementada função SQL `reset_and_seed_imperius` para limpar e repopular dados da organização "Imperius Tech".
+  - **Recursos Populados**: Contatos (200+), Deals (Pipeline diversificado), Consultas (Histórico de 1 ano), Financeiro (Receitas e Despesas Recorrentes), Estoque, Tarefas e Campanhas de Marketing.
+  - **Correções de Schema**: Identificados ajustes em enums e constraints (`inventory_movements_type_check`, `commercial_procedure_category`) para garantir integridade dos dados gerados.
+  - **Administração**: Criadas páginas de administração (`AdminUsers`, `AdminMetrics`, `AdminSettings`) para gestão global do sistema (Super Admin).
+- **Frontend Fixes**:
+  - `TeamManagement.tsx`: Adicionada validação de permissões no frontend para criação de usuários.
+

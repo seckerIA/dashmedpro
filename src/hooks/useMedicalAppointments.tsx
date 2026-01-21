@@ -766,8 +766,17 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
           });
         } else {
           // Criar transação financeira
+          // Se o agendamento não tiver organization_id (antigo), usar o do perfil do usuário atual
+          const orgId = appointment.organization_id || (profile as any)?.organization_id;
+
+          if (!orgId) {
+            console.error('Erro: Não foi possível identificar a organização para a transação.', { appointmentOrg: appointment.organization_id, profileOrg: (profile as any)?.organization_id });
+            // Não lançar erro aqui para não travar, mas o insert provavelmente falhará
+          }
+
           const transactionData: FinancialTransactionInsert = {
             user_id: appointment.user_id,
+            organization_id: orgId, // Usar orgId resolvido
             account_id: accountId,
             category_id: categoryId,
             type: 'entrada',

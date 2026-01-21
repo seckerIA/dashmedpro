@@ -151,6 +151,11 @@ const TeamManagement = () => {
         // Criar novo usuario
         const createData: any = { ...formData };
 
+        // Validar permissões no frontend
+        if ((formData.role === 'dono' || formData.role === 'admin') && !isAdminOrDono) {
+          throw new Error('Você não tem permissão para criar usuários com função de Dono ou Administrador.');
+        }
+
         // Validacao para secretaria - precisa ter pelo menos um medico
         if (formData.role === 'secretaria') {
           if (selectedDoctorIds.length === 0) {
@@ -202,6 +207,12 @@ const TeamManagement = () => {
         });
 
         if (error) {
+          console.error('Erro na Edge Function:', error);
+          // Tentar ler o corpo da resposta se disponível no erro (depende da versão do client)
+          // Se for erro genérico, lançar erro customizado
+          if (error.message && error.message.includes('non-2xx')) {
+            throw new Error('Erro ao criar usuário. Verifique se o email já está cadastrado ou se você tem permissões suficientes.');
+          }
           throw error;
         }
 
@@ -227,6 +238,7 @@ const TeamManagement = () => {
       setDialogOpen(false);
       fetchProfiles();
     } catch (error: any) {
+      console.error('Erro detalhado:', error);
       toast({
         variant: 'destructive',
         title: editingProfile ? 'Erro ao atualizar usuario' : 'Erro ao criar usuario',

@@ -5,6 +5,32 @@ export const CURRENT_PROJECT_REF = "adzaqkduxnpckbcuqpmg";
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
+// Custom fetch with real HTTP timeout to prevent browser connection exhaustion
+const FETCH_TIMEOUT_MS = 40000; // 40 seconds
+
+const fetchWithTimeout: typeof fetch = async (url, options = {}) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    console.warn(`⏳ [Fetch] Timeout de ${FETCH_TIMEOUT_MS}ms em: ${typeof url === 'string' ? url.split('?')[0] : 'request'}`);
+    controller.abort();
+  }, FETCH_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error(`Timeout de ${FETCH_TIMEOUT_MS}ms excedido`);
+    }
+    throw error;
+  }
+};
+
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
@@ -18,6 +44,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     headers: {
       'apikey': SUPABASE_PUBLISHABLE_KEY,
     },
+    fetch: fetchWithTimeout, // Use custom fetch with timeout
   },
 });
 
@@ -136,11 +163,34 @@ const timeoutPromise = (ms: number, message: string): Promise<'timeout'> => {
 };
 
 /**
+ * Cleanup all Supabase realtime channels
+ * CRITICAL: Must be called before reload/redirect to prevent hanging connections
+ */
+export const cleanupAllChannels = async (): Promise<void> => {
+  try {
+    const channels = supabase.getChannels();
+    console.log(`🧹 [Auth] Limpando ${channels.length} canais realtime...`);
+
+    // Remove all channels in parallel with timeout
+    await Promise.race([
+      supabase.removeAllChannels(),
+      new Promise(resolve => setTimeout(resolve, 2000)), // Max 2s para cleanup
+    ]);
+
+    console.log('✅ [Auth] Canais realtime limpos.');
+  } catch (e) {
+    console.error('⚠️ [Auth] Erro ao limpar canais:', e);
+    // Continue even if cleanup fails
+  }
+};
+
+/**
  * Force page reload - this clears all hanging queries and React state
  */
-const forcePageReload = () => {
+const forcePageReload = async () => {
   if (typeof window !== 'undefined') {
-    console.log('🔄 [Auth] Recarregando página...');
+    console.log('🔄 [Auth] Preparando reload...');
+    await cleanupAllChannels();
     window.location.reload();
   }
 };
@@ -148,8 +198,10 @@ const forcePageReload = () => {
 /**
  * Redirect to login page
  */
-const forceLoginRedirect = () => {
+const forceLoginRedirect = async () => {
   if (typeof window !== 'undefined') {
+    console.log('🔒 [Auth] Preparando redirect para login...');
+    await cleanupAllChannels();
     localStorage.removeItem(`sb-${CURRENT_PROJECT_REF}-auth-token`);
     window.location.href = '/login';
   }

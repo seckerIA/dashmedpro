@@ -59,8 +59,12 @@ export default function SuperAdminDashboard() {
     });
 
     useEffect(() => {
-        listOrganizations();
-    }, []);
+        // Só buscar quando o user estiver autenticado
+        if (user) {
+            console.log('📊 [SuperAdminDashboard] User autenticado. Buscando organizações...');
+            listOrganizations();
+        }
+    }, [user]);  // Dependência do user
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

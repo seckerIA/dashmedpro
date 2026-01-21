@@ -58,7 +58,7 @@ const fetchTaskById = async (taskId: string): Promise<TaskWithCRM | null> => {
 
 // Hook principal
 export function useTasks() {
-  const { user } = useAuth();
+  const { user, organization } = useAuth();
   const queryClient = useQueryClient();
   const { teamMembers } = useTeamMembers();
 
@@ -103,6 +103,7 @@ export function useTasks() {
           user_id: user?.id,
           created_by: user?.id,
           status: 'pendente',
+          organization_id: organization?.id || null, // Add organization for multi-tenant isolation
         })
         .select()
         .single();
