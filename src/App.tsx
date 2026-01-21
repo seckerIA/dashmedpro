@@ -179,8 +179,8 @@ const queryClient = new QueryClient({
         // Backoff mais rápido para fail-fast
         return Math.min(1000 * 2 ** attemptIndex, 5000);
       },
-      staleTime: 5 * 60 * 1000, // 5 minutos - usar cache mais agressivamente
-      gcTime: 10 * 60 * 1000, // 10 minutos - manter em cache por mais tempo
+      staleTime: 10 * 60 * 1000, // 10 minutos - dados são frescos por mais tempo
+      gcTime: 30 * 60 * 1000, // 30 minutos - manter em cache para idle longo
       refetchOnWindowFocus: false, // Handled by our custom focusManager
       refetchOnMount: false, // Não refetch se dados estão frescos
       refetchOnReconnect: true,

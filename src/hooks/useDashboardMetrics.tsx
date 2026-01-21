@@ -311,7 +311,7 @@ export function useDashboardMetrics() {
     refetchOnReconnect: false, // Não refetch ao reconectar - usar cache
     refetchIntervalInBackground: false, // Não refetch quando aba não está em foco
     staleTime: 5 * 60 * 1000, // Considerar dados válidos por 5 minutos (era 30s)
-    gcTime: 10 * 60 * 1000, // Manter em cache por 10 minutos
+    gcTime: 30 * 60 * 1000, // 30 minutos para idle longo
     retry: 1, // Reduzir retries para evitar acúmulo
   });
 }

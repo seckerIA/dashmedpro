@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase, SUPABASE_PROJECT_URL, SUPABASE_PROJECT_REF } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL, CURRENT_PROJECT_REF } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
 import { cacheGet, cacheSet, CacheKeys, CacheTTL } from '@/lib/cache';
@@ -137,8 +137,8 @@ export function useUserProfile() {
     retry: 2,
     retryDelay: 1000,
     refetchOnWindowFocus: false,
-    staleTime: 5 * 60 * 1000, // Cache por 5 minutos
-    gcTime: 10 * 60 * 1000,
+    staleTime: 10 * 60 * 1000, // 10 minutos
+    gcTime: 30 * 60 * 1000, // 30 minutos para idle longo
   });
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'dono';

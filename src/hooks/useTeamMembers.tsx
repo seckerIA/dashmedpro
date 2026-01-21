@@ -102,8 +102,8 @@ export function useTeamMembers() {
     queryKey: ['team-members', user?.id],
     queryFn: ({ signal }) => fetchTeamMembers(user?.id, signal),
     enabled: !!user?.id,
-    staleTime: 2 * 60 * 1000,
-    gcTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000, // 10 minutos
+    gcTime: 30 * 60 * 1000, // 30 minutos para idle longo
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
