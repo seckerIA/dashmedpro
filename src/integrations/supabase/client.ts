@@ -92,9 +92,9 @@ export const checkToken = async (): Promise<boolean> => {
     return true;
 
   } catch (e) {
-    console.error('❌ [Auth] Erro no check de token:', e);
-    // On any error, force reload to get clean state
-    forcePageReload();
+    // Timeout ou erro de rede não significa que precisa relogar
+    // Apenas significa conexão lenta - retorna false silenciosamente
+    console.warn('⚠️ [Auth] Erro no check de token (provavelmente rede lenta):', e);
     return false;
   }
 };
@@ -162,20 +162,5 @@ export const wasRecentlyAuthenticated = (): boolean => {
   return (Date.now() - lastSuccessfulCheck) < 60000; // Within last minute
 };
 
-// Auto-refresh interval (every 60 seconds while tab is active)
-if (typeof window !== 'undefined') {
-  // Check token every minute (only if tab is visible)
-  setInterval(() => {
-    if (document.visibilityState === 'visible') {
-      checkToken();
-    }
-  }, 60000);
-
-  // Also check when tab becomes visible
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      console.log('👁️ [Auth] Tab visível. Verificando sessão...');
-      checkToken();
-    }
-  });
-}
+// NOTA: O auto-refresh de token é gerenciado pelo FocusManager em App.tsx
+// Não duplicar aqui para evitar comportamento inesperado
