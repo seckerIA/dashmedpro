@@ -243,16 +243,16 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
 
     try {
       console.log('🔄 ContactForm - Iniciando processo de salvamento');
-      
-      // Tentar refresh em background sem bloquear o salvamento
-      supabase.auth.refreshSession().catch(err => console.warn('⚠️ Erro ao atualizar sessão em background:', err));
+
+      // Refresh removido para evitar conflito com focusManager
+      // supabase.auth.refreshSession().catch(err => console.warn('⚠️ Erro ao atualizar sessão em background:', err));
 
       // Verificar se procedures carregaram
-      console.log('🔍 ContactForm - Status procedures:', { 
-        isLoadingProcedures, 
-        hasProcedures: !!procedures, 
+      console.log('🔍 ContactForm - Status procedures:', {
+        isLoadingProcedures,
+        hasProcedures: !!procedures,
         count: procedures?.length,
-        hasConsultationProcedure 
+        hasConsultationProcedure
       });
 
       if (isLoadingProcedures) {
@@ -349,7 +349,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
         // IMPORTANTE: Garantir que custom_fields seja incluído explicitamente
         const updateData = {
           ...contactDataForDB,
-          custom_fields: contactDataForDB.custom_fields, // Garantir que custom_fields está presente
+          custom_fields: customFields, // Garantir que custom_fields está presente
           updated_at: new Date().toISOString(),
         };
 
@@ -378,7 +378,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
         // A tabela crm_contacts usa 'full_name', não 'name'
         const createData = {
           ...contactDataForDB,
-          custom_fields: contactDataForDB.custom_fields, // Garantir que custom_fields está presente
+          custom_fields: customFields, // Garantir que custom_fields está presente
           service_value: serviceValue || null, // Incluir service_value se houver
         };
         console.log('💾 ContactForm - Dados que serão enviados para createContact:', {
@@ -586,7 +586,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
         title: "Erro ao salvar",
         description: error instanceof Error ? error.message : "Erro inesperado ao salvar contato",
       });
-      
+
       // NÃO resetar nem fechar o formulário em caso de erro para permitir que o usuário veja os dados e tente novamente
       // setOpen(false);
       // form.reset();

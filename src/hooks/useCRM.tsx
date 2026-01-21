@@ -122,15 +122,23 @@ const createRecord = async (table: string, payload: any) => {
 
   const insertPromise = (supabase.from(table as any).insert(payload) as any).select().single();
 
-  // Timeout de 30 segundos para evitar travamento
+  // Timeout de 60 segundos para evitar travamento (aumentado devido a fila do navegador)
   const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error(`Timeout ao inserir em ${table} (30s)`)), 30000)
+    setTimeout(() => reject(new Error(`Timeout ao inserir em ${table} (60s) - Fila do navegador possivelmente cheia`)), 60000)
   );
 
-  const { data, error } = await Promise.race([insertPromise, timeoutPromise]) as any;
+  let result: any;
+  try {
+    result = await Promise.race([insertPromise, timeoutPromise]);
+  } catch (err) {
+    console.error(`❌ [createRecord] Exceção fatal no Promise.race para ${table}:`, err);
+    throw err;
+  }
+
+  const { data, error } = result as any;
 
   if (error) {
-    console.error(`❌ [createRecord] Erro ao inserir em ${table}:`, error);
+    console.error(`❌ [createRecord] Erro retornado pelo Supabase em ${table}:`, error);
     throw error;
   }
   console.log(`✅ [createRecord] Inserido com sucesso em ${table}:`, data);
@@ -142,9 +150,9 @@ const updateRecord = async (table: string, id: string, payload: any) => {
 
   const updatePromise = (supabase.from(table as any).update(payload).eq('id', id) as any).select().single();
 
-  // Timeout de 30 segundos
+  // Timeout de 60 segundos
   const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error(`Timeout ao atualizar ${table} (30s)`)), 30000)
+    setTimeout(() => reject(new Error(`Timeout ao atualizar ${table} (60s)`)), 60000)
   );
 
   const { data, error } = await Promise.race([updatePromise, timeoutPromise]) as any;
@@ -162,9 +170,9 @@ const deleteRecord = async (table: string, id: string) => {
 
   const deletePromise = supabase.from(table as any).delete().eq('id', id);
 
-  // Timeout de 30 segundos
+  // Timeout de 60 segundos
   const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error(`Timeout ao deletar ${table} (30s)`)), 30000)
+    setTimeout(() => reject(new Error(`Timeout ao deletar ${table} (60s)`)), 60000)
   );
 
   const { error } = await Promise.race([deletePromise, timeoutPromise]) as any;
