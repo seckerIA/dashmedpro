@@ -81,10 +81,24 @@ export const checkToken = async (): Promise<boolean> => {
     const now = Math.floor(Date.now() / 1000);
     const timeUntilExpiry = expiresAt - now;
 
-    // Token has been expired for MORE than 5 minutes - FORCE RELOAD
-    // This is a long idle scenario that requires full re-authentication
+    // Token has been expired for MORE than 5 minutes - PREVIOUSLY FORCED RELOAD
+    // UPDATED: Try to refresh first to avoid page reload (User Requirement: "without refreshing")
     if (timeUntilExpiry < -300) {
-      console.log(`🚨 [Auth] Token expirado há ${Math.abs(timeUntilExpiry)}s (>5min). Forçando reload...`);
+      console.log(`🚨 [Auth] Token expirado há ${Math.abs(timeUntilExpiry)}s (>5min). Tentando recuperar sessão...`);
+
+      const refreshResult = await Promise.race([
+        refreshSessionSafe(),
+        timeoutPromise(15000, 'Refresh timeout'), // More generous timeout for long idle
+      ]);
+
+      if (refreshResult && refreshResult !== 'timeout') {
+        console.log('✅ [Auth] Sessão recuperada com sucesso após longo período inativo.');
+        lastSuccessfulCheck = Date.now();
+        return true;
+      }
+
+      console.warn('❌ [Auth] Falha na recuperação de longo prazo. Agora sim, redirecionando...');
+      // Only force reload if recovery fails completely
       forcePageReload();
       return false;
     }
@@ -100,12 +114,13 @@ export const checkToken = async (): Promise<boolean> => {
       ]);
 
       if (refreshResult === 'timeout') {
-        console.log('❌ [Auth] Refresh demorou muito. Forçando reload...');
-        forcePageReload();
-        return false;
+        // Instead of reloading immediately, try one last check
+        console.warn('⚠️ [Auth] Refresh demorou. Permitindo queries tentarem (fail-soft)...');
+        return true;
       }
 
       if (!refreshResult) {
+        // If refresh explicitly failed (refresh token invalid), then we must redirect
         console.log('❌ [Auth] Refresh falhou. Redirecionando para login...');
         forceLoginRedirect();
         return false;

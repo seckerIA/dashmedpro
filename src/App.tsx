@@ -91,12 +91,12 @@ focusManager.setEventListener((handleFocus) => {
       // Verifica token em background (sem travar a UI)
       checkToken().then((isValid) => {
         if (!isValid) {
-          console.warn('⚠️ [App] Sessão inválida detectada em background (queries podem falhar com 401).');
+          console.warn('⚠️ [App] Sessão não recuperada em background.');
         } else {
-          console.log('✅ [App] Sessão confirmada em background.');
+          console.log('✅ [App] Sessão confirmada e ativa.');
         }
       }).catch(err => {
-        console.error('⚠️ [App] Erro no check de background:', err);
+        console.error('⚠️ [App] Erro silencioso no check de background:', err);
       });
     }
   };
