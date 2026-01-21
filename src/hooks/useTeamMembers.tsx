@@ -107,6 +107,8 @@ export function useTeamMembers() {
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
+    refetchInterval: 5 * 60 * 1000, // Refresh automático a cada 5 min
+    refetchIntervalInBackground: false, // Pausa quando aba não está ativa
     retry: 2,
     retryDelay: 1000,
   });
