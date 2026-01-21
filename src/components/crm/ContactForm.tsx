@@ -220,6 +220,9 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
     };
 
     try {
+      // Forçar refresh da sessão antes de salvar (evita stale connection após idle)
+      await supabase.auth.refreshSession().catch(() => {});
+
       // Validação: verificar se há procedimento CONSULTA para novos contatos
       if (!contact && !hasConsultationProcedure) {
         toast({

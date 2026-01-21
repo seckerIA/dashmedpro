@@ -13,7 +13,7 @@ type SupabaseQueryBuilder<T> = Promise<SupabaseQueryResult<T>> & {
 
 export async function supabaseQueryWithTimeout<T>(
   queryBuilder: SupabaseQueryBuilder<T> | Promise<SupabaseQueryResult<T>>,
-  timeoutMs: number = 8000, // Reduzido de 120s para 8s - fail-fast
+  timeoutMs: number = 25000, // 25s - tempo suficiente para conexões lentas após idle
   signal?: AbortSignal
 ): Promise<SupabaseQueryResult<T>> {
 
