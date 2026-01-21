@@ -1,8 +1,7 @@
-import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider, useQueryClient, QueryCache, MutationCache } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AppLayout } from "./components/layout/AppLayout";
@@ -63,51 +62,25 @@ import VOIPSettings from "@/pages/VOIPSettings";
 import { focusManager } from "@tanstack/react-query";
 import { checkToken } from "@/integrations/supabase/client";
 
-// Configuração customizada de Foco da Janela
-// Verifica token ANTES de permitir refetch de queries com refetchOnWindowFocus
+// Configuração customizada de Foco da Janela (não-bloqueante)
+// Libera queries IMEDIATAMENTE e verifica token em background para evitar travamentos
 focusManager.setEventListener((handleFocus) => {
-  if (typeof window !== "undefined" && window.addEventListener) {
+  if (typeof window === "undefined") return () => {};
 
-    let isProcessing = false;
+  const onVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      // Libera queries IMEDIATAMENTE (não bloqueia UI)
+      handleFocus();
+      // Verifica token em background (não bloqueia navegação)
+      checkToken().catch(err => console.error('[FocusManager] Token check error:', err));
+    }
+  };
 
-    const onVisibilityChange = async () => {
-      // Ignore if not becoming visible or already processing
-      if (document.visibilityState !== 'visible' || isProcessing) return;
+  document.addEventListener("visibilitychange", onVisibilityChange, false);
 
-      isProcessing = true;
-      console.log('👁️ [FocusManager] Tab visível. Verificando token...');
-
-      try {
-        // Check and refresh token if needed
-        // This will force page reload if token expired too long ago
-        const isValid = await checkToken();
-
-        if (isValid) {
-          console.log('✅ [FocusManager] Token OK. Liberando queries.');
-          // Let React Query handle refetches normally
-          handleFocus();
-        } else {
-          console.log('⚠️ [FocusManager] Token inválido. Aguardando redirect...');
-          // checkToken will handle redirect/reload
-        }
-      } catch (e) {
-        console.error('❌ [FocusManager] Erro:', e);
-        // On error, still allow focus to prevent complete lockup
-        handleFocus();
-      } finally {
-        isProcessing = false;
-      }
-    };
-
-    document.addEventListener("visibilitychange", onVisibilityChange, false);
-    window.addEventListener("focus", onVisibilityChange, false);
-
-    return () => {
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-      window.removeEventListener("focus", onVisibilityChange);
-    };
-  }
-  return () => { };
+  return () => {
+    document.removeEventListener("visibilitychange", onVisibilityChange);
+  };
 });
 
 // Configuração do QueryClient com tratamento global de timeouts, retries e 401 handling
@@ -192,111 +165,6 @@ const queryClient = new QueryClient({
     },
   },
 });
-
-// Componente para detectar e cancelar queries travadas
-const StuckQueryDetector = () => {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    const fetchStartTimes = new Map<string, number>();
-    let stuckCount = 0;
-
-    const queryCache = queryClient.getQueryCache();
-
-    const unsubscribe = queryCache.subscribe((event) => {
-      if (event?.type === 'updated') {
-        const query = event.query;
-        const state = query.state;
-
-        if (state.fetchStatus === 'fetching') {
-          const queryKey = query.queryKey.join('/');
-          if (!fetchStartTimes.has(queryKey)) {
-            fetchStartTimes.set(queryKey, Date.now());
-          }
-        }
-
-        // Se query terminou ou pausou (network offline, window hidden), remove timer
-        if (state.fetchStatus === 'idle' || state.fetchStatus === 'paused') {
-          const queryKey = query.queryKey.join('/');
-          fetchStartTimes.delete(queryKey);
-
-          if (state.status === 'success') {
-            stuckCount = 0;
-          }
-        }
-      }
-    });
-
-    // Monitoramento Periódico
-    const checkInterval = setInterval(async () => {
-      // Importante: Se a página está oculta ou o QueryClient está pausado, 
-      // NÃO aplicamos timeout, pois o navegador pode ter trottled a CPU/Network.
-      if (typeof document !== 'undefined' && document.hidden) {
-        fetchStartTimes.clear(); // Limpa para evitar falso-positivo ao acordar
-        return;
-      }
-
-      if (typeof window !== 'undefined' && !window.navigator.onLine) {
-        return;
-      }
-
-      const allQueries = queryCache.getAll();
-      const stuckQueries: any[] = [];
-      const now = Date.now();
-
-      for (const query of allQueries) {
-        const queryKey = query.queryKey.join('/');
-        const state = query.state;
-
-        // Só considera queries ATIVAS (fetching)
-        if (state.fetchStatus === 'fetching') {
-
-          let fetchStartTime = fetchStartTimes.get(queryKey);
-          if (!fetchStartTime) {
-            fetchStartTime = now;
-            fetchStartTimes.set(queryKey, now);
-          }
-
-          const timeSinceStart = now - fetchStartTime;
-
-          // Timeout de detecção ajustado para 30s (maior que qualquer timeout de query)
-          const stuckThreshold = 30000;
-
-          if (timeSinceStart > stuckThreshold) {
-            stuckQueries.push(query);
-            const queryKeyStr = query.queryKey.join('/');
-            console.warn(`⚠️ [StuckQueryDetector] Cancelando query travada (>30s): ${queryKeyStr}`);
-
-            // Forçar cancelamento - isso deve disparar o fallback/erro da query
-            queryClient.cancelQueries({ queryKey: query.queryKey });
-            fetchStartTimes.delete(queryKeyStr);
-          }
-        } else {
-          // Se não está fetching, remove do tracking
-          fetchStartTimes.delete(queryKey);
-        }
-      }
-
-      // Reset global se muitas queries estiverem travando (sinal de problema sistêmico ou rede caindo)
-      if (stuckQueries.length > 0) {
-        stuckCount += stuckQueries.length;
-        if (stuckCount >= 5) { // Aumentado de 3 para 5
-          console.warn('⚠️ Múltiplas queries travando. Resetando queries e limpando tracking...');
-          queryClient.cancelQueries();
-          fetchStartTimes.clear();
-          stuckCount = 0;
-        }
-      }
-    }, 5000); // Check every 5 seconds
-
-    return () => {
-      clearInterval(checkInterval);
-      unsubscribe();
-    };
-  }, [queryClient]);
-
-  return null;
-};
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -610,7 +478,6 @@ const App = () => (
       <SupabaseProjectValidator>
         <AuthProvider>
           <TooltipProvider>
-            <StuckQueryDetector />
             <Toaster />
             <Sonner />
             <BrowserRouter>

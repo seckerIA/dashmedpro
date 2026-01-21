@@ -61,8 +61,11 @@ export function useUserProfile() {
     refetchOnWindowFocus: false,
     staleTime: 10 * 60 * 1000, // 10 minutos
     gcTime: 30 * 60 * 1000, // 30 minutos para idle longo
-    refetchInterval: 5 * 60 * 1000, // Refresh automático a cada 5 min
-    refetchIntervalInBackground: false, // Pausa quando aba não está ativa
+    refetchInterval: () => {
+      if (typeof document !== 'undefined' && document.hidden) return false;
+      return 10 * 60 * 1000; // 10 minutos
+    },
+    refetchIntervalInBackground: false,
   });
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'dono';
