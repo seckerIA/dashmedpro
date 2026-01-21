@@ -64,7 +64,7 @@ import { focusManager } from "@tanstack/react-query";
 import { checkToken } from "@/integrations/supabase/client";
 
 // Configuração customizada de Foco da Janela
-// Cancela queries pendentes e verifica token ANTES de permitir novas queries
+// Verifica token ANTES de permitir refetch de queries com refetchOnWindowFocus
 focusManager.setEventListener((handleFocus) => {
   if (typeof window !== "undefined" && window.addEventListener) {
 
@@ -75,20 +75,16 @@ focusManager.setEventListener((handleFocus) => {
       if (document.visibilityState !== 'visible' || isProcessing) return;
 
       isProcessing = true;
-      console.log('👁️ [FocusManager] Tab visível. Cancelando queries pendentes e verificando token...');
+      console.log('👁️ [FocusManager] Tab visível. Verificando token...');
 
       try {
-        // STEP 1: Cancel ALL currently fetching queries to prevent stuck state
-        queryClient.cancelQueries();
-
-        // STEP 2: Check and refresh token if needed
+        // Check and refresh token if needed
         // This will force page reload if token expired too long ago
         const isValid = await checkToken();
 
         if (isValid) {
-          console.log('✅ [FocusManager] Token OK. Invalidando queries para refetch limpo.');
-          // STEP 3: Invalidate to trigger fresh fetches with valid token
-          queryClient.invalidateQueries();
+          console.log('✅ [FocusManager] Token OK. Liberando queries.');
+          // Let React Query handle refetches normally
           handleFocus();
         } else {
           console.log('⚠️ [FocusManager] Token inválido. Aguardando redirect...');
