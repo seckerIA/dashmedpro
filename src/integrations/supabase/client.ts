@@ -64,7 +64,7 @@ export const checkToken = async (): Promise<boolean> => {
     const sessionResult = await Promise.race([
       supabase.auth.getSession(),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('getSession timeout after 15s')), 15000)
+        setTimeout(() => reject(new Error('getSession timeout after 45s')), 45000)
       ),
     ]);
 

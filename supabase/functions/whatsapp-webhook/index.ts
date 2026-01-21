@@ -463,7 +463,69 @@ async function getOrCreateConversation(
   }
 
   console.log('[Webhook] Created new conversation:', newConversation.id, 'for phone_number_id:', phoneNumberId);
+
+  // Auto-atribuir conversa se configurado
+  await autoAssignIfEnabled(supabase, newConversation.id, userId);
+
   return newConversation.id;
+}
+
+// =========================================
+// Auto-atribuição de conversas novas
+// =========================================
+async function autoAssignIfEnabled(
+  supabase: any,
+  conversationId: string,
+  userId: string
+): Promise<void> {
+  try {
+    // Buscar configuração de atribuição
+    const { data: config } = await supabase
+      .from('whatsapp_assignment_config')
+      .select('id, assignment_mode, auto_assign_new_conversations')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .single();
+
+    if (!config || !config.auto_assign_new_conversations) {
+      console.log('[Webhook] Auto-assignment disabled or not configured for user:', userId);
+      return;
+    }
+
+    if (config.assignment_mode === 'manual') {
+      console.log('[Webhook] Assignment mode is manual, skipping auto-assign');
+      return;
+    }
+
+    // Buscar próxima secretária via round-robin
+    const { data: nextSecretary, error: rrError } = await supabase
+      .rpc('get_next_secretary_round_robin', { p_config_id: config.id });
+
+    if (rrError || !nextSecretary) {
+      console.log('[Webhook] No available secretary for auto-assignment:', rrError?.message);
+      return;
+    }
+
+    // Atribuir conversa
+    const { error: assignError } = await supabase.rpc('assign_conversation_to_secretary', {
+      p_conversation_id: conversationId,
+      p_secretary_id: nextSecretary,
+      p_assigned_by: null, // sistema
+      p_assignment_type: 'auto',
+      p_notes: 'Atribuição automática via round-robin'
+    });
+
+    if (assignError) {
+      console.error('[Webhook] Error in auto-assignment:', assignError);
+      return;
+    }
+
+    console.log('[Webhook] Auto-assigned conversation', conversationId, 'to secretary', nextSecretary);
+
+  } catch (error) {
+    console.error('[Webhook] Error in auto-assignment:', error);
+    // Não falhar o webhook por causa de erro na atribuição
+  }
 }
 
 

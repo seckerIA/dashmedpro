@@ -40,6 +40,7 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhatsAppAI } from '@/hooks/useWhatsAppAI';
 import { CONVERSATION_STATUS_CONFIG } from '@/types/whatsapp';
 import { AISuggestionsPanel, ConversationInsights, LeadScoreBadge, AISettingsDialog } from '@/components/whatsapp/ai';
+import { AssignConversationDialog } from '@/components/whatsapp/assignment';
 import type {
   WhatsAppConversationWithRelations,
   WhatsAppMessageWithRelations,
@@ -89,6 +90,7 @@ export function ChatWindow({
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [showAISettings, setShowAISettings] = useState(false);
   const [isAIProcessing, setIsAIProcessing] = useState(false);
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
 
   // Messages
   const {
@@ -519,6 +521,13 @@ export function ChatWindow({
                   <Tag className="h-4 w-4 mr-2" />
                   Ver detalhes
                 </DropdownMenuItem>
+
+                <DropdownMenuSeparator />
+
+                <DropdownMenuItem onClick={() => setShowAssignDialog(true)}>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  {conversation.assigned_to ? 'Transferir conversa' : 'Atribuir conversa'}
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -621,6 +630,14 @@ export function ChatWindow({
         open={showAISettings}
         onOpenChange={setShowAISettings}
         targetUserId={conversation.user_id}
+      />
+
+      <AssignConversationDialog
+        conversationId={conversation.id}
+        currentAssignedTo={conversation.assigned_to}
+        conversationOwnerId={conversation.user_id}
+        open={showAssignDialog}
+        onOpenChange={setShowAssignDialog}
       />
     </div>
   );

@@ -90,17 +90,17 @@ focusManager.setEventListener((handleFocus) => {
         .then((isValid) => {
           if (isValid) {
             console.log('✅ [App] Token válido após check. Liberando queries.');
-            handleFocus();
           } else {
-            console.warn('🛑 [App] Token inválido ou refresh falhou. Queries PAUSADAS até re-login.');
-            // Não chama handleFocus(), o que efetivamente pausa as queries até que um reload/login ocorra
+            console.warn('⚠️ [App] Check de token falhou, mas liberando queries para evitar travamento. (Erros 401 serão capturados globalmente)');
           }
         })
         .catch(err => {
           console.error('⚠️ [App] Erro ao verificar token no focus:', err);
-          // Em caso de erro de rede, podemos decidir liberar ou não.
-          // Por segurança, liberamos para não travar o app se for apenas flutuação de rede
-          // O QueryCache global vai pegar o erro depois se persistir
+        })
+        .finally(() => {
+          // SEMPRE liberar o foco. Se o token estiver inválido, as queries falharão com 401
+          // e o QueryCache global tratará isso (forcing reload/login).
+          // Não podemos deixar o app "pausado" silenciosamente.
           handleFocus();
         });
     }

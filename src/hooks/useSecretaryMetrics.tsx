@@ -94,7 +94,8 @@ export function useSecretaryMetrics() {
           status,
           user_id,
           doctor_id,
-          contact:crm_contacts(id, full_name, phone, email)
+          doctor_id,
+          contact_id
         `)
         .gte('start_time', todayStart)
         .lte('start_time', monthEnd) // Limitar até o fim do mês
@@ -157,6 +158,7 @@ export function useSecretaryMetrics() {
       let contactsWeekCount = 0;
       let totalContactsCount = 0;
       let myAppointmentsCount = 0;
+      let contactsMap = new Map();
 
       try {
         const [
@@ -179,37 +181,61 @@ export function useSecretaryMetrics() {
         if (appointmentsResult.error) {
           console.error('[useSecretaryMetrics] Erro ao buscar consultas:', appointmentsResult.error);
         } else {
-          appointments = appointmentsResult.data || [];
+          appointments = (appointmentsResult.data as any[]) || [];
+
+          // Buscar detalhes dos contatos separadamente para evitar erro 400/RLS no join
+          const contactIds = appointments
+            .map((a: any) => a.contact_id)
+            .filter((id, index, self) => id && self.indexOf(id) === index);
+
+          if (contactIds.length > 0) {
+            const { data: contactsData, error: contactsError } = await supabase
+              .from('crm_contacts')
+              .select('id, full_name, phone, email')
+              .in('id', contactIds);
+
+            if (!contactsError && contactsData) {
+              (contactsData as any[]).forEach(c => contactsMap.set(c.id, c));
+            } else if (contactsError) {
+              console.error('[useSecretaryMetrics] Erro ao buscar detalhes dos contatos:', contactsError);
+            }
+          }
+
+          // Anexar dados do contato manualmente
+          appointments = appointments.map(apt => ({
+            ...apt,
+            contact: apt.contact_id ? contactsMap.get(apt.contact_id) : null
+          }));
         }
 
         if (doctorsResult.error) {
           console.error('[useSecretaryMetrics] Erro ao buscar médicos:', doctorsResult.error);
         } else {
-          doctors = doctorsResult.data || [];
+          doctors = (doctorsResult.data as any[]) || [];
         }
 
         if (contactsTodayResult.error) {
           console.error('[useSecretaryMetrics] Erro ao buscar contatos de hoje:', contactsTodayResult.error);
         } else {
-          contactsTodayCount = contactsTodayResult.data?.length || 0;
+          contactsTodayCount = (contactsTodayResult.data as any[])?.length || 0;
         }
 
         if (contactsWeekResult.error) {
           console.error('[useSecretaryMetrics] Erro ao buscar contatos da semana:', contactsWeekResult.error);
         } else {
-          contactsWeekCount = contactsWeekResult.data?.length || 0;
+          contactsWeekCount = (contactsWeekResult.data as any[])?.length || 0;
         }
 
         if (totalContactsResult.error) {
           console.error('[useSecretaryMetrics] Erro ao buscar total de contatos:', totalContactsResult.error);
         } else {
-          totalContactsCount = totalContactsResult.data?.length || 0;
+          totalContactsCount = (totalContactsResult.data as any[])?.length || 0;
         }
 
         if (myAppointmentsResult.error) {
           console.error('[useSecretaryMetrics] Erro ao buscar consultas agendadas por mim:', myAppointmentsResult.error);
         } else {
-          myAppointmentsCount = myAppointmentsResult.data?.length || 0;
+          myAppointmentsCount = (myAppointmentsResult.data as any[])?.length || 0;
         }
       } catch (error) {
         console.error('[useSecretaryMetrics] Erro geral ao buscar métricas:', error);
