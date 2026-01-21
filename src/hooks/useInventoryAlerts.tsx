@@ -169,7 +169,7 @@ export function useInventoryAlerts() {
                     lowStock: lowStockCount,
                     alerts,
                 };
-            }, 20000); // 20s timeout
+            }, 60000); // 60s timeout to avoid persistence of errors
         },
         enabled: !!user,
         refetchInterval: createVisibilityAwareInterval(60000), // Atualizar a cada 1 minuto (quando tab visível)

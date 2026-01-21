@@ -92,7 +92,19 @@ export function useWhatsAppAssignment() {
                 console.error('[useWhatsAppAssignment] Config error:', error);
             }
 
-            return data as AssignmentConfig | null;
+            // Universal fallback: If no config exists, return default instead of null
+            // This prevents 406 errors and blocked UI for new users
+            return (data as AssignmentConfig) || {
+                id: 'default',
+                user_id: ownerId,
+                assignment_mode: 'manual',
+                auto_assign_new_conversations: false,
+                notify_on_assignment: true,
+                max_open_per_secretary: 5,
+                is_active: true,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            };
         },
         enabled: !!ownerId,
         staleTime: 5 * 60 * 1000,
@@ -287,7 +299,7 @@ export function useWhatsAppAssignment() {
         mutationFn: async (conversationId: string) => {
             const { error } = await supabase
                 .from('whatsapp_conversations')
-                .update({ assigned_to: null })
+                .update({ assigned_to: null } as any)
                 .eq('id', conversationId);
 
             if (error) throw error;
@@ -394,12 +406,14 @@ export function useAssignmentMetrics(secretaryId?: string) {
                 .eq('secretary_id', targetId)
                 .maybeSingle();
 
+            const poolData = poolEntry as any;
+
             return {
                 currentOpen: open,
                 currentTotal: total,
-                totalAssigned: poolEntry?.total_assigned || 0,
-                totalResolved: poolEntry?.total_resolved || resolved,
-                avgResponseTime: poolEntry?.avg_response_time_seconds || null,
+                totalAssigned: poolData?.total_assigned || 0,
+                totalResolved: poolData?.total_resolved || resolved,
+                avgResponseTime: poolData?.avg_response_time_seconds || null,
             };
         },
         enabled: !!secretaryId || !!user?.id,
