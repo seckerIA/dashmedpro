@@ -170,21 +170,9 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .lte("start_time", periodEndISO);
 
       // console.log('📡 [useCommercialMetrics] Buscando appointments...');
-      const appointmentsResult = await supabaseQueryWithTimeout(appointmentsQuery as any, 25000, signal);
-      const { data: appointments, error: appointmentsError } = appointmentsResult as { data: any[], error: any };
+      // 1-4. Executar queries independentes em paralelo
 
-      if (appointmentsError) {
-        console.error('❌ [useCommercialMetrics] Erro appointments:', appointmentsError);
-        throw appointmentsError;
-      }
-      // console.log(`✅ [useCommercialMetrics] ${appointments?.length || 0} appointments encontrados.`);
-
-      // Preparar IDs de transações para busca paralela
-      const transactionIds = appointments
-        ?.map(a => a.financial_transaction_id)
-        .filter((id): id is string => id !== null && id !== undefined) || [];
-
-      // 2. Buscar transações financeiras do período
+      // 2. Definir query de transações
       const transactionsQuery = supabase
         .from("financial_transactions")
         .select(`
@@ -204,39 +192,18 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .gte("transaction_date", format(period.start, "yyyy-MM-dd"))
         .lte("transaction_date", format(period.end, "yyyy-MM-dd"));
 
-      // console.log('📡 [useCommercialMetrics] Buscando transactions...');
-      const transactionsResult = await supabaseQueryWithTimeout(transactionsQuery as any, 25000, signal);
-      const { data: transactions, error: transactionsError } = transactionsResult as { data: any[], error: any };
-
-      if (transactionsError) {
-        if (!transactionsError.message?.includes('AbortError') && transactionsError.name !== 'AbortError') {
-          console.error('❌ [useCommercialMetrics] Erro transactions:', transactionsError);
-        }
-        throw transactionsError;
-      }
-      // console.log(`✅ [useCommercialMetrics] ${transactions?.length || 0} transactions encontradas.`);
-
-      // Atualizar transactionIds com as transações encontradas
-      const allTransactionIds = transactions?.map(t => t.id) || [];
-
-      // 3-5. Executar queries em paralelo (que não dependem de transactionIds)
+      // Executar queries independentes em paralelo
       const [
-        costsResult,
+        appointmentsResult,
+        transactionsResult,
         leadsResult,
-        campaignsResult,
+        campaignsResult
       ] = await Promise.all([
-        // 3. Buscar custos detalhados das transações
-        allTransactionIds.length > 0
-          ? supabaseQueryWithTimeout(
-            supabase
-              .from("transaction_costs")
-              .select("*")
-              .in("transaction_id", allTransactionIds) as any,
-            25000,
-            signal
-          )
-          : Promise.resolve({ data: [], error: null }),
-
+        // 1. Appointments
+        supabaseQueryWithTimeout(appointmentsQuery as any, 25000, signal),
+        // 2. Transactions
+        supabaseQueryWithTimeout(transactionsQuery as any, 25000, signal),
+        // 3. Leads
         supabaseQueryWithTimeout(
           supabase
             .from("commercial_leads")
@@ -247,8 +214,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
           25000,
           signal
         ),
-
-        // 5. Buscar campanhas
+        // 4. Campaigns
         supabaseQueryWithTimeout(
           supabase
             .from("commercial_campaigns")
@@ -256,12 +222,34 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
             .in("user_id", targetUserIds) as any,
           25000,
           signal
-        ),
+        )
       ]);
 
-      const { data: costs, error: costsError } = costsResult as { data: any[], error: any };
+      const { data: appointments, error: appointmentsError } = appointmentsResult as { data: any[], error: any };
+      const { data: transactions, error: transactionsError } = transactionsResult as { data: any[], error: any };
       const { data: leads, error: leadsError } = leadsResult as { data: any[], error: any };
       const { data: campaigns, error: campaignsError } = campaignsResult as { data: any[], error: any };
+
+      if (appointmentsError) throw appointmentsError;
+      if (transactionsError) throw transactionsError;
+      if (leadsError && !leadsError.message?.includes('AbortError')) console.error('❌ Erro leads:', leadsError);
+
+      // Preparar dados para próxima query
+      const allTransactionIds = transactions?.map(t => t.id) || [];
+
+      // 5. Buscar custos (depende das transações)
+      const costsResult = allTransactionIds.length > 0
+        ? await supabaseQueryWithTimeout(
+          supabase
+            .from("transaction_costs")
+            .select("*")
+            .in("transaction_id", allTransactionIds) as any,
+          25000,
+          signal
+        )
+        : { data: [], error: null };
+
+      const { data: costs, error: costsError } = costsResult as { data: any[], error: any };
 
       if (costsError) throw costsError;
       if (leadsError) {

@@ -37,39 +37,39 @@ export function useInventoryAlerts() {
         queryKey: ["inventory-alerts", user?.id],
         queryFn: async (): Promise<AlertsSummary> => {
             return withQueryTimeout(async () => {
-                // Buscar lotes com validade
-                const { data: batchesData, error: batchesError } = await supabase
-                    .from("inventory_batches")
-                    .select(`
-          id,
-          batch_number,
-          quantity,
-          expiration_date,
-          is_active,
-          inventory_items (
-            id,
-            name,
-            category
-          )
-        `)
-                    .eq("is_active", true);
+                // Parallelize fetching batches and items
+                const [batchesResult, itemsResult] = await Promise.all([
+                    supabase
+                        .from("inventory_batches")
+                        .select(`
+                          id,
+                          batch_number,
+                          quantity,
+                          expiration_date,
+                          is_active,
+                          inventory_items (
+                            id,
+                            name,
+                            category
+                          )
+                        `)
+                        .eq("is_active", true),
 
-                if (batchesError) throw batchesError;
+                    supabase
+                        .from("inventory_items")
+                        .select(`
+                          id,
+                          name,
+                          min_stock,
+                          inventory_batches (quantity, is_active)
+                        `)
+                ]);
 
-                // Buscar itens para verificar estoque baixo
-                const { data: itemsData, error: itemsError } = await supabase
-                    .from("inventory_items")
-                    .select(`
-          id,
-          name,
-          min_stock,
-          inventory_batches (quantity, is_active)
-        `);
+                if (batchesResult.error) throw batchesResult.error;
+                if (itemsResult.error) throw itemsResult.error;
 
-                if (itemsError) throw itemsError;
-
-                const batches = (batchesData || []) as any[];
-                const items = (itemsData || []) as any[];
+                const batches = (batchesResult.data || []) as any[];
+                const items = (itemsResult.data || []) as any[];
                 const today = new Date();
                 const alerts: InventoryAlertItem[] = [];
 
@@ -169,7 +169,7 @@ export function useInventoryAlerts() {
                     lowStock: lowStockCount,
                     alerts,
                 };
-            }, 15000); // 15s timeout
+            }, 20000); // 20s timeout
         },
         enabled: !!user,
         refetchInterval: createVisibilityAwareInterval(60000), // Atualizar a cada 1 minuto (quando tab visível)

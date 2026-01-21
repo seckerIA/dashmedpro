@@ -67,9 +67,10 @@ const fetchDeals = async (
   }
 
   // Removido 'service' e 'service_value' do select pois estão causando erro 400 no banco (colunas inexistentes)
+  // Usando FK explícita para evitar ambiguidade (crm_deals_contact_id_fkey)
   const queryPromise = supabase
     .from('crm_deals')
-    .select(`*, contact:crm_contacts(id, full_name, email, phone, company)`);
+    .select(`*, contact:crm_contacts!crm_deals_contact_id_fkey(id, full_name, email, phone, company)`);
 
   // Se tivermos uma condição OR (filtro de usuário), aplicamos. Se não, traz TUDO (respeitando RLS)
   if (orCondition) {
@@ -87,7 +88,7 @@ const fetchDeals = async (
     if (error.message?.includes('AbortError') || error.code === '20') {
       return []; // Retorna vazio silenciosamente
     }
-    console.error('❌ Erro no PostgREST crm_deals:', error);
+    console.error('❌ [useCRM] Erro ao buscar deals:', error.message || error);
     // Fallback absoluto sem subquery
     // Se não tiver orCondition, é fetchAll -> sem filtro .or()
     let fallbackQuery = supabase.from('crm_deals').select('*');
@@ -274,11 +275,11 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
     if (existing?.length > 0) {
       contact = existing[0];
     } else {
-      contact = await createRecord('crm_contacts', { 
-        user_id: user.id, 
+      contact = await createRecord('crm_contacts', {
+        user_id: user.id,
         organization_id: profile?.organization_id,
-        full_name: contactName || `WhatsApp ${phoneNumber}`, 
-        phone: phoneNumber 
+        full_name: contactName || `WhatsApp ${phoneNumber}`,
+        phone: phoneNumber
       });
     }
 
@@ -290,13 +291,13 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
     if (existingDeals?.length > 0) {
       deal = await updateRecord('crm_deals', existingDeals[0].id, { stage: targetStage, value: value || undefined });
     } else {
-      deal = await createRecord('crm_deals', { 
-        user_id: user.id, 
+      deal = await createRecord('crm_deals', {
+        user_id: user.id,
         organization_id: profile?.organization_id,
-        contact_id: contact.id, 
-        title: contactName || `Lead WhatsApp ${phoneNumber}`, 
-        stage: targetStage, 
-        value: value || null 
+        contact_id: contact.id,
+        title: contactName || `Lead WhatsApp ${phoneNumber}`,
+        stage: targetStage,
+        value: value || null
       });
     }
 
