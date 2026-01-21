@@ -207,6 +207,13 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
   }, [consultationProcedure, contact, watchedService, form]);
 
   const onSubmit = async (data: ContactFormData) => {
+    // Bloquear dupla submissão
+    if (isSubmitting) {
+      console.log('⚠️ ContactForm - Submissão já em andamento, ignorando');
+      return;
+    }
+    setIsSubmitting(true);
+
     console.log('📝 ContactForm onSubmit chamado com data:', data);
 
     // Função auxiliar para criar timeout em promises
@@ -222,6 +229,16 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
     try {
       // Forçar refresh da sessão antes de salvar (evita stale connection após idle)
       await supabase.auth.refreshSession().catch(() => {});
+
+      // Verificar se procedures carregaram
+      if (isLoadingProcedures) {
+        toast({
+          variant: "destructive",
+          title: "Aguarde",
+          description: "Carregando procedimentos...",
+        });
+        return;
+      }
 
       // Validação: verificar se há procedimento CONSULTA para novos contatos
       if (!contact && !hasConsultationProcedure) {
@@ -559,6 +576,8 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
         title: "Erro",
         description: error instanceof Error ? error.message : "Erro ao salvar contato",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
