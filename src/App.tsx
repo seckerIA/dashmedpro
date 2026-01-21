@@ -68,21 +68,41 @@ import CallsPage from "@/pages/Calls";
 import VOIPSettings from "@/pages/VOIPSettings";
 
 import { focusManager } from "@tanstack/react-query";
-import { checkToken, supabase } from "@/integrations/supabase/client";
+import { checkToken, supabase, wasRecentlyAuthenticated } from "@/integrations/supabase/client";
 
-// Configuração customizada de Foco da Janela (não-bloqueante)
-// Libera queries IMEDIATAMENTE e verifica token em background para evitar travamentos
+// Configuração customizada de Foco da Janela (não-bloqueante mas segura)
 focusManager.setEventListener((handleFocus) => {
   if (typeof window === "undefined") return () => { };
 
   const onVisibilityChange = () => {
     if (document.visibilityState === 'visible') {
-      // Força refresh da conexão Supabase para evitar stale connections após idle
-      supabase.auth.refreshSession().catch(() => { });
-      // Libera queries IMEDIATAMENTE (não bloqueia UI)
-      handleFocus();
-      // Verifica token em background (não bloqueia navegação)
-      checkToken().catch(err => console.error('[FocusManager] Token check error:', err));
+      console.log('👁️ [App] Janela focada. Verificando sessão antes de liberar queries...');
+
+      // Se verificou recentemente (< 1 min), libera imediatamente
+      if (wasRecentlyAuthenticated()) {
+        console.log('⚡ [App] Sessão verificada recentemente. Liberando queries imediatamente.');
+        handleFocus();
+        return;
+      }
+
+      // Caso contrário, verifica token primeiro para evitar 401 ou loop
+      checkToken()
+        .then((isValid) => {
+          if (isValid) {
+            console.log('✅ [App] Token válido após check. Liberando queries.');
+            handleFocus();
+          } else {
+            console.warn('🛑 [App] Token inválido ou refresh falhou. Queries PAUSADAS até re-login.');
+            // Não chama handleFocus(), o que efetivamente pausa as queries até que um reload/login ocorra
+          }
+        })
+        .catch(err => {
+          console.error('⚠️ [App] Erro ao verificar token no focus:', err);
+          // Em caso de erro de rede, podemos decidir liberar ou não.
+          // Por segurança, liberamos para não travar o app se for apenas flutuação de rede
+          // O QueryCache global vai pegar o erro depois se persistir
+          handleFocus();
+        });
     }
   };
 
