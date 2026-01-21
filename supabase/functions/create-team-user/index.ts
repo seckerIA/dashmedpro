@@ -86,6 +86,21 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    // Dono: validar que doctor_id está na hierarquia (se fornecido)
+    if (profile.role === 'dono' && doctor_id) {
+      const { data: hierarchyData } = await supabaseAdmin
+        .rpc('get_user_hierarchy', { user_id: user.id });
+
+      const hierarchyIds = (hierarchyData || []).map((h: any) => h.profile_id);
+
+      if (!hierarchyIds.includes(doctor_id)) {
+        return new Response(
+          JSON.stringify({ error: 'Você só pode atribuir secretárias a médicos da sua hierarquia' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // Validate: secretaria should have doctor_id (mas não é obrigatório na criação para flexibilidade)
     // A validação obrigatória será feita no frontend (TeamManagement)
 

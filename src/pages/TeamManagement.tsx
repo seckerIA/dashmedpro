@@ -67,7 +67,27 @@ const TeamManagement = () => {
           setProfiles([]);
           return;
         }
+      } else if (profile?.role === 'dono' && user?.id) {
+        // Dono vê apenas usuários na sua hierarquia (criados por ele ou por sua hierarquia)
+        const { data: hierarchyData, error: hierarchyError } = await supabase
+          .rpc('get_user_hierarchy', { user_id: user.id }) as { data: Array<{ profile_id: string }> | null, error: any };
+
+        if (hierarchyError) {
+          console.error('Erro ao buscar hierarquia:', hierarchyError);
+          toast({
+            variant: 'destructive',
+            title: 'Erro ao carregar hierarquia',
+            description: 'Não foi possível carregar a hierarquia de usuários.',
+          });
+          return;
+        }
+
+        const hierarchyIds = (hierarchyData && hierarchyData.length > 0)
+          ? hierarchyData.map((h: any) => h.profile_id)
+          : [user.id];
+        query = query.in('id', hierarchyIds);
       }
+      // Admin: sem filtro (vê todos os usuários)
 
       const { data, error } = await query.order('created_at', { ascending: false });
 
@@ -88,12 +108,25 @@ const TeamManagement = () => {
   const fetchDoctors = async () => {
     setLoadingDoctors(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('profiles')
         .select('id, full_name, email')
         .in('role', ['medico', 'dono'])
-        .eq('is_active', true)
-        .order('full_name', { ascending: true });
+        .eq('is_active', true);
+
+      // Dono pode apenas atribuir a médicos dentro da sua hierarquia
+      if (profile?.role === 'dono' && user?.id) {
+        const { data: hierarchyData, error: hierarchyError } = await supabase
+          .rpc('get_user_hierarchy', { user_id: user.id }) as { data: Array<{ profile_id: string }> | null, error: any };
+
+        if (!hierarchyError && hierarchyData && hierarchyData.length > 0) {
+          const hierarchyIds = hierarchyData.map((h: any) => h.profile_id);
+          query = query.in('id', hierarchyIds);
+        }
+      }
+      // Admin: sem filtro (pode atribuir a qualquer médico)
+
+      const { data, error } = await query.order('full_name', { ascending: true });
 
       if (error) {
         throw error;

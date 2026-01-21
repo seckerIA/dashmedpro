@@ -9,9 +9,15 @@ import type { Database } from './types';
 const FETCH_TIMEOUT_MS = 40000; // 40 seconds
 
 const fetchWithTimeout: typeof fetch = async (url, options = {}) => {
+  const requestId = Math.random().toString(36).substring(7);
+  const urlStr = typeof url === 'string' ? url : 'request';
+  const shortUrl = urlStr.split('?')[0].split('/').pop();
+
+  // console.log(`📡 [Fetch:${requestId}] start: ${shortUrl}`); // Uncomment for verbose debug
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => {
-    console.warn(`⏳ [Fetch] Timeout de ${FETCH_TIMEOUT_MS}ms em: ${typeof url === 'string' ? url.split('?')[0] : 'request'}`);
+    console.warn(`⏳ [Fetch:${requestId}] Timeout de ${FETCH_TIMEOUT_MS}ms em: ${urlStr}`);
     controller.abort();
   }, FETCH_TIMEOUT_MS);
 
@@ -21,12 +27,15 @@ const fetchWithTimeout: typeof fetch = async (url, options = {}) => {
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
+    // console.log(`✅ [Fetch:${requestId}] done: ${shortUrl} (${response.status})`);
     return response;
   } catch (error: any) {
     clearTimeout(timeoutId);
     if (error.name === 'AbortError') {
+      console.error(`❌ [Fetch:${requestId}] Abortado (timeout)`);
       throw new Error(`Timeout de ${FETCH_TIMEOUT_MS}ms excedido`);
     }
+    console.error(`❌ [Fetch:${requestId}] Erro de rede:`, error);
     throw error;
   }
 };
@@ -35,7 +44,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   auth: {
     storage: localStorage,
     persistSession: true,
-    autoRefreshToken: true,
+    autoRefreshToken: true, // Re-enabled - the timeout fix should handle slow refreshes
     storageKey: `sb-${CURRENT_PROJECT_REF}-auth-token`,
     detectSessionInUrl: false,
     flowType: 'pkce',
@@ -61,10 +70,11 @@ let lastSuccessfulCheck = Date.now();
 export const checkToken = async (): Promise<boolean> => {
   try {
     // Race between getSession and timeout to prevent hanging after idle
+    // CRITICAL: Reduced from 45s to 5s - if auth is slow, queries should proceed anyway
     const sessionResult = await Promise.race([
       supabase.auth.getSession(),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('getSession timeout after 45s')), 45000)
+        setTimeout(() => reject(new Error('getSession timeout after 5s')), 5000)
       ),
     ]);
 
@@ -134,10 +144,12 @@ export const checkToken = async (): Promise<boolean> => {
     return true;
 
   } catch (e) {
-    // Timeout ou erro de rede não significa que precisa relogar
-    // Apenas significa conexão lenta - retorna false silenciosamente
-    console.warn('⚠️ [Auth] Erro no check de token (provavelmente rede lenta):', e);
-    return false;
+    // CRITICAL FIX: Se getSession timeout (rede lenta após idle),
+    // retornar TRUE para permitir que queries prossigam.
+    // Se o token realmente estiver inválido, as queries falharão com 401
+    // e serão tratadas pelo error handler global do QueryClient.
+    console.warn('⚠️ [Auth] getSession timeout - permitindo queries (fail-soft):', e);
+    return true; // Changed from false to true
   }
 };
 

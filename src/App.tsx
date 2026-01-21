@@ -1,8 +1,9 @@
+import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AppLayout } from "./components/layout/AppLayout";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
@@ -77,28 +78,12 @@ focusManager.setEventListener((handleFocus) => {
 
   const onVisibilityChange = () => {
     if (document.visibilityState === 'visible') {
-      console.log('👁️ [App] Janela focada. Verificando sessão antes de liberar queries...');
+      console.log('👁️ [App] Janela focada. Liberando queries imediatamente...');
 
-      // CRITICAL FIX: Liberar queries IMEDIATAMENTE.
-      // Não podemos esperar o checkToken pois ele pode demorar 45s em redes lentas,
-      // causando a sensação de "travamento" na UI.
+      // CRITICAL: Liberar queries IMEDIATAMENTE sem nenhuma verificação
+      // Após 3h parado, qualquer check pode demorar. Queries que falharem
+      // por token inválido serão tratadas pelo error handler global.
       handleFocus();
-
-      // Se verificou recentemente, não precisa checar de novo
-      if (wasRecentlyAuthenticated()) {
-        return;
-      }
-
-      // Verifica token em background (sem travar a UI)
-      checkToken().then((isValid) => {
-        if (!isValid) {
-          console.warn('⚠️ [App] Sessão não recuperada em background.');
-        } else {
-          console.log('✅ [App] Sessão confirmada e ativa.');
-        }
-      }).catch(err => {
-        console.error('⚠️ [App] Erro silencioso no check de background:', err);
-      });
     }
   };
 
@@ -222,6 +207,25 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   return <>{children}</>;
+};
+
+// Route Change Handler - Cancels all queries on navigation to prevent connection pool exhaustion
+const RouteChangeHandler = ({ queryClient }: { queryClient: QueryClient }) => {
+  const location = useLocation();
+  const [prevLocation, setPrevLocation] = React.useState(location.pathname);
+
+  React.useEffect(() => {
+    if (location.pathname !== prevLocation) {
+      console.log(`🔄 [RouteChange] Navegando de ${prevLocation} para ${location.pathname}. Cancelando todas as queries...`);
+
+      // Cancel ALL pending queries to free up HTTP connections
+      queryClient.cancelQueries();
+
+      setPrevLocation(location.pathname);
+    }
+  }, [location.pathname, prevLocation, queryClient]);
+
+  return null;
 };
 
 // Role Protected Route Component
@@ -528,6 +532,7 @@ const App = () => (
             <Toaster />
             <Sonner />
             <BrowserRouter>
+              <RouteChangeHandler queryClient={queryClient} />
               <AppRoutes />
             </BrowserRouter>
           </TooltipProvider>
