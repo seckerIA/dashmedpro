@@ -235,6 +235,7 @@ const StuckQueryDetector = () => {
         fetchStartTimes.clear(); // Limpa para evitar falso-positivo ao acordar
         return;
       }
+
       if (typeof window !== 'undefined' && !window.navigator.onLine) {
         return;
       }
@@ -258,13 +259,13 @@ const StuckQueryDetector = () => {
 
           const timeSinceStart = now - fetchStartTime;
 
-          // Timeout de detecção ajustado para 20s (tolerante a redes instáveis)
-          const stuckThreshold = 20000;
+          // Timeout de detecção ajustado para 30s (maior que qualquer timeout de query)
+          const stuckThreshold = 30000;
 
           if (timeSinceStart > stuckThreshold) {
             stuckQueries.push(query);
             const queryKeyStr = query.queryKey.join('/');
-            console.warn(`⚠️ [StuckQueryDetector] Cancelando query travada (>20s): ${queryKeyStr}`);
+            console.warn(`⚠️ [StuckQueryDetector] Cancelando query travada (>30s): ${queryKeyStr}`);
 
             // Forçar cancelamento - isso deve disparar o fallback/erro da query
             queryClient.cancelQueries({ queryKey: query.queryKey });
@@ -279,7 +280,7 @@ const StuckQueryDetector = () => {
       // Reset global se muitas queries estiverem travando (sinal de problema sistêmico ou rede caindo)
       if (stuckQueries.length > 0) {
         stuckCount += stuckQueries.length;
-        if (stuckCount >= 3) {
+        if (stuckCount >= 5) { // Aumentado de 3 para 5
           console.warn('⚠️ Múltiplas queries travando. Resetando queries e limpando tracking...');
           queryClient.cancelQueries();
           fetchStartTimes.clear();
