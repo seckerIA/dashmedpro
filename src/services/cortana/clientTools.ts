@@ -39,12 +39,10 @@ type ActionCallback = (action: PendingAction) => void;
 let actionCallback: ActionCallback | null = null;
 
 export function setActionCallback(callback: ActionCallback) {
-  console.log('[clientTools] Callback de ação registrado', !!callback);
   actionCallback = callback;
 }
 
 function emitAction(action: PendingAction) {
-  console.log('[clientTools] Emitindo ação:', action.type, action.payload);
   if (actionCallback) {
     actionCallback(action);
   } else {
@@ -57,12 +55,6 @@ function emitAction(action: PendingAction) {
  * Estes são chamados automaticamente pelo agente de voz
  */
 export function createClientTools(context: CortanaContext) {
-  console.log('[clientTools] Criando client tools com contexto:', {
-    userId: context.userId,
-    userName: context.userName,
-    userRole: context.userRole,
-    allowedActions: context.allowedActions,
-  });
 
   const userId = context.userId;
   const doctorIds = context.doctorIds || [];
@@ -413,7 +405,6 @@ export function createClientTools(context: CortanaContext) {
        * Cria um novo agendamento
        */
       createAppointment: async (params: CreateAppointmentParams): Promise<ToolResult> => {
-        console.log('[clientTools] 🔧 createAppointment chamado com params:', params);
         try {
           // Primeiro, buscar o paciente
           const { data: contacts, error: contactError } = await supabase

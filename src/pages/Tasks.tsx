@@ -26,18 +26,10 @@ const Tasks = () => {
     isUpdatingAssignment,
   } = useTasks();
 
-  // Log de debug para verificar estado
-  useEffect(() => {
-    console.log('[Tasks] Componente montado');
-    console.log('[Tasks] User:', user);
-    console.log('[Tasks] Tasks:', tasks);
-    console.log('[Tasks] Team Members:', teamMembers);
-    console.log('[Tasks] IsLoading:', isLoading);
-  }, [user, tasks, teamMembers, isLoading]);
+
 
   const handleTaskCreate = async (data: CreateTaskData) => {
     try {
-      console.log('[Tasks] Iniciando criação de tarefa:', data);
 
       if (!user?.id) {
         console.error('[Tasks] Erro: Usuário não autenticado');
@@ -50,7 +42,6 @@ const Tasks = () => {
       }
 
       await createTask(data);
-      console.log('[Tasks] Tarefa criada com sucesso');
 
       toast({
         title: "Tarefa criada",

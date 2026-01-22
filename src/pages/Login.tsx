@@ -98,8 +98,6 @@ const Login = () => {
     setLoading(true);
 
     try {
-      console.log('🔍 DEBUG Login - Tentando login com email:', email);
-      console.log('🔍 DEBUG Login - Project Ref esperado:', CURRENT_PROJECT_REF);
 
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -136,8 +134,6 @@ const Login = () => {
 
       // Verificar se o usuário existe no perfil após login bem-sucedido
       if (data?.user) {
-        console.log('✅ Usuário autenticado:', data.user.email);
-        console.log('✅ User ID:', data.user.id);
 
         // Aguardar um momento para garantir que a sessão foi totalmente estabelecida
         await new Promise(resolve => setTimeout(resolve, 500));

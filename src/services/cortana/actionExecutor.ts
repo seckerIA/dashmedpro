@@ -69,7 +69,6 @@ export class ActionExecutor {
    * Executa uma ação baseada no tipo
    */
   execute(action: { type: string; payload: unknown }): void {
-    console.log('[ActionExecutor] Executando:', action);
     switch (action.type) {
       case 'navigate':
         this.handleNavigate(action.payload as { path: string });
@@ -101,7 +100,6 @@ export class ActionExecutor {
 
   private handleNavigate(payload: { path: string }): void {
     const { path } = payload;
-    console.log(`[ActionExecutor] Navegando para: ${path}`);
     this.navigate(path);
   }
 
@@ -111,7 +109,6 @@ export class ActionExecutor {
     variant?: 'default' | 'destructive';
     action?: { label: string; path: string };
   }): void {
-    console.log(`[ActionExecutor] Toast: ${payload.title}`);
 
     let actionElement: ReactElement | undefined;
 
@@ -132,14 +129,12 @@ export class ActionExecutor {
   }
 
   private handleOpenModal(payload: { type: string; data?: unknown }): void {
-    console.log(`[ActionExecutor] Abrindo modal: ${payload.type}`);
     if (this.openModal) {
       this.openModal(payload.type, payload.data);
     }
   }
 
   private handleCloseModal(): void {
-    console.log(`[ActionExecutor] Fechando modal`);
     if (this.closeModal) {
       this.closeModal();
     }

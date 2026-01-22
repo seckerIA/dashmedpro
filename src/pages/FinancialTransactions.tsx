@@ -42,10 +42,6 @@ const FinancialTransactions = ({ embedded = false }: FinancialTransactionsProps)
   const [selectedTransaction, setSelectedTransaction] = useState<FinancialTransactionWithDetails | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
 
-  // Debug logs
-  // console.log('FinancialTransactions - transactions:', transactions)
-  // console.log('FinancialTransactions - isLoading:', isLoading)
-
   // Filtrar transações
   const filteredTransactions = transactions?.filter(transaction => {
     const matchesSearch = transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||

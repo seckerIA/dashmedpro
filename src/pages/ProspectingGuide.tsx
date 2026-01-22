@@ -39,20 +39,16 @@ export default function ProspectingGuide() {
 
   const handleFinish = async (result: 'atendimento_encerrado' | 'contato_decisor') => {
     if (result === 'contato_decisor') {
-      console.log('🎯 Usuário escolheu: Contato do Decisor Adquirido');
       // Guardar dados para registrar depois de criar o contato
       setPendingSessionData({
         scriptId: selectedScript?.id,
         result,
       });
-      console.log('📝 Dados da sessão salvos:', { scriptId: selectedScript?.id, result });
       // Importante: Sair da sessão PRIMEIRO para desmontar a tela preta
       setSessionActive(false);
       setSelectedScript(null);
-      console.log('🚪 Sessão encerrada, abrindo formulário...');
       // Depois abrir o formulário (pequeno delay para garantir renderização)
       setTimeout(() => {
-        console.log('✅ Abrindo formulário de contato');
         setShowContactForm(true);
       }, 100);
     } else {
@@ -62,7 +58,7 @@ export default function ProspectingGuide() {
           scriptId: selectedScript?.id,
           result,
         });
-        
+
         toast({
           title: 'Atendimento registrado',
           description: 'O atendimento foi contabilizado nas suas métricas.',
@@ -75,19 +71,15 @@ export default function ProspectingGuide() {
   };
 
   const handleContactCreated = async (dealId?: string) => {
-    console.log('💾 handleContactCreated chamado com dealId:', dealId);
-    console.log('📊 pendingSessionData:', pendingSessionData);
-    
+
     // Registrar a sessão agora que o contato foi criado
     if (pendingSessionData) {
       try {
-        console.log('🔄 Tentando registrar sessão...');
         await createSession({
           scriptId: pendingSessionData.scriptId,
           result: pendingSessionData.result,
         });
-        console.log('✅ Sessão registrada com sucesso!');
-        
+
         toast({
           title: 'Sucesso! 🎉',
           description: 'Contato adicionado ao CRM e atendimento contabilizado na sua meta.',
@@ -101,19 +93,16 @@ export default function ProspectingGuide() {
         });
       }
     } else {
-      console.log('⚠️ Nenhum pendingSessionData encontrado');
       toast({
         title: 'Contato adicionado ao CRM',
         description: 'O lead foi registrado com sucesso no pipeline.',
       });
     }
-    
-    console.log('🧹 Limpando estados...');
+
     setShowContactForm(false);
     setPendingSessionData(null);
-    
+
     // Navegar para o CRM e destacar o deal criado
-    console.log('🚀 Navegando para CRM...');
     if (dealId) {
       navigate(`/crm?highlightDeal=${dealId}`);
     } else {
@@ -164,7 +153,7 @@ export default function ProspectingGuide() {
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Card para iniciar relatório diário */}
         <StartDailyReportCard />
-        
+
         {/* Seção de Scripts */}
         <div className="space-y-6">
           <div className="flex items-center gap-3">
@@ -177,7 +166,7 @@ export default function ProspectingGuide() {
               Scripts de Prospecção
             </h2>
           </div>
-          
+
           <ScriptSelector
             onSelectScript={handleSelectScript}
             onCreateNew={() => {
@@ -194,7 +183,6 @@ export default function ProspectingGuide() {
           initialStage="lead_novo"
           onSuccess={handleContactCreated}
           onCancel={() => {
-            console.log('❌ Usuário cancelou o formulário');
             setShowContactForm(false);
             setPendingSessionData(null);
           }}
