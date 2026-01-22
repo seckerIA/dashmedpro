@@ -4,6 +4,7 @@
  */
 
 import { supabase, CURRENT_PROJECT_REF, SUPABASE_URL } from './client';
+import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
 
 export const EXPECTED_PROJECT_REF = 'adzaqkduxnpckbcuqpmg';
 export const EXPECTED_SUPABASE_URL = 'https://adzaqkduxnpckbcuqpmg.supabase.co';
@@ -74,7 +75,12 @@ export async function validateSession(): Promise<{
   const errors: string[] = [];
 
   try {
-    const { data: { session }, error } = await supabase.auth.getSession();
+    // Timeout para getSession (5s) - Evitar hang na leitura do localStorage/Auth
+    const getSessionPromise = supabase.auth.getSession();
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Timeout obtendo sessão (5s)')), 5000)
+    );
+    const { data: { session }, error } = await Promise.race([getSessionPromise, timeoutPromise]) as any;
 
     if (error) {
       errors.push(`Erro ao obter sessão: ${error.message}`);
@@ -111,12 +117,15 @@ export async function validateSession(): Promise<{
         };
       }
 
-      // Verificar se o usuário existe no banco correto
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, email')
-        .eq('id', session.user.id)
-        .single();
+      // Verificar se o usuário existe no banco correto com timeout (10s)
+      const { data: profile, error: profileError } = await supabaseQueryWithTimeout(
+        supabase
+          .from('profiles')
+          .select('id, email')
+          .eq('id', session.user.id)
+          .single() as any,
+        10000
+      );
 
       if (profileError || !profile) {
         errors.push(
