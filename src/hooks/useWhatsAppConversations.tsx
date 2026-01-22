@@ -140,16 +140,18 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
         };
       }) as WhatsAppConversationWithRelations[];
 
-      // Buscar labels para cada conversa
+      // Buscar labels para cada conversa COM TIMEOUT
       if (dedupedData.length > 0) {
         const conversationIds = dedupedData.map(c => c.id);
-        const { data: labelAssignments } = await supabase
+        const labelsQuery = supabase
           .from('whatsapp_conversation_label_assignments')
           .select(`
             conversation_id,
             label:whatsapp_conversation_labels(id, name, color, description)
           `)
-          .in('conversation_id', conversationIds) as { data: any[] | null };
+          .in('conversation_id', conversationIds);
+
+        const { data: labelAssignments } = await supabaseQueryWithTimeout(labelsQuery as any, 15000) as { data: any[] | null };
 
         // Mapear labels para conversas
         const labelsMap = new Map<string, any[]>();
