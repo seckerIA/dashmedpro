@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import { validateSupabaseProject, validateSession } from '@/integrations/supabase/validator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, XCircle, WifiOff, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export function SupabaseProjectValidator({ children }: { children: React.ReactNode }) {
@@ -67,6 +67,54 @@ export function SupabaseProjectValidator({ children }: { children: React.ReactNo
   // Bloquear apenas se houver ERROS ou falha na validação básica
   if (validation.projectValid && validation.sessionValid && validation.errors.length === 0) {
     return <>{children}</>;
+  }
+
+  // Se for timeout, mostrar tela amigável de conexão
+  const isTimeout = validation.errors.some(e =>
+    e.toLowerCase().includes('timeout') ||
+    e.toLowerCase().includes('network') ||
+    e.toLowerCase().includes('fetch')
+  );
+
+  if (isTimeout) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-background animate-in fade-in duration-500">
+        <div className="max-w-md w-full text-center space-y-6">
+          <div className="mx-auto w-20 h-20 bg-yellow-100 dark:bg-yellow-900/20 rounded-full flex items-center justify-center mb-6">
+            <WifiOff className="h-10 w-10 text-yellow-600 dark:text-yellow-500" />
+          </div>
+          <div className="space-y-3">
+            <h2 className="text-2xl font-bold tracking-tight">Conexão Instável</h2>
+            <p className="text-muted-foreground text-lg">
+              Tentamos conectar mas demorou muito.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Isso é normal quando o computador volta da suspensão ou a internet oscila.
+            </p>
+          </div>
+          <div className="pt-4">
+            <Button
+              size="lg"
+              className="w-full gap-2 h-12 text-lg font-medium shadow-lg hover:shadow-xl transition-all"
+              onClick={() => {
+                // Tenta limpar estado antes
+                try { localStorage.removeItem('supabase.auth.token'); } catch (e) { }
+                window.location.reload();
+              }}
+            >
+              <RefreshCw className="h-5 w-5 animate-spin-slow" />
+              Reconectar Agora
+            </Button>
+          </div>
+          {/* Detalhe técnico discreto */}
+          <div className="pt-8 opacity-50 hover:opacity-100 transition-opacity">
+            <p className="text-xs text-muted-foreground font-mono bg-muted/50 p-2 rounded">
+              {validation.errors[0]?.substring(0, 100)}...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Se houver erros críticos, mostrar alerta
