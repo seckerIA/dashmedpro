@@ -10,48 +10,24 @@ type SupabaseQueryBuilder<T> = Promise<SupabaseQueryResult<T>> & {
 };
 
 /**
- * Wrapper for Supabase queries with real timeout, concurrency control, and AUTO-RETRY.
+ * Wrapper for Supabase queries with real timeout and concurrency control.
+ * 
+ * IMPORTANT: This function does NOT retry internally.
+ * React Query handles retries - doing it here creates an infinite loop.
+ * 
  * PROTECTS AGAINST:
  * 1. Network stalls on resume from idle (via acquireFetchSlot)
  * 2. Infinite hanging requests (via timeout)
- * 3. Ghost/Stale connections (via retry on timeout)
+ * 3. Extension interference (via fast timeout and clear error)
  */
 export async function supabaseQueryWithTimeout<T>(
   queryBuilder: SupabaseQueryBuilder<T> | Promise<SupabaseQueryResult<T>>,
-  timeoutMs: number = 30000, // 30s - falhar rápido (era 90s)
+  timeoutMs: number = 15000, // 15s - fail even faster (was 30s)
   signal?: AbortSignal
 ): Promise<SupabaseQueryResult<T>> {
-  try {
-    // First attempt
-    return await executeQueryWithTimeout(queryBuilder, timeoutMs, signal);
-  } catch (error: any) {
-    // Detect Timeout OR Chrome Extension "message channel closed" errors
-    const isTimeout = error.message && error.message.includes('Timeout');
-    const isExtensionError = error.message && (
-      error.message.includes('message channel closed') ||
-      error.message.includes('Extension context invalidated') ||
-      error.message.includes('object could not be cloned')
-    );
-    const isUserAbort = signal?.aborted || (error.name === 'AbortError');
-
-    if ((isTimeout || isExtensionError) && !isUserAbort) {
-      const waitTime = isExtensionError ? 500 : 0; // Wait a bit if it's an extension crash
-      const reason = isTimeout ? `Timeout de ${timeoutMs}ms` : 'Erro de Extensão';
-
-      console.warn(`🔄 [Retry] ${reason} detectado. Tentando novamente em ${waitTime}ms...`);
-
-      if (waitTime > 0) await new Promise(r => setTimeout(r, waitTime));
-
-      try {
-        // Retry with same timeout
-        return await executeQueryWithTimeout(queryBuilder, timeoutMs, signal);
-      } catch (retryError) {
-        // If retry fails, throw the original error or the new one
-        throw retryError;
-      }
-    }
-    throw error;
-  }
+  // NO INTERNAL RETRY - React Query handles that
+  // This prevents: supabase retry × react query retry = infinite loop
+  return await executeQueryWithTimeout(queryBuilder, timeoutMs, signal);
 }
 
 /**

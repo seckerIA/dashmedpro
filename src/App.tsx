@@ -224,24 +224,30 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: (failureCount, error: any) => {
-        // Máximo de 2 retries para fail-fast
-        if (failureCount >= 2) return false;
+        const errorMsg = error?.message?.toLowerCase() || '';
 
-        // Se for timeout, não retenta - fail fast
-        if (error?.message?.includes('timeout') || error?.message?.includes('Query timeout')) {
+        // Se for timeout, NÃO retenta - mostrar erro imediatamente
+        // Isso evita loops infinitos quando extensões bloqueiam requests
+        if (errorMsg.includes('timeout') || errorMsg.includes('excedido')) {
+          console.warn('🚫 [QueryClient] Timeout detectado, não fazendo retry');
           return false;
         }
 
         // Se for 401, não retenta aqui (será tratado pelo onError acima)
-        if (error?.message?.includes('401') || error?.status === 401) {
+        if (errorMsg.includes('401') || error?.status === 401) {
           return false;
         }
 
-        // Se for erro de extensão, retenta UMA vez
-        if (error?.message?.includes('message channel closed') ||
-          error?.message?.includes('Extension context')) {
-          return failureCount < 1;
+        // Se for erro de extensão, NÃO retenta mais - apenas falha
+        // Isso evita retry × retry = loop infinito
+        if (errorMsg.includes('message channel closed') ||
+          errorMsg.includes('extension context')) {
+          console.warn('🚫 [QueryClient] Erro de extensão detectado, não fazendo retry');
+          return false;
         }
+
+        // Máximo de 1 retry para outros erros (era 2)
+        if (failureCount >= 1) return false;
 
         return true;
       },
