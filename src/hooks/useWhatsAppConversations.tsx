@@ -7,6 +7,7 @@ import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import { useSecretaryDoctors } from '@/hooks/useSecretaryDoctors';
 import { useDoctorSecretaries } from '@/hooks/useDoctorSecretaries';
 import { toast } from '@/components/ui/use-toast';
@@ -28,12 +29,14 @@ interface UseWhatsAppConversationsOptions {
   filters?: WhatsAppConversationFilters;
   limit?: number;
   enabled?: boolean;
+  refetchInterval?: number | false;
 }
 
 export function useWhatsAppConversations(options: UseWhatsAppConversationsOptions = {}) {
   const { filters, limit = 50, enabled = true } = options;
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { isAdmin } = useUserProfile(); // Check admin role
   const { doctorIds } = useSecretaryDoctors();
   const { secretaryIds } = useDoctorSecretaries();
 
@@ -41,6 +44,7 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
   // - próprio usuário
   // - médicos vinculados (se for secretária)
   // - secretárias vinculadas (se for médico)
+  // - Para ADMINS: isso pode ser incompleto se não incluir todos, então usamos bypass
   const userIds = useMemo(() => {
     if (!user?.id) return [];
 
@@ -61,7 +65,7 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
   // Query: Lista de conversas
   // =========================================
   const conversationsQuery = useQuery({
-    queryKey: [WHATSAPP_CONVERSATIONS_KEY, filters, limit, userIds],
+    queryKey: [WHATSAPP_CONVERSATIONS_KEY, filters, limit, userIds, isAdmin],
     queryFn: async (): Promise<WhatsAppConversationWithRelations[]> => {
       if (!user?.id) return [];
 
@@ -73,9 +77,26 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
           assigned_to_profile:profiles!whatsapp_conversations_assigned_to_profiles_fkey(id, full_name, email, avatar_url),
           analysis:whatsapp_conversation_analysis${filters?.leadStatus && filters.leadStatus !== 'all' ? '!inner' : ''}(lead_status)
         `)
-        .in('user_id', userIds)
         .order('last_message_at', { ascending: false, nullsFirst: false })
         .limit(limit);
+
+      // BYPASS LOGIC:
+      // Se for Admin/Dono E não tiver filtro específico de owner, NÃO filtra por user_ids
+      // Deixa o RLS decidir (que agora permite ver tudo)
+      const hasSpecificOwnerFilter = !!(filters?.ownerId && filters.ownerId !== 'all');
+      const shouldFilterByUserId = !isAdmin || hasSpecificOwnerFilter;
+
+      console.log('[useWhatsAppConversations] DEBUG:', {
+        isAdmin,
+        hasSpecificOwnerFilter,
+        shouldFilterByUserId,
+        userIds,
+        ownerId: filters?.ownerId
+      });
+
+      if (shouldFilterByUserId) {
+        query = query.in('user_id', userIds);
+      }
 
       // Aplicar filtros
       if (filters?.status && filters.status !== 'all') {
@@ -99,6 +120,12 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
       }
 
       const { data, error } = await supabaseQueryWithTimeout(query as any, 60000);
+
+      console.log('[useWhatsAppConversations] Query result:', {
+        conversationCount: data?.length || 0,
+        error: error?.message,
+        firstConversation: data?.[0]
+      });
 
       if (error) {
         console.error('[useWhatsAppConversations] Error:', error);

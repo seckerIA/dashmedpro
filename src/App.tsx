@@ -10,6 +10,46 @@ import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { useUserProfile } from "./hooks/useUserProfile";
 import { SupabaseProjectValidator } from "./components/SupabaseProjectValidator";
 import { CortanaProvider, CortanaOverlay } from "./components/cortana";
+import { initHeartbeatRecovery } from "@/lib/heartbeatRecovery";
+
+// Componente para inicializar o Heartbeat de recuperação
+// Componente para inicializar o Heartbeat de recuperação
+const HeartbeatInitializer = () => {
+  const { user } = useAuth();
+  const cleanupRef = React.useRef<(() => void) | null>(null);
+
+  React.useEffect(() => {
+    // Só inicializa se houver usuário logado
+    if (!user) {
+      // Se deslogou, parar o heartbeat
+      if (cleanupRef.current) {
+        cleanupRef.current();
+        cleanupRef.current = null;
+      }
+      return;
+    }
+
+    // Evitar inicialização dupla
+    if (cleanupRef.current) {
+      return;
+    }
+
+    // Inicializar heartbeat
+    import('@/integrations/supabase/client').then(({ supabase }) => {
+      cleanupRef.current = initHeartbeatRecovery(queryClient, supabase);
+    });
+
+    // Cleanup no unmount
+    return () => {
+      if (cleanupRef.current) {
+        cleanupRef.current();
+        cleanupRef.current = null;
+      }
+    };
+  }, [user?.id]); // Usar user.id para evitar re-renders desnecessários
+
+  return null;
+};
 import Dashboard from "./pages/Dashboard";
 import Calculadora from "./pages/Calculadora";
 import CalculadoraSelection from "./pages/CalculadoraSelection";
@@ -73,31 +113,48 @@ import { checkToken, supabase, wasRecentlyAuthenticated } from "@/integrations/s
 import { recoverStuckQueries } from "@/lib/queryUtils";
 
 // Configuração customizada de Foco da Janela (não-bloqueante mas segura)
+// Configuração customizada de Foco da Janela (não-bloqueante mas segura)
 focusManager.setEventListener((handleFocus) => {
   if (typeof window === "undefined") return () => { };
 
   const onVisibilityChange = () => {
     if (document.visibilityState === 'visible') {
-      console.log('👁️ [App] Janela focada. Liberando queries imediatamente...');
+      console.log('👁️ [App] Tab visível');
 
-      // CRITICAL: Resetar contador de concorrência para evitar deadlocks
-      // Se o browser matou conexões no background, o contador pode estar errado.
+      // Resetar fetch tracking SEMPRE
       import("@/lib/queryUtils").then(({ resetFetchTracking }) => {
         resetFetchTracking();
-        console.log('🔓 [App] Travas de concorrência resetadas.');
-      });
+      }).catch(() => { });
 
-      // CRITICAL: Liberar queries IMEDIATAMENTE sem nenhuma verificação
-      // Após 3h parado, qualquer check pode demorar. Queries que falharem
-      // por token inválido serão tratadas pelo error handler global.
+      // Notificar TanStack Query
       handleFocus();
     }
   };
 
+  const onFocus = () => {
+    // Backup: algumas extensões bloqueiam visibilitychange
+    import("@/lib/queryUtils").then(({ resetFetchTracking }) => {
+      resetFetchTracking();
+    }).catch(() => { });
+    handleFocus();
+  };
+
+  const onOnline = () => {
+    console.log('🌐 [App] Online');
+    import("@/lib/queryUtils").then(({ resetFetchTracking }) => {
+      resetFetchTracking();
+    }).catch(() => { });
+    handleFocus();
+  };
+
   document.addEventListener("visibilitychange", onVisibilityChange, false);
+  window.addEventListener("focus", onFocus, false);
+  window.addEventListener("online", onOnline, false);
 
   return () => {
     document.removeEventListener("visibilitychange", onVisibilityChange);
+    window.removeEventListener("focus", onFocus);
+    window.removeEventListener("online", onOnline);
   };
 });
 
@@ -105,31 +162,47 @@ focusManager.setEventListener((handleFocus) => {
 const queryClient = new QueryClient({
   queryCache: new QueryCache({
     onError: async (error: any, query) => {
-      // Handle 401 Unauthorized errors - trigger token refresh
-      if (error?.message?.includes('401') ||
-        error?.message?.includes('Unauthorized') ||
-        error?.message?.includes('JWT') ||
-        error?.message?.includes('invalid_token') ||
-        error?.status === 401) {
-        console.log('🔒 [QueryCache] Erro 401 detectado. Forçando refresh do token...');
+      const errorMsg = error?.message || String(error);
+
+      // Detectar erros de autenticação
+      const isAuthError =
+        errorMsg.includes('401') ||
+        errorMsg.includes('Unauthorized') ||
+        errorMsg.includes('JWT') ||
+        errorMsg.includes('invalid_token') ||
+        errorMsg.includes('Refresh Token') ||  // <-- NOVO
+        errorMsg.includes('Invalid Refresh Token') ||  // <-- NOVO
+        error?.status === 401;
+
+      if (isAuthError) {
+        console.log('🔒 [QueryCache] Erro de autenticação:', errorMsg.substring(0, 50));
+
+        // Importar supabase e tentar refresh
+        const { supabase, checkToken } = await import('@/integrations/supabase/client');
+
+        // Se for erro de refresh token, fazer logout
+        if (errorMsg.includes('Refresh Token') || errorMsg.includes('Invalid Refresh Token')) {
+          console.log('🚪 [QueryCache] Refresh token inválido - fazendo logout');
+          await supabase.auth.signOut();
+          window.location.href = '/login';
+          return;
+        }
+
+        // Tentar renovar token
         const isValid = await checkToken();
         if (isValid) {
-          // Token refreshed - retry the query automatically
-          console.log('🔄 [QueryCache] Token atualizado. Retentando query:', query.queryKey.join('/'));
+          console.log('🔄 [QueryCache] Token renovado, retentando query');
           queryClient.invalidateQueries({ queryKey: query.queryKey });
         }
         return;
       }
 
       // Log timeout errors
-      if (error?.message?.includes('timeout') || error?.message?.includes('Query timeout')) {
-        console.error(`❌ Query timeout: ${query.queryKey.join('/')}`);
+      if (errorMsg.includes('timeout') || errorMsg.includes('Query timeout')) {
+        console.error(`❌ Query timeout: ${query.queryKey.slice(0, 2).join('/')}`);
 
-        // Se a query falhou múltiplas vezes, removemos do cache para evitar estados inconsistentes
-        const failureCount = (query.state as any).failureCount || 0;
-        if (failureCount >= 2) {
-          queryClient.removeQueries({ queryKey: query.queryKey });
-        }
+        // Resetar query travada
+        queryClient.resetQueries({ queryKey: query.queryKey });
       }
     },
   }),
@@ -184,18 +257,7 @@ const queryClient = new QueryClient({
   },
 });
 
-// ============================================================
-// QUERY RECOVERY TIMER (Nível de Módulo)
-// Detecta e reseta queries travadas a cada 5 segundos
-// ============================================================
-if (typeof window !== 'undefined') {
-  setInterval(() => {
-    const recovered = recoverStuckQueries(queryClient, 5000); // 5s timeout
-    if (recovered > 0) {
-      console.log(`🔄 [QueryRecovery] Recuperadas ${recovered} queries travadas`);
-    }
-  }, 5000); // Verificar a cada 5s
-}
+
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -231,11 +293,8 @@ const RouteChangeHandler = ({ queryClient }: { queryClient: QueryClient }) => {
 
       console.log(`🔄 [RouteChange] Navegando de ${prevLocation} para ${location.pathname}. Idle: ${idleMinutes} min`);
 
-      // REMOVED: Aggressive reload after 30s idle
-      // Instead, cancel pending queries and invalidate all data to get fresh results
-      // This provides a better UX while still ensuring fresh data
-
-      queryClient.cancelQueries();
+      // REMOVED: Aggressive cancelQueries was killing new page fetches
+      // queryClient.cancelQueries();
 
       // If idle for more than 2 minutes, invalidate all queries to get fresh data
       if (idleTime > 120000) {
@@ -549,6 +608,7 @@ const App = () => (
     <QueryClientProvider client={queryClient}>
       <SupabaseProjectValidator>
         <AuthProvider>
+          <HeartbeatInitializer />
           <TooltipProvider>
 
             <Toaster />
@@ -561,7 +621,7 @@ const App = () => (
         </AuthProvider>
       </SupabaseProjectValidator>
     </QueryClientProvider>
-  </ThemeProvider>
+  </ThemeProvider >
 );
 
 export default App;

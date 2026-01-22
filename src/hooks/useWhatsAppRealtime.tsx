@@ -5,7 +5,7 @@
 
 import { useEffect, useCallback, useRef, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase, cleanupAllChannels } from '@/integrations/supabase/client';
+import { supabase, cleanupAllChannels, checkToken } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useSecretaryDoctors } from '@/hooks/useSecretaryDoctors';
 import { toast } from '@/components/ui/use-toast';
@@ -112,34 +112,15 @@ export function useWhatsAppRealtime(options: UseWhatsAppRealtimeOptions = {}) {
 
     let activeChannel = channelRef.current;
 
-    // Função para iniciar canal com verificação de token
+    // Função para iniciar canal
     const startChannel = async () => {
-      // Double check token antes de conectar - COM TIMEOUT para evitar travamento
-      let session = null;
-      try {
-        const sessionResult = await Promise.race([
-          supabase.auth.getSession(),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('getSession timeout')), 5000)
-          ),
-        ]);
-        session = sessionResult.data?.session;
-      } catch (err) {
-        console.warn('[WhatsApp Realtime] getSession timeout/error, proceeding anyway:', err);
-        // Proceed anyway - if token is invalid, the channel will just fail to connect
-        // which is better than hanging forever
-      }
+      // Trust global supabase client state
+      // Removing manual getSession check that was causing timeouts
 
-      // Se explicitamente não há sessão (não timeout), não conectar
-      if (session === null) {
-        // Only skip if we got a definitive "no session" answer, not a timeout
-        const { data } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
-        if (!data?.session) {
-          console.warn('[WhatsApp Realtime] No session found, skipping connection.');
-          return;
-        }
-        session = data.session;
-      }
+      /* REMOVED: Redundant getSession check
+      let session = null;
+      try { ... } catch (err) { ... }
+      */
 
       // Se já existe e está conectado/conectando, não recria
       if (activeChannel && activeChannel.topic === `realtime:${channelName}` && (activeChannel.state === 'joined' || activeChannel.state === 'joining')) {
@@ -277,9 +258,33 @@ export function useWhatsAppRealtime(options: UseWhatsAppRealtimeOptions = {}) {
         }
       );
 
-      // Iniciar subscription
-      channel.subscribe((status, err) => {
+      // Iniciar subscription com RECUPERAÇÃO DE TOKEN
+      channel.subscribe(async (status, err) => {
         console.log(`[WhatsApp Realtime] ${channelName} Status:`, status, err || '');
+
+        if (status === 'CHANNEL_ERROR') {
+          const errorMsg = err?.message || '';
+          console.error('[WhatsApp Realtime] Erro no canal:', errorMsg);
+
+          // Se o token expirou, forçar refresh e tentar reconectar
+          if (errorMsg.includes('expired') || errorMsg.includes('InvalidJWTToken') || errorMsg.includes('token')) {
+            console.log('🔄 [WhatsApp Realtime] Token expirado detectado! Tentando refresh e reconexão...');
+
+            // Remover canal com erro
+            await supabase.removeChannel(channel);
+
+            // Verificar e renovar token
+            const isRefreshed = await checkToken();
+
+            if (isRefreshed) {
+              console.log('✅ [WhatsApp Realtime] Token renovado! Reconectando em 1s...');
+              setTimeout(() => {
+                // Se este hook ainda estiver montado e usando este effect
+                startChannel();
+              }, 1000);
+            }
+          }
+        }
       });
 
       channelRef.current = channel;
