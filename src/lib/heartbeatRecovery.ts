@@ -181,6 +181,45 @@ async function verifyAndRefreshSession(retryCount = 0): Promise<boolean> {
             log('✅', 'Token renovado com sucesso');
         }
 
+        // CRITICAL: Force a REAL network request to wake up the socket
+        // getSession() may be local-only, so we ping the database
+        log('🔌', 'Pingando banco de dados para acordar conexão...');
+        const pingStart = Date.now();
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+
+            const { error: pingError } = await supabaseClient
+                .from('profiles')
+                .select('id')
+                .limit(1)
+                .abortSignal(controller.signal)
+                .single();
+
+            clearTimeout(timeoutId);
+
+            if (pingError && !pingError.message.includes('aborted')) {
+                log('⚠️', `Ping falhou: ${pingError.message}`);
+                if (retryCount < CONFIG.MAX_RETRY_ATTEMPTS) {
+                    await new Promise(r => setTimeout(r, 1000));
+                    return verifyAndRefreshSession(retryCount + 1);
+                }
+                return false;
+            }
+
+            log('✅', `Ping OK (${Date.now() - pingStart}ms)`);
+        } catch (pingEx: any) {
+            if (pingEx.name === 'AbortError') {
+                log('⚠️', 'Ping timeout (5s) - conexão ainda morta');
+                if (retryCount < CONFIG.MAX_RETRY_ATTEMPTS) {
+                    await new Promise(r => setTimeout(r, 1000));
+                    return verifyAndRefreshSession(retryCount + 1);
+                }
+                return false;
+            }
+            throw pingEx;
+        }
+
         return true;
 
     } catch (e: any) {
