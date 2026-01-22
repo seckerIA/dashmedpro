@@ -182,7 +182,16 @@ export function getActiveFetchCount(): number {
  */
 export function resetFetchTracking(): void {
     activeFetchCount = 0;
+
+    // Release all queued queries so they don't hang forever
+    // This fixes the "infinite loading" bug after idle
+    const currentQueue = [...fetchQueue];
     fetchQueue.length = 0;
+
+    if (currentQueue.length > 0) {
+        console.log(`🔓 [QueryUtils] Releasing ${currentQueue.length} queued queries during reset`);
+        currentQueue.forEach(resolve => resolve());
+    }
 }
 
 /**
