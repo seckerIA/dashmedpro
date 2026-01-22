@@ -37,8 +37,19 @@ export async function ensureValidSession(): Promise<Session> {
       const fiveMinutes = 5 * 60; // 5 minutos em segundos
 
       if (expiresIn < fiveMinutes) {
-        // Tentar fazer refresh do token
-        const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+        // Tentar fazer refresh do token COM TIMEOUT
+        // Isso evita que o app trave se a extensão bloquear o fetch
+        console.log('🔄 [ensureValidSession] Check refresh...');
+
+        const refreshPromise = supabase.auth.refreshSession();
+        const timeoutPromise = new Promise<{ data: { session: Session | null }, error: any }>((_, reject) =>
+          setTimeout(() => reject(new Error('Refresh Timeout')), 10000)
+        );
+
+        const { data: { session: refreshedSession }, error: refreshError } = await Promise.race([
+          refreshPromise,
+          timeoutPromise
+        ]) as any;
 
         if (refreshError || !refreshedSession) {
           throw new Error(`Erro ao renovar sessão: ${refreshError?.message || 'Sessão não renovada'}`);

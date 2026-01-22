@@ -8,8 +8,22 @@ if (typeof window !== 'undefined') {
     // Expose lastActivityTime globally for RouteChangeHandler
     (window as any).lastActivityTime = lastActivityTime;
 
+    // Track persistent idle state (how long user WAS idle before waking up)
+    let lastLongIdleDuration = 0;
+    (window as any).lastLongIdleDuration = 0;
+
     ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(event => {
         window.addEventListener(event, () => {
+            const currentIdle = Date.now() - lastActivityTime;
+
+            // If user was idle for more than 30s, record it
+            // This allows RouteChangeHandler to know they JUST woke up
+            if (currentIdle > 30000) {
+                lastLongIdleDuration = currentIdle;
+                (window as any).lastLongIdleDuration = lastLongIdleDuration;
+                console.log(`⏱️ [IdleDetector] User active after ${Math.floor(currentIdle / 1000)}s idle (Stored for next navigation)`);
+            }
+
             lastActivityTime = Date.now();
             (window as any).lastActivityTime = lastActivityTime;
         }, { passive: true });

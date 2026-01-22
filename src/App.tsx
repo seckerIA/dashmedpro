@@ -294,11 +294,18 @@ const RouteChangeHandler = ({ queryClient }: { queryClient: QueryClient }) => {
       // Get idle time from idleDetector
       const now = Date.now();
       const lastActivity = (window as any).lastActivityTime || now;
-      const idleTime = now - lastActivity;
-      const idleMinutes = Math.floor(idleTime / 60000);
-      const idleSeconds = Math.floor(idleTime / 1000);
+      const currentIdleTime = now - lastActivity;
 
-      console.log(`🔄 [RouteChange] ${prevLocation} → ${location.pathname}. Idle: ${idleMinutes}m ${idleSeconds % 60}s`);
+      // CRITICAL FIX: Use the stored "long idle" duration if it exists
+      // This handles the case where user moves mouse (resetting currentIdle) 
+      // just before clicking a link.
+      const lastLongIdle = (window as any).lastLongIdleDuration || 0;
+      const effectiveIdleTime = Math.max(currentIdleTime, lastLongIdle);
+
+      const idleMinutes = Math.floor(effectiveIdleTime / 60000);
+      const idleSeconds = Math.floor(effectiveIdleTime / 1000);
+
+      console.log(`🔄 [RouteChange] ${prevLocation} → ${location.pathname}. Idle: ${idleMinutes}m ${idleSeconds % 60}s (Effective)`);
 
       // ALWAYS reset fetch slots on navigation to prevent slot leaks from stuck queries
       import("@/lib/queryUtils").then(({ resetFetchTracking }) => {
@@ -307,14 +314,17 @@ const RouteChangeHandler = ({ queryClient }: { queryClient: QueryClient }) => {
       }).catch(() => { });
 
       // If idle for more than 30 seconds, be more aggressive
-      if (idleTime > 30000) {
+      if (effectiveIdleTime > 30000) {
         console.log('🧹 [RouteChange] Cancelando queries travadas após idle...');
 
         // Cancel ALL in-flight queries first (they might be stuck)
         queryClient.cancelQueries();
 
+        // Reset persistent idle state so it doesn't trigger again immediately
+        (window as any).lastLongIdleDuration = 0;
+
         // If very idle (>2 min), also invalidate to get fresh data
-        if (idleTime > 120000) {
+        if (effectiveIdleTime > 120000) {
           console.log('📊 [RouteChange] Invalidando queries stale...');
           // Small delay to let cancellation complete
           setTimeout(() => {
