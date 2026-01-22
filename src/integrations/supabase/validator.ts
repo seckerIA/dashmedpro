@@ -129,7 +129,7 @@ export async function validateSession(): Promise<{
 
       if (profileError || !profile) {
         errors.push(
-          `Usuário autenticado não existe no banco de dados atual! User ID: ${session.user.id}`
+          `Usuário autenticado não existe ou erro ao validar! Detalhe: ${profileError?.message || 'Perfil não encontrado'}`
         );
         return {
           isValid: false,
