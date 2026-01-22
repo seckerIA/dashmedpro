@@ -1,19 +1,22 @@
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '../integrations/supabase/client';
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
-import { ensureValidSession } from '@/utils/supabaseHelpers';
 import { useAuth } from './useAuth';
 
-export interface TeamMember {
+export type TeamMember = {
   id: string;
   email: string;
-  full_name: string | null;
+  full_name: string;
   role: string;
-}
+  is_active: boolean;
+  avatar_url?: string;
+  phone?: string;
+  invited_by?: string;
+};
 
 const fetchTeamMembers = async (userId: string | undefined, signal?: AbortSignal): Promise<TeamMember[]> => {
   // Verificar e garantir sessão válida
-  await ensureValidSession();
+
 
   if (!userId) return [];
 

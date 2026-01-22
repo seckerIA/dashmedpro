@@ -336,9 +336,8 @@ const fetchAppointments = async (
   doctorIds?: string[], // Agora aceita array de IDs de médicos
   canViewAll: boolean = false // Nova flag para indicar se pode ver tudo
 ): Promise<MedicalAppointmentWithRelations[]> => {
-  // Verificar e garantir sessão válida
-  const { ensureValidSession } = await import('@/utils/supabaseHelpers');
-  await ensureValidSession();
+  // REMOVED: ensureValidSession() - causes timeout hangs with extensions
+  // Global auth handling will catch 401 errors and refresh token
 
   // INÍCIO DA QUERY
   let query = supabase

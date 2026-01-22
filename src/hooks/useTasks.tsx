@@ -1,15 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
-import { ensureValidSession } from '@/utils/supabaseHelpers';
 import { TaskWithProfile, TaskWithCRM, CreateTaskData, UpdateTaskData, TaskAssignment, UpdateAssignmentData } from '@/types/tasks';
 import { useAuth } from './useAuth';
 import { useTeamMembers } from './useTeamMembers';
 
 // Função para buscar tarefas do usuário
 const fetchTasks = async (userId: string, signal?: AbortSignal): Promise<TaskWithCRM[]> => {
-  // Verificar e garantir sessão válida
-  await ensureValidSession();
+  // REMOVED: ensureValidSession() - causes timeout hangs with extensions
+  // Global auth handling (checkToken, QueryCache onError) will catch 401s
 
   const queryPromise = supabase
     .from('tasks' as any)

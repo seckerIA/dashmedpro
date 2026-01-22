@@ -26,9 +26,7 @@ const fetchMeetings = async (
   filters?: UseGeneralMeetingsFilters,
   signal?: AbortSignal
 ): Promise<GeneralMeeting[]> => {
-  // Verificar e garantir sessão válida
-  const { ensureValidSession } = await import('@/utils/supabaseHelpers');
-  await ensureValidSession();
+  // REMOVED: ensureValidSession() - causes timeout hangs with extensions
 
   let query = supabase
     .from('general_meetings')

@@ -1,15 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
-import { ensureValidSession } from '@/utils/supabaseHelpers';
 import { FollowUp, CreateFollowUpData, UpdateFollowUpData } from '@/types/followUp';
 import { useAuth } from './useAuth';
 
 // Buscar follow-ups do usuário
 const fetchFollowUps = async (userId: string, signal?: AbortSignal): Promise<FollowUp[]> => {
-  // Verificar e garantir sessão válida
-  await ensureValidSession();
-
   const queryPromise = supabase
     .from('crm_follow_ups')
     .select('*')

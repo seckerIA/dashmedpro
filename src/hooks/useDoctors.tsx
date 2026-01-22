@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
-import { ensureValidSession } from '@/utils/supabaseHelpers';
 
 export interface Doctor {
   id: string;
@@ -12,7 +11,6 @@ export interface Doctor {
 
 const fetchDoctors = async (signal?: AbortSignal): Promise<Doctor[]> => {
   // Verificar e garantir sessao valida
-  await ensureValidSession();
 
   // Buscar apenas médicos, admin e dono (quem pode ter consultas/procedimentos)
   const queryPromise = supabase
