@@ -1,17 +1,14 @@
 /**
- * Heartbeat Recovery System v2
+ * Heartbeat Recovery System v3 (Deep Wake-up Protocol)
  * 
- * Versão melhorada que:
- * 1. Remove queries do cache ao invés de apenas cancelar
- * 2. Força reconexão do Supabase client
- * 3. Trata refresh token expirado
- * 4. Usa Web Worker como backup (não pode ser pausado por extensões)
- * 5. Debounce agressivo para evitar loops
+ * Camadas de Recuperação:
+ * 1. Curta (< 5m): Reset de slots e validação simples.
+ * 2. Média (5m - 60m): Smart Retry com backoff (aguarda rede).
+ * 3. Longa (> 60m): Hard Reload para limpar memória e forçar token novo.
  */
 
 import { QueryClient } from '@tanstack/react-query';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { CURRENT_PROJECT_REF } from '@/integrations/supabase/client';
 
 // ============================================================================
 // CONFIGURAÇÃO
@@ -19,22 +16,26 @@ import { CURRENT_PROJECT_REF } from '@/integrations/supabase/client';
 
 const CONFIG = {
     // Intervalo do heartbeat (ms)
-    HEARTBEAT_INTERVAL: 2000, // 2 segundos (era 3s)
+    HEARTBEAT_INTERVAL: 2000,
 
-    // Se o gap for maior que isso, consideramos freeze
-    FREEZE_THRESHOLD: 5000, // 5 segundos (era 8s) - extensões congelam rápido
+    // Se o gap for maior que isso, consideramos freeze/sleep
+    FREEZE_THRESHOLD: 5000,
 
     // Tempo mínimo entre recoveries (evita loops)
-    RECOVERY_COOLDOWN: 3000, // 3 segundos (era 5s)
+    RECOVERY_COOLDOWN: 3000,
 
-    // Se ficou idle mais que isso, força refresh completo
-    STALE_THRESHOLD: 45000, // 45 segundos (era 60s)
+    // LIMIAR HIBERNAÇÃO (Média Duração) - Força verificação robusta
+    STALE_THRESHOLD: 45000, // 45s
 
-    // Máximo de recoveries consecutivos antes de forçar reload
-    MAX_CONSECUTIVE_RECOVERIES: 4, // (era 5)
+    // LIMIAR DEEP SLEEP (Longa Duração) - Força Reload
+    // 1 Hora = 3600000 ms
+    DEEP_SLEEP_THRESHOLD: 1 * 60 * 60 * 1000,
+
+    // Máximo de tentativas de reconexão na Camada 2
+    MAX_RETRY_ATTEMPTS: 3,
 
     // Tempo para considerar query como travada
-    STUCK_QUERY_THRESHOLD: 8000, // 8 segundos (era 15s) - falhar rápido
+    STUCK_QUERY_THRESHOLD: 8000,
 };
 
 // ============================================================================
@@ -54,196 +55,158 @@ let isInitialized = false;
 // FUNÇÕES AUXILIARES
 // ============================================================================
 
-/**
- * Log com timestamp
- */
 function log(emoji: string, message: string, ...args: any[]) {
     const time = new Date().toLocaleTimeString('pt-BR');
     console.log(`${emoji} [Heartbeat ${time}] ${message}`, ...args);
 }
 
-/**
- * Reseta o tracking de fetch slots
- */
 async function resetFetchTracking() {
     try {
         const { resetFetchTracking: reset } = await import('@/lib/queryUtils');
         reset();
-        log('🔓', 'Fetch tracking resetado');
     } catch (e) {
-        // Ignorar se não existir
+        // Ignorar
     }
 }
 
-/**
- * Remove queries travadas do cache (mais agressivo que cancelar)
- */
 function removeStuckQueries(): number {
     if (!queryClient) return 0;
-
     const queries = queryClient.getQueryCache().getAll();
     let removedCount = 0;
     const now = Date.now();
 
     for (const query of queries) {
         const state = query.state;
-
-        // Query em fetching por muito tempo?
         if (state.fetchStatus === 'fetching') {
             const dataUpdatedAt = state.dataUpdatedAt || 0;
             const errorUpdatedAt = state.errorUpdatedAt || 0;
             const lastUpdate = Math.max(dataUpdatedAt, errorUpdatedAt);
             const age = lastUpdate > 0 ? now - lastUpdate : now;
 
-            // Se está travada por mais de X segundos
             if (age > CONFIG.STUCK_QUERY_THRESHOLD || lastUpdate === 0) {
-                const keyStr = Array.isArray(query.queryKey)
-                    ? query.queryKey.slice(0, 2).join('/')
-                    : String(query.queryKey);
-
                 try {
-                    // Cancelar primeiro
                     queryClient.cancelQueries({ queryKey: query.queryKey });
-
-                    // Resetar o estado da query para 'idle'
                     queryClient.resetQueries({ queryKey: query.queryKey });
-
                     removedCount++;
-                    log('🗑️', `Query resetada: ${keyStr} (${Math.round(age / 1000)}s)`);
                 } catch (e) {
-                    // Ignorar erros
+                    // Ignorar
                 }
             }
         }
     }
-
-    // Se removeu queries, também resetar o fetch tracking para evitar slots travados
-    if (removedCount > 0) {
-        resetFetchTracking();
-        log('🔓', 'Fetch slots resetados após limpar queries');
-    }
-
+    if (removedCount > 0) resetFetchTracking();
     return removedCount;
 }
 
-/**
- * Força logout e redirect para login
- */
 async function forceLogout() {
     if (!supabaseClient) return;
-
     try {
-        log('🚪', 'Forçando logout por token inválido...');
+        log('🚪', 'Forçando logout (Sessão inválida)...');
         await supabaseClient.auth.signOut();
-
-        // Limpar todo o cache
         queryClient?.clear();
-
-        // Redirect para login
-        if (typeof window !== 'undefined') {
-            window.location.href = '/login';
-        }
+        if (typeof window !== 'undefined') window.location.href = '/login';
     } catch (e) {
-        log('❌', 'Erro ao fazer logout:', e);
+        console.error(e);
     }
 }
 
-/**
- * Verifica e renova sessão - com tratamento de refresh token inválido
- */
-async function verifyAndRefreshSession(): Promise<boolean> {
+// ============================================================================
+// PROCESSO DE VALIDAÇÃO DE SESSÃO
+// ============================================================================
+
+async function verifyAndRefreshSession(retryCount = 0): Promise<boolean> {
     if (!supabaseClient) return false;
 
     try {
-        // Primeiro, tentar pegar a sessão atual
+        // Tentar pegar sessão
         const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
 
+        // ERRO DE SESSÃO
         if (sessionError) {
-            log('⚠️', 'Erro ao pegar sessão:', sessionError.message);
+            log('⚠️', `Erro de sessão (Tentativa ${retryCount + 1}):`, sessionError.message);
 
-            // Se for erro de refresh token, forçar logout
+            // Se for erro recuperável (network) e ainda temos tentativas
+            if (retryCount < CONFIG.MAX_RETRY_ATTEMPTS) {
+                const delay = 1000 * (retryCount + 1); // Backoff: 1s, 2s, 3s
+                log('⏳', `Aguardando rede (${delay}ms)...`);
+                await new Promise(r => setTimeout(r, delay));
+                return verifyAndRefreshSession(retryCount + 1);
+            }
+
+            // Se for refresh token inválido, tchau
             if (sessionError.message.includes('Refresh Token') ||
                 sessionError.message.includes('invalid_token')) {
                 await forceLogout();
                 return false;
             }
-        }
-
-        if (!session) {
-            log('⚠️', 'Sem sessão ativa');
             return false;
         }
 
-        // Verificar se o token está próximo de expirar
-        const expiresAt = session.expires_at;
-        if (expiresAt) {
-            const expiresIn = expiresAt * 1000 - Date.now();
-
-            // Se expira em menos de 5 minutos, renovar
-            if (expiresIn < 5 * 60 * 1000) {
-                log('🔄', 'Renovando token (expira em', Math.round(expiresIn / 1000), 's)');
-
-                const { data, error: refreshError } = await supabaseClient.auth.refreshSession();
-
-                if (refreshError) {
-                    log('❌', 'Erro ao renovar token:', refreshError.message);
-
-                    // Se falhou por refresh token inválido, forçar logout
-                    if (refreshError.message.includes('Refresh Token') ||
-                        refreshError.message.includes('invalid_token') ||
-                        refreshError.message.includes('Invalid Refresh Token')) {
-                        await forceLogout();
-                        return false;
-                    }
-
-                    return false;
-                }
-
-                if (data.session) {
-                    log('✅', 'Token renovado com sucesso');
-                }
+        // SEM SESSÃO
+        if (!session) {
+            // Se não tem sessão mas esperávamos ter, pode ser delay de rede
+            if (retryCount < CONFIG.MAX_RETRY_ATTEMPTS) {
+                log('⚠️', `Sessão vazia. Retentando (${retryCount + 1})...`);
+                await new Promise(r => setTimeout(r, 1000));
+                return verifyAndRefreshSession(retryCount + 1);
             }
+            return false;
+        }
+
+        // VERIFICAR EXPIRAÇÃO
+        const expiresAt = session.expires_at || 0;
+        const expiresIn = expiresAt * 1000 - Date.now();
+
+        // Se expira em menos de 5 minutos, renovar
+        if (expiresIn < 5 * 60 * 1000) {
+            log('🔄', `Renovando token (expira em ${Math.round(expiresIn / 1000)}s)`);
+            const { data, error: refreshError } = await supabaseClient.auth.refreshSession();
+
+            if (refreshError) {
+                log('❌', 'Falha na renovação:', refreshError.message);
+
+                // Retry na renovação também
+                if (retryCount < CONFIG.MAX_RETRY_ATTEMPTS) {
+                    await new Promise(r => setTimeout(r, 1000));
+                    return verifyAndRefreshSession(retryCount + 1);
+                }
+
+                if (refreshError.message.includes('Refresh Token') ||
+                    refreshError.message.includes('invalid_token')) {
+                    await forceLogout();
+                }
+                return false;
+            }
+
+            log('✅', 'Token renovado com sucesso');
         }
 
         return true;
+
     } catch (e: any) {
-        log('❌', 'Erro ao verificar sessão:', e?.message || e);
-
-        // Qualquer erro de token, forçar logout
-        if (e?.message?.includes('Refresh Token') || e?.message?.includes('invalid')) {
-            await forceLogout();
+        log('❌', 'Exceção na verificação:', e);
+        if (retryCount < CONFIG.MAX_RETRY_ATTEMPTS) {
+            await new Promise(r => setTimeout(r, 1000));
+            return verifyAndRefreshSession(retryCount + 1);
         }
-
         return false;
     }
 }
 
-/**
- * Força reconexão dos canais Realtime do Supabase
- */
 async function reconnectRealtimeChannels() {
     if (!supabaseClient) return;
-
     try {
         const channels = supabaseClient.getChannels();
-
         if (channels.length === 0) return;
 
-        log('🔌', `Reconectando ${channels.length} canais...`);
-
+        // Reconecta canais desconectados
         for (const channel of channels) {
             if (channel.state !== 'joined') {
-                try {
-                    await channel.unsubscribe();
-                    await new Promise(r => setTimeout(r, 100));
-                    channel.subscribe();
-                } catch (e) {
-                    // Ignorar erros de canal individual
-                }
+                channel.subscribe();
             }
         }
     } catch (e) {
-        log('⚠️', 'Erro ao reconectar canais:', e);
+        // Silent fail
     }
 }
 
@@ -251,19 +214,18 @@ async function reconnectRealtimeChannels() {
 // RECOVERY PRINCIPAL
 // ============================================================================
 
-/**
- * Executa a sequência de recuperação
- */
 async function triggerRecovery(reason: string, gapMs: number) {
     const now = Date.now();
+    if (now - lastRecovery < CONFIG.RECOVERY_COOLDOWN && !isRecovering) return;
+    if (isRecovering) return;
 
-    // Cooldown entre recoveries
-    if (now - lastRecovery < CONFIG.RECOVERY_COOLDOWN) {
-        return;
-    }
-
-    // Já está recuperando?
-    if (isRecovering) {
+    // CAMADA 3: DEEP SLEEP (> 1 Hora) -> HARD RELOAD
+    if (gapMs > CONFIG.DEEP_SLEEP_THRESHOLD) {
+        log('💀', `DEEP SLEEP DETECTADO (${Math.round(gapMs / 1000 / 60)}min). Iniciando Hard Reload...`);
+        // Limpar queries antes de morrer
+        queryClient?.clear();
+        // Reload forçado
+        window.location.reload();
         return;
     }
 
@@ -271,231 +233,123 @@ async function triggerRecovery(reason: string, gapMs: number) {
     lastRecovery = now;
     consecutiveRecoveries++;
 
-    log('🚨', `RECOVERY #${consecutiveRecoveries} - ${reason}`);
+    log('🚨', `RECOVERY (${reason}) - Gap: ${Math.round(gapMs / 1000)}s`);
 
     try {
-        // Se muitos recoveries consecutivos, algo está muito errado
-        if (consecutiveRecoveries >= CONFIG.MAX_CONSECUTIVE_RECOVERIES) {
-            log('💀', 'Muitos recoveries consecutivos! Recarregando página...');
-
-            // Limpar tudo antes de reload
-            queryClient?.clear();
-
-            // Aguardar um pouco e recarregar
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
-
-            return;
-        }
-
-        // 1. Resetar fetch tracking
-        log('🔧', 'Resetando fetch tracking...');
+        // CAMADA 1: Limpeza Básica
         await resetFetchTracking();
-
-        // 2. Remover queries travadas (não apenas cancelar)
-        log('🔧', 'Removendo queries travadas...');
         const removed = removeStuckQueries();
-        if (removed > 0) {
-            log('📊', `${removed} queries resetadas`);
-        }
+        if (removed > 0) log('🧹', `${removed} queries limpas`);
 
-        // 3. Verificar/renovar sessão
-        log('🔧', 'Verificando sessão...');
-        const sessionOk = await verifyAndRefreshSession();
-
-        if (!sessionOk) {
-            log('⚠️', 'Sessão inválida - aguardando login');
-            return;
-        }
-
-        // 4. Reconectar Realtime apenas se ficou muito tempo parado
+        // CAMADA 2: Validação de Sessão (Smart Retry)
         if (gapMs > CONFIG.STALE_THRESHOLD) {
-            log('🔧', 'Reconectando Realtime...');
-            await reconnectRealtimeChannels();
-        }
+            log('🔒', 'Validando sessão com retry...');
+            const sessionOk = await verifyAndRefreshSession();
 
-        // 5. Invalidar queries APENAS se sessão está OK e dados estão stale
-        if (gapMs > CONFIG.STALE_THRESHOLD) {
-            log('🔧', 'Invalidando queries stale...');
-
-            // Pequeno delay para garantir que tudo foi limpo
-            await new Promise(r => setTimeout(r, 200));
-
-            queryClient?.invalidateQueries();
-        }
-
-        log('✅', 'Recovery completo!');
-
-        // Reset contador de recoveries consecutivos após sucesso
-        setTimeout(() => {
-            if (Date.now() - lastRecovery > 30000) {
-                consecutiveRecoveries = 0;
+            if (!sessionOk) {
+                log('⚠️', 'Sessão perdida após tentativas. Aguardando ação do usuário.');
+                return;
             }
+
+            // Checkpoints extras para sessões longas
+            await reconnectRealtimeChannels();
+
+            // Invalidação geral para garantir dados frescos
+            log('📊', 'Atualizando dados...');
+            await queryClient?.invalidateQueries();
+        }
+
+        log('✅', 'Sistema recuperado');
+
+        // Reset contador após sucesso
+        setTimeout(() => {
+            if (Date.now() - lastRecovery > 30000) consecutiveRecoveries = 0;
         }, 30000);
 
     } catch (e) {
-        log('❌', 'Erro no recovery:', e);
+        log('❌', 'Falha no recovery:', e);
     } finally {
         isRecovering = false;
     }
 }
 
 // ============================================================================
-// HEARTBEAT
+// HEARTBEAT LOOP
 // ============================================================================
 
-/**
- * Função de heartbeat
- */
 function heartbeat() {
     const now = Date.now();
     const gap = now - lastHeartbeat;
 
-    // Freeze detectado?
     if (gap > CONFIG.FREEZE_THRESHOLD) {
-        log('❄️', `FREEZE detectado! Gap: ${Math.round(gap / 1000)}s`);
-        triggerRecovery(`Freeze de ${Math.round(gap / 1000)}s`, gap);
+        log('❄️', `Freeze detectado: ${Math.round(gap / 1000)}s`);
+        triggerRecovery('Freeze', gap);
     }
-
     lastHeartbeat = now;
 }
 
-/**
- * Handler de visibilidade da página
- */
-function handleVisibilityChange() {
+function handleVisibility() {
     if (document.visibilityState === 'visible') {
-        const now = Date.now();
-        const gap = now - lastHeartbeat;
+        const gap = Date.now() - lastHeartbeat;
+        log('👁️', `Tab ativa. Gap: ${Math.round(gap / 1000)}s`);
+        lastHeartbeat = Date.now();
 
-        log('👁️', `Tab visível (inativo por ${Math.round(gap / 1000)}s)`);
-
-        // Atualizar heartbeat
-        lastHeartbeat = now;
-
-        // Se ficou muito tempo em background, recuperar
         if (gap > CONFIG.FREEZE_THRESHOLD) {
-            triggerRecovery('Tab retornou do background', gap);
+            triggerRecovery('Tab Visibility', gap);
         }
     }
 }
 
-/**
- * Handler de online/offline
- */
-function handleOnline() {
-    log('🌐', 'Conexão restaurada');
-    const gap = Date.now() - lastHeartbeat;
-    triggerRecovery('Conexão restaurada', gap);
-}
-
-function handleOffline() {
-    log('📴', 'Conexão perdida');
-}
-
-/**
- * Handler de foco da janela (backup do visibility)
- */
 function handleFocus() {
-    const now = Date.now();
-    const gap = now - lastHeartbeat;
-
-    // Se o gap é grande, pode ter congelado
+    const gap = Date.now() - lastHeartbeat;
     if (gap > CONFIG.FREEZE_THRESHOLD) {
-        log('🎯', `Janela focada após ${Math.round(gap / 1000)}s`);
-        lastHeartbeat = now;
-        triggerRecovery('Janela focada após inatividade', gap);
+        lastHeartbeat = Date.now();
+        triggerRecovery('Focus', gap);
     }
 }
 
+function handleOnline() {
+    const gap = Date.now() - lastHeartbeat;
+    log('🌐', 'Online detectado');
+    triggerRecovery('Network Online', gap);
+}
+
 // ============================================================================
-// API PÚBLICA
+// EXPORT SETUP
 // ============================================================================
 
-/**
- * Inicializa o sistema de heartbeat
- */
-export function initHeartbeatRecovery(
-    qc: QueryClient,
-    supabase: SupabaseClient
-): () => void {
-    // Evitar inicialização dupla
-    if (isInitialized) {
-        log('⚠️', 'Sistema já inicializado, ignorando...');
-        return () => { };
-    }
+export function initHeartbeatRecovery(qc: QueryClient, sb: SupabaseClient): () => void {
+    if (isInitialized) return () => { };
 
-    // Salvar referências
     queryClient = qc;
-    supabaseClient = supabase;
+    supabaseClient = sb;
     lastHeartbeat = Date.now();
-    consecutiveRecoveries = 0;
     isInitialized = true;
 
-    // Limpar timer anterior (hot reload)
-    if (intervalId) {
-        clearInterval(intervalId);
-    }
-
-    // Iniciar heartbeat
+    if (intervalId) clearInterval(intervalId);
     intervalId = setInterval(heartbeat, CONFIG.HEARTBEAT_INTERVAL);
 
-    // Event listeners
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('focus', handleFocus);
+    window.addEventListener('online', handleOnline);
 
-    log('💓', 'Sistema inicializado');
-    log('⚙️', `Intervalo: ${CONFIG.HEARTBEAT_INTERVAL}ms, Threshold: ${CONFIG.FREEZE_THRESHOLD}ms`);
-
-    // Retornar cleanup
-    return () => {
-        if (intervalId) {
-            clearInterval(intervalId);
-            intervalId = null;
-        }
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-        window.removeEventListener('online', handleOnline);
-        window.removeEventListener('offline', handleOffline);
-        window.removeEventListener('focus', handleFocus);
-        isInitialized = false;
-        log('💔', 'Sistema parado');
-    };
+    log('💓', 'Deep Wake-up Protocol Ativado v3');
+    return () => stopHeartbeat();
 }
 
-/**
- * Força recovery manual
- */
-export function forceRecovery() {
-    const gap = Date.now() - lastHeartbeat;
-    log('🔧', 'Recovery manual solicitado');
-    triggerRecovery('Recovery manual', Math.max(gap, CONFIG.STALE_THRESHOLD));
-}
-
-/**
- * Retorna estatísticas
- */
-export function getHeartbeatStats() {
-    return {
-        lastHeartbeat,
-        timeSinceLastHeartbeat: Date.now() - lastHeartbeat,
-        lastRecovery,
-        consecutiveRecoveries,
-        isRecovering,
-        isInitialized,
-    };
-}
-
-/**
- * Para o sistema (para cleanup)
- */
 export function stopHeartbeat() {
-    if (intervalId) {
-        clearInterval(intervalId);
-        intervalId = null;
-    }
+    if (intervalId) clearInterval(intervalId);
+    intervalId = null;
+    document.removeEventListener('visibilitychange', handleVisibility);
+    window.removeEventListener('focus', handleFocus);
+    window.removeEventListener('online', handleOnline);
     isInitialized = false;
-    log('⏹️', 'Sistema parado manualmente');
+}
+
+export function forceRecovery() {
+    triggerRecovery('Manual Force', CONFIG.STALE_THRESHOLD + 1000);
+}
+
+export function getHeartbeatStats() {
+    return { lastHeartbeat, isRecovering, consecutiveRecoveries };
 }
