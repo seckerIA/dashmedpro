@@ -7,7 +7,7 @@
  * 3. Longa (> 60m): Hard Reload para limpar memória e forçar token novo.
  */
 
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, onlineManager } from '@tanstack/react-query';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 // ============================================================================
@@ -233,6 +233,9 @@ async function triggerRecovery(reason: string, gapMs: number) {
     lastRecovery = now;
     consecutiveRecoveries++;
 
+    // PAUSE - Impedir que queries disparem no socket morto
+    onlineManager.setOnline(false);
+
     log('🚨', `RECOVERY (${reason}) - Gap: ${Math.round(gapMs / 1000)}s`);
 
     try {
@@ -270,6 +273,8 @@ async function triggerRecovery(reason: string, gapMs: number) {
         log('❌', 'Falha no recovery:', e);
     } finally {
         isRecovering = false;
+        // RESUME - Liberar queries no socket novo (ou deixar falhar)
+        onlineManager.setOnline(true);
     }
 }
 
