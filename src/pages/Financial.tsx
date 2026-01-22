@@ -41,10 +41,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart as RechartsPieChart, ResponsiveContainer, XAxis, YAxis } from "recharts"
-import { useFinancialMetrics } from "@/hooks/useFinancialMetrics"
-import { useFinancialAccounts } from "@/hooks/useFinancialAccounts"
-import { useFinancialTransactions } from "@/hooks/useFinancialTransactions"
-import { useNavigate, useSearchParams } from "react-router-dom"
+import { useFinancialController } from "@/hooks/controllers/useFinancialController"
 import { format, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear, subDays } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { DateRange } from "react-day-picker"
@@ -63,7 +60,7 @@ import { getGradient, CHART_COLORS } from "@/lib/chart-colors"
 import { AccountForm } from "@/components/financial/AccountForm"
 import { FinancialRequirementModal } from "@/components/financial/FinancialRequirementModal"
 import { FinancialPageSkeleton } from "@/components/ui/LoadingSkeletons"
-import { useState, useEffect } from "react"
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -92,50 +89,62 @@ import FinancialForecasts from "./FinancialForecasts"
 import FinancialCategories from "./FinancialCategories"
 
 const Financial = () => {
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const tabFromUrl = searchParams.get("tab") || "dashboard";
-  const [activeTab, setActiveTab] = useState(tabFromUrl);
+  const {
+    state,
+    setters,
+    hooks,
+    actions
+  } = useFinancialController();
 
-  const { isAdmin, isVendedor, isGestorTrafego, isSecretaria } = useUserProfile();
+  const {
+    activeTab,
+    dateRange,
+    isAccountFormOpen,
+    showRequirementModal,
+    isDistributionConfigOpen,
+    editingAccount,
+    accountToDelete,
+    recentTransactions
+  } = state;
 
-  useEffect(() => {
-    if (tabFromUrl) {
-      setActiveTab(tabFromUrl);
-    }
-  }, [tabFromUrl]);
+  const {
+    setDateRange,
+    setIsAccountFormOpen,
+    setShowRequirementModal,
+    setIsDistributionConfigOpen,
+    setEditingAccount,
+    setAccountToDelete
+  } = setters;
 
-  const handleTabChange = (nextTab: string) => {
-    setActiveTab(nextTab);
-    setSearchParams((prev) => {
-      const params = new URLSearchParams(prev);
-      params.set("tab", nextTab);
-      return params;
-    });
-  };
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date()),
-  });
+  const { metricsData, accountsData } = hooks;
+  const {
+    metrics,
+    monthlyData,
+    expensesByCategory,
+    costsBreakdown,
+    cashFlowProjection,
+    isLoading
+  } = metricsData;
 
-  const { metrics, monthlyData, expensesByCategory, costsBreakdown, cashFlowProjection, isLoading } = useFinancialMetrics({
-    startDate: dateRange?.from,
-    endDate: dateRange?.to,
-  });
-  const { accountsSummary, totalBalance, accounts, isLoading: isLoadingAccounts, deleteAccount } = useFinancialAccounts();
-  const { transactions } = useFinancialTransactions();
-  const [isAccountFormOpen, setIsAccountFormOpen] = useState(false);
-  const [showRequirementModal, setShowRequirementModal] = useState(false);
-  const [isDistributionConfigOpen, setIsDistributionConfigOpen] = useState(false);
-  const [editingAccount, setEditingAccount] = useState<FinancialAccount | null>(null);
-  const [accountToDelete, setAccountToDelete] = useState<string | null>(null);
+  const {
+    accountsSummary,
+    accounts,
+    isLoading: isLoadingAccounts
+  } = accountsData;
 
-  // Verificar obrigatoriedade de conta bancária
-  useEffect(() => {
-    if (!isLoadingAccounts && accounts && accounts.length === 0) {
-      setShowRequirementModal(true);
-    }
-  }, [accounts, isLoadingAccounts]);
+  const {
+    isAdmin,
+    isVendedor,
+    isGestorTrafego,
+    isSecretaria
+  } = hooks.userProfile;
+
+  const {
+    handleTabChange,
+    handleExport,
+    handleDeleteConfirm,
+    navigate
+  } = actions;
 
   // Bloquear acesso para vendedores e gestores de tráfego
   if (isVendedor || isGestorTrafego) {
@@ -178,42 +187,7 @@ const Financial = () => {
     return <FinancialPageSkeleton />;
   }
 
-  // Pegar últimas 5 transações
-  const recentTransactions = transactions?.slice(0, 5) || [];
 
-  const handleExport = () => {
-    // Implementação básica de exportação para CSV
-    const headers = ["Data", "Descrição", "Categoria", "Valor", "Tipo", "Status"];
-    const rows = transactions?.map(t => [
-      format(new Date(t.transaction_date), 'dd/MM/yyyy'),
-      t.description,
-      t.category?.name || '-',
-      formatCurrency(t.amount),
-      t.type,
-      t.status
-    ]) || [];
-
-    const csvContent = [
-      headers.join(","),
-      ...rows.map(row => row.join(","))
-    ].join("\n");
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `financeiro_${format(new Date(), 'dd-MM-yyyy')}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const handleDeleteConfirm = () => {
-    if (accountToDelete) {
-      deleteAccount(accountToDelete);
-      setAccountToDelete(null);
-    }
-  };
 
   return (
     <div className="min-h-screen space-y-6 bg-background p-6">
