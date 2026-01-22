@@ -29,9 +29,9 @@ if (typeof window !== 'undefined') {
             // gracefully. If token is expired, the QueryCache error handler will
             // refresh it. If connection is stale, the next query will reconnect.
 
-            // For very long idle periods (>10 min), we can proactively trigger
+            // For long idle periods (>2 min), we proactively trigger
             // a soft reconnection check
-            if (idleTime > 600000) { // 10 minutes
+            if (idleTime > 120000) { // 2 minutos (era 10min)
                 console.log('🔄 [IdleDetector] Long idle detected. Triggering soft session check...');
                 // This is imported dynamically to avoid circular deps
                 try {

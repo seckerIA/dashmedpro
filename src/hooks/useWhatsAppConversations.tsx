@@ -86,14 +86,6 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
       const hasSpecificOwnerFilter = !!(filters?.ownerId && filters.ownerId !== 'all');
       const shouldFilterByUserId = !isAdmin || hasSpecificOwnerFilter;
 
-      console.log('[useWhatsAppConversations] DEBUG:', {
-        isAdmin,
-        hasSpecificOwnerFilter,
-        shouldFilterByUserId,
-        userIds,
-        ownerId: filters?.ownerId
-      });
-
       if (shouldFilterByUserId) {
         query = query.in('user_id', userIds);
       }
@@ -120,12 +112,6 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
       }
 
       const { data, error } = await supabaseQueryWithTimeout(query as any, 60000);
-
-      console.log('[useWhatsAppConversations] Query result:', {
-        conversationCount: data?.length || 0,
-        error: error?.message,
-        firstConversation: data?.[0]
-      });
 
       if (error) {
         console.error('[useWhatsAppConversations] Error:', error);

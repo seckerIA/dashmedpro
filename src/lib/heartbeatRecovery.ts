@@ -19,22 +19,22 @@ import { CURRENT_PROJECT_REF } from '@/integrations/supabase/client';
 
 const CONFIG = {
     // Intervalo do heartbeat (ms)
-    HEARTBEAT_INTERVAL: 3000, // 3 segundos
+    HEARTBEAT_INTERVAL: 2000, // 2 segundos (era 3s)
 
     // Se o gap for maior que isso, consideramos freeze
-    FREEZE_THRESHOLD: 8000, // 8 segundos
+    FREEZE_THRESHOLD: 5000, // 5 segundos (era 8s) - extensões congelam rápido
 
     // Tempo mínimo entre recoveries (evita loops)
-    RECOVERY_COOLDOWN: 5000, // 5 segundos
+    RECOVERY_COOLDOWN: 3000, // 3 segundos (era 5s)
 
     // Se ficou idle mais que isso, força refresh completo
-    STALE_THRESHOLD: 60000, // 1 minuto
+    STALE_THRESHOLD: 45000, // 45 segundos (era 60s)
 
     // Máximo de recoveries consecutivos antes de forçar reload
-    MAX_CONSECUTIVE_RECOVERIES: 5,
+    MAX_CONSECUTIVE_RECOVERIES: 4, // (era 5)
 
     // Tempo para considerar query como travada
-    STUCK_QUERY_THRESHOLD: 15000, // 15 segundos
+    STUCK_QUERY_THRESHOLD: 8000, // 8 segundos (era 15s) - falhar rápido
 };
 
 // ============================================================================
@@ -115,6 +115,12 @@ function removeStuckQueries(): number {
                 }
             }
         }
+    }
+
+    // Se removeu queries, também resetar o fetch tracking para evitar slots travados
+    if (removedCount > 0) {
+        resetFetchTracking();
+        log('🔓', 'Fetch slots resetados após limpar queries');
     }
 
     return removedCount;

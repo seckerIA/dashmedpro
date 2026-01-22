@@ -237,22 +237,28 @@ const queryClient = new QueryClient({
           return false;
         }
 
+        // Se for erro de extensão, retenta UMA vez
+        if (error?.message?.includes('message channel closed') ||
+          error?.message?.includes('Extension context')) {
+          return failureCount < 1;
+        }
+
         return true;
       },
       retryDelay: (attemptIndex) => {
         // Backoff mais rápido para fail-fast
-        return Math.min(1000 * 2 ** attemptIndex, 5000);
+        return Math.min(500 * 2 ** attemptIndex, 3000);
       },
-      staleTime: 10 * 60 * 1000, // 10 minutos - dados são frescos por mais tempo
-      gcTime: 30 * 60 * 1000, // 30 minutos - manter em cache para idle longo
+      staleTime: 5 * 60 * 1000, // 5 minutos (era 10min) - dados mais frescos
+      gcTime: 15 * 60 * 1000, // 15 minutos (era 30min) - menos memória
       refetchOnWindowFocus: false, // Handled by our custom focusManager
-      refetchOnMount: false, // Não refetch se dados estão frescos
+      refetchOnMount: 'always', // SEMPRE buscar ao montar (era false) - evita dados velhos
       refetchOnReconnect: true,
-      networkMode: 'online',
+      networkMode: 'offlineFirst', // Usar cache imediato enquanto busca (era 'online')
     },
     mutations: {
       retry: 1,
-      retryDelay: 1000,
+      retryDelay: 500,
     },
   },
 });
@@ -290,16 +296,31 @@ const RouteChangeHandler = ({ queryClient }: { queryClient: QueryClient }) => {
       const lastActivity = (window as any).lastActivityTime || now;
       const idleTime = now - lastActivity;
       const idleMinutes = Math.floor(idleTime / 60000);
+      const idleSeconds = Math.floor(idleTime / 1000);
 
-      console.log(`🔄 [RouteChange] Navegando de ${prevLocation} para ${location.pathname}. Idle: ${idleMinutes} min`);
+      console.log(`🔄 [RouteChange] ${prevLocation} → ${location.pathname}. Idle: ${idleMinutes}m ${idleSeconds % 60}s`);
 
-      // REMOVED: Aggressive cancelQueries was killing new page fetches
-      // queryClient.cancelQueries();
+      // ALWAYS reset fetch slots on navigation to prevent slot leaks from stuck queries
+      import("@/lib/queryUtils").then(({ resetFetchTracking }) => {
+        resetFetchTracking();
+        console.log('🔓 [RouteChange] Fetch slots resetados');
+      }).catch(() => { });
 
-      // If idle for more than 2 minutes, invalidate all queries to get fresh data
-      if (idleTime > 120000) {
-        console.log('📊 [RouteChange] Invalidating stale queries after idle...');
-        queryClient.invalidateQueries();
+      // If idle for more than 30 seconds, be more aggressive
+      if (idleTime > 30000) {
+        console.log('🧹 [RouteChange] Cancelando queries travadas após idle...');
+
+        // Cancel ALL in-flight queries first (they might be stuck)
+        queryClient.cancelQueries();
+
+        // If very idle (>2 min), also invalidate to get fresh data
+        if (idleTime > 120000) {
+          console.log('📊 [RouteChange] Invalidando queries stale...');
+          // Small delay to let cancellation complete
+          setTimeout(() => {
+            queryClient.invalidateQueries();
+          }, 100);
+        }
       }
 
       setPrevLocation(location.pathname);
