@@ -4,6 +4,7 @@ import { useAuth } from "./useAuth";
 import { useUserProfile } from "./useUserProfile";
 import { useToast } from "./use-toast";
 import { InventoryItem, InventoryItemInsert, InventoryItemUpdate, InventoryBatch, InventoryBatchInsert, InventoryMovement } from "@/types/inventory";
+import { supabaseQueryWithTimeout } from "@/utils/supabaseQuery";
 
 export const useInventory = () => {
     const { user } = useAuth();
@@ -14,9 +15,9 @@ export const useInventory = () => {
     // Buscar Items (com batches e saldo total)
     const { data: items, isLoading } = useQuery({
         queryKey: ["inventory-items"],
-        queryFn: async () => {
-            // Busca items
-            const { data: itemsData, error: itemsError } = await supabase
+        queryFn: async ({ signal }) => {
+            // Busca items com timeout
+            const query = supabase
                 .from("inventory_items")
                 .select(`
                     *,
@@ -24,10 +25,16 @@ export const useInventory = () => {
                 `)
                 .order("name");
 
+            const { data: itemsData, error: itemsError } = await supabaseQueryWithTimeout(
+                query as any,
+                15000,
+                signal
+            );
+
             if (itemsError) throw itemsError;
 
             // Calcular saldo total no frontend
-            const itemsWithTotal = itemsData.map((item: any) => ({
+            const itemsWithTotal = ((itemsData as any[]) || []).map((item: any) => ({
                 ...item,
                 total_quantity: item.batches?.reduce((acc: number, batch: any) => acc + (batch.quantity || 0), 0) || 0
             }));
@@ -35,6 +42,8 @@ export const useInventory = () => {
             return itemsWithTotal as InventoryItem[];
         },
         enabled: !!user,
+        staleTime: 60 * 1000,
+        retry: 2,
     });
 
     // Criar Item
@@ -44,8 +53,8 @@ export const useInventory = () => {
 
             const { data, error } = await supabase
                 .from("inventory_items")
-                .insert([{ 
-                    ...newItem, 
+                .insert([{
+                    ...newItem,
                     user_id: user.id,
                     organization_id: profile?.organization_id
                 } as any])
