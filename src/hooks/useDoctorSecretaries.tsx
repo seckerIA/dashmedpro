@@ -6,6 +6,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
 import { useAuth } from './useAuth';
 
 export const DOCTOR_SECRETARIES_KEY = 'doctor-secretaries';
@@ -19,40 +20,46 @@ export function useDoctorSecretaries() {
 
   const { data, isLoading, error } = useQuery({
     queryKey: [DOCTOR_SECRETARIES_KEY, user?.id],
-    queryFn: async (): Promise<string[]> => {
+    queryFn: async ({ signal }): Promise<string[]> => {
       if (!user?.id) return [];
 
-      // 1. Buscar role do usuário
-      const { data: profile } = await supabase
+      // 1. Buscar role do usuário COM TIMEOUT
+      const profileQuery = supabase
         .from('profiles')
         .select('role')
         .eq('id', user.id)
-        .maybeSingle(); // Changed to maybeSingle to handle null gracefully
+        .maybeSingle();
+
+      const { data: profile } = await supabaseQueryWithTimeout(profileQuery as any, 15000, signal);
 
       const role = profile?.role;
       const isOwnerOrAdmin = role === 'dono' || role === 'admin';
 
-      // 2. Se for Dono ou Admin, retorna TODAS as secretárias
+      // 2. Se for Dono ou Admin, retorna TODAS as secretárias COM TIMEOUT
       if (isOwnerOrAdmin) {
-        const { data: secretaries, error } = await supabase
+        const secretariesQuery = supabase
           .from('profiles')
           .select('id')
           .eq('role', 'secretaria')
           .eq('is_active', true);
 
+        const { data: secretaries, error } = await supabaseQueryWithTimeout(secretariesQuery as any, 15000, signal);
+
         if (error) {
           console.error('[useDoctorSecretaries] Error fetching all secretaries:', error);
-          // Fallback
-        } else {
-          return (secretaries as any[])?.map(s => s.id) || [];
+          return []; // Return empty instead of falling through
         }
+
+        return (secretaries as any[])?.map(s => s.id) || [];
       }
 
-      // 3. Comportamento padrão (Médicos): Apenas vinculadas
-      const { data, error } = await supabase
+      // 3. Comportamento padrão (Médicos): Apenas vinculadas COM TIMEOUT
+      const linksQuery = supabase
         .from('secretary_doctor_links')
         .select('secretary_id')
         .eq('doctor_id', user.id);
+
+      const { data, error } = await supabaseQueryWithTimeout(linksQuery as any, 15000, signal);
 
       if (error) {
         console.error('[useDoctorSecretaries] Error fetching secretaries:', error);
