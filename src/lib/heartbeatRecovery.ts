@@ -335,6 +335,16 @@ function heartbeat() {
 function handleVisibility() {
     if (document.visibilityState === 'visible') {
         const gap = Date.now() - lastHeartbeat;
+
+        // CRITICAL: Se passou mais que DEEP_SLEEP_THRESHOLD, forçar reload IMEDIATAMENTE
+        // Isso acontece ANTES de qualquer query tentar rodar
+        if (gap > CONFIG.DEEP_SLEEP_THRESHOLD) {
+            log('💀', `DEEP SLEEP na visibilidade (${Math.round(gap / 1000 / 60)}min). Forçando reload...`);
+            queryClient?.clear();
+            window.location.reload();
+            return; // Nunca chega aqui, mas por segurança
+        }
+
         log('👁️', `Tab ativa. Gap: ${Math.round(gap / 1000)}s`);
         lastHeartbeat = Date.now();
 
