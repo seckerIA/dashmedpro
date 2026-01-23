@@ -319,17 +319,7 @@ const RouteChangeHandler = ({ queryClient }: { queryClient: QueryClient }) => {
         console.log('🔓 [RouteChange] Fetch slots resetados');
       }).catch(() => { });
 
-      // CRITICAL: Se ficou idle mais de 5 minutos, FORCAR RELOAD imediato
-      // Isso acontece ANTES de qualquer query tentar rodar
-      const DEEP_SLEEP_THRESHOLD = 5 * 60 * 1000; // 5 minutos
-      if (effectiveIdleTime > DEEP_SLEEP_THRESHOLD) {
-        console.log(`💀 [RouteChange] DEEP SLEEP detectado (${idleMinutes}min). Forçando reload...`);
-        queryClient.clear();
-        window.location.reload();
-        return; // Nunca chega aqui
-      }
-
-      // If idle for more than 30 seconds, be more aggressive
+      // If idle for more than 30 seconds, cancel stuck queries
       if (effectiveIdleTime > 30000) {
         console.log('🧹 [RouteChange] Cancelando queries travadas após idle...');
 
@@ -339,14 +329,9 @@ const RouteChangeHandler = ({ queryClient }: { queryClient: QueryClient }) => {
         // Reset persistent idle state so it doesn't trigger again immediately
         (window as any).lastLongIdleDuration = 0;
 
-        // If very idle (>2 min), also invalidate to get fresh data
-        if (effectiveIdleTime > 120000) {
-          console.log('📊 [RouteChange] Invalidando queries stale...');
-          // Small delay to let cancellation complete
-          setTimeout(() => {
-            queryClient.invalidateQueries();
-          }, 100);
-        }
+        // NOTA: NÃO fazemos invalidateQueries() aqui!
+        // Isso causava fetch em sockets mortos.
+        // As queries vão buscar dados quando o componente montar (refetchOnMount: 'always')
       }
 
       setPrevLocation(location.pathname);

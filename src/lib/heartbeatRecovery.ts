@@ -28,8 +28,8 @@ const CONFIG = {
     STALE_THRESHOLD: 45000, // 45s
 
     // LIMIAR DEEP SLEEP (Longa Duração) - Força Reload
-    // 5 minutos = 300000 ms (agressivo - qualquer idle significativo = reload)
-    DEEP_SLEEP_THRESHOLD: 5 * 60 * 1000,
+    // 30 minutos = 1800000 ms (menos agressivo - só em casos extremos)
+    DEEP_SLEEP_THRESHOLD: 30 * 60 * 1000,
 
     // Máximo de tentativas de reconexão na Camada 2
     MAX_RETRY_ATTEMPTS: 3,
@@ -235,17 +235,60 @@ async function verifyAndRefreshSession(retryCount = 0): Promise<boolean> {
 async function reconnectRealtimeChannels() {
     if (!supabaseClient) return;
     try {
-        const channels = supabaseClient.getChannels();
-        if (channels.length === 0) return;
+        // Primeiro: fazer um fetch simples para "acordar" o socket HTTP
+        // Isso força o browser a criar uma nova conexão se a anterior morreu
+        log('🔌', 'Testando conexão com banco...');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        // Reconecta canais desconectados
-        for (const channel of channels) {
-            if (channel.state !== 'joined') {
-                channel.subscribe();
+        try {
+            const { error } = await supabaseClient
+                .from('profiles')
+                .select('id')
+                .limit(1)
+                .abortSignal(controller.signal);
+
+            clearTimeout(timeoutId);
+
+            if (error) {
+                log('⚠️', `Teste de conexão falhou: ${error.message}`);
+                // Não é fatal - o próximo fetch do usuário vai tentar novamente
+            } else {
+                log('✅', 'Conexão HTTP OK');
+            }
+        } catch (e: any) {
+            clearTimeout(timeoutId);
+            if (e.name === 'AbortError') {
+                log('⚠️', 'Timeout no teste de conexão (5s)');
+            } else {
+                log('⚠️', 'Erro no teste de conexão:', e);
             }
         }
+
+        // Segundo: reconectar canais Realtime
+        const channels = supabaseClient.getChannels();
+        if (channels.length === 0) {
+            log('📡', 'Nenhum canal Realtime para reconectar');
+            return;
+        }
+
+        log('📡', `Reconectando ${channels.length} canais Realtime...`);
+
+        // Remove e reconecta para forçar nova conexão WebSocket
+        for (const channel of channels) {
+            try {
+                await supabaseClient.removeChannel(channel);
+            } catch (e) {
+                // Ignorar erros de remoção
+            }
+        }
+
+        // Os hooks que usam Realtime vão re-subscrever automaticamente
+        // quando o componente re-renderizar
+        log('✅', 'Canais Realtime limpos. Re-subscrição automática.');
+
     } catch (e) {
-        // Silent fail
+        log('⚠️', 'Erro ao reconectar Realtime:', e);
     }
 }
 
@@ -296,9 +339,10 @@ async function triggerRecovery(reason: string, gapMs: number) {
             // Checkpoints extras para sessões longas
             await reconnectRealtimeChannels();
 
-            // Invalidação geral para garantir dados frescos
-            log('📊', 'Atualizando dados...');
-            await queryClient?.invalidateQueries();
+            // IMPORTANTE: NÃO fazemos invalidateQueries() aqui!
+            // Isso causava fetch em sockets mortos.
+            // As queries vão buscar dados frescos quando o usuário interagir.
+            log('✅', 'Canais reconectados. Queries buscarão dados na próxima interação.');
         }
 
         log('✅', 'Sistema recuperado');
@@ -336,18 +380,20 @@ function handleVisibility() {
     if (document.visibilityState === 'visible') {
         const gap = Date.now() - lastHeartbeat;
 
-        // CRITICAL: Se passou mais que DEEP_SLEEP_THRESHOLD, forçar reload IMEDIATAMENTE
-        // Isso acontece ANTES de qualquer query tentar rodar
-        if (gap > CONFIG.DEEP_SLEEP_THRESHOLD) {
-            log('💀', `DEEP SLEEP na visibilidade (${Math.round(gap / 1000 / 60)}min). Forçando reload...`);
-            queryClient?.clear();
-            window.location.reload();
-            return; // Nunca chega aqui, mas por segurança
+        // Log para diagnóstico
+        const gapMinutes = Math.round(gap / 1000 / 60);
+        const gapSeconds = Math.round(gap / 1000);
+
+        if (gapMinutes > 0) {
+            log('👁️', `Tab ativa após ${gapMinutes}min`);
+        } else {
+            log('👁️', `Tab ativa. Gap: ${gapSeconds}s`);
         }
 
-        log('👁️', `Tab ativa. Gap: ${Math.round(gap / 1000)}s`);
         lastHeartbeat = Date.now();
 
+        // Trigger recovery se passou do threshold de freeze
+        // Isso faz reconexão graceful SEM reload
         if (gap > CONFIG.FREEZE_THRESHOLD) {
             triggerRecovery('Tab Visibility', gap);
         }
