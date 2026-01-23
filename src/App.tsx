@@ -2,7 +2,7 @@ import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AppLayout } from "./components/layout/AppLayout";
@@ -11,6 +11,8 @@ import { useUserProfile } from "./hooks/useUserProfile";
 import { SupabaseProjectValidator } from "./components/SupabaseProjectValidator";
 import { CortanaProvider, CortanaOverlay } from "./components/cortana";
 import { initHeartbeatRecovery } from "@/lib/heartbeatRecovery";
+import { useIdleDetector } from "@/lib/idleDetector";
+import { queryClient, cancelOngoingQueries, resetFetchTracking } from "@/lib/queryUtils";
 
 // Componente para inicializar o Heartbeat de recuperação (NÃO-BLOQUEANTE)
 const HeartbeatInitializer = () => {
@@ -107,8 +109,7 @@ import CallsPage from "@/pages/Calls";
 import VOIPSettings from "@/pages/VOIPSettings";
 
 import { focusManager } from "@tanstack/react-query";
-import { checkToken, supabase, wasRecentlyAuthenticated } from "@/integrations/supabase/client";
-import { recoverStuckQueries } from "@/lib/queryUtils";
+import { checkToken } from "@/integrations/supabase/client";
 
 // Configuração customizada de Foco da Janela (não-bloqueante mas segura)
 // Configuração customizada de Foco da Janela (não-bloqueante mas segura)
@@ -156,28 +157,38 @@ focusManager.setEventListener((handleFocus) => {
   };
 });
 
-// Configuração do QueryClient com tratamento global de timeouts, retries e 401 handling
-const queryClient = new QueryClient({
-  queryCache: new QueryCache({
-    onError: async (error: any, query) => {
-      const errorMsg = error?.message || String(error);
+// ============================================================================
+// V3: Configuração de Error Handlers no QueryClient importado
+// ============================================================================
+let consecutiveTimeouts = 0;
+let lastReloadCheck = 0;
 
-      // Detectar erros de autenticação
-      const isAuthError =
-        errorMsg.includes('401') ||
-        errorMsg.includes('Unauthorized') ||
-        errorMsg.includes('JWT') ||
-        errorMsg.includes('invalid_token') ||
-        errorMsg.includes('Refresh Token') ||  // <-- NOVO
-        errorMsg.includes('Invalid Refresh Token') ||  // <-- NOVO
-        error?.status === 401;
+// Subscreve aos eventos de erro do QueryCache
+queryClient.getQueryCache().subscribe((event) => {
+  if (event.type === 'updated' && event.action?.type === 'success') {
+    consecutiveTimeouts = 0;
+  }
 
-      if (isAuthError) {
-        console.log('🔒 [QueryCache] Erro de autenticação:', errorMsg.substring(0, 50));
+  if (event.type === 'updated' && event.action?.type === 'error') {
+    const error = event.action.error as any;
+    const query = event.query;
+    const errorMsg = error?.message || String(error);
 
-        // Importar supabase e tentar refresh
-        const { supabase, checkToken } = await import('@/integrations/supabase/client');
+    // Detectar erros de autenticação
+    const isAuthError =
+      errorMsg.includes('401') ||
+      errorMsg.includes('Unauthorized') ||
+      errorMsg.includes('JWT') ||
+      errorMsg.includes('invalid_token') ||
+      errorMsg.includes('Refresh Token') ||
+      errorMsg.includes('Invalid Refresh Token') ||
+      error?.status === 401;
 
+    if (isAuthError) {
+      console.log('🔒 [QueryCache] Erro de autenticação:', errorMsg.substring(0, 50));
+
+      // Importar supabase e tentar refresh
+      import('@/integrations/supabase/client').then(async ({ supabase, checkToken }) => {
         // Se for erro de refresh token, fazer logout
         if (errorMsg.includes('Refresh Token') || errorMsg.includes('Invalid Refresh Token')) {
           console.log('🚪 [QueryCache] Refresh token inválido - fazendo logout');
@@ -192,82 +203,44 @@ const queryClient = new QueryClient({
           console.log('🔄 [QueryCache] Token renovado, retentando query');
           queryClient.invalidateQueries({ queryKey: query.queryKey });
         }
-        return;
+      }).catch(console.error);
+      return;
+    }
+
+    // Detectar timeouts consecutivos (apenas log, não recarrega)
+    if (errorMsg.includes('timeout') || errorMsg.includes('Timeout') || errorMsg.includes('excedido')) {
+      consecutiveTimeouts++;
+      console.warn(`⚠️ Query timeout (${consecutiveTimeouts}x): ${query.queryKey.slice(0, 2).join('/')}`);
+
+      // Resetar query travada
+      queryClient.resetQueries({ queryKey: query.queryKey });
+
+      // V3: Apenas loga, não faz reload automático
+      if (consecutiveTimeouts >= 3) {
+        console.warn('⚠️ [App] Muitos timeouts consecutivos (' + consecutiveTimeouts + '). Considere verificar a conexão.');
       }
-
-      // Log timeout errors
-      if (errorMsg.includes('timeout') || errorMsg.includes('Query timeout')) {
-        console.error(`❌ Query timeout: ${query.queryKey.slice(0, 2).join('/')}`);
-
-        // Resetar query travada
-        queryClient.resetQueries({ queryKey: query.queryKey });
-      }
-    },
-  }),
-  mutationCache: new MutationCache({
-    onError: async (error: any) => {
-      // Handle 401 in mutations too
-      if (error?.message?.includes('401') ||
-        error?.message?.includes('Unauthorized') ||
-        error?.status === 401) {
-        console.log('🔒 [MutationCache] Erro 401 em mutation. Forçando refresh...');
-        await checkToken();
-      }
-
-      if (error?.message?.includes('timeout') || error?.message?.includes('Query timeout')) {
-        console.error('❌ Mutation timeout:', error);
-      }
-    },
-  }),
-  defaultOptions: {
-    queries: {
-      retry: (failureCount, error: any) => {
-        const errorMsg = error?.message?.toLowerCase() || '';
-
-        // Se for timeout, NÃO retenta - mostrar erro imediatamente
-        // Isso evita loops infinitos quando extensões bloqueiam requests
-        if (errorMsg.includes('timeout') || errorMsg.includes('excedido')) {
-          console.warn('🚫 [QueryClient] Timeout detectado, não fazendo retry');
-          return false;
-        }
-
-        // Se for 401, não retenta aqui (será tratado pelo onError acima)
-        if (errorMsg.includes('401') || error?.status === 401) {
-          return false;
-        }
-
-        // Se for erro de extensão, NÃO retenta mais - apenas falha
-        // Isso evita retry × retry = loop infinito
-        if (errorMsg.includes('message channel closed') ||
-          errorMsg.includes('extension context')) {
-          console.warn('🚫 [QueryClient] Erro de extensão detectado, não fazendo retry');
-          return false;
-        }
-
-        // Máximo de 1 retry para outros erros (era 2)
-        if (failureCount >= 1) return false;
-
-        return true;
-      },
-      retryDelay: (attemptIndex) => {
-        // Backoff mais rápido para fail-fast
-        return Math.min(500 * 2 ** attemptIndex, 3000);
-      },
-      staleTime: 5 * 60 * 1000, // 5 minutos (era 10min) - dados mais frescos
-      gcTime: 15 * 60 * 1000, // 15 minutos (era 30min) - menos memória
-      refetchOnWindowFocus: false, // Handled by our custom focusManager
-      refetchOnMount: 'always', // SEMPRE buscar ao montar (era false) - evita dados velhos
-      refetchOnReconnect: true,
-      networkMode: 'offlineFirst', // Usar cache imediato enquanto busca (era 'online')
-    },
-    mutations: {
-      retry: 1,
-      retryDelay: 500,
-    },
-  },
+    }
+  }
 });
 
+// Subscreve aos eventos de erro do MutationCache
+queryClient.getMutationCache().subscribe((event) => {
+  if (event.type === 'updated' && event.action?.type === 'error') {
+    const error = event.action.error as any;
+    const errorMsg = error?.message || '';
 
+    if (errorMsg.includes('401') || errorMsg.includes('Unauthorized') || error?.status === 401) {
+      console.log('🔒 [MutationCache] Erro 401 em mutation. Forçando refresh...');
+      import('@/integrations/supabase/client').then(({ checkToken }) => {
+        checkToken();
+      }).catch(console.error);
+    }
+
+    if (errorMsg.includes('timeout') || errorMsg.includes('Query timeout')) {
+      console.error('❌ Mutation timeout:', error);
+    }
+  }
+});
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -288,53 +261,23 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Route Change Handler - Gracefully handles navigation and data refresh
-const RouteChangeHandler = ({ queryClient }: { queryClient: QueryClient }) => {
+// Route Change Handler V3 - Simplified, no deadlock
+const RouteChangeHandler = () => {
   const location = useLocation();
   const [prevLocation, setPrevLocation] = React.useState(location.pathname);
 
   React.useEffect(() => {
     if (location.pathname !== prevLocation) {
-      // Get idle time from idleDetector
-      const now = Date.now();
-      const lastActivity = (window as any).lastActivityTime || now;
-      const currentIdleTime = now - lastActivity;
+      console.log(`🔄 [RouteChange] ${prevLocation} → ${location.pathname}`);
 
-      // CRITICAL FIX: Use the stored "long idle" duration if it exists
-      // This handles the case where user moves mouse (resetting currentIdle) 
-      // just before clicking a link.
-      const lastLongIdle = (window as any).lastLongIdleDuration || 0;
-      const effectiveIdleTime = Math.max(currentIdleTime, lastLongIdle);
+      // Cancela queries em andamento (não bloqueia novas)
+      cancelOngoingQueries();
 
-      const idleMinutes = Math.floor(effectiveIdleTime / 60000);
-      const idleSeconds = Math.floor(effectiveIdleTime / 1000);
-
-      console.log(`🔄 [RouteChange] ${prevLocation} → ${location.pathname}. Idle: ${idleMinutes}m ${idleSeconds % 60}s (Effective)`);
-
-      // ALWAYS reset fetch slots on navigation to prevent slot leaks from stuck queries
-      import("@/lib/queryUtils").then(({ resetFetchTracking }) => {
-        resetFetchTracking();
-        console.log('🔓 [RouteChange] Fetch slots resetados');
-      }).catch(() => { });
-
-      // If idle for more than 30 seconds, cancel stuck queries
-      if (effectiveIdleTime > 30000) {
-        console.log('🧹 [RouteChange] Cancelando queries travadas após idle...');
-
-        // Cancel ALL in-flight queries first (they might be stuck)
-        queryClient.cancelQueries();
-
-        // Reset persistent idle state so it doesn't trigger again immediately
-        (window as any).lastLongIdleDuration = 0;
-
-        // NOTA: NÃO fazemos invalidateQueries() aqui!
-        // Isso causava fetch em sockets mortos.
-        // As queries vão buscar dados quando o componente montar (refetchOnMount: 'always')
-      }
-
+      // Atualiza referência
       setPrevLocation(location.pathname);
     }
-  }, [location.pathname, prevLocation, queryClient]);
+  }, [location.pathname, prevLocation]);
+
 
   return null;
 };
@@ -371,6 +314,9 @@ const RoleProtectedRoute = ({
 
 const AppRoutes = () => {
   const { user, loading, isSuperAdmin } = useAuth();
+
+  // V3: Ativa detecção de idle (não bloqueia queries)
+  useIdleDetector();
 
   if (loading) {
     return (
@@ -644,7 +590,7 @@ const App = () => (
             <Toaster />
             <Sonner />
             <BrowserRouter>
-              <RouteChangeHandler queryClient={queryClient} />
+              <RouteChangeHandler />
               <AppRoutes />
             </BrowserRouter>
           </TooltipProvider>

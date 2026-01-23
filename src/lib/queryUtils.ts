@@ -1,49 +1,155 @@
 /**
- * Query utilities for timeout handling, visibility-aware refetching, and connection limiting
+ * QUERY UTILS V3 - Utilitários SEM deadlock
+ * 
+ * MUDANÇAS CRÍTICAS:
+ * 1. Remove bloqueio durante wake-up (causava deadlock)
+ * 2. Invalidação suave em vez de cancelamento forçado
+ * 3. Retry automático para queries que falharam
  */
 
+import { QueryClient } from '@tanstack/react-query';
+
 /**
- * Creates a promise that rejects after a specified timeout
+ * QueryClient configurado para recuperação automática
  */
-export function createTimeoutPromise(ms: number, message?: string): Promise<never> {
-    return new Promise((_, reject) => {
-        setTimeout(() => {
-            reject(new Error(message || `Query timeout after ${ms}ms`));
-        }, ms);
+export const queryClient = new QueryClient({
+    defaultOptions: {
+        queries: {
+            staleTime: 5 * 60 * 1000, // 5 min
+            gcTime: 10 * 60 * 1000, // 10 min (era cacheTime)
+            retry: (failureCount, error: any) => {
+                // Não retry em erros de auth
+                if (error?.message?.includes('JWT') || error?.code === 'PGRST301') {
+                    return false;
+                }
+                // Retry até 2 vezes em outros erros
+                return failureCount < 2;
+            },
+            retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
+            // Refetch automático ao focar a window
+            refetchOnWindowFocus: true,
+            // Não refetch ao reconnect (deixa o IdleDetector cuidar)
+            refetchOnReconnect: false,
+        },
+        mutations: {
+            retry: false, // Mutations nunca retry automaticamente
+        },
+    },
+});
+
+/**
+ * Cancela queries em andamento (útil em navegação)
+ * NÃO bloqueia novas queries
+ */
+export function cancelOngoingQueries() {
+    console.log('🧹 [QueryUtils] Cancelando queries em andamento...');
+
+    // Cancela apenas queries que estão fetchando agora
+    queryClient.cancelQueries({
+        predicate: (query) => query.state.fetchStatus === 'fetching'
     });
 }
 
 /**
- * Wraps a Supabase query with timeout and AbortController
- * @param queryFn - The async function to execute
- * @param timeoutMs - Timeout in milliseconds (default: 5000ms)
- * @returns Promise that resolves with query result or rejects on timeout
+ * Invalida queries antigas (>10min)
+ * Útil após idle longo
  */
-export async function withQueryTimeout<T>(
-    queryFn: (signal?: AbortSignal) => Promise<T>,
-    timeoutMs: number = 5000
-): Promise<T> {
-    const controller = new AbortController();
-    const { signal } = controller;
+export function invalidateStaleQueries() {
+    console.log('🔄 [QueryUtils] Invalidando queries antigas...');
 
-    const timeoutPromise = createTimeoutPromise(timeoutMs).finally(() => {
-        controller.abort();
+    const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+
+    queryClient.getQueryCache().getAll().forEach(query => {
+        const dataUpdatedAt = query.state.dataUpdatedAt;
+        if (dataUpdatedAt && dataUpdatedAt < tenMinutesAgo) {
+            queryClient.invalidateQueries({ queryKey: query.queryKey });
+        }
+    });
+}
+
+/**
+ * Remove queries que nunca foram carregadas
+ * Útil para limpar lixo no cache
+ */
+export function removeNeverLoadedQueries() {
+    console.log('🗑️ [QueryUtils] Removendo queries não carregadas...');
+
+    queryClient.getQueryCache().getAll().forEach(query => {
+        if (!query.state.data && query.state.status === 'pending') {
+            queryClient.removeQueries({ queryKey: query.queryKey });
+        }
+    });
+}
+
+/**
+ * Retry forçado para queries que falharam
+ * Útil após renovação de sessão
+ */
+export function retryFailedQueries() {
+    console.log('🔁 [QueryUtils] Retry de queries falhadas...');
+
+    queryClient.getQueryCache().getAll().forEach(query => {
+        if (query.state.status === 'error') {
+            queryClient.invalidateQueries({ queryKey: query.queryKey });
+        }
+    });
+}
+
+/**
+ * Limpa tudo e reseta o cache (uso emergencial)
+ * Apenas em casos extremos (logout, erro fatal)
+ */
+export function emergencyCacheClear() {
+    console.warn('🚨 [QueryUtils] EMERGENCY: Limpando cache completo!');
+    queryClient.clear();
+}
+
+/**
+ * Retorna estatísticas do cache para debug
+ */
+export function getCacheStats() {
+    const allQueries = queryClient.getQueryCache().getAll();
+
+    const stats = {
+        total: allQueries.length,
+        fetching: 0,
+        error: 0,
+        success: 0,
+        stale: 0,
+        oldestUpdate: Date.now(),
+    };
+
+    allQueries.forEach(query => {
+        if (query.state.fetchStatus === 'fetching') stats.fetching++;
+        if (query.state.status === 'error') stats.error++;
+        if (query.state.status === 'success') stats.success++;
+        if (query.isStale()) stats.stale++;
+
+        if (query.state.dataUpdatedAt && query.state.dataUpdatedAt < stats.oldestUpdate) {
+            stats.oldestUpdate = query.state.dataUpdatedAt;
+        }
     });
 
-    try {
-        return await Promise.race([
-            queryFn(signal),
-            timeoutPromise
-        ]);
-    } catch (error) {
-        controller.abort();
-        throw error;
-    }
+    return {
+        ...stats,
+        oldestAge: Date.now() - stats.oldestUpdate,
+    };
 }
+
+/**
+ * Reseta tracking de fetch (compatibilidade com código legado)
+ */
+export function resetFetchTracking(): void {
+    console.log('🔓 [QueryUtils] Reset fetch tracking (no-op em V3)');
+    // No-op em V3 - mantido para compatibilidade
+}
+
+// ============================================================================
+// BACKWARD COMPATIBILITY EXPORTS
+// ============================================================================
 
 /**
  * Check if tab is currently visible
- * Used to prevent queries from running when tab is hidden
  */
 export function isTabVisible(): boolean {
     if (typeof document === 'undefined') return true;
@@ -59,29 +165,10 @@ export function isOnline(): boolean {
 }
 
 /**
- * Returns a refetchInterval that respects tab visibility
- * When tab is hidden, returns false (disables polling)
- * When tab is visible, returns the specified interval
- * 
- * Use this in useQuery options like:
- * refetchInterval: getVisibilityAwareInterval(60000)
- */
-export function getVisibilityAwareInterval(intervalMs: number): number | false {
-    if (!isTabVisible()) return false;
-    if (!isOnline()) return false;
-    return intervalMs;
-}
-
-/**
  * Creates a dynamic refetchInterval function that checks visibility
- * Use this for useQuery's refetchInterval option
- * 
- * Example:
- * refetchInterval: createVisibilityAwareInterval(60000)
  */
 export function createVisibilityAwareInterval(intervalMs: number): (query: any) => number | false {
     return (_query: any) => {
-        // Disable polling when tab is hidden or offline
         if (!isTabVisible() || !isOnline()) {
             return false;
         }
@@ -90,25 +177,21 @@ export function createVisibilityAwareInterval(intervalMs: number): (query: any) 
 }
 
 /**
- * Default query options for better cache utilization and performance
+ * Returns a refetchInterval that respects tab visibility
  */
-export const defaultQueryOptions = {
-    staleTime: 30 * 60 * 1000, // 30 minutes - use cached data
-    gcTime: 120 * 60 * 1000, // 2 hours - keep in cache
-    retry: 2, // Only retry twice for faster failure
-    retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 5000),
-    refetchOnWindowFocus: false,
-    refetchOnMount: false, // Don't refetch on mount if data is fresh
-    refetchOnReconnect: true,
-} as const;
+export function getVisibilityAwareInterval(intervalMs: number): number | false {
+    if (!isTabVisible()) return false;
+    if (!isOnline()) return false;
+    return intervalMs;
+}
 
 /**
  * Query options for real-time/frequently updating data
  */
 export const realtimeQueryOptions = {
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    gcTime: 60 * 60 * 1000, // 1 hour
-    retry: 1, // Fail fast for real-time data
+    staleTime: 2 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+    retry: 1,
     retryDelay: 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: true,
@@ -116,11 +199,24 @@ export const realtimeQueryOptions = {
 } as const;
 
 /**
+ * Default query options for better cache utilization
+ */
+export const defaultQueryOptions = {
+    staleTime: 30 * 60 * 1000,
+    gcTime: 120 * 60 * 1000,
+    retry: 2,
+    retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 5000),
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: true,
+} as const;
+
+/**
  * Query options for static/rarely changing data
  */
 export const staticQueryOptions = {
-    staleTime: 60 * 60 * 1000, // 60 minutes
-    gcTime: 4 * 60 * 60 * 1000, // 4 hours
+    staleTime: 60 * 60 * 1000,
+    gcTime: 4 * 60 * 60 * 1000,
     retry: 2,
     retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 5000),
     refetchOnWindowFocus: false,
@@ -129,124 +225,34 @@ export const staticQueryOptions = {
 } as const;
 
 /**
- * Maximum concurrent fetching queries allowed
- * Prevents browser connection limits from being exceeded
+ * Creates a promise that rejects after a specified timeout
  */
-export const MAX_CONCURRENT_QUERIES = 4;
-
-/**
- * Tracks currently fetching queries for connection limiting
- */
-let activeFetchCount = 0;
-const fetchQueue: Array<() => void> = [];
-
-/**
- * Acquires a fetch slot, waiting if too many queries are in flight
- * Call releaseFetchSlot when done
- */
-export async function acquireFetchSlot(): Promise<void> {
-    if (activeFetchCount < MAX_CONCURRENT_QUERIES) {
-        activeFetchCount++;
-        return;
-    }
-
-    // Wait for a slot to become available
-    return new Promise((resolve) => {
-        fetchQueue.push(() => {
-            activeFetchCount++;
-            resolve();
-        });
+export function createTimeoutPromise(ms: number, message?: string): Promise<never> {
+    return new Promise((_, reject) => {
+        setTimeout(() => {
+            reject(new Error(message || `Query timeout after ${ms}ms`));
+        }, ms);
     });
 }
 
 /**
- * Releases a fetch slot, allowing queued fetches to proceed
+ * Wraps a query with timeout
  */
-export function releaseFetchSlot(): void {
-    activeFetchCount = Math.max(0, activeFetchCount - 1);
-    const next = fetchQueue.shift();
-    if (next) {
-        next();
+export async function withQueryTimeout<T>(
+    queryFn: (signal?: AbortSignal) => Promise<T>,
+    timeoutMs: number = 5000
+): Promise<T> {
+    const controller = new AbortController();
+    const { signal } = controller;
+
+    const timeoutPromise = createTimeoutPromise(timeoutMs).finally(() => {
+        controller.abort();
+    });
+
+    try {
+        return await Promise.race([queryFn(signal), timeoutPromise]);
+    } catch (error) {
+        controller.abort();
+        throw error;
     }
-}
-
-/**
- * Gets current active fetch count (for debugging)
- */
-export function getActiveFetchCount(): number {
-    return activeFetchCount;
-}
-
-/**
- * Resets fetch tracking (call on auth state change or error recovery)
- */
-export function resetFetchTracking(): void {
-    activeFetchCount = 0;
-
-    // Release all queued queries so they don't hang forever
-    // This fixes the "infinite loading" bug after idle
-    const currentQueue = [...fetchQueue];
-    fetchQueue.length = 0;
-
-    if (currentQueue.length > 0) {
-        console.log(`🔓 [QueryUtils] Releasing ${currentQueue.length} queued queries during reset`);
-        currentQueue.forEach(resolve => resolve());
-    }
-}
-
-/**
- * Reset queries que estão em estado 'pending' por mais de X segundos.
- * Chame periodicamente via setInterval para auto-recovery de queries travadas.
- * 
- * @param queryClient - Instância do QueryClient do TanStack Query
- * @param maxPendingMs - Tempo máximo em ms antes de considerar a query travada (default: 45s)
- * @returns Número de queries recuperadas
- */
-export function recoverStuckQueries(
-    queryClient: { getQueryCache: () => any; cancelQueries: (opts: any) => void; invalidateQueries: (opts: any) => void },
-    maxPendingMs: number = 45000
-): number {
-    const queries = queryClient.getQueryCache().getAll();
-    let recoveredCount = 0;
-
-    for (const query of queries) {
-        const state = query.state;
-
-        // Query está em fetching mas sem resposta
-        if (state.fetchStatus === 'fetching') {
-            // dataUpdatedAt = 0 se nunca teve dados, ou timestamp do último sucesso
-            // fetchMeta.fetchedAt não existe, então usamos heurística baseada no tempo relativo
-            const lastKnownTime = state.dataUpdatedAt || query.state.errorUpdatedAt || 0;
-            const now = Date.now();
-
-            // Se a última atualização foi há mais de maxPendingMs, está travada
-            // Isso funciona porque queries recém-iniciadas terão lastKnownTime == 0,
-            // então comparamos com query.cacheTime (quando a query foi criada)
-            const queryAge = now - (lastKnownTime || (query as any).initialDataUpdatedAt || now - maxPendingMs - 1);
-
-            if (queryAge > maxPendingMs) {
-                const queryKeyStr = Array.isArray(query.queryKey)
-                    ? query.queryKey.join('/')
-                    : String(query.queryKey);
-
-                console.warn(`🔄 [QueryRecovery] Recuperando query travada (${Math.round(queryAge / 1000)}s): ${queryKeyStr}`);
-
-                try {
-                    queryClient.cancelQueries({ queryKey: query.queryKey });
-                    // Não invalidamos imediatamente para evitar loop de refetch
-                    // A query será refetched naturalmente na próxima interação
-                    recoveredCount++;
-                } catch (err) {
-                    console.error(`❌ [QueryRecovery] Erro ao cancelar query:`, err);
-                }
-            }
-        }
-    }
-
-    // Se recuperamos queries, também resetamos o tracking de fetch slots
-    if (recoveredCount > 0) {
-        resetFetchTracking();
-    }
-
-    return recoveredCount;
 }
