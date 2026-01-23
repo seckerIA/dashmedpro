@@ -7,7 +7,7 @@
  * 3. Longa (> 60m): Hard Reload para limpar memória e forçar token novo.
  */
 
-import { QueryClient, onlineManager } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/react-query';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 // ============================================================================
@@ -19,23 +19,28 @@ const CONFIG = {
     HEARTBEAT_INTERVAL: 2000,
 
     // Se o gap for maior que isso, consideramos freeze/sleep
-    FREEZE_THRESHOLD: 5000,
+    // 30 segundos - muito menos agressivo
+    FREEZE_THRESHOLD: 30000,
 
     // Tempo mínimo entre recoveries (evita loops)
-    RECOVERY_COOLDOWN: 3000,
+    // 10 segundos - mais espaço entre tentativas
+    RECOVERY_COOLDOWN: 10000,
 
     // LIMIAR HIBERNAÇÃO (Média Duração) - Força verificação robusta
-    STALE_THRESHOLD: 45000, // 45s
+    // 2 minutos - só para idle realmente longo
+    STALE_THRESHOLD: 120000,
 
     // LIMIAR DEEP SLEEP (Longa Duração) - Força Reload
-    // 30 minutos = 1800000 ms (menos agressivo - só em casos extremos)
+    // 30 minutos - só em casos extremos (não usado mais)
     DEEP_SLEEP_THRESHOLD: 30 * 60 * 1000,
 
-    // Máximo de tentativas de reconexão na Camada 2
-    MAX_RETRY_ATTEMPTS: 3,
+    // Máximo de tentativas de reconexão
+    // 1 tentativa apenas - fail-fast, não bloquear
+    MAX_RETRY_ATTEMPTS: 1,
 
     // Tempo para considerar query como travada
-    STUCK_QUERY_THRESHOLD: 8000,
+    // 15 segundos - mais tolerante
+    STUCK_QUERY_THRESHOLD: 15000,
 };
 
 // ============================================================================
@@ -114,120 +119,37 @@ async function forceLogout() {
 // PROCESSO DE VALIDAÇÃO DE SESSÃO
 // ============================================================================
 
-async function verifyAndRefreshSession(retryCount = 0): Promise<boolean> {
+async function verifyAndRefreshSession(): Promise<boolean> {
     if (!supabaseClient) return false;
 
     try {
-        // Tentar pegar sessão
+        // UMA tentativa apenas - fail-fast
         const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
 
-        // ERRO DE SESSÃO
+        // ERRO DE SESSÃO - não retry, apenas false
         if (sessionError) {
-            log('⚠️', `Erro de sessão (Tentativa ${retryCount + 1}):`, sessionError.message);
+            log('⚠️', 'Erro de sessão:', sessionError.message);
 
-            // Se for erro recuperável (network) e ainda temos tentativas
-            if (retryCount < CONFIG.MAX_RETRY_ATTEMPTS) {
-                const delay = 1000 * (retryCount + 1); // Backoff: 1s, 2s, 3s
-                log('⏳', `Aguardando rede (${delay}ms)...`);
-                await new Promise(r => setTimeout(r, delay));
-                return verifyAndRefreshSession(retryCount + 1);
-            }
-
-            // Se for refresh token inválido, tchau
+            // Se for refresh token inválido, logout
             if (sessionError.message.includes('Refresh Token') ||
                 sessionError.message.includes('invalid_token')) {
                 await forceLogout();
-                return false;
             }
             return false;
         }
 
-        // SEM SESSÃO
+        // SEM SESSÃO - retorna false, usuário será redirecionado naturalmente
         if (!session) {
-            // Se não tem sessão mas esperávamos ter, pode ser delay de rede
-            if (retryCount < CONFIG.MAX_RETRY_ATTEMPTS) {
-                log('⚠️', `Sessão vazia. Retentando (${retryCount + 1})...`);
-                await new Promise(r => setTimeout(r, 1000));
-                return verifyAndRefreshSession(retryCount + 1);
-            }
+            log('⚠️', 'Sem sessão');
             return false;
         }
 
-        // VERIFICAR EXPIRAÇÃO
-        const expiresAt = session.expires_at || 0;
-        const expiresIn = expiresAt * 1000 - Date.now();
-
-        // Se expira em menos de 5 minutos, renovar
-        if (expiresIn < 5 * 60 * 1000) {
-            log('🔄', `Renovando token (expira em ${Math.round(expiresIn / 1000)}s)`);
-            const { data, error: refreshError } = await supabaseClient.auth.refreshSession();
-
-            if (refreshError) {
-                log('❌', 'Falha na renovação:', refreshError.message);
-
-                // Retry na renovação também
-                if (retryCount < CONFIG.MAX_RETRY_ATTEMPTS) {
-                    await new Promise(r => setTimeout(r, 1000));
-                    return verifyAndRefreshSession(retryCount + 1);
-                }
-
-                if (refreshError.message.includes('Refresh Token') ||
-                    refreshError.message.includes('invalid_token')) {
-                    await forceLogout();
-                }
-                return false;
-            }
-
-            log('✅', 'Token renovado com sucesso');
-        }
-
-        // CRITICAL: Force a REAL network request to wake up the socket
-        // getSession() may be local-only, so we ping the database
-        log('🔌', 'Pingando banco de dados para acordar conexão...');
-        const pingStart = Date.now();
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
-
-            const { error: pingError } = await supabaseClient
-                .from('profiles')
-                .select('id')
-                .limit(1)
-                .abortSignal(controller.signal)
-                .single();
-
-            clearTimeout(timeoutId);
-
-            if (pingError && !pingError.message.includes('aborted')) {
-                log('⚠️', `Ping falhou: ${pingError.message}`);
-                if (retryCount < CONFIG.MAX_RETRY_ATTEMPTS) {
-                    await new Promise(r => setTimeout(r, 1000));
-                    return verifyAndRefreshSession(retryCount + 1);
-                }
-                return false;
-            }
-
-            log('✅', `Ping OK (${Date.now() - pingStart}ms)`);
-        } catch (pingEx: any) {
-            if (pingEx.name === 'AbortError') {
-                log('⚠️', 'Ping timeout (5s) - conexão ainda morta');
-                if (retryCount < CONFIG.MAX_RETRY_ATTEMPTS) {
-                    await new Promise(r => setTimeout(r, 1000));
-                    return verifyAndRefreshSession(retryCount + 1);
-                }
-                return false;
-            }
-            throw pingEx;
-        }
-
+        // Sessão existe e é válida
+        log('✅', 'Sessão OK');
         return true;
 
     } catch (e: any) {
-        log('❌', 'Exceção na verificação:', e);
-        if (retryCount < CONFIG.MAX_RETRY_ATTEMPTS) {
-            await new Promise(r => setTimeout(r, 1000));
-            return verifyAndRefreshSession(retryCount + 1);
-        }
+        log('⚠️', 'Exceção na verificação:', e.message);
         return false;
     }
 }
@@ -301,63 +223,51 @@ async function triggerRecovery(reason: string, gapMs: number) {
     if (now - lastRecovery < CONFIG.RECOVERY_COOLDOWN && !isRecovering) return;
     if (isRecovering) return;
 
-    // CAMADA 3: DEEP SLEEP (> 1 Hora) -> HARD RELOAD
-    if (gapMs > CONFIG.DEEP_SLEEP_THRESHOLD) {
-        log('💀', `DEEP SLEEP DETECTADO (${Math.round(gapMs / 1000 / 60)}min). Iniciando Hard Reload...`);
-        // Limpar queries antes de morrer
-        queryClient?.clear();
-        // Reload forçado
-        window.location.reload();
-        return;
-    }
+    // Recovery é feito em background para NUNCA bloquear a UI
+    // Se algo falhar, as queries vão falhar individualmente (melhor que travar tudo)
+    doRecoveryInBackground(reason, gapMs);
+}
 
+async function doRecoveryInBackground(reason: string, gapMs: number) {
     isRecovering = true;
-    lastRecovery = now;
+    lastRecovery = Date.now();
     consecutiveRecoveries++;
 
-    // PAUSE - Impedir que queries disparem no socket morto
-    onlineManager.setOnline(false);
+    // NÃO usa onlineManager.setOnline(false) - isso trava a UI!
+    // Deixamos queries rodarem normalmente, se falharem, falham individualmente
 
-    log('🚨', `RECOVERY (${reason}) - Gap: ${Math.round(gapMs / 1000)}s`);
+    log('�', `Recovery em background (${reason}) - Gap: ${Math.round(gapMs / 1000)}s`);
 
     try {
-        // CAMADA 1: Limpeza Básica
+        // CAMADA 1: Limpeza Básica (rápido, não bloqueia)
         await resetFetchTracking();
         const removed = removeStuckQueries();
         if (removed > 0) log('🧹', `${removed} queries limpas`);
 
-        // CAMADA 2: Validação de Sessão (Smart Retry)
+        // CAMADA 2: Apenas para idle muito longo (>2 min)
         if (gapMs > CONFIG.STALE_THRESHOLD) {
-            log('🔒', 'Validando sessão com retry...');
+            log('🔒', 'Verificando sessão...');
+
+            // UMA tentativa apenas, sem retry
             const sessionOk = await verifyAndRefreshSession();
 
             if (!sessionOk) {
-                log('⚠️', 'Sessão perdida após tentativas. Aguardando ação do usuário.');
-                return;
+                log('⚠️', 'Sessão inválida. Usuário será redirecionado ao tentar ação.');
+                // Não fazemos nada - as queries vão falhar e redirecionar naturalmente
+            } else {
+                // Tentar reconectar Realtime em background
+                reconnectRealtimeChannels().catch(() => { });
+                log('✅', 'Sessão OK. Realtime reconectando em background.');
             }
-
-            // Checkpoints extras para sessões longas
-            await reconnectRealtimeChannels();
-
-            // IMPORTANTE: NÃO fazemos invalidateQueries() aqui!
-            // Isso causava fetch em sockets mortos.
-            // As queries vão buscar dados frescos quando o usuário interagir.
-            log('✅', 'Canais reconectados. Queries buscarão dados na próxima interação.');
         }
 
-        log('✅', 'Sistema recuperado');
-
-        // Reset contador após sucesso
-        setTimeout(() => {
-            if (Date.now() - lastRecovery > 30000) consecutiveRecoveries = 0;
-        }, 30000);
+        log('✅', 'Recovery concluído (não-bloqueante)');
 
     } catch (e) {
-        log('❌', 'Falha no recovery:', e);
+        log('⚠️', 'Recovery falhou (sem impacto na UI):', e);
     } finally {
         isRecovering = false;
-        // RESUME - Liberar queries no socket novo (ou deixar falhar)
-        onlineManager.setOnline(true);
+        // NÃO chama onlineManager.setOnline() - nunca pausamos
     }
 }
 
@@ -392,9 +302,9 @@ function handleVisibility() {
 
         lastHeartbeat = Date.now();
 
-        // Trigger recovery se passou do threshold de freeze
-        // Isso faz reconexão graceful SEM reload
-        if (gap > CONFIG.FREEZE_THRESHOLD) {
+        // Só faz recovery se ficou mais de 1 MINUTO inativo
+        // Menos que isso, não vale a pena - pode ser só alt-tab rápido
+        if (gap > 60000) {
             triggerRecovery('Tab Visibility', gap);
         }
     }

@@ -12,8 +12,7 @@ import { SupabaseProjectValidator } from "./components/SupabaseProjectValidator"
 import { CortanaProvider, CortanaOverlay } from "./components/cortana";
 import { initHeartbeatRecovery } from "@/lib/heartbeatRecovery";
 
-// Componente para inicializar o Heartbeat de recuperação
-// Componente para inicializar o Heartbeat de recuperação
+// Componente para inicializar o Heartbeat de recuperação (NÃO-BLOQUEANTE)
 const HeartbeatInitializer = () => {
   const { user } = useAuth();
   const cleanupRef = React.useRef<(() => void) | null>(null);
@@ -21,7 +20,6 @@ const HeartbeatInitializer = () => {
   React.useEffect(() => {
     // Só inicializa se houver usuário logado
     if (!user) {
-      // Se deslogou, parar o heartbeat
       if (cleanupRef.current) {
         cleanupRef.current();
         cleanupRef.current = null;
