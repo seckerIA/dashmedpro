@@ -319,6 +319,16 @@ const RouteChangeHandler = ({ queryClient }: { queryClient: QueryClient }) => {
         console.log('🔓 [RouteChange] Fetch slots resetados');
       }).catch(() => { });
 
+      // CRITICAL: Se ficou idle mais de 5 minutos, FORCAR RELOAD imediato
+      // Isso acontece ANTES de qualquer query tentar rodar
+      const DEEP_SLEEP_THRESHOLD = 5 * 60 * 1000; // 5 minutos
+      if (effectiveIdleTime > DEEP_SLEEP_THRESHOLD) {
+        console.log(`💀 [RouteChange] DEEP SLEEP detectado (${idleMinutes}min). Forçando reload...`);
+        queryClient.clear();
+        window.location.reload();
+        return; // Nunca chega aqui
+      }
+
       // If idle for more than 30 seconds, be more aggressive
       if (effectiveIdleTime > 30000) {
         console.log('🧹 [RouteChange] Cancelando queries travadas após idle...');

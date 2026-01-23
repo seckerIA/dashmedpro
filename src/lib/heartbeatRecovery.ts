@@ -28,8 +28,8 @@ const CONFIG = {
     STALE_THRESHOLD: 45000, // 45s
 
     // LIMIAR DEEP SLEEP (Longa Duração) - Força Reload
-    // 15 minutos = 900000 ms (reduzido de 1 hora para recuperar mais rápido)
-    DEEP_SLEEP_THRESHOLD: 15 * 60 * 1000,
+    // 5 minutos = 300000 ms (agressivo - qualquer idle significativo = reload)
+    DEEP_SLEEP_THRESHOLD: 5 * 60 * 1000,
 
     // Máximo de tentativas de reconexão na Camada 2
     MAX_RETRY_ATTEMPTS: 3,
