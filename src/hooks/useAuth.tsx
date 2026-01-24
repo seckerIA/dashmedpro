@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { Organization } from '@/types/organization';
+import { sessionManager } from '@/lib/sessionManager';
 
 interface AuthContextType {
   user: User | null;
@@ -11,6 +12,8 @@ interface AuthContextType {
   isSuperAdmin: boolean;
   loading: boolean;
   signOut: () => Promise<void>;
+  checkAuth: () => Promise<boolean>;
+  renewSession: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -143,6 +146,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  /**
+   * Verifica se está autenticado usando SessionManager
+   */
+  const checkAuth = async (): Promise<boolean> => {
+    return sessionManager.isSessionValid();
+  };
+
+  /**
+   * Força renovação da sessão
+   */
+  const renewSession = async (): Promise<boolean> => {
+    return sessionManager.forceRenewal();
+  };
+
   const value = {
     user,
     session,
@@ -151,6 +168,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isSuperAdmin,
     loading,
     signOut,
+    checkAuth,
+    renewSession,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -99,7 +99,7 @@ export function SupabaseProjectValidator({ children }: { children: React.ReactNo
               onClick={() => {
                 // Tenta limpar estado antes
                 try { localStorage.removeItem('supabase.auth.token'); } catch (e) { }
-                window.location.reload();
+                // window.location.reload(); // Desativado para evitar loop
               }}
             >
               <RefreshCw className="h-5 w-5 animate-spin-slow" />
@@ -168,7 +168,7 @@ export function SupabaseProjectValidator({ children }: { children: React.ReactNo
               // Limpar localStorage e recarregar
               localStorage.clear();
               sessionStorage.clear();
-              window.location.reload();
+              // window.location.reload(); // Desativado
             }}
             variant="default"
           >
@@ -177,7 +177,7 @@ export function SupabaseProjectValidator({ children }: { children: React.ReactNo
           <Button
             onClick={() => {
               // Recarregar página
-              window.location.reload();
+              // window.location.reload();
             }}
             variant="outline"
           >

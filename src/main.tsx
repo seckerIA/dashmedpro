@@ -1,7 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import "./lib/idleDetector"; // Track user activity for session recovery
+
 
 // Disable React DevTools to prevent extension crashes
 if (typeof window !== 'undefined' && 'try' in window) {

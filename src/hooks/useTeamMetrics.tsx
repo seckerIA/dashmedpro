@@ -166,24 +166,24 @@ const fetchSecretaryMetrics = async (
     confirmationsTodayResult,
     pendingConfirmationsResult
   ] = await Promise.all([
-    supabaseQueryWithTimeout(profileQuery, 30000, signal),
-    supabaseQueryWithTimeout(appointmentsTodayQuery, 30000, signal),
-    supabaseQueryWithTimeout(appointmentsMonthQuery, 30000, signal),
-    supabaseQueryWithTimeout(contactsTodayQuery, 30000, signal),
-    supabaseQueryWithTimeout(contactsMonthQuery, 30000, signal),
-    supabaseQueryWithTimeout(confirmationsTodayQuery, 30000, signal),
-    supabaseQueryWithTimeout(pendingConfirmationsQuery, 30000, signal),
+    supabaseQueryWithTimeout(profileQuery as any, 30000, signal),
+    supabaseQueryWithTimeout(appointmentsTodayQuery as any, 30000, signal),
+    supabaseQueryWithTimeout(appointmentsMonthQuery as any, 30000, signal),
+    supabaseQueryWithTimeout(contactsTodayQuery as any, 30000, signal),
+    supabaseQueryWithTimeout(contactsMonthQuery as any, 30000, signal),
+    supabaseQueryWithTimeout(confirmationsTodayQuery as any, 30000, signal),
+    supabaseQueryWithTimeout(pendingConfirmationsQuery as any, 30000, signal),
   ]);
 
   return {
-    appointmentsScheduledToday: appointmentsTodayResult.count || 0,
-    appointmentsScheduledThisMonth: appointmentsMonthResult.count || 0,
-    patientsRegisteredToday: contactsTodayResult.count || 0,
-    patientsRegisteredThisMonth: contactsMonthResult.count || 0,
-    confirmationsToday: confirmationsTodayResult.count || 0,
-    pendingConfirmations: pendingConfirmationsResult.count || 0,
-    userName: profileResult.data?.full_name || profileResult.data?.email || 'Secretaria',
-    userEmail: profileResult.data?.email || '',
+    appointmentsScheduledToday: (appointmentsTodayResult as any).count || 0,
+    appointmentsScheduledThisMonth: (appointmentsMonthResult as any).count || 0,
+    patientsRegisteredToday: (contactsTodayResult as any).count || 0,
+    patientsRegisteredThisMonth: (contactsMonthResult as any).count || 0,
+    confirmationsToday: (confirmationsTodayResult as any).count || 0,
+    pendingConfirmations: (pendingConfirmationsResult as any).count || 0,
+    userName: (profileResult as any).data?.full_name || (profileResult as any).data?.email || 'Secretaria',
+    userEmail: (profileResult as any).data?.email || '',
   };
 };
 
@@ -202,7 +202,7 @@ const fetchTeamMetrics = async (
       .select('secretary_id')
       .eq('doctor_id', userId);
 
-    const linkedSecretaryIds = links?.map(l => l.secretary_id) || [];
+    const linkedSecretaryIds = (links as any)?.map((l: any) => l.secretary_id) || [];
     const allUserIds = [userId, ...linkedSecretaryIds];
 
     // Buscar dados para o médico e suas secretárias
@@ -228,27 +228,27 @@ const fetchTeamMetrics = async (
       .in('id', allUserIds);
 
     const [dealsResult, contactsResult, leadsResult, profilesResult] = await Promise.all([
-      supabaseQueryWithTimeout(dealsQuery, 60000, signal),
-      supabaseQueryWithTimeout(contactsQuery, 60000, signal),
-      supabaseQueryWithTimeout(leadsQuery, 60000, signal),
-      supabaseQueryWithTimeout(profilesQuery, 60000, signal),
+      supabaseQueryWithTimeout(dealsQuery as any, 60000, signal),
+      supabaseQueryWithTimeout(contactsQuery as any, 60000, signal),
+      supabaseQueryWithTimeout(leadsQuery as any, 60000, signal),
+      supabaseQueryWithTimeout(profilesQuery as any, 60000, signal),
     ]);
 
     if (dealsResult.error) throw new Error(`Erro ao buscar deals: ${dealsResult.error.message}`);
     if (contactsResult.error) throw new Error(`Erro ao buscar contatos: ${contactsResult.error.message}`);
 
-    const deals = dealsResult.data || [];
-    const contacts = contactsResult.data || [];
-    const leads = leadsResult.data || [];
-    const profiles = profilesResult.data || [];
+    const deals = (dealsResult as any).data || [];
+    const contacts = (contactsResult as any).data || [];
+    const leads = (leadsResult as any).data || [];
+    const profiles = (profilesResult as any).data || [];
 
-    const profilesMap = new Map(profiles.map(p => [p.id, p]));
+    const profilesMap = new Map(profiles.map((p: any) => [p.id, p]));
 
     // Calcular métricas por usuário (médico + secretárias)
     const teamMetrics: TeamMetrics[] = allUserIds.map(targetUserId => {
-      const userDeals = deals.filter(d => d.user_id === targetUserId || d.assigned_to === targetUserId);
-      const userContacts = contacts.filter(c => c.user_id === targetUserId);
-      const userLeads = leads.filter(l => l.user_id === targetUserId);
+      const userDeals = deals.filter((d: any) => d.user_id === targetUserId || d.assigned_to === targetUserId);
+      const userContacts = contacts.filter((c: any) => c.user_id === targetUserId);
+      const userLeads = leads.filter((l: any) => l.user_id === targetUserId);
       const profile = profilesMap.get(targetUserId);
 
       return calculateUserMetricsFromData(targetUserId, userDeals, userContacts, userLeads, profile);
@@ -294,19 +294,19 @@ const fetchTeamMetrics = async (
       .eq('id', userId);
 
     const [dealsResult, contactsResult, leadsResult, profilesResult] = await Promise.all([
-      supabaseQueryWithTimeout(dealsQuery, 60000, signal),
-      supabaseQueryWithTimeout(contactsQuery, 60000, signal),
-      supabaseQueryWithTimeout(leadsQuery, 60000, signal),
-      supabaseQueryWithTimeout(profilesQuery, 60000, signal),
+      supabaseQueryWithTimeout(dealsQuery as any, 60000, signal),
+      supabaseQueryWithTimeout(contactsQuery as any, 60000, signal),
+      supabaseQueryWithTimeout(leadsQuery as any, 60000, signal),
+      supabaseQueryWithTimeout(profilesQuery as any, 60000, signal),
     ]);
 
     if (dealsResult.error) throw new Error(`Erro ao buscar deals: ${dealsResult.error.message}`);
     if (contactsResult.error) throw new Error(`Erro ao buscar contatos: ${contactsResult.error.message}`);
 
-    const deals = dealsResult.data || [];
-    const contacts = contactsResult.data || [];
-    const leads = leadsResult.data || [];
-    const profiles = profilesResult.data || [];
+    const deals = (dealsResult as any).data || [];
+    const contacts = (contactsResult as any).data || [];
+    const leads = (leadsResult as any).data || [];
+    const profiles = (profilesResult as any).data || [];
 
     const profile = profiles[0];
     const userMetrics = calculateUserMetrics(userId, deals, contacts, leads, profile);
@@ -331,9 +331,9 @@ const fetchTeamMetrics = async (
       .eq('is_active', true)
       .limit(50); // Reduzido de 100 para 50 para melhor performance
 
-    const { data: profiles, error } = await supabaseQueryWithTimeout(profilesQuery, 60000, signal);
-    if (!error && profiles && profiles.length > 0) {
-      targetUserIds = profiles.map(p => p.id);
+    const { data: profiles, error } = await supabaseQueryWithTimeout(profilesQuery as any, 60000, signal);
+    if (!error && profiles && (profiles as any[]).length > 0) {
+      targetUserIds = (profiles as any[]).map(p => p.id);
     }
   }
 
@@ -365,27 +365,27 @@ const fetchTeamMetrics = async (
     .in('id', targetUserIds);
 
   const [dealsResult, contactsResult, leadsResult, profilesResult] = await Promise.all([
-    supabaseQueryWithTimeout(dealsQuery, 60000, signal),
-    supabaseQueryWithTimeout(contactsQuery, 60000, signal),
-    supabaseQueryWithTimeout(leadsQuery, 60000, signal),
-    supabaseQueryWithTimeout(profilesQuery, 60000, signal),
+    supabaseQueryWithTimeout(dealsQuery as any, 60000, signal),
+    supabaseQueryWithTimeout(contactsQuery as any, 60000, signal),
+    supabaseQueryWithTimeout(leadsQuery as any, 60000, signal),
+    supabaseQueryWithTimeout(profilesQuery as any, 60000, signal),
   ]);
 
   if (dealsResult.error) throw new Error(`Erro ao buscar deals: ${dealsResult.error.message}`);
   if (contactsResult.error) throw new Error(`Erro ao buscar contatos: ${contactsResult.error.message}`);
 
-  const deals = dealsResult.data || [];
-  const contacts = contactsResult.data || [];
-  const leads = leadsResult.data || [];
-  const profiles = profilesResult.data || [];
+  const deals = (dealsResult as any).data || [];
+  const contacts = (contactsResult as any).data || [];
+  const leads = (leadsResult as any).data || [];
+  const profiles = (profilesResult as any).data || [];
 
-  const profilesMap = new Map(profiles.map(p => [p.id, p]));
+  const profilesMap = new Map(profiles.map((p: any) => [p.id, p]));
 
   // Calcular métricas por usuário
   const teamMetrics: TeamMetrics[] = targetUserIds.map(targetUserId => {
-    const userDeals = deals.filter(d => d.user_id === targetUserId || d.assigned_to === targetUserId);
-    const userContacts = contacts.filter(c => c.user_id === targetUserId);
-    const userLeads = leads.filter(l => l.user_id === targetUserId);
+    const userDeals = deals.filter((d: any) => d.user_id === targetUserId || d.assigned_to === targetUserId);
+    const userContacts = contacts.filter((c: any) => c.user_id === targetUserId);
+    const userLeads = leads.filter((l: any) => l.user_id === targetUserId);
     const profile = profilesMap.get(targetUserId);
 
     return calculateUserMetricsFromData(targetUserId, userDeals, userContacts, userLeads, profile);
@@ -556,7 +556,7 @@ function calculateUserMetricsFromData(
     userRole: profile?.role || undefined,
     totalPipeline,
     totalRevenue,
-    activeDeals: activeDeals.length,
+    activeDeals: activeDeals,
     wonDeals: wonDeals.length,
     lostDeals: lostDeals.length,
     conversionRate,
@@ -578,7 +578,9 @@ export function useTeamMetrics(selectedUserIds?: string[]) {
   const {
     data: metrics,
     isLoading,
+    isError,
     error,
+    refetch,
   } = useQuery({
     queryKey: ['team-metrics', user?.id, selectedUserIds?.join(','), isMedico],
     queryFn: async ({ signal }) => {
@@ -616,7 +618,9 @@ export function useTeamMetrics(selectedUserIds?: string[]) {
   const {
     data: secretaryMetrics,
     isLoading: isLoadingSecretary,
+    isError: isErrorSecretary,
     error: secretaryError,
+    refetch: refetchSecretary,
   } = useQuery({
     queryKey: ['secretary-team-metrics', user?.id],
     queryFn: async ({ signal }) => {
@@ -648,7 +652,9 @@ export function useTeamMetrics(selectedUserIds?: string[]) {
     metrics: metrics || emptyMetrics,
     secretaryMetrics: secretaryMetrics || emptySecretaryMetrics,
     isLoading: isSecretaria ? isLoadingSecretary : isLoading,
+    isError: isSecretaria ? isErrorSecretary : isError,
     error: isSecretaria ? secretaryError : error,
+    refetch: isSecretaria ? refetchSecretary : refetch,
     isSecretaria,
   };
 }

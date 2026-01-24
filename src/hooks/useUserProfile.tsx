@@ -37,7 +37,7 @@ export function useUserProfile() {
 
         const { data: profileData, error: profileError } = await supabaseQueryWithTimeout(
           profileQuery as any,
-          15000, // 15 segundos - fail fast para recuperar conexão zumbi
+          20000, // 20 segundos - mais tolerante para wake-up
           signal
         );
 
@@ -101,7 +101,7 @@ export function useUserProfile() {
       }
     },
     enabled: !!user?.id && !authLoading, // Aguardar auth terminar de carregar
-    retry: 2,
+    retry: 3,
     retryDelay: 1000,
     refetchOnWindowFocus: false,
     staleTime: 10 * 60 * 1000, // 10 minutos

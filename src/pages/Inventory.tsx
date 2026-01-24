@@ -229,7 +229,7 @@ const ProductFormFields = ({ formInstance, showBatchFields = false }: { formInst
 );
 
 const InventoryProductsTab = () => {
-    const { items, isLoading, createItem, updateItem, deleteItem, addBatch } = useInventory();
+    const { items, isLoading, isError, refetch, createItem, updateItem, deleteItem, addBatch } = useInventory();
     const [searchTerm, setSearchTerm] = useState("");
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -443,6 +443,17 @@ const InventoryProductsTab = () => {
                         {isLoading ? (
                             <TableRow>
                                 <TableCell colSpan={6} className="text-center py-8">Carregando...</TableCell>
+                            </TableRow>
+                        ) : isError ? (
+                            <TableRow>
+                                <TableCell colSpan={6} className="text-center py-8 text-destructive">
+                                    <div className="flex flex-col items-center gap-2">
+                                        <span>Erro ao carregar produtos. Verifique sua conexão.</span>
+                                        <Button variant="outline" size="sm" onClick={() => refetch()}>
+                                            Tentar Novamente
+                                        </Button>
+                                    </div>
+                                </TableCell>
                             </TableRow>
                         ) : filteredItems?.length === 0 ? (
                             <TableRow>

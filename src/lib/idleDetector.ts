@@ -73,7 +73,7 @@ export function useIdleDetector() {
 
             if (!sessionValid) {
                 console.error('❌ [IdleDetector] Sessão inválida após renovação. Redirecionando...');
-                window.location.href = '/login';
+                // window.location.href = '/login'; // Desativado
                 return;
             }
 

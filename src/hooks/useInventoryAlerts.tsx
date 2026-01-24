@@ -56,8 +56,8 @@ export function useInventoryAlerts() {
             try {
                 // Executar queries em paralelo com controle de concorrência e timeout de 15s
                 const [batchesResult, itemsResult] = await Promise.all([
-                    supabaseQueryWithTimeout(batchesQuery as any, 15000),
-                    supabaseQueryWithTimeout(itemsQuery as any, 15000)
+                    supabaseQueryWithTimeout(batchesQuery as any, 20000),
+                    supabaseQueryWithTimeout(itemsQuery as any, 20000)
                 ]);
 
                 if (batchesResult.error) throw batchesResult.error;

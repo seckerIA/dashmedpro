@@ -26,7 +26,7 @@ class SessionManager {
 
     private readonly MAX_FAILURES = 3;
     private readonly CHECK_INTERVAL = 30000; // 30s
-    private readonly RENEWAL_TIMEOUT = 8000; // 8s (agressivo)
+    private readonly RENEWAL_TIMEOUT = 20000; // 20s (mais tolerante)
 
     private checkTimer: NodeJS.Timeout | null = null;
     private renewalTimeout: NodeJS.Timeout | null = null;
@@ -217,11 +217,11 @@ class SessionManager {
             this.state.consecutiveFailures = 0;
 
             // Recarrega a página para limpar tudo
-            window.location.href = '/login';
+            // window.location.href = '/login'; // Desativado
         } catch (error) {
             console.error('❌ [SessionManager] Erro ao forçar logout:', error);
             // Se nem logout funcionar, recarrega de qualquer forma
-            window.location.href = '/login';
+            // window.location.href = '/login'; // Desativado
         }
     }
 

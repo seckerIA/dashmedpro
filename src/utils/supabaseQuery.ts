@@ -1,5 +1,3 @@
-import { acquireFetchSlot, releaseFetchSlot } from "@/lib/queryUtils";
-
 export interface SupabaseQueryResult<T> {
   data: T | null;
   error: any;
@@ -10,19 +8,18 @@ type SupabaseQueryBuilder<T> = Promise<SupabaseQueryResult<T>> & {
 };
 
 /**
- * Wrapper for Supabase queries with real timeout and concurrency control.
+ * Wrapper for Supabase queries with real timeout.
  * 
  * IMPORTANT: This function does NOT retry internally.
  * React Query handles retries - doing it here creates an infinite loop.
  * 
  * PROTECTS AGAINST:
- * 1. Network stalls on resume from idle (via acquireFetchSlot)
- * 2. Infinite hanging requests (via timeout)
- * 3. Extension interference (via fast timeout and clear error)
+ * 1. Infinite hanging requests (via timeout)
+ * 2. Extension interference (via fast timeout and clear error)
  */
 export async function supabaseQueryWithTimeout<T>(
   queryBuilder: SupabaseQueryBuilder<T> | Promise<SupabaseQueryResult<T>>,
-  timeoutMs: number = 15000, // 15s - fail even faster (was 30s)
+  timeoutMs: number = 5000, // 5s - fail muito rápido (era 15s)
   signal?: AbortSignal
 ): Promise<SupabaseQueryResult<T>> {
   // NO INTERNAL RETRY - React Query handles that
@@ -31,7 +28,7 @@ export async function supabaseQueryWithTimeout<T>(
 }
 
 /**
- * Internal execution logic with slot acquisition and race against clock
+ * Internal execution logic with race against clock
  */
 async function executeQueryWithTimeout<T>(
   queryBuilder: SupabaseQueryBuilder<T> | Promise<SupabaseQueryResult<T>>,
@@ -45,10 +42,6 @@ async function executeQueryWithTimeout<T>(
   if (signal?.aborted) {
     throw new Error('Query cancelada');
   }
-
-  // 🚦 CONCURRENCY CONTROL: Wait for a free network slot
-  // prevent browser from choking on too many simultaneous requests (Chrome max: 6 per domain)
-  await acquireFetchSlot();
 
   const timeoutController = new AbortController();
   let timeoutId: any;
@@ -103,8 +96,5 @@ async function executeQueryWithTimeout<T>(
       console.error(`❌ [Query Error] ${queryDesc}:`, error.message || error);
     }
     throw error;
-  } finally {
-    // 🚦 RELEASE SLOT: Allow next query to run
-    releaseFetchSlot();
   }
 }

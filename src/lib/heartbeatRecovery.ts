@@ -39,8 +39,8 @@ const CONFIG = {
     MAX_RETRY_ATTEMPTS: 1,
 
     // Tempo para considerar query como travada
-    // 15 segundos - mais tolerante
-    STUCK_QUERY_THRESHOLD: 15000,
+    // 30 segundos - mais tolerante para não competir com timeouts de 15s
+    STUCK_QUERY_THRESHOLD: 30000,
 };
 
 // ============================================================================
@@ -109,7 +109,7 @@ async function forceLogout() {
         log('🚪', 'Forçando logout (Sessão inválida)...');
         await supabaseClient.auth.signOut();
         queryClient?.clear();
-        if (typeof window !== 'undefined') window.location.href = '/login';
+        // if (typeof window !== 'undefined') window.location.href = '/login'; // Desativado
     } catch (e) {
         console.error(e);
     }

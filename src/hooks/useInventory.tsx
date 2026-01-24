@@ -13,7 +13,7 @@ export const useInventory = () => {
     const queryClient = useQueryClient();
 
     // Buscar Items (com batches e saldo total)
-    const { data: items, isLoading } = useQuery({
+    const { data: items, isLoading, isError, error, refetch } = useQuery({
         queryKey: ["inventory-items"],
         queryFn: async ({ signal }) => {
             // Busca items com timeout
@@ -27,7 +27,7 @@ export const useInventory = () => {
 
             const { data: itemsData, error: itemsError } = await supabaseQueryWithTimeout(
                 query as any,
-                15000,
+                20000,
                 signal
             );
 
@@ -179,6 +179,9 @@ export const useInventory = () => {
     return {
         items,
         isLoading,
+        isError,
+        error,
+        refetch,
         createItem,
         updateItem,
         deleteItem,

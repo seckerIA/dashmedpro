@@ -193,7 +193,7 @@ queryClient.getQueryCache().subscribe((event) => {
         if (errorMsg.includes('Refresh Token') || errorMsg.includes('Invalid Refresh Token')) {
           console.log('🚪 [QueryCache] Refresh token inválido - fazendo logout');
           await supabase.auth.signOut();
-          window.location.href = '/login';
+          // window.location.href = '/login'; // Desativado para evitar loop de refresh
           return;
         }
 
@@ -212,8 +212,9 @@ queryClient.getQueryCache().subscribe((event) => {
       consecutiveTimeouts++;
       console.warn(`⚠️ Query timeout (${consecutiveTimeouts}x): ${query.queryKey.slice(0, 2).join('/')}`);
 
-      // Resetar query travada
-      queryClient.resetQueries({ queryKey: query.queryKey });
+      // V3: Removido resetQueries para evitar loop infinito
+      // Deixamos o React Query lidar com o estado de erro e retries (se configurado)
+      // queryClient.resetQueries({ queryKey: query.queryKey });
 
       // V3: Apenas loga, não faz reload automático
       if (consecutiveTimeouts >= 3) {
