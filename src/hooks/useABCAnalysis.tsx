@@ -49,7 +49,11 @@ export function useABCAnalysis() {
 
     const abcQuery = useQuery({
         queryKey: ["abc-analysis", user?.id],
-        queryFn: async (): Promise<ABCSummary> => {
+        queryFn: async ({ signal }): Promise<ABCSummary> => {
+            // Check if cancelled
+            if (signal?.aborted) {
+                return { totalValue: 0, classA: { items: 0, value: 0, percentage: 0 }, classB: { items: 0, value: 0, percentage: 0 }, classC: { items: 0, value: 0, percentage: 0 }, items: [] };
+            }
             // Buscar todos os itens com seus lotes ativos
             const { data: itemsData, error: itemsError } = await supabase
                 .from("inventory_items")
@@ -63,7 +67,8 @@ export function useABCAnalysis() {
             quantity,
             is_active
           )
-        `);
+        `)
+                .abortSignal(signal);
 
             if (itemsError) throw itemsError;
 
@@ -135,6 +140,7 @@ export function useABCAnalysis() {
         enabled: !!user,
         refetchInterval: 300000, // 5 minutos
         staleTime: 120000,
+        refetchOnMount: false,
     });
 
     return {

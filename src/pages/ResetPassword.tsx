@@ -68,7 +68,8 @@ const ResetPassword = () => {
     checkRecoveryMode();
 
     // Listen for recovery events
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // Note: Do NOT use await inside this callback - causes deadlocks in supabase-js
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && window.location.pathname === '/reset-password')) {
         // Check for errors first
         const hashParams = new URLSearchParams(window.location.hash.substring(1));

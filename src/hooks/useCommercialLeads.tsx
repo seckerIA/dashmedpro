@@ -108,7 +108,7 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
       }
 
       // Timeout reduzido para segurança (60s), já que deve ser muito mais rápido agora
-      const result = await supabaseQueryWithTimeout(queryPromise as any, 60000, signal);
+      const result = await supabaseQueryWithTimeout(queryPromise as any, 25000, signal);
 
       if (result.error) {
         if (!result.error.message?.includes('AbortError') && (result.error as any).code !== '20') {

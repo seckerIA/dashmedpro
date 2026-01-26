@@ -66,8 +66,10 @@ export function useWhatsAppRealtime(options: UseWhatsAppRealtimeOptions = {}) {
   }, [conversationId, user?.id]);
 
   // Auth State Listener para forçar reconexão se o token mudar
+  // IMPORTANT: Do NOT use await inside onAuthStateChange callback!
+  // This causes deadlocks in supabase-js. See: https://github.com/supabase/gotrue-js/issues/762
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
         console.log(`[WhatsApp Realtime] Auth event: ${event}. Reconnecting...`);
         // O Supabase Channel deve se reconectar automaticamente se o client tiver o novo token,
@@ -78,9 +80,12 @@ export function useWhatsAppRealtime(options: UseWhatsAppRealtimeOptions = {}) {
       }
 
       // CRITICAL: Se o usuário deslogou ou token expirou, limpar canais imediatamente
+      // Use setTimeout to avoid deadlock - cleanupAllChannels is async
       if (event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)) {
         console.log(`[WhatsApp Realtime] Auth lost. Cleaning up channels...`);
-        await cleanupAllChannels();
+        setTimeout(() => {
+          cleanupAllChannels();
+        }, 0);
       }
     });
 

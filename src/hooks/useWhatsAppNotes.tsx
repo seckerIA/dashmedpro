@@ -27,13 +27,15 @@ export function useWhatsAppNotes(options: UseWhatsAppNotesOptions) {
   // =========================================
   const notesQuery = useQuery({
     queryKey: [WHATSAPP_NOTES_KEY, conversationId],
-    queryFn: async (): Promise<WhatsAppInternalNote[]> => {
+    queryFn: async ({ signal }): Promise<WhatsAppInternalNote[]> => {
       if (!conversationId) return [];
+      if (signal?.aborted) return [];
 
       const { data, error} = await supabase
         .from('whatsapp_internal_notes')
         .select('*')
         .eq('conversation_id', conversationId)
+        .abortSignal(signal)
         .order('created_at', { ascending: false});
 
       if (error) {
@@ -45,6 +47,7 @@ export function useWhatsAppNotes(options: UseWhatsAppNotesOptions) {
     },
     enabled: enabled && !!conversationId,
     staleTime: 30 * 1000,
+    refetchOnMount: false,
   });
 
   // =========================================

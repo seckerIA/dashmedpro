@@ -17,14 +17,16 @@ export function useAIInsights() {
     // Fetch existing insights
     const insightsQuery = useQuery({
         queryKey: ['ai-insights', user?.id],
-        queryFn: async (): Promise<AIInsight[]> => {
+        queryFn: async ({ signal }): Promise<AIInsight[]> => {
             if (!user) return [];
+            if (signal?.aborted) return [];
 
             const { data, error } = await supabase
                 .from('crm_ai_insights' as any)
                 .select('*')
                 .eq('user_id', user.id)
                 .gt('expires_at', new Date().toISOString())
+                .abortSignal(signal)
                 .order('impact', { ascending: true })
                 .order('generated_at', { ascending: false });
 
@@ -37,19 +39,22 @@ export function useAIInsights() {
         },
         enabled: !!user,
         staleTime: 5 * 60 * 1000,
+        refetchOnMount: false,
     });
 
     // Get last analysis time
     const lastAnalysisQuery = useQuery({
         queryKey: ['ai-last-analysis', user?.id],
-        queryFn: async (): Promise<string | null> => {
+        queryFn: async ({ signal }): Promise<string | null> => {
             if (!user) return null;
+            if (signal?.aborted) return null;
 
             const { data } = await supabase
                 .from('crm_ai_analysis_batches' as any)
                 .select('created_at')
                 .eq('user_id', user.id)
                 .eq('status', 'completed')
+                .abortSignal(signal)
                 .order('created_at', { ascending: false })
                 .limit(1)
                 .single();
@@ -57,6 +62,7 @@ export function useAIInsights() {
             return data?.created_at || null;
         },
         enabled: !!user,
+        refetchOnMount: false,
     });
 
     // Run AI analysis

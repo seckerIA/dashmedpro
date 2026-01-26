@@ -11,17 +11,20 @@ export function useDefaultGoals() {
 
   const { data: defaultGoals, isLoading } = useQuery({
     queryKey: ['user-default-goals', user?.id],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!user?.id) return null;
+      if (signal?.aborted) return null;
       const { data, error } = await supabase
         .from('user_daily_goals')
         .select('*')
         .eq('user_id', user.id)
+        .abortSignal(signal)
         .maybeSingle();
       if (error) throw error;
       return data;
     },
     enabled: !!user?.id,
+    refetchOnMount: false,
   });
 
   const saveDefaultGoals = useMutation({

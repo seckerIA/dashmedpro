@@ -228,10 +228,10 @@ const fetchTeamMetrics = async (
       .in('id', allUserIds);
 
     const [dealsResult, contactsResult, leadsResult, profilesResult] = await Promise.all([
-      supabaseQueryWithTimeout(dealsQuery, 60000, signal),
-      supabaseQueryWithTimeout(contactsQuery, 60000, signal),
-      supabaseQueryWithTimeout(leadsQuery, 60000, signal),
-      supabaseQueryWithTimeout(profilesQuery, 60000, signal),
+      supabaseQueryWithTimeout(dealsQuery, 25000, signal),
+      supabaseQueryWithTimeout(contactsQuery, 25000, signal),
+      supabaseQueryWithTimeout(leadsQuery, 25000, signal),
+      supabaseQueryWithTimeout(profilesQuery, 25000, signal),
     ]);
 
     if (dealsResult.error) throw new Error(`Erro ao buscar deals: ${dealsResult.error.message}`);
@@ -294,10 +294,10 @@ const fetchTeamMetrics = async (
       .eq('id', userId);
 
     const [dealsResult, contactsResult, leadsResult, profilesResult] = await Promise.all([
-      supabaseQueryWithTimeout(dealsQuery, 60000, signal),
-      supabaseQueryWithTimeout(contactsQuery, 60000, signal),
-      supabaseQueryWithTimeout(leadsQuery, 60000, signal),
-      supabaseQueryWithTimeout(profilesQuery, 60000, signal),
+      supabaseQueryWithTimeout(dealsQuery, 25000, signal),
+      supabaseQueryWithTimeout(contactsQuery, 25000, signal),
+      supabaseQueryWithTimeout(leadsQuery, 25000, signal),
+      supabaseQueryWithTimeout(profilesQuery, 25000, signal),
     ]);
 
     if (dealsResult.error) throw new Error(`Erro ao buscar deals: ${dealsResult.error.message}`);
@@ -331,7 +331,7 @@ const fetchTeamMetrics = async (
       .eq('is_active', true)
       .limit(50); // Reduzido de 100 para 50 para melhor performance
 
-    const { data: profiles, error } = await supabaseQueryWithTimeout(profilesQuery, 60000, signal);
+    const { data: profiles, error } = await supabaseQueryWithTimeout(profilesQuery, 25000, signal);
     if (!error && profiles && profiles.length > 0) {
       targetUserIds = profiles.map(p => p.id);
     }
@@ -365,10 +365,10 @@ const fetchTeamMetrics = async (
     .in('id', targetUserIds);
 
   const [dealsResult, contactsResult, leadsResult, profilesResult] = await Promise.all([
-    supabaseQueryWithTimeout(dealsQuery, 60000, signal),
-    supabaseQueryWithTimeout(contactsQuery, 60000, signal),
-    supabaseQueryWithTimeout(leadsQuery, 60000, signal),
-    supabaseQueryWithTimeout(profilesQuery, 60000, signal),
+    supabaseQueryWithTimeout(dealsQuery, 25000, signal),
+    supabaseQueryWithTimeout(contactsQuery, 25000, signal),
+    supabaseQueryWithTimeout(leadsQuery, 25000, signal),
+    supabaseQueryWithTimeout(profilesQuery, 25000, signal),
   ]);
 
   if (dealsResult.error) throw new Error(`Erro ao buscar deals: ${dealsResult.error.message}`);

@@ -1,4 +1,5 @@
 import { acquireFetchSlot, releaseFetchSlot } from "@/lib/queryUtils";
+import { isPostRecoveryMode } from "@/lib/heartbeatRecovery";
 
 export interface SupabaseQueryResult<T> {
   data: T | null;
@@ -46,9 +47,22 @@ async function executeQueryWithTimeout<T>(
     throw new Error('Query cancelada');
   }
 
-  // 🚦 CONCURRENCY CONTROL: Wait for a free network slot
-  // prevent browser from choking on too many simultaneous requests (Chrome max: 6 per domain)
-  await acquireFetchSlot();
+  // POST-RECOVERY MODE: Bypass slot queue e usar timeout curto
+  // Isso permite queries rodarem imediatamente após recovery
+  const postRecovery = isPostRecoveryMode();
+  let acquiredSlot = false;
+
+  if (postRecovery) {
+    console.log('⚡ [Query] Bypass slot queue (post-recovery mode)');
+  } else {
+    // 🚦 CONCURRENCY CONTROL: Wait for a free network slot
+    // prevent browser from choking on too many simultaneous requests (Chrome max: 6 per domain)
+    await acquireFetchSlot();
+    acquiredSlot = true;
+  }
+
+  // Em post-recovery, usar timeout de 3s (fail fast)
+  const effectiveTimeout = postRecovery ? 3000 : timeoutMs;
 
   const timeoutController = new AbortController();
   let timeoutId: any;
@@ -58,8 +72,8 @@ async function executeQueryWithTimeout<T>(
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => {
         timeoutController.abort();
-        reject(new Error(`Timeout de ${timeoutMs}ms excedido`));
-      }, timeoutMs);
+        reject(new Error(`Timeout de ${effectiveTimeout}ms excedido${postRecovery ? ' (post-recovery)' : ''}`));
+      }, effectiveTimeout);
     });
 
     // Handle external abort signal (e.g. user navigation)
@@ -104,7 +118,9 @@ async function executeQueryWithTimeout<T>(
     }
     throw error;
   } finally {
-    // 🚦 RELEASE SLOT: Allow next query to run
-    releaseFetchSlot();
+    // 🚦 RELEASE SLOT: Allow next query to run (only if we acquired one)
+    if (acquiredSlot) {
+      releaseFetchSlot();
+    }
   }
 }

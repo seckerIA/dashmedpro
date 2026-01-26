@@ -439,7 +439,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .gte("transaction_date", format(period.start, "yyyy-MM-dd"))
         .lte("transaction_date", format(period.end, "yyyy-MM-dd"));
 
-      const expensesResult = await supabaseQueryWithTimeout(expensesQuery as any, 60000, signal);
+      const expensesResult = await supabaseQueryWithTimeout(expensesQuery as any, 25000, signal);
       const { data: expenses } = expensesResult as { data: any[], error: any };
 
       const totalExpenses = (expenses as any[])?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
@@ -567,7 +567,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .in("user_id", targetUserIds)
         .eq("is_active", true);
 
-      const proceduresResult = await supabaseQueryWithTimeout(proceduresQuery as any, 60000, signal);
+      const proceduresResult = await supabaseQueryWithTimeout(proceduresQuery as any, 25000, signal);
       const { data: procedures, error: proceduresError } = proceduresResult as { data: any[], error: any };
 
       // Contar procedimentos ativos no catálogo
@@ -658,7 +658,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         .gte("created_at", periodStartISO)
         .lte("created_at", periodEndISO);
 
-      const newContactsResult = await supabaseQueryWithTimeout(newContactsQuery as any, 60000, signal);
+      const newContactsResult = await supabaseQueryWithTimeout(newContactsQuery as any, 25000, signal);
       const { data: newContacts } = newContactsResult as { data: any[], error: any };
 
       const newPatients = (newContacts as any[])?.length || 0;

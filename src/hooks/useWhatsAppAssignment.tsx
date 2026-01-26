@@ -79,13 +79,17 @@ export function useWhatsAppAssignment() {
     // =========================================
     const configQuery = useQuery({
         queryKey: [ASSIGNMENT_CONFIG_KEY, ownerId],
-        queryFn: async (): Promise<AssignmentConfig | null> => {
+        queryFn: async ({ signal }): Promise<AssignmentConfig | null> => {
             if (!ownerId) return null;
+
+            // Check if already cancelled
+            if (signal?.aborted) return null;
 
             const { data, error } = await supabase
                 .from('whatsapp_assignment_config')
                 .select('*')
                 .eq('user_id', ownerId)
+                .abortSignal(signal)
                 .maybeSingle();
 
             if (error && error.code !== 'PGRST116') {
@@ -108,6 +112,7 @@ export function useWhatsAppAssignment() {
         },
         enabled: !!ownerId,
         staleTime: 5 * 60 * 1000,
+        refetchOnMount: false,
     });
 
     // =========================================
@@ -115,8 +120,14 @@ export function useWhatsAppAssignment() {
     // =========================================
     const poolQuery = useQuery({
         queryKey: [ASSIGNMENT_POOL_KEY, configQuery.data?.id],
-        queryFn: async (): Promise<AssignmentPoolMember[]> => {
+        queryFn: async ({ signal }): Promise<AssignmentPoolMember[]> => {
             if (!configQuery.data?.id) return [];
+
+            // Check if already cancelled
+            if (signal?.aborted) return [];
+
+            // Skip if config is default (not persisted)
+            if (configQuery.data.id === 'default') return [];
 
             const { data, error } = await supabase
                 .from('whatsapp_assignment_pool')
@@ -127,6 +138,7 @@ export function useWhatsAppAssignment() {
           )
         `)
                 .eq('config_id', configQuery.data.id)
+                .abortSignal(signal)
                 .order('weight', { ascending: false });
 
             if (error) {
@@ -136,8 +148,9 @@ export function useWhatsAppAssignment() {
 
             return (data || []) as AssignmentPoolMember[];
         },
-        enabled: !!configQuery.data?.id,
+        enabled: !!configQuery.data?.id && configQuery.data.id !== 'default',
         staleTime: 2 * 60 * 1000,
+        refetchOnMount: false,
     });
 
     // =========================================

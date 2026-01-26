@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { addDays, differenceInDays, startOfMonth, endOfMonth } from "date-fns";
 import { createVisibilityAwareInterval } from "@/lib/queryUtils";
+import { supabaseQueryWithTimeout } from "@/utils/supabaseQuery";
 
 export type InventoryAlert = {
     id: string;
@@ -42,8 +43,8 @@ export function useInventoryDashboard() {
     const dashboardQuery = useQuery({
         queryKey: ["inventory-dashboard", user?.id],
         queryFn: async (): Promise<DashboardMetrics> => {
-            // 1. Buscar todos os itens com seus lotes
-            const { data: itemsData, error: itemsError } = await supabase
+            // 1. Buscar todos os itens com seus lotes (timeout: 20s)
+            const itemsQuery = supabase
                 .from("inventory_items")
                 .select(`
           id,
@@ -60,6 +61,8 @@ export function useInventoryDashboard() {
             is_active
           )
         `);
+
+            const { data: itemsData, error: itemsError } = await supabaseQueryWithTimeout(itemsQuery as any, 20000);
 
             if (itemsError) throw itemsError;
 
@@ -165,12 +168,14 @@ export function useInventoryDashboard() {
                 });
             }
 
-            // 3. Buscar movimentações recentes (últimos 30 dias)
+            // 3. Buscar movimentações recentes (últimos 30 dias) - timeout: 15s
             const thirtyDaysAgo = addDays(today, -30);
-            const { count: recentMovements } = await supabase
+            const movementsQuery = supabase
                 .from("inventory_movements")
                 .select("*", { count: "exact", head: true })
                 .gte("created_at", thirtyDaysAgo.toISOString());
+
+            const { count: recentMovements } = await supabaseQueryWithTimeout(movementsQuery as any, 15000);
 
             // Ordenar alertas por prioridade
             const alertPriority = { expired: 0, critical: 1, warning: 2, low_stock: 3 };

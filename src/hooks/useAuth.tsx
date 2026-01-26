@@ -67,43 +67,56 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
+    // IMPORTANT: Do NOT use await inside onAuthStateChange callback!
+    // This causes deadlocks in supabase-js due to Web Locks API.
+    // See: https://github.com/supabase/gotrue-js/issues/762
+    // Solution: Use setTimeout(0) to defer Supabase operations after callback completes.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
+      (event, currentSession) => {
+        // Synchronous operations - safe to do immediately
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
 
         if (currentSession?.user) {
-          // Check Super Admin on auth change too
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('is_super_admin')
-            .eq('id', currentSession.user.id)
-            .single();
+          // Defer Supabase operations to avoid deadlock
+          setTimeout(async () => {
+            try {
+              // Check Super Admin on auth change
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('is_super_admin')
+                .eq('id', currentSession.user.id)
+                .single();
 
-          if (profile?.is_super_admin) setIsSuperAdmin(true);
-          else setIsSuperAdmin(false);
+              if (profile?.is_super_admin) setIsSuperAdmin(true);
+              else setIsSuperAdmin(false);
 
-          // Fetch organization on auth change (login)
-          const { data: memberData } = await supabase
-            .from('organization_members')
-            .select('role, organization:organizations(*)')
-            .eq('user_id', currentSession.user.id)
-            .maybeSingle();
+              // Fetch organization on auth change (login)
+              const { data: memberData } = await supabase
+                .from('organization_members')
+                .select('role, organization:organizations(*)')
+                .eq('user_id', currentSession.user.id)
+                .maybeSingle();
 
-          if (memberData && memberData.organization) {
-            setOrganization(memberData.organization as any);
-            setOrgRole(memberData.role);
-          } else {
-            setOrganization(null);
-            setOrgRole(null);
-          }
+              if (memberData && memberData.organization) {
+                setOrganization(memberData.organization as any);
+                setOrgRole(memberData.role);
+              } else {
+                setOrganization(null);
+                setOrgRole(null);
+              }
+            } catch (err) {
+              console.error('[useAuth] Error fetching user data:', err);
+            } finally {
+              setLoading(false);
+            }
+          }, 0);
         } else {
           setOrganization(null);
           setOrgRole(null);
           setIsSuperAdmin(false);
+          setLoading(false);
         }
-
-        setLoading(false);
       }
     );
 

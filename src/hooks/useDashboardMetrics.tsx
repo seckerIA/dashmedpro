@@ -51,8 +51,8 @@ const fetchDashboardMetrics = async (
   }
   // Admin/Dono: ver todos os deals (sem filtro)
 
-  // Passar o query builder (não executado) para permitir abortSignal
-  const dealsResult = await supabaseQueryWithTimeout(dealsQuery as any, 90000, signal);
+  // Passar o query builder (não executado) para permitir abortSignal (timeout: 20s)
+  const dealsResult = await supabaseQueryWithTimeout(dealsQuery as any, 20000, signal);
   const { data: deals, error: dealsError } = dealsResult;
 
   if (dealsError) throw new Error(`Erro ao buscar deals: ${dealsError.message}`);
@@ -93,8 +93,8 @@ const fetchDashboardMetrics = async (
   }
   // Admin/Dono: ver todos os contatos (sem filtro)
 
-  // Passar o query builder (não executado) para permitir abortSignal
-  const contactsResult = await supabaseQueryWithTimeout(contactsQuery as any, 90000, signal);
+  // Passar o query builder (não executado) para permitir abortSignal (timeout: 20s)
+  const contactsResult = await supabaseQueryWithTimeout(contactsQuery as any, 20000, signal);
   const { data: contacts, error: contactsError } = contactsResult;
 
   if (contactsError) throw new Error(`Erro ao buscar contatos: ${contactsError.message}`);

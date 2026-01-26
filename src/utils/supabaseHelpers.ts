@@ -29,6 +29,45 @@ function createSessionTimeout<T>(ms: number, operation: string): Promise<T> {
  * @throws Error se não há sessão válida, timeout, ou se não foi possível fazer refresh
  */
 export async function ensureValidSession(): Promise<Session> {
+  // Se acabamos de voltar de idle longo, pular verificação de rede
+  // Isso evita timeout que bloqueia queries - 401 do Supabase fará logout se token inválido
+  if (typeof window !== 'undefined' && (window as any).__skipNextAuthCheck) {
+    (window as any).__skipNextAuthCheck = false;
+    console.log('⏭️ [ensureValidSession] Pulando verificação de rede (retornou de idle)');
+
+    // Verificar apenas se existe sessão no localStorage (sem rede)
+    const stored = localStorage.getItem(`sb-adzaqkduxnpckbcuqpmg-auth-token`);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed?.access_token && parsed?.refresh_token) {
+          // Construir sessão mínima a partir do localStorage
+          // O token pode estar expirado mas deixamos o Supabase tratar o refresh automaticamente
+          return {
+            access_token: parsed.access_token,
+            refresh_token: parsed.refresh_token,
+            expires_at: parsed.expires_at,
+            expires_in: parsed.expires_in || 3600,
+            token_type: 'bearer',
+            user: parsed.user || {
+              id: '',
+              aud: 'authenticated',
+              role: 'authenticated',
+              email: '',
+              created_at: '',
+              app_metadata: {},
+              user_metadata: {},
+            },
+          } as Session;
+        }
+      } catch {
+        // Se não conseguir parsear, continuar com verificação normal
+      }
+    }
+    // Se não há sessão válida no localStorage, throw para forçar login
+    throw new Error('Sessão inválida ou expirada. Por favor, faça login novamente.');
+  }
+
   try {
     // Obter sessão atual COM TIMEOUT
     // Esta é a operação mais crítica - se uma extensão trava o fetch, travamos aqui

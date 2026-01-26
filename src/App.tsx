@@ -10,7 +10,7 @@ import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { useUserProfile } from "./hooks/useUserProfile";
 import { SupabaseProjectValidator } from "./components/SupabaseProjectValidator";
 import { CortanaProvider, CortanaOverlay } from "./components/cortana";
-import { initHeartbeatRecovery } from "@/lib/heartbeatRecovery";
+import { initHeartbeatRecovery, isPostRecoveryMode } from "@/lib/heartbeatRecovery";
 
 // Componente para inicializar o Heartbeat de recuperação
 // Componente para inicializar o Heartbeat de recuperação
@@ -161,6 +161,10 @@ focusManager.setEventListener((handleFocus) => {
 // Configuração do QueryClient com tratamento global de timeouts, retries e 401 handling
 const queryClient = new QueryClient({
   queryCache: new QueryCache({
+    onSuccess: () => {
+      // Resetar contador de timeouts quando uma query tem sucesso
+      (window as any).__consecutiveTimeouts = 0;
+    },
     onError: async (error: any, query) => {
       const errorMsg = error?.message || String(error);
 
@@ -197,12 +201,35 @@ const queryClient = new QueryClient({
         return;
       }
 
-      // Log timeout errors
+      // Log timeout errors e detectar conexão morta
       if (errorMsg.includes('timeout') || errorMsg.includes('Query timeout')) {
         console.error(`❌ Query timeout: ${query.queryKey.slice(0, 2).join('/')}`);
 
         // Resetar query travada
         queryClient.resetQueries({ queryKey: query.queryKey });
+
+        // Contar timeouts consecutivos para detectar conexão morta
+        const timeoutCount = ((window as any).__consecutiveTimeouts || 0) + 1;
+        (window as any).__consecutiveTimeouts = timeoutCount;
+        (window as any).__lastTimeoutAt = Date.now();
+
+        // Se muitos timeouts consecutivos, conexão pode estar morta
+        if (timeoutCount >= 3) {
+          console.error('🔴 [QueryClient] Múltiplos timeouts detectados - conexão pode estar morta');
+
+          // Mostrar toast sugerindo reload
+          import('@/components/ui/use-toast').then(({ toast }) => {
+            toast({
+              title: 'Conexão instável',
+              description: 'Problemas de conexão detectados. Recarregue a página se os dados não carregarem.',
+              variant: 'destructive',
+              duration: 10000,
+            });
+          }).catch(() => { });
+
+          // Resetar contador após mostrar toast
+          (window as any).__consecutiveTimeouts = 0;
+        }
       }
     },
   }),
@@ -225,10 +252,18 @@ const queryClient = new QueryClient({
     queries: {
       retry: (failureCount, error: any) => {
         const errorMsg = error?.message?.toLowerCase() || '';
+        const isTimeout = errorMsg.includes('timeout') || errorMsg.includes('excedido');
 
-        // Se for timeout, NÃO retenta - mostrar erro imediatamente
+        // POST-RECOVERY MODE: permitir até 3 retries rápidos para timeout
+        // Isso permite queries se recuperarem após idle longo
+        if (isTimeout && isPostRecoveryMode() && failureCount < 3) {
+          console.log(`🔄 [QueryClient] Retry #${failureCount + 1} (post-recovery timeout)`);
+          return true;
+        }
+
+        // Se for timeout FORA do post-recovery, NÃO retenta
         // Isso evita loops infinitos quando extensões bloqueiam requests
-        if (errorMsg.includes('timeout') || errorMsg.includes('excedido')) {
+        if (isTimeout) {
           console.warn('🚫 [QueryClient] Timeout detectado, não fazendo retry');
           return false;
         }
@@ -252,13 +287,17 @@ const queryClient = new QueryClient({
         return true;
       },
       retryDelay: (attemptIndex) => {
-        // Backoff mais rápido para fail-fast
+        // POST-RECOVERY MODE: retry mais rápido (500ms, 1s, 1.5s)
+        if (isPostRecoveryMode()) {
+          return Math.min(500 * (attemptIndex + 1), 2000);
+        }
+        // Normal: backoff mais rápido para fail-fast
         return Math.min(500 * 2 ** attemptIndex, 3000);
       },
       staleTime: 5 * 60 * 1000, // 5 minutos (era 10min) - dados mais frescos
       gcTime: 15 * 60 * 1000, // 15 minutos (era 30min) - menos memória
       refetchOnWindowFocus: false, // Handled by our custom focusManager
-      refetchOnMount: 'always', // SEMPRE buscar ao montar (era false) - evita dados velhos
+      refetchOnMount: false, // Respeitar cache - individual hooks podem override
       refetchOnReconnect: true,
       networkMode: 'offlineFirst', // Usar cache imediato enquanto busca (era 'online')
     },
@@ -319,22 +358,36 @@ const RouteChangeHandler = ({ queryClient }: { queryClient: QueryClient }) => {
         console.log('🔓 [RouteChange] Fetch slots resetados');
       }).catch(() => { });
 
-      // If idle for more than 30 seconds, be more aggressive
+      // If idle for more than 30 seconds, recover stuck queries (not cancel all)
       if (effectiveIdleTime > 30000) {
-        console.log('🧹 [RouteChange] Cancelando queries travadas após idle...');
+        console.log('🧹 [RouteChange] Verificando queries travadas após idle...');
 
-        // Cancel ALL in-flight queries first (they might be stuck)
-        queryClient.cancelQueries();
+        // Only cancel queries that are actually stuck (>45s fetching)
+        // Instead of cancelling ALL queries indiscriminately
+        recoverStuckQueries(queryClient, 45000);
 
         // Reset persistent idle state so it doesn't trigger again immediately
         (window as any).lastLongIdleDuration = 0;
 
-        // If very idle (>2 min), also invalidate to get fresh data
-        if (effectiveIdleTime > 120000) {
-          console.log('📊 [RouteChange] Invalidando queries stale...');
-          // Small delay to let cancellation complete
+        // CRITICAL v7.1: Activate post-recovery mode for navigation after idle
+        // This handles the case where user stays in same tab but doesn't interact,
+        // so visibilitychange never fires and heartbeat recovery doesn't trigger.
+        // Without post-recovery mode, queries may hang due to dead TCP connections.
+        if (effectiveIdleTime > 60000 && typeof window !== 'undefined') {
+          console.log('⚡ [RouteChange] Ativando post-recovery mode (idle >1min)');
+          (window as any).__postRecoveryMode = true;
+          (window as any).__postRecoveryModeUntil = Date.now() + 30000; // 30 segundos
+        }
+
+        // If very idle (>5 min), also invalidate stale queries to refresh
+        if (effectiveIdleTime > 300000) {
+          console.log('📊 [RouteChange] Invalidando queries muito stale...');
+          // Small delay to let recovery complete
           setTimeout(() => {
-            queryClient.invalidateQueries();
+            // Only invalidate queries that are actually stale
+            queryClient.invalidateQueries({
+              predicate: (query) => query.isStale(),
+            });
           }, 100);
         }
       }

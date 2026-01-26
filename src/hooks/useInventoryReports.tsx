@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { startOfMonth, endOfMonth, subMonths, format } from "date-fns";
+import { supabaseQueryWithTimeout } from "@/utils/supabaseQuery";
 
 export type MonthlyConsumption = {
     month: string;
@@ -60,8 +61,8 @@ export function useInventoryReports() {
             const today = new Date();
             const sixMonthsAgo = subMonths(today, 6);
 
-            // 1. Buscar movimentações de saída dos últimos 6 meses
-            const { data: movementsData, error: movementsError } = await supabase
+            // 1. Buscar movimentações de saída dos últimos 6 meses (timeout: 25s)
+            const movementsQuery = supabase
                 .from("inventory_movements")
                 .select(`
           id,
@@ -83,12 +84,14 @@ export function useInventoryReports() {
                 .gte("created_at", sixMonthsAgo.toISOString())
                 .order("created_at", { ascending: false });
 
+            const { data: movementsData, error: movementsError } = await supabaseQueryWithTimeout(movementsQuery as any, 25000);
+
             if (movementsError) throw movementsError;
 
             const movements = (movementsData || []) as any[];
 
-            // 2. Buscar todos os itens com estoque atual
-            const { data: itemsData, error: itemsError } = await supabase
+            // 2. Buscar todos os itens com estoque atual (timeout: 20s)
+            const itemsQuery = supabase
                 .from("inventory_items")
                 .select(`
           id,
@@ -102,6 +105,8 @@ export function useInventoryReports() {
             is_active
           )
         `);
+
+            const { data: itemsData, error: itemsError } = await supabaseQueryWithTimeout(itemsQuery as any, 20000);
 
             if (itemsError) throw itemsError;
 

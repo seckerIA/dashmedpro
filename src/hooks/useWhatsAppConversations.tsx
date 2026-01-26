@@ -111,7 +111,7 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
         query = query.or(`contact_name.ilike.%${filters.search}%,phone_number.ilike.%${filters.search}%,last_message_preview.ilike.%${filters.search}%`);
       }
 
-      const { data, error } = await supabaseQueryWithTimeout(query as any, 60000);
+      const { data, error } = await supabaseQueryWithTimeout(query as any, 25000);
 
       if (error) {
         console.error('[useWhatsAppConversations] Error:', error);

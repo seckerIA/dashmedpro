@@ -4,6 +4,7 @@ import { useAuth } from "./useAuth";
 import { useUserProfile } from "./useUserProfile";
 import { useToast } from "./use-toast";
 import { InventoryItem, InventoryItemInsert, InventoryItemUpdate, InventoryBatch, InventoryBatchInsert, InventoryMovement } from "@/types/inventory";
+import { supabaseQueryWithTimeout } from "@/utils/supabaseQuery";
 
 export const useInventory = () => {
     const { user } = useAuth();
@@ -11,18 +12,20 @@ export const useInventory = () => {
     const { toast } = useToast();
     const queryClient = useQueryClient();
 
-    // Buscar Items (com batches e saldo total)
+    // Buscar Items (com batches e saldo total) - timeout: 20s
     const { data: items, isLoading } = useQuery({
         queryKey: ["inventory-items"],
         queryFn: async () => {
-            // Busca items
-            const { data: itemsData, error: itemsError } = await supabase
+            // Busca items com timeout de 20s
+            const itemsQuery = supabase
                 .from("inventory_items")
                 .select(`
                     *,
                     batches:inventory_batches(*)
                 `)
                 .order("name");
+
+            const { data: itemsData, error: itemsError } = await supabaseQueryWithTimeout(itemsQuery as any, 20000);
 
             if (itemsError) throw itemsError;
 

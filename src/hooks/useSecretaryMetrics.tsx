@@ -169,12 +169,12 @@ export function useSecretaryMetrics() {
           totalContactsResult,
           myAppointmentsResult,
         ] = await Promise.all([
-          supabaseQueryWithTimeout(appointmentsQuery as any, 60000, signal),
-          supabaseQueryWithTimeout(doctorsQuery as any, 60000, signal),
-          supabaseQueryWithTimeout(contactsTodayQuery as any, 60000, signal),
-          supabaseQueryWithTimeout(contactsWeekQuery as any, 60000, signal),
-          supabaseQueryWithTimeout(totalContactsQuery as any, 60000, signal),
-          supabaseQueryWithTimeout(myAppointmentsQuery as any, 60000, signal),
+          supabaseQueryWithTimeout(appointmentsQuery as any, 25000, signal),
+          supabaseQueryWithTimeout(doctorsQuery as any, 25000, signal),
+          supabaseQueryWithTimeout(contactsTodayQuery as any, 25000, signal),
+          supabaseQueryWithTimeout(contactsWeekQuery as any, 25000, signal),
+          supabaseQueryWithTimeout(totalContactsQuery as any, 25000, signal),
+          supabaseQueryWithTimeout(myAppointmentsQuery as any, 25000, signal),
         ]);
 
         // Tratar erros individualmente para não quebrar toda a query se uma falhar
