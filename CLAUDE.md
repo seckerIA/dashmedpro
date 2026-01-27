@@ -222,3 +222,16 @@ supabase/functions/
 - **Frontend Fixes**:
   - `TeamManagement.tsx`: Adicionada validação de permissões no frontend para criação de usuários.
 
+### Contexto Atual (26/01/2026 - AI Data Extraction & UI Fixes)
+- **WhatsApp AI Data Enrichment**:
+  - Implementada lógica de extração autônoma de dados (CPF, Email, Nome, Endereço) diretamente da conversa do WhatsApp na Edge Function `whatsapp-ai-analyze`.
+  - A IA agora detecta informações sensíveis e atualiza automaticamente as tabelas `crm_contacts` (email, full_name, custom_fields) e `patients` (cpf, name).
+  - Adicionado log de debug (`debug_logs`) para rastrear atualizações de contatos via IA (`CRM Contact Enriched`).
+- **UI/UX Fixes**:
+  - `WhatsAppLayout.tsx`: Corrigido bug de sobreposição do botão de toggle da sidebar adicionando `relative` ao container.
+  - `ContactInfo.tsx`: 
+    - Corrigido layout dos botões de ação ("Agendar" e "Ver no CRM") para ficarem lado a lado em grid.
+    - Estilização aprimorada: removidas bordas brancas, aplicado background colorido suave (blue/green tints) para melhor contraste no tema dark.
+    - Botão "Agendar" tornado sempre visível, com alerta amigável se o contato não estiver vinculado.
+    - Corrigidos erros de tipagem TypeScript (`name` -> `full_name`, `avatar_url` removido).
+

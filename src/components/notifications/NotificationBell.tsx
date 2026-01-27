@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bell, X, CheckCheck, Calendar, ClipboardCheck, Sparkles, MessageSquare, AlertCircle, Clock } from 'lucide-react';
+import { Bell, X, CheckCheck, Calendar, ClipboardCheck, Sparkles, MessageSquare, AlertCircle, Clock, AlertTriangle, Snowflake, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -78,6 +78,28 @@ export function NotificationBell({ className }: NotificationBellProps) {
           bgLight: 'bg-amber-500/10',
           textColor: 'text-amber-600'
         };
+      case 'appointment_forgotten':
+        return {
+          icon: AlertTriangle,
+          color: 'bg-red-500',
+          bgLight: 'bg-red-500/10',
+          textColor: 'text-red-600'
+        };
+      case 'lead_stagnant':
+        return {
+          icon: Snowflake,
+          color: 'bg-blue-400',
+          bgLight: 'bg-blue-400/10',
+          textColor: 'text-blue-500'
+        };
+      case 'sinal_pending_warning':
+      case 'bill_due_today':
+        return {
+          icon: DollarSign,
+          color: 'bg-yellow-500',
+          bgLight: 'bg-yellow-500/10',
+          textColor: 'text-yellow-600'
+        };
     }
   };
 
@@ -114,7 +136,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
         <>
           {/* Backdrop */}
           <div
-            className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
+            className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
           />
 

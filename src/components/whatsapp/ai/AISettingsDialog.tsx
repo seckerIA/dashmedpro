@@ -35,6 +35,7 @@ export function AISettingsDialog({ open, onOpenChange, targetUserId }: AISetting
         already_known_info: '',
         custom_prompt_instructions: '',
         auto_reply_enabled: false,
+        auto_scheduling_enabled: false,
     });
 
     useEffect(() => {
@@ -44,6 +45,7 @@ export function AISettingsDialog({ open, onOpenChange, targetUserId }: AISetting
                 already_known_info: aiConfig.already_known_info || '',
                 custom_prompt_instructions: aiConfig.custom_prompt_instructions || '',
                 auto_reply_enabled: aiConfig.auto_reply_enabled || false,
+                auto_scheduling_enabled: aiConfig.auto_scheduling_enabled || false,
             });
         }
     }, [aiConfig]);
@@ -171,6 +173,36 @@ export function AISettingsDialog({ open, onOpenChange, targetUserId }: AISetting
                                 checked={formData.auto_reply_enabled}
                                 onCheckedChange={(checked) => setFormData(prev => ({ ...prev, auto_reply_enabled: checked }))}
                                 className="data-[state=checked]:bg-emerald-500"
+                            />
+                        </div>
+                    </div>
+                    {/* Auto-Scheduling Switch */}
+                    <div className={cn(
+                        "p-4 rounded-xl border transition-all duration-200",
+                        formData.auto_scheduling_enabled
+                            ? "bg-purple-500/10 border-purple-500/20"
+                            : "bg-muted/30 border-border"
+                    )}>
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="space-y-1">
+                                <Label className="text-sm font-bold flex items-center gap-2">
+                                    Agendamento Autônomo
+                                    {formData.auto_scheduling_enabled && (
+                                        <span className="text-[10px] bg-purple-500 text-white px-2 py-0.5 rounded-full font-bold">
+                                            ATIVO
+                                        </span>
+                                    )}
+                                </Label>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    Permitir que a IA agende horários na sua agenda automaticamente quando o paciente confirmar.
+                                    Requer "Auto-Resposta" ativada.
+                                </p>
+                            </div>
+                            <Switch
+                                checked={formData.auto_scheduling_enabled}
+                                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, auto_scheduling_enabled: checked }))}
+                                className="data-[state=checked]:bg-purple-500"
+                                disabled={!formData.auto_reply_enabled}
                             />
                         </div>
                     </div>

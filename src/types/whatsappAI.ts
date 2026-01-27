@@ -101,6 +101,7 @@ export interface AIConfig {
   already_known_info?: string;
   custom_prompt_instructions?: string;
   auto_reply_enabled: boolean;
+  auto_scheduling_enabled: boolean;
 
   created_at: string;
   updated_at: string;

@@ -31,7 +31,7 @@ export function WhatsAppLayout({
   const showInboxOnMobile = !selectedConversationId || isMobileView === 'inbox';
 
   return (
-    <div className="h-[calc(100vh-120px)] flex overflow-hidden rounded-lg border bg-background">
+    <div className="h-[calc(100vh-120px)] flex overflow-hidden rounded-lg border bg-background relative">
       {/* Coluna 1: Inbox/Lista de conversas */}
       <div
         className={cn(

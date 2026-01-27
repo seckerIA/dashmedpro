@@ -10,6 +10,7 @@ export interface Notification {
   read: boolean;
   created_at: string;
   user_id: string;
+  metadata?: Record<string, any>;
 }
 
 // Hook para gerenciar notificações
@@ -27,7 +28,7 @@ export function useNotifications() {
     try {
       const { data, error } = await supabase
         .from('notifications')
-        .select('id, type, title, message, read, created_at, user_id')
+        .select('id, type, title, message, read, created_at, user_id, metadata')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -37,8 +38,9 @@ export function useNotifications() {
         return;
       }
 
-      setNotifications(data as Notification[] || []);
-      setUnreadCount(data?.filter(n => !n.read).length || 0);
+      const notificationsData = (data as Notification[]) || [];
+      setNotifications(notificationsData);
+      setUnreadCount(notificationsData.filter(n => !n.read).length || 0);
     } catch (error) {
       console.error('Erro inesperado ao buscar notificações:', error);
     } finally {
@@ -60,7 +62,7 @@ export function useNotifications() {
       }
 
       // Atualizar estado local
-      setNotifications(prev => 
+      setNotifications(prev =>
         prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
       );
       setUnreadCount(prev => Math.max(0, prev - 1));

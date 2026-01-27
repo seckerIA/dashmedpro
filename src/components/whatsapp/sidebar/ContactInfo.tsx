@@ -14,7 +14,11 @@ import {
   Edit2,
   Building2,
   CreditCard,
+  CalendarPlus,
 } from 'lucide-react';
+import { AppointmentForm } from "@/components/medical-calendar/AppointmentForm";
+import { useMedicalAppointments } from "@/hooks/useMedicalAppointments";
+import { useAuth } from "@/hooks/useAuth";
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -41,11 +45,39 @@ export function ContactInfo({
   onViewInCRM,
 }: ContactInfoProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [showAppointmentForm, setShowAppointmentForm] = useState(false);
+  const { user } = useAuth();
+  const { createAppointment } = useMedicalAppointments();
+
+  const handleAppointmentSubmit = async (data: any) => {
+    try {
+      const appointmentData = {
+        ...data,
+        contact_id: conversation.contact?.id,
+        user_id: user?.id,
+      };
+
+      await createAppointment.mutateAsync(appointmentData);
+      setShowAppointmentForm(false);
+    } catch (error) {
+      console.error("Erro ao agendar pelo Chat:", error);
+    }
+  };
+
+  const handleScheduleClick = () => {
+    if (!contact) {
+      // Se não tiver contato vinculado, tentar encontrar no CRM ou avisar
+      // Por enquanto, vamos avisar que precisa salvar
+      alert("Por favor, vincule este número a um contato no CRM antes de agendar (Clique no ícone de lápis ou em Ver no CRM).");
+      return;
+    }
+    setShowAppointmentForm(true);
+  };
 
   const contact = conversation.contact;
   const displayName =
     conversation.contact_name ||
-    contact?.name ||
+    contact?.full_name ||
     conversation.phone_number;
   const initials = displayName
     .split(' ')
@@ -71,7 +103,7 @@ export function ContactInfo({
           <AvatarImage
             src={
               conversation.contact_profile_picture ||
-              contact?.avatar_url ||
+              // contact?.avatar_url || // Propriedade não existe no tipo inferido
               undefined
             }
           />
@@ -96,18 +128,41 @@ export function ContactInfo({
           )}
         </div>
 
-        {/* Link para CRM */}
-        {contact && (
+        {/* Botões de Ação */}
+        <div className="grid grid-cols-2 gap-2 mt-4 w-full">
           <Button
-            variant="link"
+            variant="ghost"
             size="sm"
-            className="mt-2 text-green-600"
-            onClick={onViewInCRM}
+            className="w-full text-primary bg-primary/10 hover:bg-primary/20 border-0"
+            onClick={handleScheduleClick}
           >
-            <ExternalLink className="h-3 w-3 mr-1" />
-            Ver no CRM
+            <CalendarPlus className="h-4 w-4 mr-2" />
+            Agendar
           </Button>
-        )}
+
+          {contact ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full text-green-600 bg-green-600/10 hover:bg-green-600/20 border-0"
+              onClick={onViewInCRM}
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Ver no CRM
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full opacity-50 cursor-not-allowed bg-muted border-0"
+              disabled
+              title="Vincule um contato para ver no CRM"
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              CRM
+            </Button>
+          )}
+        </div>
       </div>
 
       <Separator />
@@ -183,8 +238,8 @@ export function ContactInfo({
                   contact.health_insurance_type === 'particular'
                     ? 'Particular'
                     : contact.health_insurance_type === 'convenio'
-                    ? 'Convênio'
-                    : contact.health_insurance_type
+                      ? 'Convênio'
+                      : contact.health_insurance_type
                 }
               />
             )}
@@ -228,6 +283,21 @@ export function ContactInfo({
           </div>
         </div>
       </div>
+      {/* Appointment Modal */}
+      {showAppointmentForm && contact && (
+        <AppointmentForm
+          open={showAppointmentForm}
+          onOpenChange={setShowAppointmentForm}
+          onSubmit={handleAppointmentSubmit}
+          conversionData={{
+            contactId: contact.id,
+            paidInAdvance: false
+          }}
+          onAppointmentCreated={() => {
+            setShowAppointmentForm(false);
+          }}
+        />
+      )}
     </div>
   );
 }

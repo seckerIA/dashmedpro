@@ -5,6 +5,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { DatePicker } from "@/components/ui/date-picker";
 import { format } from "date-fns";
+import { AppointmentForm } from "@/components/medical-calendar/AppointmentForm";
+import { useMedicalAppointments } from "@/hooks/useMedicalAppointments";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Dialog,
   DialogContent,
@@ -47,7 +50,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { X, Plus, HandCoins, Phone, Mail, Copy, MoreVertical, Settings, Trash2, Archive, User, Edit3, Save, Stethoscope, AlertTriangle } from "lucide-react";
+import { X, Plus, HandCoins, Phone, Mail, Copy, MoreVertical, Settings, Trash2, Archive, User, Edit3, Save, Stethoscope, AlertTriangle, CalendarPlus } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCRM } from "@/hooks/useCRM";
 import { useToast } from "@/hooks/use-toast";
@@ -94,11 +97,14 @@ interface DealFormProps {
 
 export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFormProps) {
   const { isSecretaria } = useUserProfile();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(!!deal);
   const [tagInput, setTagInput] = useState("");
   const [showSidebar, setShowSidebar] = useState(false);
+  const [showAppointmentForm, setShowAppointmentForm] = useState(false);
   const [editingContact, setEditingContact] = useState(false);
+  const { createAppointment } = useMedicalAppointments();
   const [contactFormData, setContactFormData] = useState({
     full_name: '',
     email: '',
@@ -339,6 +345,41 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
     // Usar formatCurrencyInput do lib/currency para formatação correta
     const formatted = formatCurrencyInput(value);
     form.setValue("value", formatted as any);
+  };
+
+  const handleScheduleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!selectedContact || selectedContact.id === 'none') {
+      toast({
+        variant: "destructive",
+        title: "Selecione um contato",
+        description: "É necessário selecionar um contato para agendar.",
+      });
+      return;
+    }
+    setShowAppointmentForm(true);
+  };
+
+  const handleAppointmentSubmit = async (data: any) => {
+    // O AppointmentForm já faz a validação e formatação
+    // Precisamos apenas garantir o contact_id correto se não vier no data
+    try {
+      // Se estamos vindo do DealForm, garantimos que o ID do contato é o selecionado aqui
+      // e o user_id é o atual
+      const appointmentData = {
+        ...data,
+        contact_id: selectedContact?.id,
+        user_id: user?.id,
+      };
+
+      await createAppointment.mutateAsync(appointmentData);
+      setShowAppointmentForm(false);
+      // Opcional: Atualizar o stage para 'Agendado' automaticamente? 
+      // O hook useMedicalAppointments já tem lógica para isso (updateDealPipeline).
+    } catch (error) {
+      console.error("Erro ao agendar pelo DealForm:", error);
+      // O hook já mostra toast de erro
+    }
   };
 
   const isLoading = isCreatingDeal || isUpdatingDeal;
@@ -604,6 +645,19 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
                   </Button>
                 </div>
 
+                {selectedContact && !editingContact && (
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    className="w-full bg-violet-600 hover:bg-violet-700 text-white mb-2"
+                    onClick={handleScheduleClick}
+                  >
+                    <CalendarPlus className="w-4 h-4 mr-2" />
+                    Agendar Consulta Agora
+                  </Button>
+                )}
+
                 {editingContact ? (
                   <div className="space-y-3">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -798,201 +852,26 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
               Opções avançadas e configurações adicionais para este contrato.
             </SheetDescription>
           </SheetHeader>
-
-          <div className="mt-6 space-y-6">
-            {/* Edição de Contato */}
-            {selectedContact && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <User className="w-4 h-4" />
-                    Informações do Contato
-                  </h4>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setEditingContact(!editingContact)}
-                    className="h-7 px-2"
-                  >
-                    <Edit3 className="w-3 h-3 mr-1" />
-                    {editingContact ? 'Cancelar' : 'Editar'}
-                  </Button>
-                </div>
-
-                {editingContact ? (
-                  <div className="bg-muted/50 rounded-lg p-4 space-y-3">
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-foreground">Nome Completo</label>
-                      <Input
-                        value={contactFormData.full_name}
-                        onChange={(e) => setContactFormData(prev => ({ ...prev, full_name: e.target.value }))}
-                        placeholder="Nome do contato"
-                        className="text-sm"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-foreground">Email</label>
-                      <Input
-                        value={contactFormData.email}
-                        onChange={(e) => setContactFormData(prev => ({ ...prev, email: e.target.value }))}
-                        placeholder="email@exemplo.com"
-                        type="email"
-                        className="text-sm"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-foreground">Telefone</label>
-                      <Input
-                        value={contactFormData.phone}
-                        onChange={(e) => setContactFormData(prev => ({ ...prev, phone: e.target.value }))}
-                        placeholder="(11) 99999-9999"
-                        className="text-sm"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-foreground">Empresa</label>
-                      <Input
-                        value={contactFormData.company}
-                        onChange={(e) => setContactFormData(prev => ({ ...prev, company: e.target.value }))}
-                        placeholder="Nome da empresa"
-                        className="text-sm"
-                      />
-                    </div>
-                    {/* Valor do Serviço - oculto para secretária */}
-                    {!isSecretaria && (
-                      <div className="space-y-2">
-                        <label className="text-xs font-medium text-foreground">Valor do Serviço (R$)</label>
-                        <Input
-                          value={contactFormData.service_value}
-                          onChange={(e) => setContactFormData(prev => ({ ...prev, service_value: e.target.value }))}
-                          placeholder="0,00"
-                          className="text-sm"
-                        />
-                      </div>
-                    )}
-                    <Button
-                      onClick={handleSaveContact}
-                      size="sm"
-                      className="w-full"
-                    >
-                      <Save className="w-3 h-3 mr-1" />
-                      Salvar Alterações
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="bg-muted/50 rounded-lg p-4 space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-muted-foreground">Nome:</span>
-                      <span className="text-sm font-medium">{selectedContact.full_name}</span>
-                    </div>
-                    {selectedContact.email && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-muted-foreground">Email:</span>
-                        <span className="text-sm">{selectedContact.email}</span>
-                      </div>
-                    )}
-                    {selectedContact.phone && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-muted-foreground">Telefone:</span>
-                        <span className="text-sm font-mono">{selectedContact.phone}</span>
-                      </div>
-                    )}
-                    {selectedContact.company && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-muted-foreground">Empresa:</span>
-                        <span className="text-sm">{selectedContact.company}</span>
-                      </div>
-                    )}
-                    {/* Valor do Serviço - oculto para secretária */}
-                    {!isSecretaria && selectedContact.service_value && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-muted-foreground">Valor do Serviço:</span>
-                        <span className="text-sm font-semibold text-green-600">
-                          {formatCurrency(selectedContact.service_value)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Ações Rápidas do Contato */}
-            {selectedContact && (
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-foreground">⚡ Ações Rápidas</h4>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleContactAction('call')}
-                    className="justify-start"
-                  >
-                    📞 Ligar
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleContactAction('whatsapp')}
-                    className="justify-start"
-                  >
-                    💬 WhatsApp
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleContactAction('email')}
-                    className="justify-start"
-                  >
-                    📧 Email
-                  </Button>
-                  <Button variant="outline" size="sm" className="justify-start">
-                    📅 Agendar
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Configurações Avançadas */}
-            <div className="space-y-3">
-              <h4 className="text-sm font-semibold text-foreground">⚙️ Configurações Avançadas</h4>
-              <div className="space-y-2">
-                <Button variant="outline" size="sm" className="w-full justify-start">
-                  <Archive className="w-4 h-4 mr-2" />
-                  Arquivar Contrato
-                </Button>
-                <Button variant="outline" size="sm" className="w-full justify-start">
-                  📋 Duplicar Contrato
-                </Button>
-                <Button variant="outline" size="sm" className="w-full justify-start">
-                  📊 Gerar Relatório
-                </Button>
-              </div>
-            </div>
-
-            {/* Informações Técnicas */}
-            {deal && (
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-foreground">🔧 Informações Técnicas</h4>
-                <div className="bg-muted/50 rounded-lg p-4 space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">ID:</span>
-                    <span className="font-mono text-xs">{deal.id}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Criado em:</span>
-                    <span>{new Date(deal.created_at).toLocaleDateString('pt-BR')}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Atualizado em:</span>
-                    <span>{new Date(deal.updated_at).toLocaleDateString('pt-BR')}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
         </SheetContent>
       </Sheet>
+
+      {/* Appointment Modal */}
+      {showAppointmentForm && selectedContact && (
+        <AppointmentForm
+          open={showAppointmentForm}
+          onOpenChange={setShowAppointmentForm}
+          onSubmit={handleAppointmentSubmit}
+          conversionData={{
+            contactId: selectedContact.id,
+            appointmentValue: form.getValues('value') as any, // Tenta passar o valor negociado
+            paidInAdvance: false
+          }}
+          onAppointmentCreated={() => {
+            setShowAppointmentForm(false);
+            // Se desejar fechar o DealForm também: handleClose();
+          }}
+        />
+      )}
     </Dialog>
   );
 }

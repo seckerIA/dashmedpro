@@ -441,6 +441,13 @@ async function getOrCreateConversation(
     .limit(1)
     .single();
 
+  // Buscar config de IA do usuário para definir modo inicial
+  const { data: aiConfig } = await supabase
+    .from('whatsapp_ai_config')
+    .select('auto_reply_enabled')
+    .eq('user_id', userId)
+    .single();
+
   // Criar nova conversa com phone_number_id
   const { data: newConversation, error } = await supabase
     .from('whatsapp_conversations')
@@ -453,6 +460,7 @@ async function getOrCreateConversation(
       status: 'open',
       priority: 'normal',
       unread_count: 0,
+      ai_autonomous_mode: aiConfig?.auto_reply_enabled === true, // Herda do config global
     })
     .select('id')
     .single();

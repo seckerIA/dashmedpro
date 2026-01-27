@@ -156,10 +156,7 @@ export function AppLayout({ children, hideSidebar = false }: AppLayoutProps) {
                           </TooltipContent>
                         </Tooltip>
                       )}
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">Comunicações</span>
-                        <NotificationBell />
-                      </div>
+                      <NotificationBell />
                     </div>
                   </div>
 

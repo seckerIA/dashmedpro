@@ -47,6 +47,16 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error(`Message not found: ${message_id}`);
     }
 
+    // HANDOVER: Se um humano está enviando mensagem, desligar o modo autônomo da conversa
+    const { error: handoverError } = await supabaseAdmin
+      .from('whatsapp_conversations')
+      .update({ ai_autonomous_mode: false } as any)
+      .eq('id', dbMessage.conversation_id || '');
+
+    if (handoverError) {
+      console.warn('[send-message] Failed to update handover status', handoverError);
+    }
+
     let configUserId = dbMessage.user_id;
 
     // 1. Tentar buscar config do próprio remetente

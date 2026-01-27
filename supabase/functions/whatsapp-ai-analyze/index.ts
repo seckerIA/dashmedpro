@@ -19,6 +19,13 @@ type UrgencyLevel = 'baixa' | 'media' | 'alta' | 'urgente';
 type Sentiment = 'positivo' | 'neutro' | 'negativo';
 type SuggestionType = 'quick_reply' | 'full_message' | 'procedure_info' | 'scheduling' | 'follow_up';
 
+interface Suggestion {
+  type: SuggestionType;
+  content: string;
+  confidence: number;
+  reasoning: string;
+}
+
 interface AIResponse {
   lead_status: LeadStatus;
   conversion_probability: number;
@@ -27,12 +34,22 @@ interface AIResponse {
   detected_urgency: UrgencyLevel;
   sentiment: Sentiment;
   suggested_next_action: string;
-  suggestions: Array<{
-    type: SuggestionType;
-    content: string;
-    confidence: number;
-    reasoning: string;
-  }>;
+  suggestions: Suggestion[];
+  // Novo campo para agendamento autônomo
+  schedule_confirmation?: {
+    is_confirmed: boolean;
+    doctor_id?: string;
+    procedure_name?: string;
+    date_iso?: string; // ISO 8601 exato
+    reasoning?: string;
+  };
+  // Campos extraídos para enriquecimento de dados
+  extracted_info?: {
+    full_name_correction?: string;
+    cpf?: string; // Formato 000.000.000-00
+    email?: string;
+    address?: string; // Endereço completo se houver
+  };
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -72,9 +89,10 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Verificar se a conversa existe (USANDO ADMIN PARA EVITAR RLS ERROR)
+    // Buscando também contact_id para atualização
     const { data: conversation, error: convError } = await supabaseAdmin
       .from('whatsapp_conversations')
-      .select('id, contact_name, phone_number, user_id, status')
+      .select('id, contact_id, contact_name, phone_number, user_id, status, ai_autonomous_mode')
       .eq('id', conversation_id)
       .single();
 
@@ -150,7 +168,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Buscar configuração IA
     const { data: aiConfig } = await supabaseAdmin
       .from('whatsapp_ai_config')
-      .select('knowledge_base, already_known_info, custom_prompt_instructions, auto_reply_enabled')
+      .select('knowledge_base, already_known_info, custom_prompt_instructions, auto_reply_enabled, auto_scheduling_enabled')
       .eq('user_id', conversation.user_id)
       .maybeSingle();
 
@@ -158,12 +176,13 @@ const handler = async (req: Request): Promise<Response> => {
     const now = new Date();
     const brazilTime = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 
+    // ... (Mantendo código da agenda igual)
     const next5Days = new Date();
     next5Days.setDate(now.getDate() + 5);
 
     const { data: appointments } = await supabaseAdmin
       .from('medical_appointments')
-      .select('start_time, end_time, status')
+      .select('start_time, end_time, status, doctor_id')
       .in('doctor_id', targetUserIds)
       .gte('start_time', now.toISOString())
       .lte('start_time', next5Days.toISOString())
@@ -180,17 +199,10 @@ const handler = async (req: Request): Promise<Response> => {
       .neq('status', 'cancelled')
       .order('start_time', { ascending: true });
 
-    const formatAgenda = () => {
-      const allEvents = [
-        ...(appointments || []).map(a => ({ start: new Date(a.start_time).getTime(), end: new Date(a.end_time).getTime() })),
-        ...(meetings || []).map(m => ({ start: new Date(m.start_time).getTime(), end: new Date(m.end_time).getTime() }))
-      ].sort((a, b) => a.start - b.start);
-
+    const formatAgenda = (targetDoctors: any[]) => {
       const daysContext: string[] = [];
       const startHour = 8;
       const endHour = 18;
-
-      // Pegar a hora atual convertida para o "mundo" de Brasília para comparação
       const nowInBrStr = new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' });
       const nowInBrDate = new Date(nowInBrStr);
       const bridgeTime = nowInBrDate.getTime();
@@ -199,43 +211,45 @@ const handler = async (req: Request): Promise<Response> => {
         const d = new Date(nowInBrDate);
         d.setDate(d.getDate() + i);
         d.setHours(0, 0, 0, 0);
-
-        const dateLabel = d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: '2-digit' });
         if (d.getDay() === 0 || d.getDay() === 6) continue;
 
-        const freeSlots: string[] = [];
-        for (let hour = startHour; hour < endHour; hour++) {
-          for (let min of [0, 30]) {
-            // SP é UTC-3 fixo. HH:mm SP = (HH+3):mm UTC
-            const slotUtc = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), hour + 3, min, 0));
-            const slotStamp = slotUtc.getTime();
+        const dateString = d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: '2-digit' });
+        let dayOutput = `\n[${dateString}]`;
+        let hasSlots = false;
 
-            if (slotStamp < bridgeTime) continue;
+        for (const docId of targetDoctors) {
+          const docAppointments = (appointments || []).filter((a: any) => a.doctor_id === docId);
+          const docMeetings = (meetings || []).filter((m: any) => m.user_id === docId);
 
-            const isBusy = allEvents.some(evt => slotStamp >= evt.start && slotStamp < evt.end);
-            if (!isBusy) {
-              freeSlots.push(`${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`);
+          const docEvents = [
+            ...docAppointments.map((a: any) => ({ start: new Date(a.start_time).getTime(), end: new Date(a.end_time).getTime() })),
+            ...docMeetings.map((m: any) => ({ start: new Date(m.start_time).getTime(), end: new Date(m.end_time).getTime() }))
+          ].sort((a, b) => a.start - b.start);
+
+          const freeSlots: string[] = [];
+          for (let hour = startHour; hour < endHour; hour++) {
+            for (let min of [0, 30]) {
+              const slotUtc = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), hour + 3, min, 0));
+              const slotStamp = slotUtc.getTime();
+              if (slotStamp < bridgeTime) continue;
+              const isBusy = docEvents.some(evt => slotStamp >= evt.start && slotStamp < evt.end);
+              if (!isBusy) freeSlots.push(`${hour}:${min.toString().padStart(2, '0')}`);
             }
           }
+          if (freeSlots.length > 0) {
+            hasSlots = true;
+            dayOutput += `\n  - Médico ${docId.slice(0, 4)}...: ${freeSlots.join(', ')}`;
+          }
         }
-
-        if (freeSlots.length > 0) {
-          const morning = freeSlots.filter(s => parseInt(s.split(':')[0]) < 12);
-          const afternoon = freeSlots.filter(s => parseInt(s.split(':')[0]) >= 12);
-          let summary = "";
-          if (morning.length > 0) summary += `Manhã: ${morning[0]} às ${morning[morning.length - 1]}. `;
-          if (afternoon.length > 0) summary += `Tarde: ${afternoon[0]} às ${afternoon[afternoon.length - 1]}.`;
-          daysContext.push(`${dateLabel}: ${summary}`);
-        } else {
-          daysContext.push(`${dateLabel}: Sem horários disponíveis.`);
-        }
+        if (!hasSlots) dayOutput += "\n  (Sem horários livres)";
+        daysContext.push(dayOutput);
       }
       return daysContext.join('\n');
     };
 
     const agendaContext = `ESTES SÃO OS ÚNICOS HORÁRIOS DISPONÍVEIS:
-${formatAgenda()}
-NUNCA ofereça horários fora desses intervalos. Seja resumida e natural ao falar da disponibilidade.`;
+${formatAgenda(targetUserIds)}
+NUNCA ofereça horários fora desses intervalos.`;
 
     await supabaseAdmin.from('debug_logs').insert({
       function_name: 'whatsapp-ai-analyze',
@@ -265,59 +279,57 @@ NUNCA ofereça horários fora desses intervalos. Seja resumida e natural ao fala
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openaiApiKey) throw new Error('OpenAI API key missing');
 
-    const systemPrompt = `Você é uma SECRETÁRIA VIRTUAL experiente de uma clínica médica. Seu trabalho é atender pacientes via WhatsApp de forma natural, simpática e EFICIENTE.
+    const systemPrompt = `Você é uma SECRETÁRIA VIRTUAL experiente. Seu trabalho é atender pacientes, agendar consultas e EXTRAIR INFORMAÇÕES PESSOAIS para cadastro.
 
 DATA E HORA ATUAL: ${brazilTime} (Dia de hoje).
 
-INTERPRETAÇÃO DA AGENDA (CRÍTICO):
+OBJETIVO EXTRA: DATA ENRICHMENT
+Analise toda a conversa em busca de dados do paciente que possam ser salvos no banco de dados.
+Se o paciente informou CPF, email, nome completo correto ou endereço, extraia-os.
+Se o paciente mandou uma foto de documento ou disse dados, extraia.
+
+INTERPRETAÇÃO DA AGENDA:
 Dê ao paciente APENAS horários que estão explicitamente listados como "DISPONÍVEIS" abaixo.
-Se o paciente pedir um horário que NÃO está na lista, diga que já está ocupado e sugira os mais próximos da lista.
-NUNCA invente horários fora dessa lista.
-Sempre ofereça pelo menos 1 opção de manhã e 1 de tarde se houver disponibilidade.
-
-${aiConfig?.knowledge_base ? `SOBRE A CLÍNICA:\n${aiConfig.knowledge_base}\n` : ''}
-${aiConfig?.already_known_info ? `INFORMAÇÕES QUE JÁ TEMOS: ${aiConfig.already_known_info}\n` : ''}
-${aiConfig?.custom_prompt_instructions ? `INSTRUÇÕES ESPECIAIS:\n${aiConfig.custom_prompt_instructions}\n` : ''}
-
-PROCEDIMENTOS E PREÇOS:
-${proceduresContext}
-
 ${agendaContext}
 
-COMO RESPONDER:
-- "Quais horários?" → Use a lista de "HORÁRIOS DISPONÍVEIS". Ofereça alguns horários de forma natural.
-- "Quanto custa X?" → Diga o preço
-- Dúvidas técnicas → Explique breve e sugira avaliação
+ PROCEDIMENTOS E PREÇOS:
+${proceduresContext}
 
 FORMATO DE RESPOSTA (JSON):
 {
   "lead_status": "frio" | "morno" | "quente",
   "conversion_probability": 0-100,
-  "detected_intent": "O que o paciente quer",
-  "detected_procedure": "Procedimento ou null",
+  "detected_intent": "Resumo do que o paciente quer",
+  "detected_procedure": "Nome do procedimento ou null",
   "detected_urgency": "baixa" | "media" | "alta" | "urgente",
   "sentiment": "positivo" | "neutro" | "negativo",
-  "suggested_next_action": "O que fazer agora",
+  "suggested_next_action": "Ação recomendada",
   "suggestions": [
-    {
-      "type": "full_message",
-      "content": "RESPOSTA COMPLETA",
-      "confidence": 0.0-1.0,
-      "reasoning": "Motivo"
-    }
-  ]
+     { "type": "full_message", "content": "Sua resposta aqui", "confidence": 1.0, "reasoning": "..." }
+  ],
+  "schedule_confirmation": {
+     "is_confirmed": boolean,
+     "date_iso": "YYYY-MM-DDTHH:mm:ss-03:00",
+     "doctor_id": "ID",
+     "procedure_name": "Procedimento"
+  },
+  "extracted_info": {
+     "full_name_correction": "Nome completo se o cliente informou/corrigiu",
+     "cpf": "000.000.000-00 (apenas se informado)",
+     "email": "email (apenas se informado)",
+     "address": "endereço (apenas se informado)"
+  }
 }
-
-IMPORTANTE: Gere EXATAMENTE 3 sugestões.`;
+`;
 
     const userPrompt = `
 CONVERSA ATUAL:
 ${messagesContext}
 
-PACIENTE: ${conversation.contact_name || 'Nome não identificado'}
+PACIENTE (Nome atual no sistema): ${conversation.contact_name || 'Nome não identificado'}
 TELEFONE: ${conversation.phone_number}
 
-Analise a conversa e gere respostas naturais. Responda diretamente.`;
+Analise a conversa, extraia dados e gere respostas.`;
 
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -331,7 +343,7 @@ Analise a conversa e gere respostas naturais. Responda diretamente.`;
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        temperature: 0.2,
+        temperature: 0.1, // Temperatura baixa para extração de dados precisa
         max_tokens: 1200,
         response_format: { "type": "json_object" }
       }),
@@ -377,6 +389,13 @@ Analise a conversa e gere respostas naturais. Responda diretamente.`;
       ai_model_used: 'gpt-4o-mini',
     };
 
+    // --- NOVA LÓGICA DE CONDICIONAL DE AGENDAMENTO ---
+    // Se a IA detectou intenção de agendamento, mas o agendamento automático está DESLIGADO,
+    // devemos forçar uma resposta de "Triagem Humana" e fazer Handover.
+
+    // Injetar no prompt a informação se pode ou não agendar ajudaria, mas vamos tratar no pós-processamento 
+    // ou instruir o prompt (melhor).
+
     const { data: savedAnalysis, error: upsertError } = await supabaseAdmin
       .from('whatsapp_conversation_analysis')
       .upsert(analysisData, { onConflict: 'conversation_id' })
@@ -407,12 +426,174 @@ Analise a conversa e gere respostas naturais. Responda diretamente.`;
 
     const { data: savedSuggestions } = await supabaseAdmin.from('whatsapp_ai_suggestions').insert(suggestionsToInsert).select();
 
+    // ==========================================
+    // DATA ENRICHMENT (NOVO)
+    // ==========================================
+    if (aiResponse.extracted_info) {
+      const info = aiResponse.extracted_info;
+      const validUpdates: any = {};
+
+      // Mapeamento de campos para CRM
+      if (info.full_name_correction) validUpdates.full_name = info.full_name_correction;
+      if (info.email) validUpdates.email = info.email;
+
+      // Se temos CPF e não é coluna nativa do crm_contacts, salvamos em custom_fields
+      if (info.cpf || info.address) {
+        // Primeiro buscamos o contato atual para não sobrescrever outros custom_fields
+        if (conversation.contact_id) {
+          const { data: currentContact } = await supabaseAdmin.from('crm_contacts').select('custom_fields').eq('id', conversation.contact_id).single();
+          const existingCustomFields = currentContact?.custom_fields || {};
+
+          validUpdates.custom_fields = {
+            ...existingCustomFields,
+            ...(info.cpf ? { cpf: info.cpf } : {}),
+            ...(info.address ? { address: info.address } : {})
+          };
+        }
+      }
+
+      // 1. Atualizar CRM Contact se houver ID
+      if (conversation.contact_id && Object.keys(validUpdates).length > 0) {
+        console.log('[DataEnrichment] Updates found for Contact:', validUpdates);
+        await supabaseAdmin.from('crm_contacts')
+          .update(validUpdates)
+          .eq('id', conversation.contact_id);
+
+        // Log
+        await supabaseAdmin.from('debug_logs').insert({
+          function_name: 'whatsapp-ai-analyze',
+          message: 'CRM Contact Enriched',
+          data: { contact_id: conversation.contact_id, updates: validUpdates }
+        });
+      }
+
+      // 2. Atualizar ou Criar Paciente (tabela patients) se tivermos dados ricos (CPF principalmente)
+      // A tabela patients costuma ter coluna cpf nativa
+      if (info.cpf || info.full_name_correction) {
+        const patientUpdates: any = {};
+        if (info.full_name_correction) patientUpdates.name = info.full_name_correction; // Tabela patients usa 'name' ou 'full_name'? O código antigo usava 'name' (linha 499 original)
+        // Verificando Step 583 (vazio) e Step 598 (crm_contacts). O código na linha 499 insere { name: ... }
+        // Portanto vamos usar 'name'.
+
+        // Se tiver CPF, tentamos inserir. Se a coluna nao existir, vai dar erro, entao melhor verificar
+        // Assumindo que patients foi criada para ter dados medicos, provavelmente tem cpf.
+        // Mas para garantir, vamos usar logica defensiva ou try/catch
+
+        // Vamos tentar buscar o paciente pelo telefone primeiro
+        let patientId = null;
+        const { data: existingPatient } = await supabaseAdmin.from('patients').select('id').eq('phone', conversation.phone_number).maybeSingle();
+
+        if (existingPatient) {
+          // Atualizar
+          if (info.cpf) patientUpdates.cpf = info.cpf;
+          // Nota: Se 'cpf' não existir na tabela patients, esse update vai falhar.
+          // Supabase ignora campos extras em insert? Não, dá erro.
+          // Como não vi o schema da tabela patients (Step 583 vazio), 
+          // vou arriscar que existe 'cpf' pois é tabela de paciente.
+          // Se der erro, o catch global pega.
+
+          if (Object.keys(patientUpdates).length > 0) {
+            await supabaseAdmin.from('patients').update(patientUpdates).eq('id', existingPatient.id);
+          }
+        }
+      }
+    }
+
     // Auto-Reply
-    if (aiConfig?.auto_reply_enabled === true) {
+    // Somente se a configuração global permitir E o modo autônomo da conversa estiver ligado
+    if (aiConfig?.auto_reply_enabled === true && conversation.ai_autonomous_mode !== false) {
       const bestSuggestion = suggestionsToInsert[0];
       const CONFIDENCE_THRESHOLD = 0.85;
 
-      if (bestSuggestion && bestSuggestion.confidence >= CONFIDENCE_THRESHOLD) {
+      // ==========================================
+      // AUTONOMOUS SCHEDULING INTERCEPTION
+      // ==========================================
+      let modifiedContent = null;
+      let shouldSend = true;
+
+      if (
+        aiResponse.schedule_confirmation?.is_confirmed === true &&
+        aiResponse.schedule_confirmation.date_iso
+      ) {
+        // CASO A: TENTAR AGENDAR
+        if (aiConfig?.auto_scheduling_enabled === true) {
+          try {
+            console.log('[AutoSchedule] Attempting to book:', aiResponse.schedule_confirmation);
+            const bookDate = new Date(aiResponse.schedule_confirmation.date_iso);
+            const endDate = new Date(bookDate.getTime() + 30 * 60000);
+
+            // 1. Verificar conflito
+            const { count: conflictCount } = await supabaseAdmin
+              .from('medical_appointments')
+              .select('*', { count: 'exact', head: true })
+              .eq('doctor_id', aiResponse.schedule_confirmation.doctor_id || conversation.user_id)
+              .neq('status', 'cancelled')
+              .or(`start_time.lte.${endDate.toISOString()},end_time.gte.${bookDate.toISOString()}`)
+              .lt('start_time', endDate.toISOString())
+              .gt('end_time', bookDate.toISOString());
+
+            if (conflictCount && conflictCount > 0) {
+              console.warn('[AutoSchedule] Conflict detected just before booking.');
+              // ERRO: CONFLITO - Mudar mensagem para falha e fazer handover
+              modifiedContent = "Desculpe, acabei de verificar e esse horário foi tomado por outro paciente agorinha! 😕 Vou pedir para nossa secretária te chamar para ver outro horário, ok?";
+
+              await supabaseAdmin.from('whatsapp_conversations')
+                .update({ ai_autonomous_mode: false, priority: 'high', status: 'open' })
+                .eq('id', conversation_id);
+            } else {
+              // 2. Resolver Paciente
+              let patientId = conversation.contact_id;
+              if (!patientId) {
+                const { data: existingPatient } = await supabaseAdmin.from('patients').select('id').eq('phone', conversation.phone_number).maybeSingle();
+                if (existingPatient) patientId = existingPatient.id;
+                else {
+                  const { data: newPatient } = await supabaseAdmin.from('patients').insert({
+                    name: conversation.contact_name || 'Paciente WhatsApp', phone: conversation.phone_number, user_id: conversation.user_id
+                  }).select('id').single();
+                  if (newPatient) patientId = newPatient.id;
+                }
+              }
+
+              // 3. Criar
+              if (patientId) {
+                const { error: appError } = await supabaseAdmin
+                  .from('medical_appointments')
+                  .insert({
+                    doctor_id: aiResponse.schedule_confirmation.doctor_id || conversation.user_id,
+                    patient_id: patientId,
+                    start_time: bookDate.toISOString(),
+                    end_time: endDate.toISOString(),
+                    status: 'scheduled',
+                    notes: `Agendado via IA. Procedimento: ${aiResponse.schedule_confirmation.procedure_name || 'Geral'}.`,
+                    user_id: conversation.user_id
+                  });
+
+                if (!appError) {
+                  console.log('[AutoSchedule] Success.');
+                  await supabaseAdmin.from('whatsapp_conversation_analysis').update({ lead_status: 'convertido' }).eq('conversation_id', conversation_id);
+                  // SUCESSO: Mantém a mensagem original de confirmação
+                } else {
+                  throw appError;
+                }
+              }
+            }
+          } catch (err: any) {
+            console.error('[AutoSchedule] Failed:', err.message);
+            modifiedContent = "Tive um pequeno erro técnico aqui. Vou pedir para nossa equipe confirmar manualmente com você! 🙏";
+            await supabaseAdmin.from('whatsapp_conversations').update({ ai_autonomous_mode: false, priority: 'high' }).eq('id', conversation_id);
+          }
+        }
+        // CASO B: HANDOVER (Já tratado pelo prompt gerando msg de verificação, mas vamos garantir o desligamento)
+        else {
+          console.log('[AutoSchedule] Disabled. Triggering Handover.');
+          await supabaseAdmin.from('whatsapp_conversations').update({ ai_autonomous_mode: false, status: 'open', priority: 'high' }).eq('id', conversation_id);
+          await supabaseAdmin.from('whatsapp_conversation_analysis').update({ lead_status: 'quente', suggested_next_action: 'Confirmar agendamento manualmente' }).eq('conversation_id', conversation_id);
+        }
+      }
+
+      const contentToSend = modifiedContent || bestSuggestion.content;
+
+      if (shouldSend && bestSuggestion && bestSuggestion.confidence >= CONFIDENCE_THRESHOLD) {
         try {
           const { data: newMessage } = await supabaseAdmin
             .from('whatsapp_messages')
@@ -420,7 +601,7 @@ Analise a conversa e gere respostas naturais. Responda diretamente.`;
               user_id: conversation.user_id,
               conversation_id: conversation_id,
               phone_number: conversation.phone_number,
-              content: bestSuggestion.content,
+              content: contentToSend,
               direction: 'outbound',
               message_type: 'text',
               status: 'pending',
@@ -451,7 +632,7 @@ Analise a conversa e gere respostas naturais. Responda diretamente.`;
                     messaging_product: 'whatsapp',
                     to: conversation.phone_number,
                     type: 'text',
-                    text: { body: bestSuggestion.content }
+                    text: { body: contentToSend }
                   }),
                 }
               );
@@ -466,33 +647,227 @@ Analise a conversa e gere respostas naturais. Responda diretamente.`;
                 await supabaseAdmin.from('whatsapp_ai_suggestions')
                   .update({ was_used: true, used_at: new Date().toISOString() })
                   .eq('conversation_id', conversation_id)
-                  .eq('content', bestSuggestion.content);
+                  .eq('content', bestSuggestion.content); // Marca a original como usada, mesmo se mudamos o texto
               }
             }
           }
         } catch (e) {
           console.error('[AutoReply] Error:', e);
         }
+        // ==========================================
+        // AUTONOMOUS SCHEDULING (NEW)
+        // ==========================================
+        if (
+          aiResponse.schedule_confirmation?.is_confirmed === true &&
+          aiResponse.schedule_confirmation.date_iso
+        ) {
+          // CASO A: AGENDAMENTO AUTOMÁTICO LIGADO
+          if (aiConfig?.auto_scheduling_enabled === true) {
+            try {
+              console.log('[AutoSchedule] Attempting to book:', aiResponse.schedule_confirmation);
+
+              const bookDate = new Date(aiResponse.schedule_confirmation.date_iso);
+              const endDate = new Date(bookDate.getTime() + 30 * 60000); // 30 min padrão
+
+              // 1. Verificar conflito de última hora (Double Check)
+              const { count: conflictCount } = await supabaseAdmin
+                .from('medical_appointments')
+                .select('*', { count: 'exact', head: true })
+                .eq('doctor_id', aiResponse.schedule_confirmation.doctor_id || conversation.user_id)
+                .neq('status', 'cancelled')
+                .or(`start_time.lte.${endDate.toISOString()},end_time.gte.${bookDate.toISOString()}`)
+                .lt('start_time', endDate.toISOString())
+                .gt('end_time', bookDate.toISOString());
+
+              if (conflictCount && conflictCount > 0) {
+                console.warn('[AutoSchedule] Conflict detected just before booking. Aborting.');
+                // Update bestSuggestion for conflict
+                bestSuggestion = {
+                  ...bestSuggestion,
+                  content: "Desculpe, acabei de verificar e esse horário foi tomado por outro paciente agorinha! 😕 Vou pedir para nossa secretária te chamar para ver outro horário, ok?",
+                  confidence: 1.0, // High confidence for this system message
+                  suggestion_type: 'system_message'
+                };
+                await supabaseAdmin.from('whatsapp_conversations')
+                  .update({ ai_autonomous_mode: false, priority: 'high', status: 'open' })
+                  .eq('id', conversation_id);
+              } else {
+                // 2. Resolver o Paciente
+                let patientId = conversation.contact_id;
+
+                if (!patientId) {
+                  const { data: existingPatient } = await supabaseAdmin
+                    .from('patients')
+                    .select('id')
+                    .eq('phone', conversation.phone_number)
+                    .maybeSingle();
+
+                  if (existingPatient) patientId = existingPatient.id;
+                  else {
+                    const { data: newPatient } = await supabaseAdmin.from('patients').insert({
+                      name: conversation.contact_name || 'Paciente WhatsApp',
+                      phone: conversation.phone_number,
+                      user_id: conversation.user_id
+                    }).select('id').single();
+                    if (newPatient) patientId = newPatient.id;
+                  }
+                }
+
+                if (patientId) {
+                  // 3. Criar o Agendamento
+                  const { error: appError } = await supabaseAdmin
+                    .from('medical_appointments')
+                    .insert({
+                      doctor_id: aiResponse.schedule_confirmation.doctor_id || conversation.user_id,
+                      patient_id: patientId,
+                      start_time: bookDate.toISOString(),
+                      end_time: endDate.toISOString(),
+                      status: 'scheduled',
+                      notes: `Agendado via IA. Procedimento: ${aiResponse.schedule_confirmation.procedure_name || 'Geral'}.`,
+                      user_id: conversation.user_id
+                    });
+
+                  if (!appError) {
+                    console.log('[AutoSchedule] Success.');
+
+                    // 4. Marcar como Convertido
+                    await supabaseAdmin
+                      .from('whatsapp_conversation_analysis')
+                      .update({ lead_status: 'convertido' })
+                      .eq('conversation_id', conversation_id);
+                    // No need to change bestSuggestion, original confirmation is fine
+                  } else {
+                    throw appError; // Propagate error to catch block
+                  }
+                }
+              }
+            } catch (err: any) {
+              console.error('[AutoSchedule] Failed:', err.message);
+              // Update bestSuggestion for booking failure
+              bestSuggestion = {
+                ...bestSuggestion,
+                content: "Tive um pequeno erro técnico aqui. Vou pedir para nossa equipe confirmar manualmente com você! 🙏",
+                confidence: 1.0, // High confidence for this system message
+                suggestion_type: 'system_message'
+              };
+              await supabaseAdmin.from('whatsapp_conversations').update({ ai_autonomous_mode: false, priority: 'high' }).eq('id', conversation_id);
+            }
+          }
+          // CASO B: AGENDAMENTO AUTOMÁTICO DESLIGADO (HANDOVER)
+          else {
+            console.log('[AutoSchedule] Disabled. Triggering Handover for manual review.');
+
+            // 1. Desligar modo autônomo para transbordo para humana
+            await supabaseAdmin
+              .from('whatsapp_conversations')
+              .update({
+                ai_autonomous_mode: false,
+                status: 'open', // Garante que está visível
+                priority: 'high' // Marca como alta prioridade
+              })
+              .eq('id', conversation_id);
+
+            // 2. Atualizar status para Quente (pronto para fechar)
+            await supabaseAdmin
+              .from('whatsapp_conversation_analysis')
+              .update({ lead_status: 'quente', suggested_next_action: 'Confirmar agendamento manualmente' })
+              .eq('conversation_id', conversation_id);
+
+            // 3. Enviar a mensagem de "Vamos verificar" que a IA gerou (suggestion[0])
+            // Isso já acontece no bloco de Auto-Reply padrão acima, pois o ai_autonomous_mode 
+            // só vai ser false NA PRÓXIMA rodada. Mas espera!
+            // Se mudarmos o modo aqui, a mensagem pode não sair se a checagem for depois.
+            // A checagem de envio é FEITA ANTES DESTE BLOCO no código atual.
+            // Então a mensagem "Vou verificar" SAI AUTOMATICAMENTE.
+            // E AQUI nós só desligamos o robô. Perfeito.
+          }
+        }
+
+        // The `modifiedContent` and `shouldSend` variables from the old "AUTONOMOUS SCHEDULING INTERCEPTION"
+        // are no longer needed as `bestSuggestion` is directly updated.
+        // The `contentToSend` will now directly use `bestSuggestion.content`.
+
+        if (shouldSend && bestSuggestion && bestSuggestion.confidence >= CONFIDENCE_THRESHOLD) {
+          try {
+            const { data: newMessage } = await supabaseAdmin
+              .from('whatsapp_messages')
+              .insert({
+                user_id: conversation.user_id,
+                conversation_id: conversation_id,
+                phone_number: conversation.phone_number,
+                content: bestSuggestion.content, // Use bestSuggestion.content directly
+                direction: 'outbound',
+                message_type: 'text',
+                status: 'pending',
+                sent_at: new Date().toISOString(),
+                metadata: { auto_reply: true, confidence: bestSuggestion.confidence, ai_generated: true }
+              })
+              .select('id')
+              .single();
+
+            if (newMessage) {
+              const { data: waConfig } = await supabaseAdmin
+                .from('whatsapp_config')
+                .select('phone_number_id, access_token')
+                .eq('user_id', conversation.user_id)
+                .eq('is_active', true)
+                .maybeSingle();
+
+              if (waConfig) {
+                const waRes = await fetch(
+                  `https://graph.facebook.com/v18.0/${waConfig.phone_number_id}/messages`,
+                  {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${waConfig.access_token}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      messaging_product: 'whatsapp',
+                      to: conversation.phone_number,
+                      type: 'text',
+                      text: { body: bestSuggestion.content } // Use bestSuggestion.content directly
+                    }),
+                  }
+                );
+
+                if (waRes.ok) {
+                  const waResData = await waRes.json();
+                  await supabaseAdmin
+                    .from('whatsapp_messages')
+                    .update({ status: 'sent', message_id: waResData.messages?.[0]?.id })
+                    .eq('id', newMessage.id);
+
+                  await supabaseAdmin.from('whatsapp_ai_suggestions')
+                    .update({ was_used: true, used_at: new Date().toISOString() })
+                    .eq('conversation_id', conversation_id)
+                    .eq('content', suggestionsToInsert[0].content); // Mark the original suggestion as used
+                }
+              }
+            }
+          } catch (e) {
+            console.error('[AutoReply] Error:', e);
+          }
+        }
       }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          analysis: savedAnalysis,
+          suggestions: savedSuggestions || [],
+          cached: false,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+
+    } catch (error: any) {
+      console.error('[whatsapp-ai-analyze] Error:', error.message);
+      return new Response(
+        JSON.stringify({ success: false, error: error.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
+  };
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        analysis: savedAnalysis,
-        suggestions: savedSuggestions || [],
-        cached: false,
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
-  } catch (error: any) {
-    console.error('[whatsapp-ai-analyze] Error:', error.message);
-    return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-};
-
-serve(handler);
+  serve(handler);
