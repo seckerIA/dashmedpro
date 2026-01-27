@@ -1,0 +1,170 @@
+{
+  "node": {
+    "401f2be813ef3c2efe98656ae1a86f641ac179cadc": {
+      "workers": {
+        "app/(dashboard)/medical-records/page": {
+          "moduleId": 574713,
+          "async": false,
+          "exportedName": "createDeal",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/crm.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/medical-records/page": "rsc"
+      },
+      "exportedName": "createDeal",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/crm.ts"
+    },
+    "406bde9740cdc5379861bf21878ff7a4a1e83221d9": {
+      "workers": {
+        "app/(dashboard)/medical-records/page": {
+          "moduleId": 574713,
+          "async": false,
+          "exportedName": "createContact",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/crm.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/medical-records/page": "rsc"
+      },
+      "exportedName": "createContact",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/crm.ts"
+    },
+    "409c88f5df54332becf3e8a549f76834788622b71b": {
+      "workers": {
+        "app/(dashboard)/medical-records/page": {
+          "moduleId": 574713,
+          "async": false,
+          "exportedName": "deleteDeal",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/crm.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/medical-records/page": "rsc"
+      },
+      "exportedName": "deleteDeal",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/crm.ts"
+    },
+    "40ef73fbab409cf618015a9133052ea74054e63ff0": {
+      "workers": {
+        "app/(dashboard)/medical-records/page": {
+          "moduleId": 574713,
+          "async": false,
+          "exportedName": "getContacts",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/crm.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/medical-records/page": "rsc"
+      },
+      "exportedName": "getContacts",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/crm.ts"
+    },
+    "6039af55c96a61ecc648e3c62b5c833772c2d136df": {
+      "workers": {
+        "app/(dashboard)/medical-records/page": {
+          "moduleId": 574713,
+          "async": false,
+          "exportedName": "updateDeal",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/crm.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/medical-records/page": "rsc"
+      },
+      "exportedName": "updateDeal",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/crm.ts"
+    },
+    "60a88ae124e724f933f70aa96b987832caca5f9a77": {
+      "workers": {
+        "app/(dashboard)/medical-records/page": {
+          "moduleId": 574713,
+          "async": false,
+          "exportedName": "getDeals",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/crm.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/medical-records/page": "rsc"
+      },
+      "exportedName": "getDeals",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/crm.ts"
+    },
+    "60e6a143c738df5d0c764d05c99a11bd1d6c50c940": {
+      "workers": {
+        "app/(dashboard)/medical-records/page": {
+          "moduleId": 574713,
+          "async": false,
+          "exportedName": "updateContact",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/crm.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/medical-records/page": "rsc"
+      },
+      "exportedName": "updateContact",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/crm.ts"
+    },
+    "402469c504ec5040b29baf63300a0f7454ffc3e6b4": {
+      "workers": {
+        "app/(dashboard)/medical-records/page": {
+          "moduleId": 574713,
+          "async": false,
+          "exportedName": "getMedicalRecords",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/medical-records.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/medical-records/page": "action-browser"
+      },
+      "exportedName": "getMedicalRecords",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/medical-records.ts"
+    },
+    "60efe3ae36aea7645f6fac635cf35037fc922d6eb9": {
+      "workers": {
+        "app/(dashboard)/medical-records/page": {
+          "moduleId": 574713,
+          "async": false,
+          "exportedName": "updatePatientMedicalInfo",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/medical-records.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/medical-records/page": "action-browser"
+      },
+      "exportedName": "updatePatientMedicalInfo",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/medical-records.ts"
+    },
+    "40f47240692467e9c134d4c176cfc2261c302c4ecc": {
+      "workers": {
+        "app/(dashboard)/medical-records/page": {
+          "moduleId": 574713,
+          "async": false,
+          "exportedName": "getPrescriptions",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/medical-records.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/medical-records/page": "action-browser"
+      },
+      "exportedName": "getPrescriptions",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/medical-records.ts"
+    },
+    "4090b4621d551bf62a1de6dbda2c47e0427a650c05": {
+      "workers": {
+        "app/(dashboard)/medical-records/page": {
+          "moduleId": 574713,
+          "async": false,
+          "exportedName": "createMedicalRecord",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/medical-records.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/medical-records/page": "action-browser"
+      },
+      "exportedName": "createMedicalRecord",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/medical-records.ts"
+    }
+  },
+  "edge": {}
+}

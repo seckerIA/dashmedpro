@@ -1,0 +1,13 @@
+var R=require("../../chunks/ssr/[turbopack]_runtime.js")("server/app/_global-error/page.js")
+R.c("server/chunks/ssr/[root-of-the-server]__7cfa8d79._.js")
+R.c("server/chunks/ssr/dashmedpro-1_dashmed-nextjs_a9050140._.js")
+R.c("server/chunks/ssr/aaef9_next_dist_121f1585._.js")
+R.c("server/chunks/ssr/[root-of-the-server]__33eb6380._.js")
+R.c("server/chunks/ssr/aaef9_next_dist_b74f8bd1._.js")
+R.c("server/chunks/ssr/[root-of-the-server]__1816e6ef._.js")
+R.c("server/chunks/ssr/aaef9_next_dist_183e4e20._.js")
+R.c("server/chunks/ssr/aaef9_next_dist_compiled_@opentelemetry_api_index_76cfc4b5.js")
+R.c("server/chunks/ssr/dashmedpro-1_dashmed-nextjs_src_app_18a939bf._.js")
+R.c("server/chunks/ssr/1f112_dashmed-nextjs__next-internal_server_app__global-error_page_actions_524a0ac9.js")
+R.m(726838)
+module.exports=R.m(726838).exports

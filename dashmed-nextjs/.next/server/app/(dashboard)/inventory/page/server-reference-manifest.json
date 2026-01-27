@@ -1,0 +1,95 @@
+{
+  "node": {
+    "009c36e0474c58078d52144ee4124fcec764bba004": {
+      "workers": {
+        "app/(dashboard)/inventory/page": {
+          "moduleId": 982414,
+          "async": false,
+          "exportedName": "getInventoryItems",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/inventory.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/inventory/page": "rsc"
+      },
+      "exportedName": "getInventoryItems",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/inventory.ts"
+    },
+    "00bfa0e2b55a0ee9096a83f322d5fdeed14f42421e": {
+      "workers": {
+        "app/(dashboard)/inventory/page": {
+          "moduleId": 982414,
+          "async": false,
+          "exportedName": "getSuppliers",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/inventory.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/inventory/page": "rsc"
+      },
+      "exportedName": "getSuppliers",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/inventory.ts"
+    },
+    "40151de6bcec720e9ff3289b73ac829a9476be60cf": {
+      "workers": {
+        "app/(dashboard)/inventory/page": {
+          "moduleId": 982414,
+          "async": false,
+          "exportedName": "addBatch",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/inventory.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/inventory/page": "rsc"
+      },
+      "exportedName": "addBatch",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/inventory.ts"
+    },
+    "40531c231806f3e3c7c975acaa12377e1fe97f3c90": {
+      "workers": {
+        "app/(dashboard)/inventory/page": {
+          "moduleId": 982414,
+          "async": false,
+          "exportedName": "deleteInventoryItem",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/inventory.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/inventory/page": "rsc"
+      },
+      "exportedName": "deleteInventoryItem",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/inventory.ts"
+    },
+    "4072302b2c09fb18bd7b7e3543c05b898ddbdd7932": {
+      "workers": {
+        "app/(dashboard)/inventory/page": {
+          "moduleId": 982414,
+          "async": false,
+          "exportedName": "createInventoryItem",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/inventory.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/inventory/page": "rsc"
+      },
+      "exportedName": "createInventoryItem",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/inventory.ts"
+    },
+    "60b56893427eddb77e692b0a05af1377552040fba2": {
+      "workers": {
+        "app/(dashboard)/inventory/page": {
+          "moduleId": 982414,
+          "async": false,
+          "exportedName": "updateInventoryItem",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/inventory.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/inventory/page": "rsc"
+      },
+      "exportedName": "updateInventoryItem",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/inventory.ts"
+    }
+  },
+  "edge": {}
+}

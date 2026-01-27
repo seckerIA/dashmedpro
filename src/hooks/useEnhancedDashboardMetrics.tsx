@@ -108,14 +108,19 @@ const fetchEnhancedMetrics = async (
   currentMonth.setDate(1);
   currentMonth.setHours(0, 0, 0, 0);
 
-  // RLS handles organization filtering
-  const appointmentsQuery = supabase
-    .from('medical_appointments')
-    .select('id, status')
-    .gte('start_time', currentMonth.toISOString());
+  let appointmentsData: any[] = [];
+  try {
+    // RLS handles organization filtering
+    const appointmentsQuery = supabase
+      .from('medical_appointments')
+      .select('id, status')
+      .gte('start_time', currentMonth.toISOString());
 
-  const appointmentsResult = await supabaseQueryWithTimeout(appointmentsQuery as any, 30000, signal);
-  const appointmentsData = (appointmentsResult.data || []) as any[];
+    const appointmentsResult = await supabaseQueryWithTimeout(appointmentsQuery as any, 30000, signal);
+    appointmentsData = (appointmentsResult.data || []) as any[];
+  } catch (err) {
+    console.error('⚠️ Erro ao buscar agendamentos no dashboard:', err);
+  }
 
   const appointmentsThisMonth = appointmentsData.length;
   const completedAppointmentsThisMonth = appointmentsData.filter((a: any) => a.status === 'completed').length;
@@ -195,11 +200,11 @@ const fetchEnhancedMetrics = async (
 
       const receita = monthTransactions
         .filter((t: any) => (t.type === 'entrada' || t.type === 'receita') && t.status !== 'cancelada')
-        .reduce((sum: number, t: any) => sum + (typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount), 0);
+        .reduce((sum: number, t: any) => sum + ((typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount) || 0), 0);
 
       const despesas = monthTransactions
         .filter((t: any) => (t.type === 'saida' || t.type === 'despesa') && t.status !== 'cancelada')
-        .reduce((sum: number, t: any) => sum + (typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount), 0);
+        .reduce((sum: number, t: any) => sum + ((typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount) || 0), 0);
 
       receitaDespesas.push({
         month: monthName,

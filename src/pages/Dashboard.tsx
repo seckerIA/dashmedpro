@@ -1,3 +1,6 @@
+
+import { DoctorDashboard } from "@/components/dashboard/DoctorDashboard"
+import { DashboardWrapper } from "@/components/dashboard/DashboardWrapper"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics"
 import SecretaryDashboard from "@/components/dashboard/SecretaryDashboard"
@@ -8,7 +11,7 @@ import { useState } from "react" // Import useState
 import { Button } from "@/components/ui/button" // Import Button
 
 const Dashboard = () => {
-  const { isSecretaria } = useUserProfile();
+  const { isSecretaria, isMedico, profile } = useUserProfile();
   const { isLoading, error } = useDashboardMetrics();
   // State for view mode
   const [viewMode, setViewMode] = useState<'vision' | 'detailed'>('vision');
@@ -36,8 +39,12 @@ const Dashboard = () => {
     return <SecretaryDashboard />;
   }
 
-  // Vision Dashboard (New UI) for Everyone else (Admin, Vendedor, Medico)
+  // Se for médico, mostrar nova interface focada em agenda
+  if (isMedico || profile?.role === 'medico') {
+    return <DashboardWrapper />;
+  }
 
+  // Vision Dashboard (New UI) for Everyone else (Admin, Vendedor)
   return (
     <div className="min-h-screen bg-background relative">
       {viewMode === 'vision' ? (
@@ -50,4 +57,3 @@ const Dashboard = () => {
 }
 
 export default Dashboard
-

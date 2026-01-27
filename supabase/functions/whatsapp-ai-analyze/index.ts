@@ -505,24 +505,26 @@ Analise a conversa, extraia dados e gere respostas.`;
       const bestSuggestion = suggestionsToInsert[0];
       const CONFIDENCE_THRESHOLD = 0.85;
 
-      // ==========================================
-      // AUTONOMOUS SCHEDULING INTERCEPTION
-      // ==========================================
-      let modifiedContent = null;
+      const CONFIDENCE_THRESHOLD = 0.85;
       let shouldSend = true;
+
+      // ==========================================
+      // AUTONOMOUS SCHEDULING & REPLY
+      // ==========================================
 
       if (
         aiResponse.schedule_confirmation?.is_confirmed === true &&
         aiResponse.schedule_confirmation.date_iso
       ) {
-        // CASO A: TENTAR AGENDAR
+        // CASO A: AGENDAMENTO AUTOMÁTICO LIGADO
         if (aiConfig?.auto_scheduling_enabled === true) {
           try {
             console.log('[AutoSchedule] Attempting to book:', aiResponse.schedule_confirmation);
-            const bookDate = new Date(aiResponse.schedule_confirmation.date_iso);
-            const endDate = new Date(bookDate.getTime() + 30 * 60000);
 
-            // 1. Verificar conflito
+            const bookDate = new Date(aiResponse.schedule_confirmation.date_iso);
+            const endDate = new Date(bookDate.getTime() + 30 * 60000); // 30 min padrão
+
+            // 1. Verificar conflito de última hora (Double Check)
             const { count: conflictCount } = await supabaseAdmin
               .from('medical_appointments')
               .select('*', { count: 'exact', head: true })
@@ -533,29 +535,41 @@ Analise a conversa, extraia dados e gere respostas.`;
               .gt('end_time', bookDate.toISOString());
 
             if (conflictCount && conflictCount > 0) {
-              console.warn('[AutoSchedule] Conflict detected just before booking.');
-              // ERRO: CONFLITO - Mudar mensagem para falha e fazer handover
-              modifiedContent = "Desculpe, acabei de verificar e esse horário foi tomado por outro paciente agorinha! 😕 Vou pedir para nossa secretária te chamar para ver outro horário, ok?";
-
+              console.warn('[AutoSchedule] Conflict detected just before booking. Aborting.');
+              // Update bestSuggestion for conflict
+              bestSuggestion = {
+                ...bestSuggestion,
+                content: "Desculpe, acabei de verificar e esse horário foi tomado por outro paciente agorinha! 😕 Vou pedir para nossa secretária te chamar para ver outro horário, ok?",
+                confidence: 1.0, // High confidence for this system message
+                suggestion_type: 'system_message'
+              };
               await supabaseAdmin.from('whatsapp_conversations')
                 .update({ ai_autonomous_mode: false, priority: 'high', status: 'open' })
                 .eq('id', conversation_id);
             } else {
-              // 2. Resolver Paciente
+              // 2. Resolver o Paciente
               let patientId = conversation.contact_id;
+
               if (!patientId) {
-                const { data: existingPatient } = await supabaseAdmin.from('patients').select('id').eq('phone', conversation.phone_number).maybeSingle();
+                const { data: existingPatient } = await supabaseAdmin
+                  .from('patients')
+                  .select('id')
+                  .eq('phone', conversation.phone_number)
+                  .maybeSingle();
+
                 if (existingPatient) patientId = existingPatient.id;
                 else {
                   const { data: newPatient } = await supabaseAdmin.from('patients').insert({
-                    name: conversation.contact_name || 'Paciente WhatsApp', phone: conversation.phone_number, user_id: conversation.user_id
+                    name: conversation.contact_name || 'Paciente WhatsApp',
+                    phone: conversation.phone_number,
+                    user_id: conversation.user_id
                   }).select('id').single();
                   if (newPatient) patientId = newPatient.id;
                 }
               }
 
-              // 3. Criar
               if (patientId) {
+                // 3. Criar o Agendamento
                 const { error: appError } = await supabaseAdmin
                   .from('medical_appointments')
                   .insert({
@@ -570,28 +584,63 @@ Analise a conversa, extraia dados e gere respostas.`;
 
                 if (!appError) {
                   console.log('[AutoSchedule] Success.');
-                  await supabaseAdmin.from('whatsapp_conversation_analysis').update({ lead_status: 'convertido' }).eq('conversation_id', conversation_id);
-                  // SUCESSO: Mantém a mensagem original de confirmação
+
+                  // 4. Marcar como Convertido
+                  await supabaseAdmin
+                    .from('whatsapp_conversation_analysis')
+                    .update({ lead_status: 'convertido' })
+                    .eq('conversation_id', conversation_id);
+                  // No need to change bestSuggestion, original confirmation is fine
                 } else {
-                  throw appError;
+                  throw appError; // Propagate error to catch block
                 }
               }
             }
           } catch (err: any) {
             console.error('[AutoSchedule] Failed:', err.message);
-            modifiedContent = "Tive um pequeno erro técnico aqui. Vou pedir para nossa equipe confirmar manualmente com você! 🙏";
+            // Update bestSuggestion for booking failure
+            bestSuggestion = {
+              ...bestSuggestion,
+              content: "Tive um pequeno erro técnico aqui. Vou pedir para nossa equipe confirmar manualmente com você! 🙏",
+              confidence: 1.0, // High confidence for this system message
+              suggestion_type: 'system_message'
+            };
             await supabaseAdmin.from('whatsapp_conversations').update({ ai_autonomous_mode: false, priority: 'high' }).eq('id', conversation_id);
           }
         }
-        // CASO B: HANDOVER (Já tratado pelo prompt gerando msg de verificação, mas vamos garantir o desligamento)
+        // CASO B: AGENDAMENTO AUTOMÁTICO DESLIGADO (HANDOVER)
         else {
-          console.log('[AutoSchedule] Disabled. Triggering Handover.');
-          await supabaseAdmin.from('whatsapp_conversations').update({ ai_autonomous_mode: false, status: 'open', priority: 'high' }).eq('id', conversation_id);
-          await supabaseAdmin.from('whatsapp_conversation_analysis').update({ lead_status: 'quente', suggested_next_action: 'Confirmar agendamento manualmente' }).eq('conversation_id', conversation_id);
+          console.log('[AutoSchedule] Disabled. Triggering Handover for manual review.');
+
+          // 1. Desligar modo autônomo para transbordo para humana
+          await supabaseAdmin
+            .from('whatsapp_conversations')
+            .update({
+              ai_autonomous_mode: false,
+              status: 'open', // Garante que está visível
+              priority: 'high' // Marca como alta prioridade
+            })
+            .eq('id', conversation_id);
+
+          // 2. Atualizar status para Quente (pronto para fechar)
+          await supabaseAdmin
+            .from('whatsapp_conversation_analysis')
+            .update({ lead_status: 'quente', suggested_next_action: 'Confirmar agendamento manualmente' })
+            .eq('conversation_id', conversation_id);
+
+          // 3. Enviar a mensagem de "Vamos verificar" que a IA gerou (suggestion[0])
+          // Isso já acontece no bloco de Auto-Reply padrão acima, pois o ai_autonomous_mode 
+          // só vai ser false NA PRÓXIMA rodada. Mas espera!
+          // Se mudarmos o modo aqui, a mensagem pode não sair se a checagem for depois.
+          // A checagem de envio é FEITA ANTES DESTE BLOCO no código atual.
+          // Então a mensagem "Vou verificar" SAI AUTOMATICAMENTE.
+          // E AQUI nós só desligamos o robô. Perfeito.
         }
       }
 
-      const contentToSend = modifiedContent || bestSuggestion.content;
+      // The `modifiedContent` and `shouldSend` variables from the old "AUTONOMOUS SCHEDULING INTERCEPTION"
+      // are no longer needed as `bestSuggestion` is directly updated.
+      // The `contentToSend` will now directly use `bestSuggestion.content`.
 
       if (shouldSend && bestSuggestion && bestSuggestion.confidence >= CONFIDENCE_THRESHOLD) {
         try {
@@ -601,7 +650,7 @@ Analise a conversa, extraia dados e gere respostas.`;
               user_id: conversation.user_id,
               conversation_id: conversation_id,
               phone_number: conversation.phone_number,
-              content: contentToSend,
+              content: bestSuggestion.content, // Use bestSuggestion.content directly
               direction: 'outbound',
               message_type: 'text',
               status: 'pending',
@@ -632,7 +681,7 @@ Analise a conversa, extraia dados e gere respostas.`;
                     messaging_product: 'whatsapp',
                     to: conversation.phone_number,
                     type: 'text',
-                    text: { body: contentToSend }
+                    text: { body: bestSuggestion.content } // Use bestSuggestion.content directly
                   }),
                 }
               );
@@ -647,227 +696,33 @@ Analise a conversa, extraia dados e gere respostas.`;
                 await supabaseAdmin.from('whatsapp_ai_suggestions')
                   .update({ was_used: true, used_at: new Date().toISOString() })
                   .eq('conversation_id', conversation_id)
-                  .eq('content', bestSuggestion.content); // Marca a original como usada, mesmo se mudamos o texto
+                  .eq('content', suggestionsToInsert[0].content); // Mark the original suggestion as used
               }
             }
           }
         } catch (e) {
           console.error('[AutoReply] Error:', e);
         }
-        // ==========================================
-        // AUTONOMOUS SCHEDULING (NEW)
-        // ==========================================
-        if (
-          aiResponse.schedule_confirmation?.is_confirmed === true &&
-          aiResponse.schedule_confirmation.date_iso
-        ) {
-          // CASO A: AGENDAMENTO AUTOMÁTICO LIGADO
-          if (aiConfig?.auto_scheduling_enabled === true) {
-            try {
-              console.log('[AutoSchedule] Attempting to book:', aiResponse.schedule_confirmation);
-
-              const bookDate = new Date(aiResponse.schedule_confirmation.date_iso);
-              const endDate = new Date(bookDate.getTime() + 30 * 60000); // 30 min padrão
-
-              // 1. Verificar conflito de última hora (Double Check)
-              const { count: conflictCount } = await supabaseAdmin
-                .from('medical_appointments')
-                .select('*', { count: 'exact', head: true })
-                .eq('doctor_id', aiResponse.schedule_confirmation.doctor_id || conversation.user_id)
-                .neq('status', 'cancelled')
-                .or(`start_time.lte.${endDate.toISOString()},end_time.gte.${bookDate.toISOString()}`)
-                .lt('start_time', endDate.toISOString())
-                .gt('end_time', bookDate.toISOString());
-
-              if (conflictCount && conflictCount > 0) {
-                console.warn('[AutoSchedule] Conflict detected just before booking. Aborting.');
-                // Update bestSuggestion for conflict
-                bestSuggestion = {
-                  ...bestSuggestion,
-                  content: "Desculpe, acabei de verificar e esse horário foi tomado por outro paciente agorinha! 😕 Vou pedir para nossa secretária te chamar para ver outro horário, ok?",
-                  confidence: 1.0, // High confidence for this system message
-                  suggestion_type: 'system_message'
-                };
-                await supabaseAdmin.from('whatsapp_conversations')
-                  .update({ ai_autonomous_mode: false, priority: 'high', status: 'open' })
-                  .eq('id', conversation_id);
-              } else {
-                // 2. Resolver o Paciente
-                let patientId = conversation.contact_id;
-
-                if (!patientId) {
-                  const { data: existingPatient } = await supabaseAdmin
-                    .from('patients')
-                    .select('id')
-                    .eq('phone', conversation.phone_number)
-                    .maybeSingle();
-
-                  if (existingPatient) patientId = existingPatient.id;
-                  else {
-                    const { data: newPatient } = await supabaseAdmin.from('patients').insert({
-                      name: conversation.contact_name || 'Paciente WhatsApp',
-                      phone: conversation.phone_number,
-                      user_id: conversation.user_id
-                    }).select('id').single();
-                    if (newPatient) patientId = newPatient.id;
-                  }
-                }
-
-                if (patientId) {
-                  // 3. Criar o Agendamento
-                  const { error: appError } = await supabaseAdmin
-                    .from('medical_appointments')
-                    .insert({
-                      doctor_id: aiResponse.schedule_confirmation.doctor_id || conversation.user_id,
-                      patient_id: patientId,
-                      start_time: bookDate.toISOString(),
-                      end_time: endDate.toISOString(),
-                      status: 'scheduled',
-                      notes: `Agendado via IA. Procedimento: ${aiResponse.schedule_confirmation.procedure_name || 'Geral'}.`,
-                      user_id: conversation.user_id
-                    });
-
-                  if (!appError) {
-                    console.log('[AutoSchedule] Success.');
-
-                    // 4. Marcar como Convertido
-                    await supabaseAdmin
-                      .from('whatsapp_conversation_analysis')
-                      .update({ lead_status: 'convertido' })
-                      .eq('conversation_id', conversation_id);
-                    // No need to change bestSuggestion, original confirmation is fine
-                  } else {
-                    throw appError; // Propagate error to catch block
-                  }
-                }
-              }
-            } catch (err: any) {
-              console.error('[AutoSchedule] Failed:', err.message);
-              // Update bestSuggestion for booking failure
-              bestSuggestion = {
-                ...bestSuggestion,
-                content: "Tive um pequeno erro técnico aqui. Vou pedir para nossa equipe confirmar manualmente com você! 🙏",
-                confidence: 1.0, // High confidence for this system message
-                suggestion_type: 'system_message'
-              };
-              await supabaseAdmin.from('whatsapp_conversations').update({ ai_autonomous_mode: false, priority: 'high' }).eq('id', conversation_id);
-            }
-          }
-          // CASO B: AGENDAMENTO AUTOMÁTICO DESLIGADO (HANDOVER)
-          else {
-            console.log('[AutoSchedule] Disabled. Triggering Handover for manual review.');
-
-            // 1. Desligar modo autônomo para transbordo para humana
-            await supabaseAdmin
-              .from('whatsapp_conversations')
-              .update({
-                ai_autonomous_mode: false,
-                status: 'open', // Garante que está visível
-                priority: 'high' // Marca como alta prioridade
-              })
-              .eq('id', conversation_id);
-
-            // 2. Atualizar status para Quente (pronto para fechar)
-            await supabaseAdmin
-              .from('whatsapp_conversation_analysis')
-              .update({ lead_status: 'quente', suggested_next_action: 'Confirmar agendamento manualmente' })
-              .eq('conversation_id', conversation_id);
-
-            // 3. Enviar a mensagem de "Vamos verificar" que a IA gerou (suggestion[0])
-            // Isso já acontece no bloco de Auto-Reply padrão acima, pois o ai_autonomous_mode 
-            // só vai ser false NA PRÓXIMA rodada. Mas espera!
-            // Se mudarmos o modo aqui, a mensagem pode não sair se a checagem for depois.
-            // A checagem de envio é FEITA ANTES DESTE BLOCO no código atual.
-            // Então a mensagem "Vou verificar" SAI AUTOMATICAMENTE.
-            // E AQUI nós só desligamos o robô. Perfeito.
-          }
-        }
-
-        // The `modifiedContent` and `shouldSend` variables from the old "AUTONOMOUS SCHEDULING INTERCEPTION"
-        // are no longer needed as `bestSuggestion` is directly updated.
-        // The `contentToSend` will now directly use `bestSuggestion.content`.
-
-        if (shouldSend && bestSuggestion && bestSuggestion.confidence >= CONFIDENCE_THRESHOLD) {
-          try {
-            const { data: newMessage } = await supabaseAdmin
-              .from('whatsapp_messages')
-              .insert({
-                user_id: conversation.user_id,
-                conversation_id: conversation_id,
-                phone_number: conversation.phone_number,
-                content: bestSuggestion.content, // Use bestSuggestion.content directly
-                direction: 'outbound',
-                message_type: 'text',
-                status: 'pending',
-                sent_at: new Date().toISOString(),
-                metadata: { auto_reply: true, confidence: bestSuggestion.confidence, ai_generated: true }
-              })
-              .select('id')
-              .single();
-
-            if (newMessage) {
-              const { data: waConfig } = await supabaseAdmin
-                .from('whatsapp_config')
-                .select('phone_number_id, access_token')
-                .eq('user_id', conversation.user_id)
-                .eq('is_active', true)
-                .maybeSingle();
-
-              if (waConfig) {
-                const waRes = await fetch(
-                  `https://graph.facebook.com/v18.0/${waConfig.phone_number_id}/messages`,
-                  {
-                    method: 'POST',
-                    headers: {
-                      'Authorization': `Bearer ${waConfig.access_token}`,
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                      messaging_product: 'whatsapp',
-                      to: conversation.phone_number,
-                      type: 'text',
-                      text: { body: bestSuggestion.content } // Use bestSuggestion.content directly
-                    }),
-                  }
-                );
-
-                if (waRes.ok) {
-                  const waResData = await waRes.json();
-                  await supabaseAdmin
-                    .from('whatsapp_messages')
-                    .update({ status: 'sent', message_id: waResData.messages?.[0]?.id })
-                    .eq('id', newMessage.id);
-
-                  await supabaseAdmin.from('whatsapp_ai_suggestions')
-                    .update({ was_used: true, used_at: new Date().toISOString() })
-                    .eq('conversation_id', conversation_id)
-                    .eq('content', suggestionsToInsert[0].content); // Mark the original suggestion as used
-                }
-              }
-            }
-          } catch (e) {
-            console.error('[AutoReply] Error:', e);
-          }
-        }
       }
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          analysis: savedAnalysis,
-          suggestions: savedSuggestions || [],
-          cached: false,
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-
-    } catch (error: any) {
-      console.error('[whatsapp-ai-analyze] Error:', error.message);
-      return new Response(
-        JSON.stringify({ success: false, error: error.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
     }
-  };
 
-  serve(handler);
+    return new Response(
+      JSON.stringify({
+        success: true,
+        analysis: savedAnalysis,
+        suggestions: savedSuggestions || [],
+        cached: false,
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error: any) {
+    console.error('[whatsapp-ai-analyze] Error:', error.message);
+    return new Response(
+      JSON.stringify({ success: false, error: error.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+};
+
+serve(handler);

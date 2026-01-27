@@ -21,6 +21,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
+import { useEnhancedDashboardMetrics } from "@/hooks/useEnhancedDashboardMetrics";
 
 interface ViewModeProps {
     viewMode?: 'vision' | 'detailed';
@@ -32,7 +33,8 @@ export function DetailedDashboard({ viewMode, onViewModeChange }: ViewModeProps)
     const [isExporting, setIsExporting] = useState(false);
     const [filterPeriod, setFilterPeriod] = useState("30");
     const [showFilters, setShowFilters] = useState(false);
-    const { metrics } = useDashboardMetrics();
+    const { data: metrics } = useDashboardMetrics();
+    const { data: enhancedMetrics } = useEnhancedDashboardMetrics();
 
     // Handler para compartilhar
     const handleShare = async () => {
@@ -61,12 +63,12 @@ export function DetailedDashboard({ viewMode, onViewModeChange }: ViewModeProps)
                 geradoEm: new Date().toLocaleString('pt-BR'),
                 periodo: `Últimos ${filterPeriod} dias`,
                 metricas: {
-                    receitaTotal: metrics?.revenue?.total || 0,
-                    totalConsultas: metrics?.appointments?.total || 0,
-                    consultasRealizadas: metrics?.appointments?.completed || 0,
-                    totalLeads: metrics?.leads?.total || 0,
-                    leadsConvertidos: metrics?.leads?.converted || 0,
-                    taxaConversao: metrics?.leads?.conversionRate || 0,
+                    receitaTotal: metrics?.totalClosedValue || 0,
+                    totalConsultas: enhancedMetrics?.appointmentsThisMonth || 0,
+                    consultasRealizadas: enhancedMetrics?.completedAppointmentsThisMonth || 0,
+                    totalLeads: metrics?.totalContacts || 0,
+                    leadsConvertidos: metrics?.wonDeals || 0,
+                    taxaConversao: metrics?.conversionRate || 0,
                 }
             };
 
@@ -125,12 +127,12 @@ export function DetailedDashboard({ viewMode, onViewModeChange }: ViewModeProps)
                     {onViewModeChange && (
                         <div className="flex items-center gap-1 bg-muted/20 p-1 rounded-lg border border-border/50 mr-2">
                             <Button
-                                variant={viewMode === 'vision' ? 'default' : 'ghost'}
+                                variant="ghost"
                                 size="sm"
-                                onClick={() => onViewModeChange('vision')}
-                                className={`text-xs h-8 px-3 rounded-md ${viewMode === 'vision' ? 'shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                                onClick={() => onViewModeChange('daily' as any)}
+                                className="text-xs h-8 px-3 rounded-md text-muted-foreground hover:text-foreground"
                             >
-                                Visão Geral
+                                Dia a Dia
                             </Button>
                             <Button
                                 variant={viewMode === 'detailed' ? 'default' : 'ghost'}
@@ -139,6 +141,14 @@ export function DetailedDashboard({ viewMode, onViewModeChange }: ViewModeProps)
                                 className={`text-xs h-8 px-3 rounded-md ${viewMode === 'detailed' ? 'shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                             >
                                 Detalhada
+                            </Button>
+                            <Button
+                                variant={viewMode === 'vision' ? 'default' : 'ghost'} // vision mapped to general
+                                size="sm"
+                                onClick={() => onViewModeChange('vision')}
+                                className={`text-xs h-8 px-3 rounded-md ${viewMode === 'vision' ? 'shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                            >
+                                Visão Geral
                             </Button>
                         </div>
                     )}

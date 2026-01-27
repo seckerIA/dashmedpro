@@ -1,0 +1,155 @@
+{
+  "node": {
+    "403c23b48482ceb29f5cdb63e6b194a0f17a9be4f6": {
+      "workers": {
+        "app/(dashboard)/agenda/page": {
+          "moduleId": 609231,
+          "async": false,
+          "exportedName": "getAppointments",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/agenda.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/agenda/page": "action-browser"
+      },
+      "exportedName": "getAppointments",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/agenda.ts"
+    },
+    "4023322abe3fc1d206e313464e232e5a5490097b8f": {
+      "workers": {
+        "app/(dashboard)/agenda/page": {
+          "moduleId": 609231,
+          "async": false,
+          "exportedName": "getMeetings",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/agenda.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/agenda/page": "action-browser"
+      },
+      "exportedName": "getMeetings",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/agenda.ts"
+    },
+    "60aae12293c515309327fe8f23675d4b2c049b883c": {
+      "workers": {
+        "app/(dashboard)/agenda/page": {
+          "moduleId": 609231,
+          "async": false,
+          "exportedName": "updateAppointment",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/agenda.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/agenda/page": "action-browser"
+      },
+      "exportedName": "updateAppointment",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/agenda.ts"
+    },
+    "6076304b8adca90fe2a22caa1d9acfa9b47d283342": {
+      "workers": {
+        "app/(dashboard)/agenda/page": {
+          "moduleId": 609231,
+          "async": false,
+          "exportedName": "updateMeeting",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/agenda.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/agenda/page": "action-browser"
+      },
+      "exportedName": "updateMeeting",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/agenda.ts"
+    },
+    "40ef73fbab409cf618015a9133052ea74054e63ff0": {
+      "workers": {
+        "app/(dashboard)/agenda/page": {
+          "moduleId": 609231,
+          "async": false,
+          "exportedName": "getContacts",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/crm.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/agenda/page": "action-browser"
+      },
+      "exportedName": "getContacts",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/crm.ts"
+    },
+    "7834561bb59e01582db798f1430660720837cdb2f7": {
+      "workers": {
+        "app/(dashboard)/agenda/page": {
+          "moduleId": 609231,
+          "async": false,
+          "exportedName": "checkAvailability",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/agenda.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/agenda/page": "action-browser"
+      },
+      "exportedName": "checkAvailability",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/agenda.ts"
+    },
+    "40f153f4ae03a121a129278d1ec8dd67af5108b372": {
+      "workers": {
+        "app/(dashboard)/agenda/page": {
+          "moduleId": 609231,
+          "async": false,
+          "exportedName": "createAppointment",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/agenda.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/agenda/page": "action-browser"
+      },
+      "exportedName": "createAppointment",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/agenda.ts"
+    },
+    "4072502de0cff476ddf93027a5932957ec20f210d8": {
+      "workers": {
+        "app/(dashboard)/agenda/page": {
+          "moduleId": 609231,
+          "async": false,
+          "exportedName": "createMeeting",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/agenda.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/agenda/page": "action-browser"
+      },
+      "exportedName": "createMeeting",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/agenda.ts"
+    },
+    "40b767c25a20ae0d6f24bb15d1bbcb0883b9e2d5c5": {
+      "workers": {
+        "app/(dashboard)/agenda/page": {
+          "moduleId": 609231,
+          "async": false,
+          "exportedName": "deleteAppointment",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/agenda.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/agenda/page": "action-browser"
+      },
+      "exportedName": "deleteAppointment",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/agenda.ts"
+    },
+    "407f50e663c1946dfed4981f3c9e91e9826f546139": {
+      "workers": {
+        "app/(dashboard)/agenda/page": {
+          "moduleId": 609231,
+          "async": false,
+          "exportedName": "deleteMeeting",
+          "filename": "dashmedpro-1/dashmed-nextjs/src/actions/agenda.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/agenda/page": "action-browser"
+      },
+      "exportedName": "deleteMeeting",
+      "filename": "dashmedpro-1/dashmed-nextjs/src/actions/agenda.ts"
+    }
+  },
+  "edge": {}
+}

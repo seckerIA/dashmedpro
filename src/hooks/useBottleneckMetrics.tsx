@@ -82,16 +82,8 @@ export function useBottleneckMetrics() {
       const last30Days = subDays(now, 30);
 
       // Fetch all data in parallel for better performance
-      const [
-        currentAppointments,
-        prevAppointments,
-        currentLeads,
-        prevLeads,
-        currentDeals,
-        prevDeals,
-        conversations,
-        callSessions,
-      ] = await Promise.all([
+      // Fetch all data in parallel for better performance but use allSettled to prevent one failure from crashing everything
+      const results = await Promise.allSettled([
         // Current month appointments
         supabaseQueryWithTimeout(
           supabase
@@ -118,7 +110,7 @@ export function useBottleneckMetrics() {
         supabaseQueryWithTimeout(
           supabase
             .from("commercial_leads")
-            .select("id, status, created_at")
+            .select("id, status, created_at, last_contact_at")
             .in("user_id", targetUserIds.length > 0 ? targetUserIds : [user.id])
             .gte("created_at", currentMonthStart.toISOString()) as any,
           30000,
@@ -139,7 +131,7 @@ export function useBottleneckMetrics() {
         supabaseQueryWithTimeout(
           supabase
             .from("crm_deals")
-            .select("id, stage, value, created_at, closed_at, updated_at")
+            .select("id, stage, value, created_at, closed_at, updated_at, is_defaulting, is_in_treatment")
             .in("user_id", targetUserIds.length > 0 ? targetUserIds : [user.id])
             .gte("created_at", last30Days.toISOString()) as any,
           30000,
@@ -166,7 +158,7 @@ export function useBottleneckMetrics() {
           30000,
           signal
         ),
-        // Call sessions
+        // Call sessions - Wrap in extra try/catch inside implementation if needed, but allSettled handles rejection
         supabaseQueryWithTimeout(
           supabase
             .from("voip_call_sessions" as any)
@@ -178,14 +170,24 @@ export function useBottleneckMetrics() {
         ),
       ]);
 
-      const appointments = (currentAppointments.data || []) as any[];
-      const prevAppts = (prevAppointments.data || []) as any[];
-      const leads = (currentLeads.data || []) as any[];
-      const prevLeadsData = (prevLeads.data || []) as any[];
-      const deals = (currentDeals.data || []) as any[];
-      const prevDealsData = (prevDeals.data || []) as any[];
-      const convos = (conversations.data || []) as any[];
-      const calls = (callSessions.data || []) as any[];
+      // Helper to extract data or return empty array
+      const getData = (index: number) => {
+        const result = results[index];
+        if (result.status === 'fulfilled') {
+          return result.value.data || [];
+        }
+        console.warn(`Failed to fetch data for index ${index}:`, result.reason);
+        return [];
+      };
+
+      const appointments = getData(0) as any[];
+      const prevAppts = getData(1) as any[];
+      const leads = getData(2) as any[];
+      const prevLeadsData = getData(3) as any[];
+      const deals = getData(4) as any[];
+      const prevDealsData = getData(5) as any[];
+      const convos = getData(6) as any[];
+      const calls = getData(7) as any[];
 
       // =============================================
       // 1. TAXA DE COMPARECIMENTO (No-Show Analysis)

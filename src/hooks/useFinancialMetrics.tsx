@@ -65,11 +65,11 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
 
       const monthRevenue = transactionsData
         .filter(t => t.type === "entrada")
-        .reduce((sum, t) => sum + t.amount, 0);
+        .reduce((sum, t) => sum + (t.amount || 0), 0);
 
       const monthExpenses = transactionsData
         .filter(t => t.type === "saida")
-        .reduce((sum, t) => sum + t.amount, 0);
+        .reduce((sum, t) => sum + (t.amount || 0), 0);
 
       // Calcular custos totais (apenas de entradas)
       const monthTotalCosts = transactionsData
@@ -144,8 +144,8 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
         const { data } = queryResult;
         const transactionsData = (data || []) as Array<{ type: string; amount: number }>;
 
-        const receitas = transactionsData.filter(t => t.type === "entrada").reduce((sum, t) => sum + t.amount, 0);
-        const despesas = transactionsData.filter(t => t.type === "saida").reduce((sum, t) => sum + t.amount, 0);
+        const receitas = transactionsData.filter(t => t.type === "entrada").reduce((sum, t) => sum + (t.amount || 0), 0);
+        const despesas = transactionsData.filter(t => t.type === "saida").reduce((sum, t) => sum + (t.amount || 0), 0);
 
         monthlyResults.push({
           month: format(monthDate, "MMM"),
@@ -208,7 +208,7 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
           };
         }
 
-        acc[categoryName].value += transaction.amount;
+        acc[categoryName].value += (transaction.amount || 0);
         return acc;
       }, {} as Record<string, CategoryExpense>);
 
