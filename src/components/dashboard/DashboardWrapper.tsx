@@ -12,8 +12,9 @@ export function DashboardWrapper() {
     const [currentView, setCurrentView] = useState<DashboardView>('daily');
 
     const handleViewChange = (mode: string) => {
-        // Safe cast as we know the modes match
-        setCurrentView(mode as DashboardView);
+        // Normalize 'vision' to 'general' since VisionDashboard uses 'vision' internally
+        const normalizedMode = mode === 'vision' ? 'general' : mode;
+        setCurrentView(normalizedMode as DashboardView);
     };
 
     return (
@@ -42,7 +43,7 @@ export function DashboardWrapper() {
                         <VisionDashboard
                             viewMode="vision" // vision maps to general view in old component
                             // @ts-ignore
-                            onViewModeChange={(mode) => handleViewChange(mode === 'vision' ? 'general' : mode)}
+                            onViewModeChange={(mode) => handleViewChange(mode)}
                         />
                     </div>
                 )}

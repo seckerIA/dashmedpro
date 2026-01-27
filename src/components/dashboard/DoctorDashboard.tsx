@@ -49,15 +49,6 @@ export function DoctorDashboard({ viewMode, onViewModeChange }: DoctorDashboardP
                                 Dia a Dia
                             </Button>
                             <Button
-                                variant={viewMode === 'detailed' ? 'default' : 'ghost'}
-                                size="sm"
-                                onClick={() => onViewModeChange('detailed')}
-                                className={`text-xs h-8 px-3 rounded-lg ${viewMode === 'detailed' ? 'shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-                            >
-                                <Activity className="w-3.5 h-3.5 mr-2" />
-                                Detalhada
-                            </Button>
-                            <Button
                                 variant={viewMode === 'general' ? 'default' : 'ghost'}
                                 size="sm"
                                 onClick={() => onViewModeChange('general')}
@@ -65,6 +56,15 @@ export function DoctorDashboard({ viewMode, onViewModeChange }: DoctorDashboardP
                             >
                                 <BarChart2 className="w-3.5 h-3.5 mr-2" />
                                 Visão Geral
+                            </Button>
+                            <Button
+                                variant={viewMode === 'detailed' ? 'default' : 'ghost'}
+                                size="sm"
+                                onClick={() => onViewModeChange('detailed')}
+                                className={`text-xs h-8 px-3 rounded-lg ${viewMode === 'detailed' ? 'shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                            >
+                                <Activity className="w-3.5 h-3.5 mr-2" />
+                                Detalhada
                             </Button>
                         </div>
                     )}

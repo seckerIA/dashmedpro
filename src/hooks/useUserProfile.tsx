@@ -16,6 +16,7 @@ interface Profile {
   invited_by: string | null;
   doctor_id: string | null;
   organization_id: string | null;
+  enable_agenda_alerts: boolean | null;
 }
 
 export function useUserProfile() {
@@ -29,6 +30,7 @@ export function useUserProfile() {
 
       try {
         // Buscar perfil com timeout de 15s
+        // Nota: enable_agenda_alerts pode não existir se a migration não foi executada
         const profileQuery = supabase
           .from('profiles')
           .select('id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by, doctor_id, organization_id')
@@ -73,14 +75,14 @@ export function useUserProfile() {
               if (minimalError && minimalError.code !== 'PGRST116') {
                 throw minimalError;
               }
-              // Adicionar doctor_id como undefined se não existir
-              const result = { ...(minimalData as any), doctor_id: undefined };
+              // Adicionar campos faltantes com defaults
+              const result = { ...(minimalData as any), doctor_id: undefined, enable_agenda_alerts: true };
               // Salvar no cache
               cacheSet(cacheKey, result, CacheTTL.MEDIUM).catch(() => { });
               return result;
             }
-            // Adicionar doctor_id como undefined se não existir
-            const result = { ...(basicData as any), doctor_id: undefined };
+            // Adicionar campos faltantes com defaults
+            const result = { ...(basicData as any), doctor_id: undefined, enable_agenda_alerts: true };
             // Salvar no cache
             cacheSet(cacheKey, result, CacheTTL.MEDIUM).catch(() => { });
             return result;
@@ -92,8 +94,29 @@ export function useUserProfile() {
           throw new Error('Profile not found');
         }
 
-        console.log('useUserProfile - Profile carregado com sucesso:', profileData);
-        return profileData as Profile;
+        // Tentar buscar enable_agenda_alerts separadamente (pode não existir se migration não foi executada)
+        let enableAgendaAlerts: boolean | null = true; // default true
+        try {
+          const { data: alertsData, error: alertsError } = await supabase
+            .from('profiles')
+            .select('enable_agenda_alerts')
+            .eq('id', user.id)
+            .single();
+
+          if (!alertsError && alertsData && 'enable_agenda_alerts' in alertsData) {
+            enableAgendaAlerts = (alertsData as any).enable_agenda_alerts ?? true;
+          } else if (alertsError) {
+            // Coluna não existe ainda, usar default
+            console.log('useUserProfile - enable_agenda_alerts column not found, using default true');
+          }
+        } catch {
+          // Erro inesperado, usar default
+          console.log('useUserProfile - enable_agenda_alerts fetch failed, using default true');
+        }
+
+        const result = { ...profileData, enable_agenda_alerts: enableAgendaAlerts } as Profile;
+        console.log('useUserProfile - Profile carregado com sucesso:', result);
+        return result;
 
       } catch (err: any) {
         console.error('useUserProfile - Erro:', err);

@@ -20,6 +20,8 @@ import { OverdueAppointmentsList } from "@/components/shared/OverdueAppointments
 import { AlertTriangle } from "lucide-react"
 import { GlobalSearch } from "@/components/crm/GlobalSearch"
 import { CortanaButtonCompact } from "@/components/cortana"
+import { useAppointmentAlerts } from "@/hooks/useAppointmentAlerts"
+import { AppointmentAlertModal } from "@/components/alerts/AppointmentAlertModal"
 
 interface AppLayoutProps {
   children: ReactNode
@@ -32,6 +34,13 @@ export function AppLayout({ children, hideSidebar = false }: AppLayoutProps) {
   const sidebarRef = useRef<ImperativePanelHandle>(null)
   const { profile } = useUserProfile()
   const { hasOverdue, overdueCount } = useOverdueAppointments()
+  const {
+    currentAlert,
+    hasAlert,
+    minutesUntilAppointment,
+    dismissAlert,
+    openMedicalRecord,
+  } = useAppointmentAlerts()
   const displayName = profile?.full_name || profile?.email || 'Usuário'
   const displayRole = profile?.role || 'vendedor'
 
@@ -191,6 +200,16 @@ export function AppLayout({ children, hideSidebar = false }: AppLayoutProps) {
 
       {/* Modal de consultas pendentes */}
       <OverdueAppointmentsList open={showOverdueList} onOpenChange={setShowOverdueList} />
+
+      {/* Modal de alerta de consulta proxima */}
+      {hasAlert && currentAlert && (
+        <AppointmentAlertModal
+          appointment={currentAlert}
+          minutesUntil={minutesUntilAppointment}
+          onDismiss={dismissAlert}
+          onOpenRecord={() => openMedicalRecord(currentAlert)}
+        />
+      )}
     </>
   )
 }

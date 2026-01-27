@@ -62,20 +62,20 @@ export default function VisionDashboard({ viewMode, onViewModeChange }: ViewMode
                                 Dia a Dia
                             </Button>
                             <Button
-                                variant={viewMode === 'detailed' ? 'default' : 'ghost'}
-                                size="sm"
-                                onClick={() => onViewModeChange('detailed')}
-                                className={`text-xs h-8 px-3 rounded-lg ${viewMode === 'detailed' ? 'shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-                            >
-                                Detalhada
-                            </Button>
-                            <Button
                                 variant={viewMode === 'vision' ? 'default' : 'ghost'}
                                 size="sm"
                                 onClick={() => onViewModeChange('vision')}
                                 className={`text-xs h-8 px-3 rounded-lg ${viewMode === 'vision' ? 'shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                             >
                                 Visão Geral
+                            </Button>
+                            <Button
+                                variant={viewMode === 'detailed' ? 'default' : 'ghost'}
+                                size="sm"
+                                onClick={() => onViewModeChange('detailed')}
+                                className={`text-xs h-8 px-3 rounded-lg ${viewMode === 'detailed' ? 'shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                            >
+                                Detalhada
                             </Button>
                         </div>
                     )}

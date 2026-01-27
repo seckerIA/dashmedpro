@@ -63,6 +63,17 @@ export function useBottleneckMetrics() {
       : [user.id]
     : [];
 
+  // Helper to apply correct filter: .eq() for single value, .in() for multiple
+  const applyUserFilter = <T extends { eq: (col: string, val: string) => T; in: (col: string, vals: string[]) => T }>(
+    query: T,
+    userIds: string[]
+  ): T => {
+    if (userIds.length === 1) {
+      return query.eq("user_id", userIds[0]);
+    }
+    return query.in("user_id", userIds);
+  };
+
   return useQuery({
     queryKey: ["bottleneck-metrics-v2", user?.id, targetUserIds],
     queryFn: async ({ signal }): Promise<BottleneckAnalysis> => {
@@ -82,14 +93,18 @@ export function useBottleneckMetrics() {
       const last30Days = subDays(now, 30);
 
       // Fetch all data in parallel for better performance
-      // Fetch all data in parallel for better performance but use allSettled to prevent one failure from crashing everything
+      // Use allSettled to prevent one failure from crashing everything
+      const userIds = targetUserIds.length > 0 ? targetUserIds : [user.id];
+
       const results = await Promise.allSettled([
         // Current month appointments
         supabaseQueryWithTimeout(
-          supabase
-            .from("medical_appointments")
-            .select("id, status, start_time, created_at, contact_id")
-            .in("user_id", targetUserIds.length > 0 ? targetUserIds : [user.id])
+          applyUserFilter(
+            supabase
+              .from("medical_appointments")
+              .select("id, status, start_time, created_at, contact_id"),
+            userIds
+          )
             .gte("start_time", currentMonthStart.toISOString())
             .lte("start_time", currentMonthEnd.toISOString()) as any,
           30000,
@@ -97,31 +112,38 @@ export function useBottleneckMetrics() {
         ),
         // Previous month appointments
         supabaseQueryWithTimeout(
-          supabase
-            .from("medical_appointments")
-            .select("id, status")
-            .in("user_id", targetUserIds.length > 0 ? targetUserIds : [user.id])
+          applyUserFilter(
+            supabase
+              .from("medical_appointments")
+              .select("id, status"),
+            userIds
+          )
             .gte("start_time", prevMonthStart.toISOString())
             .lte("start_time", prevMonthEnd.toISOString()) as any,
           30000,
           signal
         ),
         // Current month leads
+        // Note: last_contact_at does NOT exist in commercial_leads table, only in crm_contacts
         supabaseQueryWithTimeout(
-          supabase
-            .from("commercial_leads")
-            .select("id, status, created_at, last_contact_at")
-            .in("user_id", targetUserIds.length > 0 ? targetUserIds : [user.id])
+          applyUserFilter(
+            supabase
+              .from("commercial_leads")
+              .select("id, status, created_at"),
+            userIds
+          )
             .gte("created_at", currentMonthStart.toISOString()) as any,
           30000,
           signal
         ),
         // Previous month leads
         supabaseQueryWithTimeout(
-          supabase
-            .from("commercial_leads")
-            .select("id, status")
-            .in("user_id", targetUserIds.length > 0 ? targetUserIds : [user.id])
+          applyUserFilter(
+            supabase
+              .from("commercial_leads")
+              .select("id, status"),
+            userIds
+          )
             .gte("created_at", prevMonthStart.toISOString())
             .lte("created_at", prevMonthEnd.toISOString()) as any,
           30000,
@@ -129,20 +151,24 @@ export function useBottleneckMetrics() {
         ),
         // Current deals
         supabaseQueryWithTimeout(
-          supabase
-            .from("crm_deals")
-            .select("id, stage, value, created_at, closed_at, updated_at, is_defaulting, is_in_treatment")
-            .in("user_id", targetUserIds.length > 0 ? targetUserIds : [user.id])
+          applyUserFilter(
+            supabase
+              .from("crm_deals")
+              .select("id, stage, value, created_at, closed_at, updated_at, is_defaulting, is_in_treatment"),
+            userIds
+          )
             .gte("created_at", last30Days.toISOString()) as any,
           30000,
           signal
         ),
         // Previous period deals
         supabaseQueryWithTimeout(
-          supabase
-            .from("crm_deals")
-            .select("id, stage, created_at, closed_at")
-            .in("user_id", targetUserIds.length > 0 ? targetUserIds : [user.id])
+          applyUserFilter(
+            supabase
+              .from("crm_deals")
+              .select("id, stage, created_at, closed_at"),
+            userIds
+          )
             .gte("created_at", subDays(now, 60).toISOString())
             .lt("created_at", last30Days.toISOString()) as any,
           30000,
@@ -150,20 +176,24 @@ export function useBottleneckMetrics() {
         ),
         // WhatsApp conversations for response time
         supabaseQueryWithTimeout(
-          supabase
-            .from("whatsapp_conversations")
-            .select("id, last_message_at, status, created_at")
-            .in("user_id", targetUserIds.length > 0 ? targetUserIds : [user.id])
+          applyUserFilter(
+            supabase
+              .from("whatsapp_conversations")
+              .select("id, last_message_at, status, created_at"),
+            userIds
+          )
             .gte("created_at", last7Days.toISOString()) as any,
           30000,
           signal
         ),
         // Call sessions - Wrap in extra try/catch inside implementation if needed, but allSettled handles rejection
         supabaseQueryWithTimeout(
-          supabase
-            .from("voip_call_sessions" as any)
-            .select("id, status, duration_seconds, direction, initiated_at")
-            .in("user_id", targetUserIds.length > 0 ? targetUserIds : [user.id])
+          applyUserFilter(
+            supabase
+              .from("voip_call_sessions" as any)
+              .select("id, status, duration_seconds, direction, initiated_at"),
+            userIds
+          )
             .gte("initiated_at", last7Days.toISOString()) as any,
           30000,
           signal

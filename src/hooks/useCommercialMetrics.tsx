@@ -131,6 +131,18 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
     return [user.id];
   }, [user?.id, isAdmin, isSecretaria, doctorIds, allActiveUserIds, viewAsUserIds]);
 
+  // Helper to apply correct filter: .eq() for single value, .in() for multiple
+  // PostgREST requires multiple values for .in() filter, single value causes 400 error
+  const applyUserFilter = <T extends { eq: (col: string, val: string) => T; in: (col: string, vals: string[]) => T }>(
+    query: T,
+    userIds: string[]
+  ): T => {
+    if (userIds.length === 1) {
+      return query.eq("user_id", userIds[0]);
+    }
+    return query.in("user_id", userIds);
+  };
+
   const queryResult = useQuery({
     queryKey: [
       "commercial-metrics",
@@ -149,23 +161,25 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       const prevEndISO = previousPeriod.end.toISOString();
 
       // 1. Buscar consultas médicas com transações financeiras
-      const appointmentsQuery = supabase
-        .from("medical_appointments" as any)
-        .select(`
-          id,
-          title,
-          appointment_type,
-          status,
-          start_time,
-          end_time,
-          duration_minutes,
-          estimated_value,
-          financial_transaction_id,
-          completed_at,
-          contact_id,
-          contact:crm_contacts!medical_appointments_contact_id_fkey(id, full_name)
-        `)
-        .in("user_id", targetUserIds)
+      const appointmentsQuery = applyUserFilter(
+        supabase
+          .from("medical_appointments" as any)
+          .select(`
+            id,
+            title,
+            appointment_type,
+            status,
+            start_time,
+            end_time,
+            duration_minutes,
+            estimated_value,
+            financial_transaction_id,
+            completed_at,
+            contact_id,
+            contact:crm_contacts!medical_appointments_contact_id_fkey(id, full_name)
+          `),
+        targetUserIds
+      )
         .gte("start_time", periodStartISO)
         .lte("start_time", periodEndISO);
 
@@ -173,20 +187,22 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       // 1-4. Executar queries independentes em paralelo
 
       // 2. Definir query de transações
-      const transactionsQuery = supabase
-        .from("financial_transactions")
-        .select(`
-          id,
-          amount,
-          type,
-          total_costs,
-          has_costs,
-          transaction_date,
-          contact_id,
-          description,
-          metadata
-        `)
-        .in("user_id", targetUserIds)
+      const transactionsQuery = applyUserFilter(
+        supabase
+          .from("financial_transactions")
+          .select(`
+            id,
+            amount,
+            type,
+            total_costs,
+            has_costs,
+            transaction_date,
+            contact_id,
+            description,
+            metadata
+          `),
+        targetUserIds
+      )
         .eq("type", "entrada")
         .eq("status", "concluida")
         .gte("transaction_date", format(period.start, "yyyy-MM-dd"))
@@ -205,10 +221,12 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         supabaseQueryWithTimeout(transactionsQuery as any, 25000, signal),
         // 3. Leads
         supabaseQueryWithTimeout(
-          supabase
-            .from("commercial_leads")
-            .select("*")
-            .in("user_id", targetUserIds)
+          applyUserFilter(
+            supabase
+              .from("commercial_leads")
+              .select("*"),
+            targetUserIds
+          )
             .gte("created_at", periodStartISO)
             .lte("created_at", periodEndISO) as any,
           25000,
@@ -216,10 +234,12 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         ),
         // 4. Campaigns
         supabaseQueryWithTimeout(
-          supabase
-            .from("commercial_campaigns")
-            .select("*")
-            .in("user_id", targetUserIds) as any,
+          applyUserFilter(
+            supabase
+              .from("commercial_campaigns")
+              .select("*"),
+            targetUserIds
+          ) as any,
           25000,
           signal
         )
@@ -276,10 +296,12 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       ] = await Promise.all([
         // 6. Buscar vendas comerciais
         supabaseQueryWithTimeout(
-          supabase
-            .from("commercial_sales")
-            .select("*")
-            .in("user_id", targetUserIds)
+          applyUserFilter(
+            supabase
+              .from("commercial_sales")
+              .select("*"),
+            targetUserIds
+          )
             .gte("sale_date", format(period.start, "yyyy-MM-dd"))
             .lte("sale_date", format(period.end, "yyyy-MM-dd")) as any,
           25000,
@@ -288,18 +310,20 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
 
         // 7. Buscar deals do CRM
         supabaseQueryWithTimeout(
-          supabase
-            .from("crm_deals")
-            .select(`
-              id,
-              title,
-              stage,
-              value,
-              created_at,
-              closed_at,
-              contact_id
-            `)
-            .in("user_id", targetUserIds)
+          applyUserFilter(
+            supabase
+              .from("crm_deals")
+              .select(`
+                id,
+                title,
+                stage,
+                value,
+                created_at,
+                closed_at,
+                contact_id
+              `),
+            targetUserIds
+          )
             .gte("created_at", periodStartISO)
             .lte("created_at", periodEndISO) as any,
           25000,
@@ -308,10 +332,12 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
 
         // 8a. Buscar transações do período anterior
         supabaseQueryWithTimeout(
-          supabase
-            .from("financial_transactions")
-            .select("amount, type, total_costs")
-            .in("user_id", targetUserIds)
+          applyUserFilter(
+            supabase
+              .from("financial_transactions")
+              .select("amount, type, total_costs"),
+            targetUserIds
+          )
             .eq("type", "entrada")
             .eq("status", "concluida")
             .gte("transaction_date", format(previousPeriod.start, "yyyy-MM-dd"))
@@ -322,10 +348,12 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
 
         // 8b. Buscar appointments do período anterior
         supabaseQueryWithTimeout(
-          supabase
-            .from("medical_appointments")
-            .select("id")
-            .in("user_id", targetUserIds)
+          applyUserFilter(
+            supabase
+              .from("medical_appointments")
+              .select("id"),
+            targetUserIds
+          )
             .gte("start_time", prevStartISO)
             .lte("start_time", prevEndISO) as any,
           25000,
@@ -561,11 +589,12 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         : 0;
 
       // Buscar procedimentos do catálogo (total de procedimentos ativos cadastrados) - MOVER PARA ANTES DO LOG
-      const proceduresQuery = supabase
-        .from("commercial_procedures")
-        .select("id, name")
-        .in("user_id", targetUserIds)
-        .eq("is_active", true);
+      const proceduresQuery = applyUserFilter(
+        supabase
+          .from("commercial_procedures")
+          .select("id, name"),
+        targetUserIds
+      ).eq("is_active", true);
 
       const proceduresResult = await supabaseQueryWithTimeout(proceduresQuery as any, 25000, signal);
       const { data: procedures, error: proceduresError } = proceduresResult as { data: any[], error: any };
@@ -651,10 +680,12 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         : 0;
 
       // Calcular pacientes novos (contatos criados no período)
-      const newContactsQuery = supabase
-        .from("crm_contacts")
-        .select("id")
-        .in("user_id", targetUserIds)
+      const newContactsQuery = applyUserFilter(
+        supabase
+          .from("crm_contacts")
+          .select("id"),
+        targetUserIds
+      )
         .gte("created_at", periodStartISO)
         .lte("created_at", periodEndISO);
 

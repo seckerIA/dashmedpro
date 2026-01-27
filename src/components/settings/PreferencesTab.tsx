@@ -4,15 +4,69 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { useTheme } from 'next-themes';
-import { Palette, Bell, Moon, Sun, Monitor } from 'lucide-react';
+import { Palette, Bell, Moon, Sun, Monitor, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import { useAuth } from '@/hooks/useAuth';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { cacheDelete, CacheKeys } from '@/lib/cache';
 
 const PreferencesTab = () => {
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { profile } = useUserProfile();
+  const queryClient = useQueryClient();
   const [mounted, setMounted] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(false);
+
+  // Mutation to update user preferences
+  const updatePreferenceMutation = useMutation({
+    mutationFn: async (preferences: { enable_agenda_alerts?: boolean }) => {
+      if (!user?.id) throw new Error('User not authenticated');
+
+      const { error } = await supabase
+        .from('profiles')
+        .update(preferences)
+        .eq('id', user.id);
+
+      if (error) throw error;
+      return preferences;
+    },
+    onSuccess: async () => {
+      // Invalidate caches
+      if (user?.id) {
+        await cacheDelete(CacheKeys.userProfile(user.id));
+      }
+      queryClient.invalidateQueries({ queryKey: ['user-profile'] });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao atualizar preferencias',
+        description: error.message || 'Tente novamente.',
+      });
+    },
+  });
+
+  // Handler for agenda alerts toggle
+  const handleAgendaAlertsChange = (checked: boolean) => {
+    updatePreferenceMutation.mutate(
+      { enable_agenda_alerts: checked },
+      {
+        onSuccess: () => {
+          toast({
+            title: checked ? 'Alertas de agenda ativados' : 'Alertas de agenda desativados',
+            description: checked
+              ? 'Voce recebera lembretes 10 minutos antes das consultas.'
+              : 'Voce nao recebera mais lembretes de consultas.',
+          });
+        },
+      }
+    );
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -142,6 +196,24 @@ const PreferencesTab = () => {
                 id="push-notifications"
                 checked={pushNotifications}
                 onCheckedChange={handlePushNotificationsChange}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="agenda-alerts" className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-primary" />
+                  Alertas de Agenda
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Receba lembretes 10 minutos antes das consultas
+                </p>
+              </div>
+              <Switch
+                id="agenda-alerts"
+                checked={profile?.enable_agenda_alerts ?? true}
+                onCheckedChange={handleAgendaAlertsChange}
+                disabled={updatePreferenceMutation.isPending}
               />
             </div>
           </div>
