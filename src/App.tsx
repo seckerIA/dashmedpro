@@ -59,6 +59,7 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
+import AuthCallback from "./pages/AuthCallback";
 import TeamManagement from "./pages/TeamManagement";
 import Procedimentos from "./pages/Procedimentos";
 import Tasks from "./pages/Tasks";
@@ -445,6 +446,7 @@ const AppRoutes = () => {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );

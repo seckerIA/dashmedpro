@@ -153,7 +153,7 @@ if (typeof window !== 'undefined' && (window as any)[SUPABASE_CLIENT_KEY]) {
       persistSession: true,
       autoRefreshToken: true,
       storageKey: AUTH_STORAGE_KEY,
-      detectSessionInUrl: false,
+      detectSessionInUrl: true, // Habilitar para OAuth (Google, etc.)
       flowType: 'pkce',
     },
     global: {
@@ -425,7 +425,7 @@ export async function resetSupabaseClient(): Promise<typeof supabase> {
         persistSession: true,
         autoRefreshToken: true,
         storageKey: AUTH_STORAGE_KEY,
-        detectSessionInUrl: false,
+        detectSessionInUrl: true, // Habilitar para OAuth (Google, etc.)
         flowType: 'pkce',
       },
       global: {
