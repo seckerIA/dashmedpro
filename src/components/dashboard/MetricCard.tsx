@@ -2,6 +2,9 @@ import { LucideIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { CardVariant } from '@/lib/design-tokens';
+import { AnimatedNumber, AnimatedCurrency } from '@/components/ui/animated-number';
+
+type SemanticVariant = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
 
 interface MetricCardProps {
   title: string;
@@ -15,7 +18,46 @@ interface MetricCardProps {
   illustration?: string;
   className?: string;
   onClick?: () => void;
+  /** Semantic color based on meaning (success, warning, danger, info) */
+  semantic?: SemanticVariant;
+  /** Format for numeric values */
+  format?: 'number' | 'currency' | 'percentage' | 'text';
+  /** Animate the value (only works when format is not 'text') */
+  animate?: boolean;
 }
+
+// Semantic color mappings
+const semanticColors: Record<SemanticVariant, {
+  gradient: string;
+  iconColor: string;
+  borderAccent: string;
+}> = {
+  success: {
+    gradient: 'from-emerald-50/30 via-emerald-50/15 to-emerald-50/30 dark:from-emerald-900/20 dark:via-emerald-900/10 dark:to-emerald-900/20',
+    iconColor: 'text-emerald-600 dark:text-emerald-400',
+    borderAccent: 'from-emerald-400/30 to-emerald-500/30 dark:from-emerald-600/30 dark:to-emerald-500/30',
+  },
+  warning: {
+    gradient: 'from-amber-50/30 via-amber-50/15 to-amber-50/30 dark:from-amber-900/20 dark:via-amber-900/10 dark:to-amber-900/20',
+    iconColor: 'text-amber-600 dark:text-amber-400',
+    borderAccent: 'from-amber-400/30 to-amber-500/30 dark:from-amber-600/30 dark:to-amber-500/30',
+  },
+  danger: {
+    gradient: 'from-red-50/30 via-red-50/15 to-red-50/30 dark:from-red-900/20 dark:via-red-900/10 dark:to-red-900/20',
+    iconColor: 'text-red-600 dark:text-red-400',
+    borderAccent: 'from-red-400/30 to-red-500/30 dark:from-red-600/30 dark:to-red-500/30',
+  },
+  info: {
+    gradient: 'from-blue-50/30 via-blue-50/15 to-blue-50/30 dark:from-blue-900/20 dark:via-blue-900/10 dark:to-blue-900/20',
+    iconColor: 'text-blue-600 dark:text-blue-400',
+    borderAccent: 'from-blue-400/30 to-blue-500/30 dark:from-blue-600/30 dark:to-blue-500/30',
+  },
+  neutral: {
+    gradient: 'from-slate-50/30 via-slate-50/15 to-slate-50/30 dark:from-slate-900/20 dark:via-slate-900/10 dark:to-slate-900/20',
+    iconColor: 'text-slate-600 dark:text-slate-400',
+    borderAccent: 'from-slate-400/30 to-slate-500/30 dark:from-slate-600/30 dark:to-slate-500/30',
+  },
+};
 
 // Simplified to 2 alternating neutral color schemes
 const getVariantColors = (variant: CardVariant) => {
@@ -50,9 +92,32 @@ export function MetricCard({
   illustration,
   className,
   onClick,
+  semantic,
+  format = 'text',
+  animate = true,
 }: MetricCardProps) {
   const isPositive = trend && trend.value >= 0;
-  const colors = getVariantColors(variant);
+  // Use semantic colors if provided, otherwise fall back to variant colors
+  const colors = semantic ? semanticColors[semantic] : getVariantColors(variant);
+
+  // Render value based on format
+  const renderValue = () => {
+    if (typeof value === 'string' || format === 'text' || !animate) {
+      return value;
+    }
+
+    const numValue = typeof value === 'number' ? value : parseFloat(String(value));
+
+    switch (format) {
+      case 'currency':
+        return <AnimatedCurrency value={numValue} duration={1.2} />;
+      case 'percentage':
+        return <AnimatedNumber value={numValue} format={(n) => `${n.toFixed(1)}%`} duration={1} />;
+      case 'number':
+      default:
+        return <AnimatedNumber value={numValue} duration={1} />;
+    }
+  };
 
   const Component = onClick ? motion.button : motion.div;
   const componentProps = onClick ? {
@@ -95,7 +160,7 @@ export function MetricCard({
           className="text-xl sm:text-2xl lg:text-3xl font-semibold mb-2 sm:mb-3 text-foreground truncate"
           title={value.toString()}
         >
-          {value}
+          {renderValue()}
         </h3>
 
         {/* Trend */}

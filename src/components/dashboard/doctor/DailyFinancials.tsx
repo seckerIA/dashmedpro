@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { DollarSign, TrendingUp, TrendingDown, ArrowRight, CreditCard, AlertCircle } from "lucide-react";
 import { useFinancialMetrics } from "@/hooks/useFinancialMetrics"; // Assuming this exists or use a generic hook
 import { formatCurrency } from "@/lib/currency"; // Assuming utility exists
-import { Skeleton } from "@/components/ui/skeleton";
+import { SkeletonShimmer } from "@/components/ui/skeleton-shimmer";
+import { AnimatedCurrency, AnimatedNumber } from "@/components/ui/animated-number";
 import { useNavigate } from "react-router-dom";
 
 export function DailyFinancials() {
@@ -18,7 +19,19 @@ export function DailyFinancials() {
     const pendingPayments = 2;
 
     if (isLoading) {
-        return <Skeleton className="w-full h-32" />;
+        return (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {Array.from({ length: 3 }).map((_, i) => (
+                    <Card key={i} className="p-5">
+                        <div className="space-y-3">
+                            <SkeletonShimmer className="h-3 w-24" />
+                            <SkeletonShimmer className="h-8 w-32" />
+                            <SkeletonShimmer className="h-2 w-16" />
+                        </div>
+                    </Card>
+                ))}
+            </div>
+        );
     }
 
     return (
@@ -32,7 +45,9 @@ export function DailyFinancials() {
                     <div className="space-y-1">
                         <p className="text-xs font-medium text-emerald-600/80 uppercase tracking-wider">Faturamento Hoje</p>
                         <div className="flex items-baseline gap-2">
-                            <span className="text-2xl font-bold text-foreground">{formatCurrency(todayRevenue)}</span>
+                            <span className="text-2xl font-bold text-foreground">
+                                <AnimatedCurrency value={todayRevenue} duration={1.2} />
+                            </span>
                             <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] h-5 px-1.5 gap-0.5">
                                 <TrendingUp className="w-2.5 h-2.5" /> +12%
                             </Badge>
@@ -52,8 +67,10 @@ export function DailyFinancials() {
                         <div className="space-y-1">
                             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Sinais Pendentes</p>
                             <div className="flex items-baseline gap-2">
-                                <span className="text-2xl font-bold text-foreground">{pendingPayments}</span>
-                                <span className="text-xs text-muted-foreground">aguardando liberação</span>
+                                <span className="text-2xl font-bold text-foreground">
+                                    <AnimatedNumber value={pendingPayments} duration={0.8} />
+                                </span>
+                                <span className="text-xs text-muted-foreground">aguardando liberacao</span>
                             </div>
                         </div>
                         <div className="bg-orange-500/10 p-2 rounded-lg text-orange-600">
@@ -76,7 +93,9 @@ export function DailyFinancials() {
                         <div className="space-y-1">
                             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Acumulado Semana</p>
                             <div className="flex items-baseline gap-2">
-                                <span className="text-2xl font-bold text-foreground">{formatCurrency(weekRevenue)}</span>
+                                <span className="text-2xl font-bold text-foreground">
+                                    <AnimatedCurrency value={weekRevenue} duration={1.5} delay={0.3} />
+                                </span>
                             </div>
                         </div>
                         <div className="bg-blue-500/10 p-2 rounded-lg text-blue-600">

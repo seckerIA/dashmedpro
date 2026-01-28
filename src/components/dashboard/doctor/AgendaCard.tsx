@@ -13,6 +13,12 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { PatientQuickView } from "./PatientQuickView";
@@ -61,6 +67,19 @@ export function AgendaCard({ appointment, onStatusChange }: AgendaCardProps) {
         }
     };
 
+    const getStatusDescription = (status: string) => {
+        switch (status) {
+            case 'agendado': return 'Consulta agendada, aguardando confirmação do paciente';
+            case 'confirmed': return 'Paciente confirmou presenca';
+            case 'in_progress': return 'Atendimento em andamento';
+            case 'completed': return 'Consulta finalizada com sucesso';
+            case 'cancelled': return 'Consulta foi cancelada';
+            case 'no_show': return 'Paciente nao compareceu';
+            case 'bloqueado': return 'Horario bloqueado na agenda';
+            default: return 'Status da consulta';
+        }
+    };
+
     return (
         <>
             <Card
@@ -76,9 +95,18 @@ export function AgendaCard({ appointment, onStatusChange }: AgendaCardProps) {
                                 {format(new Date(appointment.start_time), 'HH:mm')}
                             </div>
                             <div className="flex items-center gap-1.5">
-                                <Badge variant="outline" className={cn("text-[10px] h-5 px-1.5 uppercase tracking-wider font-semibold", getStatusColor(appointment.status))}>
-                                    {getStatusLabel(appointment.status)}
-                                </Badge>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Badge variant="outline" className={cn("text-[10px] h-5 px-1.5 uppercase tracking-wider font-semibold cursor-help", getStatusColor(appointment.status))}>
+                                                {getStatusLabel(appointment.status)}
+                                            </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p className="text-xs">{getStatusDescription(appointment.status)}</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
                             </div>
                         </div>
 

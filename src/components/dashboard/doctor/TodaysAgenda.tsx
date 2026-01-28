@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { SkeletonShimmer } from "@/components/ui/skeleton-shimmer";
 import { Plus, CalendarX2 } from "lucide-react";
 import { useMedicalAppointments } from "@/hooks/useMedicalAppointments";
 import { AgendaCard } from "./AgendaCard";
@@ -39,9 +39,26 @@ export function TodaysAgenda() {
     if (isLoading) {
         return (
             <div className="space-y-4">
-                <Skeleton className="h-[100px] w-full rounded-xl" />
-                <Skeleton className="h-[100px] w-full rounded-xl" />
-                <Skeleton className="h-[100px] w-full rounded-xl" />
+                <div className="flex items-center justify-between mb-2">
+                    <SkeletonShimmer className="h-6 w-40" />
+                    <SkeletonShimmer className="h-5 w-8 rounded-full" />
+                </div>
+                {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="flex gap-4 p-4 rounded-xl border border-border/50 bg-card/50">
+                        <div className="flex flex-col items-start gap-1 min-w-[80px] border-r border-border/50 pr-4">
+                            <SkeletonShimmer className="h-6 w-14" />
+                            <SkeletonShimmer className="h-5 w-16 rounded-full" />
+                        </div>
+                        <div className="flex-1 flex items-center gap-3">
+                            <SkeletonShimmer className="h-10 w-10 rounded-full" />
+                            <div className="space-y-2 flex-1">
+                                <SkeletonShimmer className="h-4 w-3/4" />
+                                <SkeletonShimmer className="h-3 w-1/2" />
+                            </div>
+                        </div>
+                        <SkeletonShimmer className="h-8 w-8 rounded" />
+                    </div>
+                ))}
             </div>
         );
     }
@@ -57,7 +74,8 @@ export function TodaysAgenda() {
                     Você não possui atendimentos agendados para hoje.
                 </p>
                 <Button
-                    variant="outline"
+                    variant="default"
+                    size="lg"
                     className="gap-2"
                     onClick={() => navigate('/calendar?openForm=true')}
                 >

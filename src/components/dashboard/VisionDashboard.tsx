@@ -20,9 +20,29 @@ interface ViewModeProps {
 }
 
 export default function VisionDashboard({ viewMode, onViewModeChange }: ViewModeProps) {
-    const { profile, isVendedor } = useUserProfile();
+    const { profile, isVendedor, isAdmin } = useUserProfile();
     const { data: dashboardMetrics } = useDashboardMetrics();
     const navigate = useNavigate();
+
+    // Contextual greeting based on time and role
+    const hour = new Date().getHours();
+    const timeGreeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
+    const firstName = profile?.full_name?.split(' ')[0] || 'Bem-vindo';
+
+    const getContextualSubtitle = () => {
+        if (isVendedor) {
+            const activeDeals = dashboardMetrics?.activeDeals || 0;
+            if (activeDeals > 0) {
+                return `Voce tem ${activeDeals} negociacao${activeDeals > 1 ? 'oes' : ''} ativa${activeDeals > 1 ? 's' : ''} no pipeline.`;
+            }
+            return 'Seu pipeline esta vazio. Hora de prospectar novos leads!';
+        }
+        if (isAdmin) {
+            const totalContacts = dashboardMetrics?.totalContacts || 0;
+            return `Visao geral da clinica. ${totalContacts} pacientes cadastrados.`;
+        }
+        return 'Aqui esta o relatorio geral da sua clinica hoje.';
+    };
 
     if (!profile) {
         return <div className="p-8"><Skeleton className="h-96 w-full" /></div>;
@@ -35,10 +55,10 @@ export default function VisionDashboard({ viewMode, onViewModeChange }: ViewMode
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                        Olá, <span className="text-primary">{profile.full_name?.split(' ')[0] || 'Bem-vindo'}</span>
+                        {timeGreeting}, <span className="text-primary">{firstName}</span>
                     </h1>
                     <p className="text-muted-foreground mt-1 font-light tracking-wide">
-                        Aqui está o relatório geral da sua clínica hoje.
+                        {getContextualSubtitle()}
                     </p>
                 </div>
 

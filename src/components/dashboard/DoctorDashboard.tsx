@@ -1,5 +1,7 @@
-
+import { useMemo } from 'react';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { useAuth } from '@/hooks/useAuth';
+import { useMedicalAppointments } from '@/hooks/useMedicalAppointments';
 import { TodaysAgenda } from './doctor/TodaysAgenda';
 import { DailyFinancials } from './doctor/DailyFinancials';
 import { FutureOutlook } from './doctor/FutureOutlook';
@@ -7,6 +9,8 @@ import { SecretaryActivities } from './doctor/SecretaryActivities';
 import { NegotiationsWidget } from './doctor/NegotiationsWidget';
 import { MedicalRecordSearch } from './doctor/MedicalRecordSearch';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Card } from '@/components/ui/card';
+import { startOfDay, endOfDay } from 'date-fns';
 
 import { Button } from "@/components/ui/button";
 import { LayoutDashboard, Activity, BarChart2 } from "lucide-react";
@@ -18,10 +22,32 @@ interface DoctorDashboardProps {
 
 export function DoctorDashboard({ viewMode, onViewModeChange }: DoctorDashboardProps) {
     const { profile } = useUserProfile();
+    const { user } = useAuth();
 
-    // Greeting based on time
+    // Get today's appointments count for contextual greeting
+    const today = useMemo(() => new Date(), []);
+    const { appointments } = useMedicalAppointments({
+        startDate: startOfDay(today),
+        endDate: endOfDay(today),
+        doctorIds: user?.id ? [user.id] : undefined
+    });
+
+    const appointmentsCount = appointments?.length || 0;
+    const firstName = profile?.full_name?.split(' ')[0] || 'Doutor';
+
+    // Contextual greeting based on time and schedule
     const hour = new Date().getHours();
-    const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
+    const timeGreeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
+
+    const getContextualSubtitle = () => {
+        if (appointmentsCount === 0) {
+            return 'Sua agenda está livre hoje. Aproveite para organizar prontuários.';
+        }
+        if (appointmentsCount === 1) {
+            return 'Você tem 1 consulta agendada para hoje.';
+        }
+        return `Você tem ${appointmentsCount} consultas agendadas para hoje.`;
+    };
 
     return (
         <div className="min-h-screen bg-background p-4 md:p-8 space-y-8 font-sans transition-colors duration-300">
@@ -29,10 +55,10 @@ export function DoctorDashboard({ viewMode, onViewModeChange }: DoctorDashboardP
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex flex-col space-y-1">
                     <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                        {greeting}, Dr. <span className="text-primary">{profile?.full_name?.split(' ')[0] || 'Médico'}</span>
+                        {timeGreeting}, Dr. <span className="text-primary">{firstName}</span>
                     </h1>
                     <p className="text-muted-foreground mt-1 font-light tracking-wide">
-                        Aqui está o resumo do seu dia hoje.
+                        {getContextualSubtitle()}
                     </p>
                 </div>
 
@@ -81,14 +107,14 @@ export function DoctorDashboard({ viewMode, onViewModeChange }: DoctorDashboardP
                         <DailyFinancials />
                     </div>
 
-                    {/* Today's Agenda */}
-                    <div className="min-h-[350px] bg-card rounded-xl border border-border shadow-sm overflow-hidden flex flex-col">
+                    {/* Today's Agenda - Primary focus card */}
+                    <Card hierarchy="primary" className="min-h-[350px] overflow-hidden flex flex-col">
                         <ScrollArea className="h-full">
                             <div className="p-6">
                                 <TodaysAgenda />
                             </div>
                         </ScrollArea>
-                    </div>
+                    </Card>
 
                     {/* Medical Record Search & History */}
                     <div className="flex-1 min-h-[300px]">
@@ -99,9 +125,9 @@ export function DoctorDashboard({ viewMode, onViewModeChange }: DoctorDashboardP
                 {/* Right Column: Future & Quick Actions */}
                 <div className="lg:col-span-4 flex flex-col gap-6">
                     {/* Future Outlook */}
-                    <div className="bg-card rounded-xl border border-border shadow-sm p-4">
+                    <Card hierarchy="tertiary" className="p-4">
                         <FutureOutlook />
-                    </div>
+                    </Card>
 
                     {/* Live Negotiations Widget */}
                     <div className="h-[350px]">
@@ -109,9 +135,9 @@ export function DoctorDashboard({ viewMode, onViewModeChange }: DoctorDashboardP
                     </div>
 
                     {/* Secretary Activities */}
-                    <div className="flex-1 min-h-[250px] bg-card rounded-xl border border-border shadow-sm overflow-hidden flex flex-col">
+                    <Card hierarchy="tertiary" className="flex-1 min-h-[250px] overflow-hidden flex flex-col">
                         <SecretaryActivities />
-                    </div>
+                    </Card>
                 </div>
             </div>
         </div>

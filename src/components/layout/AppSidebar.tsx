@@ -154,9 +154,10 @@ const navigationGroups: Array<{
 
 interface AppSidebarProps {
   isCollapsed: boolean;
+  onNavigate?: () => void; // Callback when a navigation item is clicked (useful for closing mobile sheet)
 }
 
-export function AppSidebar({ isCollapsed }: AppSidebarProps) {
+export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const { signOut, user, organization } = useAuth()
@@ -430,6 +431,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                                       <NavLink
                                         key={subItem.title}
                                         to={subItem.url}
+                                        onClick={() => onNavigate?.()}
                                         className={`
                                         flex items-center gap-3 px-3 py-2 rounded-xl
                                         text-sm font-medium transition-all duration-200
@@ -535,6 +537,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                                       <NavLink
                                         key={subItem.title}
                                         to={subItem.url}
+                                        onClick={() => onNavigate?.()}
                                         className={`
                                         group flex items-center gap-3 px-4 py-2.5 rounded-xl
                                         text-sm font-medium transition-all duration-200
@@ -630,7 +633,10 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                             <NavLink
                               to={item.url}
                               end={item.url === "/"}
-                              onClick={() => setExpandedItems([])}
+                              onClick={() => {
+                                setExpandedItems([]);
+                                onNavigate?.();
+                              }}
                               className={`
                                 group relative w-full block
                                 ${isCollapsed ? 'p-2.5' : 'px-4 py-3.5'}
@@ -704,6 +710,7 @@ export function AppSidebar({ isCollapsed }: AppSidebarProps) {
                 <TooltipTrigger asChild>
                   <NavLink
                     to="/configuracoes"
+                    onClick={() => onNavigate?.()}
                     className={`
                       group relative w-full block
                       ${isCollapsed ? 'p-2.5' : 'px-4 py-3.5'}

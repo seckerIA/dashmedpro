@@ -1,5 +1,7 @@
 import { ReactNode, useState, useRef } from "react"
 import { AppSidebar } from "./AppSidebar"
+import { BottomNav } from "./BottomNav"
+import { SkipLink } from "./SkipLink"
 import { Button } from "@/components/ui/button"
 import { AlignJustify, Search, ChevronDown } from "lucide-react"
 import {
@@ -62,6 +64,7 @@ export function AppLayout({ children, hideSidebar = false }: AppLayoutProps) {
 
   return (
     <>
+      <SkipLink />
       <TooltipProvider>
         <ResizablePanelGroup
           direction="horizontal"
@@ -190,7 +193,7 @@ export function AppLayout({ children, hideSidebar = false }: AppLayoutProps) {
               </header>
 
               {/* Main Content */}
-              <main className="flex-1 p-8 bg-background overflow-auto">
+              <main id="main-content" className="flex-1 p-4 md:p-8 pb-20 md:pb-8 bg-background overflow-auto">
                 {children}
               </main>
             </div>
@@ -210,6 +213,9 @@ export function AppLayout({ children, hideSidebar = false }: AppLayoutProps) {
           onOpenRecord={() => openMedicalRecord(currentAlert)}
         />
       )}
+
+      {/* Mobile Bottom Navigation */}
+      {!hideSidebar && <BottomNav />}
     </>
   )
 }
