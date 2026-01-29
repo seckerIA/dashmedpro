@@ -1,3 +1,0 @@
-module.exports=[884513,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(976534);a.n(d("[project]/dashmedpro-1/dashmed-nextjs/node_modules/next/dist/client/components/builtin/global-error.js <module evaluation>"))},32774,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(976534);a.n(d("[project]/dashmedpro-1/dashmed-nextjs/node_modules/next/dist/client/components/builtin/global-error.js"))},402435,a=>{"use strict";a.i(884513);var b=a.i(32774);a.n(b)}];
-
-//# sourceMappingURL=aaef9_next_dist_client_components_builtin_global-error_57358c04.js.map

@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//e/dashmedpro-main/dashmedpro-1/dashmed-nextjs/src/**)",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(taskkill:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(powershell -Command \"cd ''e:\\\\dashmedpro-main\\\\dashmedpro-1\\\\dashmed-nextjs''; Remove-Item ''.next\\\\dev\\\\lock'' -Force -ErrorAction SilentlyContinue; npm run dev\")"
+    ]
+  }
+}

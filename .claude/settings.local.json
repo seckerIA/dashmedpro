@@ -35,7 +35,23 @@
       "Bash(node:*)",
       "Bash(git rm:*)",
       "Bash(cd:*)",
-      "Bash(gh auth status:*)"
+      "Bash(gh auth status:*)",
+      "Read(//e/dashmedpro-main/dashmedpro-1/**)",
+      "Bash(dir:*)",
+      "Bash(for dir in /e/dashmedpro-main/dashmedpro-1/dashmed-nextjs/src/components/*/)",
+      "Bash(powershell -Command \"cd ''e:\\\\dashmedpro-main\\\\dashmedpro-1\\\\dashmed-nextjs''; if \\(Test-Path ''.next''\\) { Remove-Item -Recurse -Force ''.next'' }; Write-Host ''Pasta .next removida''\")",
+      "Bash(powershell -Command \"Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2; cd ''e:\\\\dashmedpro-main\\\\dashmedpro-1\\\\dashmed-nextjs''; if \\(Test-Path ''.next''\\) { Remove-Item -Recurse -Force ''.next'' }; Write-Host ''Pronto''\")",
+      "Bash(copy \"e:\\\\dashmedpro-main\\\\dashmedpro\\\\public\\\\favicon.ico\" \"e:\\\\dashmedpro-main\\\\dashmedpro-1\\\\dashmed-nextjs\\\\src\\\\app\\\\favicon.ico\")",
+      "Bash(copy \"e:\\\\dashmedpro-main\\\\dashmedpro\\\\public\\\\imgdashmed-logo.png\" \"e:\\\\dashmedpro-main\\\\dashmedpro-1\\\\dashmed-nextjs\\\\public\\\\dashmed-logo.png\")",
+      "Bash(xargs:*)",
+      "Read(//e/**)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:groups.google.com)",
+      "WebFetch(domain:supabase.com)"
+    ],
+    "additionalDirectories": [
+      "e:\\dashmedpro-main\\dashmedpro-1\\dashmed-nextjs",
+      "e:\\dashmedpro-main\\dashmedpro"
     ]
   }
 }
