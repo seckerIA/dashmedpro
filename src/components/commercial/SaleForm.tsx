@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useAuth } from "@/hooks/useAuth";
 import { useCommercialSales } from "@/hooks/useCommercialSales";
 import { useCommercialProcedures } from "@/hooks/useCommercialProcedures";
 import { useCRM } from "@/hooks/useCRM";
@@ -18,12 +19,13 @@ import { Loader2 } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { format } from "date-fns";
 
+// Schema with strings for form inputs
 const saleSchema = z.object({
-  contact_id: z.string().uuid().optional().or(z.literal("")),
-  procedure_id: z.string().uuid().optional().or(z.literal("")),
-  value: z.string().min(1, "Valor é obrigatório").transform((val) => parseCurrencyToNumber(val)),
+  contact_id: z.string().optional(),
+  procedure_id: z.string().optional(),
+  value: z.string().min(1, "Valor é obrigatório"),
   status: z.enum(['quote', 'confirmed', 'completed', 'cancelled']),
-  payment_method: z.enum(['cash', 'credit_card', 'debit_card', 'pix', 'bank_transfer', 'installment']).optional().or(z.literal("")),
+  payment_method: z.string().optional(),
   installments: z.number().min(1).optional(),
   sale_date: z.string().optional(),
   notes: z.string().optional(),
@@ -38,6 +40,7 @@ interface SaleFormProps {
 }
 
 export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
+  const { user } = useAuth();
   const { createSale, updateSale } = useCommercialSales();
   const { procedures } = useCommercialProcedures();
   const { contacts } = useCRM();
@@ -69,7 +72,7 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
       reset({
         contact_id: sale.contact_id || "",
         procedure_id: sale.procedure_id || "",
-        value: sale.value.toString(),
+        value: formatCurrency(sale.value),
         status: sale.status,
         payment_method: sale.payment_method || "",
         installments: sale.installments || 1,
@@ -92,12 +95,21 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
 
   const onSubmit = async (data: SaleFormData) => {
     try {
+      if (!user?.id) {
+        console.error("User not authenticated");
+        return;
+      }
+
+      // Parse value string to number
+      const valueNumber = parseCurrencyToNumber(data.value);
+
       const saleData: CommercialSaleInsert = {
+        user_id: user.id,
         contact_id: data.contact_id || null,
         procedure_id: data.procedure_id || null,
-        value: data.value,
+        value: valueNumber,
         status: data.status,
-        payment_method: data.payment_method || null,
+        payment_method: data.payment_method as any || null,
         installments: data.installments,
         sale_date: data.sale_date ? new Date(data.sale_date).toISOString() : null,
         notes: data.notes || null,
@@ -124,7 +136,7 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
   const selectedProcedure = procedures.find(p => p.id === watch("procedure_id"));
   useEffect(() => {
     if (selectedProcedure && !watch("value")) {
-      setValue("value", selectedProcedure.price.toString(), { shouldValidate: true });
+      setValue("value", formatCurrency(selectedProcedure.price), { shouldValidate: true });
     }
   }, [selectedProcedure, setValue, watch]);
 
@@ -214,7 +226,7 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
               <Label htmlFor="payment_method">Forma de Pagamento</Label>
               <Select
                 value={watch("payment_method") || ""}
-                onValueChange={(value) => setValue("payment_method", value as any)}
+                onValueChange={(value) => setValue("payment_method", value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione" />
@@ -271,12 +283,3 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
     </Dialog>
   );
 }
-
-
-
-
-
-
-
-
-

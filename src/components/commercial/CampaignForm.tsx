@@ -17,11 +17,12 @@ import { Loader2 } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { format } from "date-fns";
 
+// Schema for form input (all strings for controlled inputs)
 const campaignSchema = z.object({
   name: z.string().min(3, "Nome deve ter pelo menos 3 caracteres"),
   type: z.enum(['first_consultation_discount', 'procedure_package', 'seasonal_promotion', 'referral_benefit']),
-  discount_percentage: z.string().optional().transform((val) => val ? parseFloat(val) : undefined),
-  discount_amount: z.string().optional().transform((val) => val ? parseCurrencyToNumber(val) : undefined),
+  discount_percentage: z.string().optional(),
+  discount_amount: z.string().optional(),
   start_date: z.string().min(1, "Data de início é obrigatória"),
   end_date: z.string().min(1, "Data de término é obrigatória"),
   target_audience: z.string().optional(),
@@ -97,11 +98,15 @@ export function CampaignForm({ open, onOpenChange, campaign }: CampaignFormProps
 
   const onSubmit = async (data: CampaignFormData) => {
     try {
-      const campaignData: CommercialCampaignInsert = {
+      // Parse string values to numbers for API
+      const discountPercentage = data.discount_percentage ? parseFloat(data.discount_percentage) : null;
+      const discountAmount = data.discount_amount ? parseCurrencyToNumber(data.discount_amount) : null;
+
+      const campaignData: Omit<CommercialCampaignInsert, 'user_id'> = {
         name: data.name,
         type: data.type,
-        discount_percentage: data.discount_percentage || null,
-        discount_amount: data.discount_amount || null,
+        discount_percentage: discountPercentage,
+        discount_amount: discountAmount,
         start_date: new Date(data.start_date).toISOString(),
         end_date: new Date(data.end_date).toISOString(),
         target_audience: data.target_audience || null,
@@ -113,7 +118,8 @@ export function CampaignForm({ open, onOpenChange, campaign }: CampaignFormProps
       if (isEditing && campaign) {
         await updateCampaign.mutateAsync({ id: campaign.id, updates: campaignData });
       } else {
-        await createCampaign.mutateAsync(campaignData);
+        // user_id is added by the hook
+        await createCampaign.mutateAsync(campaignData as CommercialCampaignInsert);
       }
 
       onOpenChange(false);
@@ -268,19 +274,3 @@ export function CampaignForm({ open, onOpenChange, campaign }: CampaignFormProps
     </Dialog>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

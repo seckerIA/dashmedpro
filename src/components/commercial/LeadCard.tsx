@@ -75,7 +75,7 @@ export function LeadCard({ lead }: LeadCardProps) {
           insurance_type: 'particular' as const,
         };
 
-        const newContact = await createContact.mutateAsync(contactData);
+        const newContact = await createContact(contactData);
         contactId = newContact.id;
 
         // Converter o lead

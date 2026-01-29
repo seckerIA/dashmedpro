@@ -1,28 +1,64 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUp, Target, DollarSign, BarChart3, UserPlus, Calendar, Loader2 } from "lucide-react";
+import { 
+  TrendingUp, 
+  Target, 
+  DollarSign, 
+  BarChart3, 
+  UserPlus, 
+  Calendar, 
+  Loader2,
+  Percent,
+  Clock,
+  UserCheck,
+  Calculator,
+  Zap,
+  LucideIcon
+} from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 
+type IconType = 
+  | "trending-up" 
+  | "target" 
+  | "dollar-sign" 
+  | "bar-chart" 
+  | "user-plus" 
+  | "calendar"
+  | "percent"
+  | "clock"
+  | "user-check"
+  | "calculator"
+  | "zap";
+
 interface MetricCardProps {
   title: string;
   value: string | number | undefined | null;
-  icon: "trending-up" | "target" | "dollar-sign" | "bar-chart" | "user-plus" | "calendar";
+  icon: IconType;
   format?: "currency" | "number" | "percentage";
   isLoading?: boolean;
+  comparison?: {
+    value: number;
+    label: string;
+  };
 }
 
-const iconMap = {
+const iconMap: Record<IconType, LucideIcon> = {
   "trending-up": TrendingUp,
   "target": Target,
   "dollar-sign": DollarSign,
   "bar-chart": BarChart3,
   "user-plus": UserPlus,
   "calendar": Calendar,
+  "percent": Percent,
+  "clock": Clock,
+  "user-check": UserCheck,
+  "calculator": Calculator,
+  "zap": Zap,
 };
 
-export function MetricCard({ title, value, icon, format = "number", isLoading }: MetricCardProps) {
-  const Icon = iconMap[icon];
+export function MetricCard({ title, value, icon, format = "number", isLoading, comparison }: MetricCardProps) {
+  const Icon = iconMap[icon] || DollarSign;
 
   const formatValue = (val: string | number | undefined | null): string => {
     if (val === undefined || val === null) return "-";
@@ -61,6 +97,14 @@ export function MetricCard({ title, value, icon, format = "number", isLoading }:
                 <span className="inline-block w-24 h-8 animate-pulse bg-muted rounded" />
               ) : formatValue(value)}
             </motion.p>
+            {comparison && comparison.value !== 0 && (
+              <p className={cn(
+                "text-xs",
+                comparison.value > 0 ? "text-green-500" : "text-red-500"
+              )}>
+                {comparison.value > 0 ? "+" : ""}{comparison.value.toFixed(1)}% {comparison.label}
+              </p>
+            )}
           </div>
 
           <motion.div

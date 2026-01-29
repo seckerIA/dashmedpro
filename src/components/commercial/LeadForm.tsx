@@ -16,13 +16,14 @@ import { COMMERCIAL_LEAD_ORIGIN_LABELS } from "@/types/commercial";
 import { formatCurrencyInput, parseCurrencyToNumber, formatCurrency } from "@/lib/currency";
 import { Loader2 } from "lucide-react";
 
+// Schema with all strings for form inputs
 const leadSchema = z.object({
   name: z.string().min(3, "Nome deve ter pelo menos 3 caracteres"),
   email: z.string().email("Email inválido").optional().or(z.literal("")),
   phone: z.string().optional(),
   origin: z.enum(['google', 'instagram', 'facebook', 'indication', 'website', 'other']),
   procedure_id: z.string().optional(),
-  estimated_value: z.string().optional().transform((val) => val ? parseCurrencyToNumber(val) : undefined),
+  estimated_value: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -94,9 +95,9 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
       // Buscar o procedimento selecionado para obter o valor estimado se não foi preenchido
       const selectedProcedure = procedures?.find(p => p.id === data.procedure_id);
 
-      // O valor vem do hook-form transformado (number), mas o watch retorna string do input
-      // Como estamos no onSubmit, data.estimated_value já passou pelo transform do zod e é number | undefined
-      const estimatedValue = data.estimated_value || (selectedProcedure ? Number(selectedProcedure.price) : null);
+      // Parse string to number
+      const estimatedValueParsed = data.estimated_value ? parseCurrencyToNumber(data.estimated_value) : null;
+      const estimatedValue = estimatedValueParsed || (selectedProcedure ? Number(selectedProcedure.price) : null);
 
       const leadData: CommercialLeadInsert = {
         name: data.name,
@@ -107,7 +108,7 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
         procedure_id: data.procedure_id && data.procedure_id !== "none" ? data.procedure_id : null,
         estimated_value: estimatedValue,
         notes: data.notes || null,
-        user_id: user.id, // Adicionado user_id obrigatório
+        user_id: user.id,
       };
 
       if (isEditing && lead) {
@@ -178,11 +179,7 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
                   }
                   if (value.length > 9) {
                     value = `${value.slice(0, 9)}-${value.slice(9)}`;
-                  } // Ajuste para o nono dígito (celular) ou fixo
-
-                  // Melhor formatação para móvel vs fixo
-                  // (XX) XXXXX-XXXX -> Móvel (11 chars)
-                  // (XX) XXXX-XXXX -> Fixo (10 chars)
+                  }
 
                   setValue("phone", value);
                 }}
@@ -222,7 +219,6 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
                     const currentValue = watch("estimated_value");
                     // Só preencher se o campo estiver vazio
                     if (!currentValue || currentValue.trim() === "") {
-                      // Formatar o preço como moeda usando formatCurrency
                       const formattedPrice = formatCurrency(selectedProcedure.price);
                       setValue("estimated_value", formattedPrice);
                     }
@@ -303,12 +299,3 @@ export function LeadForm({ open, onOpenChange, lead }: LeadFormProps) {
     </Dialog>
   );
 }
-
-
-
-
-
-
-
-
-
