@@ -17,6 +17,110 @@ import {
 } from '@/types/medicalAppointments';
 import { FinancialTransactionInsert } from '@/types/financial';
 
+/**
+ * Cria uma transação financeira para uma consulta
+ * Usada quando payment_status = 'paid' no momento de criar/atualizar consulta
+ * OU quando a consulta é marcada como concluída com pagamento confirmado
+ */
+const createFinancialTransactionForAppointment = async (
+  appointment: {
+    id: string;
+    user_id: string;
+    organization_id?: string;
+    contact_id: string;
+    title: string;
+    start_time: string;
+    estimated_value?: number | null;
+    appointment_type: string;
+    payment_status?: string;
+  },
+  profileOrgId?: string
+): Promise<string | null> => {
+  try {
+    // Validar se tem valor para criar transação
+    if (!appointment.estimated_value || appointment.estimated_value <= 0) {
+      console.log('[Financial] Sem valor estimado, não criando transação');
+      return null;
+    }
+
+    // Buscar categoria padrão de entrada
+    const { data: categories } = await supabase
+      .from('financial_categories')
+      .select('id')
+      .eq('type', 'entrada')
+      .limit(1);
+
+    // Buscar conta ativa
+    const { data: accounts } = await supabase
+      .from('financial_accounts')
+      .select('id')
+      .eq('is_active', true)
+      .order('is_default', { ascending: false })
+      .limit(1);
+
+    const categoryId = categories?.[0]?.id;
+    const accountId = accounts?.[0]?.id;
+
+    if (!accountId || !categoryId) {
+      console.warn('[Financial] Conta ou categoria não encontrada');
+      return null;
+    }
+
+    const orgId = appointment.organization_id || profileOrgId;
+
+    const transactionData: FinancialTransactionInsert = {
+      user_id: appointment.user_id,
+      organization_id: orgId,
+      account_id: accountId,
+      category_id: categoryId,
+      type: 'entrada',
+      amount: Number(appointment.estimated_value),
+      description: `Consulta: ${appointment.title}`,
+      date: new Date(appointment.start_time).toISOString().split('T')[0],
+      transaction_date: new Date(appointment.start_time).toISOString().split('T')[0],
+      contact_id: appointment.contact_id,
+      payment_method: 'pix',
+      status: 'concluida',
+      notes: `Consulta médica - ${appointment.appointment_type}`,
+      tags: ['consulta-medica'],
+      has_costs: false,
+      total_costs: 0,
+      metadata: {
+        appointment_id: appointment.id,
+        appointment_type: appointment.appointment_type,
+      },
+    };
+
+    const { data: transaction, error } = await supabase
+      .from('financial_transactions')
+      .insert(transactionData)
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('[Financial] Erro ao criar transação:', error);
+      return null;
+    }
+
+    console.log('[Financial] Transação criada:', transaction.id);
+    return transaction.id;
+  } catch (error) {
+    console.error('[Financial] Erro inesperado:', error);
+    return null;
+  }
+};
+
+/**
+ * Verifica se existe conta bancária ativa
+ */
+const checkHasActiveAccount = async (): Promise<boolean> => {
+  const { count } = await supabase
+    .from('financial_accounts')
+    .select('*', { count: 'exact', head: true })
+    .eq('is_active', true);
+  return (count || 0) > 0;
+};
+
 interface UseMedicalAppointmentsFilters {
   startDate?: Date;
   endDate?: Date;
@@ -441,6 +545,31 @@ const createAppointment = async (
     throw new Error(`Erro ao criar consulta: ${error.message}`);
   }
 
+  // Se payment_status = 'paid', criar transação financeira IMEDIATAMENTE
+  if (appointmentData.payment_status === 'paid' && appointmentData.estimated_value && appointmentData.estimated_value > 0) {
+    const transactionId = await createFinancialTransactionForAppointment({
+      id: data.id,
+      user_id: appointmentData.user_id,
+      organization_id: (data as any).organization_id,
+      contact_id: appointmentData.contact_id,
+      title: appointmentData.title,
+      start_time: appointmentData.start_time,
+      estimated_value: appointmentData.estimated_value,
+      appointment_type: appointmentData.appointment_type || 'consultation',
+      payment_status: appointmentData.payment_status,
+    });
+
+    // Vincular transação à consulta
+    if (transactionId) {
+      await supabase
+        .from('medical_appointments')
+        .update({ financial_transaction_id: transactionId })
+        .eq('id', data.id);
+
+      console.log('[Create] Transação financeira criada e vinculada:', transactionId);
+    }
+  }
+
   // Atualizar pipeline automaticamente ao criar consulta
   await updateDealPipeline(
     appointmentData.contact_id,
@@ -485,6 +614,36 @@ const updateAppointment = async ({
   if (error) throw new Error(`Erro ao atualizar consulta: ${error.message}`);
 
   const appointment = data as MedicalAppointmentWithRelations;
+
+  // Se payment_status mudou para 'paid' e não tem transação, criar IMEDIATAMENTE
+  if (
+    updates.payment_status === 'paid' &&
+    !appointment.financial_transaction_id &&
+    appointment.estimated_value &&
+    appointment.estimated_value > 0
+  ) {
+    const transactionId = await createFinancialTransactionForAppointment({
+      id: appointment.id,
+      user_id: appointment.user_id,
+      organization_id: (appointment as any).organization_id,
+      contact_id: appointment.contact_id,
+      title: appointment.title,
+      start_time: appointment.start_time,
+      estimated_value: appointment.estimated_value,
+      appointment_type: appointment.appointment_type || 'consultation',
+      payment_status: 'paid',
+    });
+
+    // Vincular transação à consulta
+    if (transactionId) {
+      await supabase
+        .from('medical_appointments')
+        .update({ financial_transaction_id: transactionId })
+        .eq('id', appointment.id);
+
+      console.log('[Update] Transação financeira criada e vinculada:', transactionId);
+    }
+  }
 
   // Atualizar pipeline automaticamente quando houver mudança de status ou pagamento
   if (appointment.contact_id && (appointment.doctor_id || appointment.user_id)) {

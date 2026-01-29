@@ -37,6 +37,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { useSinalReceipts } from '@/hooks/useSinalReceipts';
+import { useFinancialAccounts } from '@/hooks/useFinancialAccounts';
 
 // Ensure ptBR is available (defensive check)
 const locale = ptBR || undefined;
@@ -111,6 +112,8 @@ export function AppointmentForm({
   const [linkedProcedure, setLinkedProcedure] = useState<any>(null);
   const [selectedProcedureId, setSelectedProcedureId] = useState<string | null>(null);
   const { uploadReceipt, isUploading } = useSinalReceipts();
+  const { accounts, isLoading: isLoadingAccounts } = useFinancialAccounts();
+  const hasActiveAccount = accounts && accounts.length > 0;
 
   // Refs para evitar loops infinitos de re-renders
   const contactsRef = useRef(contacts);
@@ -936,6 +939,22 @@ export function AppointmentForm({
               </Select>
             </div>
           </div>
+
+          {/* Aviso de conta bancária obrigatória */}
+          {watch('payment_status') === 'paid' && !hasActiveAccount && !isLoadingAccounts && (
+            <Alert variant="destructive" className="border-red-500 bg-red-50 dark:bg-red-950/50">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Conta Bancária Obrigatória</AlertTitle>
+              <AlertDescription>
+                Para marcar consultas como "Pago", você precisa primeiro cadastrar uma conta bancária no módulo Financeiro.
+                Sem uma conta ativa, a transação financeira não será registrada e você poderá perder o controle dos recebimentos.
+                <br />
+                <a href="/financeiro" className="text-primary underline font-medium hover:text-primary/80">
+                  Ir para Financeiro → Cadastrar Conta
+                </a>
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* Seção de Sinal (Entrada/Depósito) - Sempre visível */}
           <div className="space-y-3 border-t pt-4 mt-4 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20 -mx-6 px-6 py-4">

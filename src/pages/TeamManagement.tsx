@@ -10,11 +10,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { UserPlus, Users, Eye, EyeOff, Stethoscope } from 'lucide-react';
+import { UserPlus, Users, Eye, EyeOff, Stethoscope, AlertTriangle, CreditCard } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useSecretaryDoctorLinks } from '@/hooks/useSecretaryDoctors';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useAuth } from '@/hooks/useAuth';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 import { DataTable } from '@/components/datatable/DataTable';
 import { getColumns, Profile } from '@/components/datatable/DataColumns';
@@ -28,6 +29,9 @@ const TeamManagement = () => {
   const [doctors, setDoctors] = useState<Array<{ id: string; full_name: string; email: string }>>([]);
   const [loadingDoctors, setLoadingDoctors] = useState(false);
   const [selectedDoctorIds, setSelectedDoctorIds] = useState<string[]>([]); // Para multiplos medicos
+  const [memberLimitReached, setMemberLimitReached] = useState(false);
+  const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
+  const [memberLimitInfo, setMemberLimitInfo] = useState<{ current: number; limit: number; price: number } | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -140,9 +144,45 @@ const TeamManagement = () => {
     }
   };
 
+  // Verificar limite de membros da organização
+  const checkMemberLimit = async () => {
+    try {
+      // Buscar organização do usuário atual
+      const { data: orgMember } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user?.id)
+        .single();
+
+      if (!orgMember?.organization_id) return;
+
+      // Buscar limite e contagem de membros
+      const { data: org } = await supabase
+        .from('organizations')
+        .select('member_limit, additional_member_price')
+        .eq('id', orgMember.organization_id)
+        .single();
+
+      const { count } = await supabase
+        .from('organization_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', orgMember.organization_id);
+
+      const currentMembers = count || 0;
+      const limit = org?.member_limit || 1;
+      const price = org?.additional_member_price || 89.90;
+
+      setMemberLimitInfo({ current: currentMembers, limit, price });
+      setMemberLimitReached(currentMembers >= limit);
+    } catch (error) {
+      console.error('Erro ao verificar limite de membros:', error);
+    }
+  };
+
   useEffect(() => {
     fetchProfiles();
     fetchDoctors();
+    checkMemberLimit();
   }, []);
 
   // Buscar médicos quando role mudar para secretaria
@@ -475,6 +515,48 @@ const TeamManagement = () => {
           </p>
         </div>
 
+        {/* Dialog de Upgrade - Limite de Membros */}
+        <Dialog open={upgradeDialogOpen} onOpenChange={setUpgradeDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-warning" />
+                Limite de Membros Atingido
+              </DialogTitle>
+              <DialogDescription>
+                Seu plano atual permite apenas {memberLimitInfo?.limit || 1} membro(s) na equipe.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+              <Alert>
+                <CreditCard className="h-4 w-4" />
+                <AlertTitle>Adicionar mais membros</AlertTitle>
+                <AlertDescription>
+                  Para adicionar mais pessoas à sua equipe, é necessário um pagamento adicional de{' '}
+                  <strong>R$ {(memberLimitInfo?.price || 89.90).toFixed(2).replace('.', ',')}</strong> por membro.
+                </AlertDescription>
+              </Alert>
+              <div className="text-sm text-muted-foreground">
+                <p>Membros atuais: <strong>{memberLimitInfo?.current || 0}</strong></p>
+                <p>Limite do plano: <strong>{memberLimitInfo?.limit || 1}</strong></p>
+              </div>
+            </div>
+            <DialogFooter className="flex gap-2">
+              <Button variant="outline" onClick={() => setUpgradeDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={() => {
+                // Redirecionar para página de upgrade ou abrir contato
+                window.open('https://wa.me/5511999999999?text=Olá! Gostaria de adicionar mais membros à minha equipe no DashMed Pro.', '_blank');
+                setUpgradeDialogOpen(false);
+              }}>
+                <CreditCard className="mr-2 h-4 w-4" />
+                Solicitar Upgrade
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <Dialog open={dialogOpen} onOpenChange={(open) => {
           setDialogOpen(open);
           if (!open) {
@@ -484,7 +566,13 @@ const TeamManagement = () => {
           }
         }}>
           <DialogTrigger asChild>
-            <Button>
+            <Button onClick={(e) => {
+              // Verificar limite antes de abrir o dialog
+              if (memberLimitReached && !editingProfile) {
+                e.preventDefault();
+                setUpgradeDialogOpen(true);
+              }
+            }}>
               <UserPlus className="mr-2 h-4 w-4" />
               Adicionar Membro
             </Button>

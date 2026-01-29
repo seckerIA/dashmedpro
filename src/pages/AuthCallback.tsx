@@ -101,7 +101,7 @@ const AuthCallback = () => {
           // Verificar whitelist no banco de dados (tabela allowed_emails)
           const { data: allowedEmail, error: allowedError } = await supabase
             .from('allowed_emails')
-            .select('id, expires_at, used_at')
+            .select('id, expires_at, used_at, payment_confirmed')
             .ilike('email', user.email || '')
             .maybeSingle();
 
@@ -109,9 +109,27 @@ const AuthCallback = () => {
             console.error('❌ [AuthCallback] Erro ao verificar whitelist:', allowedError);
           }
 
-          // Verificar se email está permitido e não expirou
+          // Verificar se email está permitido, não expirou E o pagamento foi confirmado
           const isExpired = allowedEmail?.expires_at && new Date(allowedEmail.expires_at) < new Date();
-          const isEmailAllowed = allowedEmail && !isExpired;
+          const isPaid = allowedEmail?.payment_confirmed === true;
+          const isEmailAllowed = allowedEmail && !isExpired && isPaid;
+
+          // Mensagem específica para quem não pagou
+          if (allowedEmail && !isPaid) {
+            setStatus('error');
+            setErrorMessage('Pagamento pendente. Seu cadastro está aguardando confirmação de pagamento. Entre em contato com o suporte.');
+
+            toast({
+              variant: 'destructive',
+              title: 'Pagamento Pendente',
+              description: 'Seu acesso será liberado após a confirmação do pagamento.',
+              duration: 6000,
+            });
+
+            await supabase.auth.signOut();
+            setTimeout(() => navigate('/login'), 4000);
+            return;
+          }
 
           if (!isEmailAllowed) {
             setStatus('error');

@@ -180,7 +180,7 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, onCancel, 
             </div>
 
             <div className="space-y-2">
-                <Label htmlFor="initial_balance">Saldo Inicial</Label>
+                <Label htmlFor="initial_balance">Saldo Atual da Clínica</Label>
                 <Input
                     id="initial_balance"
                     {...register("initial_balance")}

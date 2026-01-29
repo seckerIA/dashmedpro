@@ -6,8 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Copy, Check, Plus, Eye, ExternalLink } from "lucide-react";
-import { useGenerateUtm, useGeneratedUtms } from "@/hooks/useUtmGenerator";
+import { Copy, Check, Plus, Eye, ExternalLink, Trash2 } from "lucide-react";
+import { useGenerateUtm, useGeneratedUtms, useDeleteGeneratedUtm } from "@/hooks/useUtmGenerator";
 import { useUtmTemplates } from "@/hooks/useUtmTemplates";
 import { useAdCampaignsSync } from "@/hooks/useAdCampaignsSync";
 import { useAuth } from "@/hooks/useAuth";
@@ -19,6 +19,7 @@ export function UtmGenerator() {
   const { user } = useAuth();
   const { toast } = useToast();
   const generateUtm = useGenerateUtm();
+  const deleteUtm = useDeleteGeneratedUtm();
   const { data: templates } = useUtmTemplates(true);
   const { data: generatedUtms } = useGeneratedUtms();
   const { data: campaigns } = useAdCampaignsSync();
@@ -359,20 +360,47 @@ export function UtmGenerator() {
                       {utm.clicks} cliques • {utm.conversions} conversões
                     </p>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setGeneratedUrl(utm.full_url);
-                      navigator.clipboard.writeText(utm.full_url);
-                      toast({
-                        title: 'Copiado!',
-                        description: 'Link copiado para a área de transferência.',
-                      });
-                    }}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setGeneratedUrl(utm.full_url);
+                        navigator.clipboard.writeText(utm.full_url);
+                        toast({
+                          title: 'Copiado!',
+                          description: 'Link copiado para a área de transferência.',
+                        });
+                      }}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={async () => {
+                        if (confirm('Tem certeza que deseja excluir este UTM?')) {
+                          try {
+                            await deleteUtm.mutateAsync(utm.id);
+                            toast({
+                              title: 'UTM excluído',
+                              description: 'O link UTM foi removido com sucesso.',
+                            });
+                          } catch (error) {
+                            toast({
+                              variant: 'destructive',
+                              title: 'Erro',
+                              description: 'Não foi possível excluir o UTM.',
+                            });
+                          }
+                        }
+                      }}
+                      disabled={deleteUtm.isPending}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
