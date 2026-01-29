@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { supabase, CURRENT_PROJECT_REF } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, LogIn, UserPlus, Loader2, RefreshCw, Lock } from 'lucide-react';
-const dashmedLogo = '/dashmed transparente.png';
+const dashmedLogo = '/dashmed-logo.png';
 
 // CONFIGURAÇÃO: Definir como false para reabilitar o registro de contas
 const REGISTRATION_DISABLED = true;

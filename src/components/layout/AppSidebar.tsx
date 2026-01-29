@@ -51,7 +51,7 @@ import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/hooks/useAuth"
 import { useToast } from "@/hooks/use-toast"
 import { useUserProfile } from "@/hooks/useUserProfile"
-const dashmedLogo = '/dashmed transparente.png'
+const dashmedLogo = '/dashmed-logo.png'
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { useInventoryAlerts } from "@/hooks/useInventoryAlerts"
 
