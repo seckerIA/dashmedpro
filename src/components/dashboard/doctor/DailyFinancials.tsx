@@ -41,11 +41,11 @@ export function DailyFinancials() {
 
     const isLoading = loadingToday || loadingYesterday || loadingWeek;
 
-    // Calculate today's revenue from completed/paid appointments
+    // Calculate today's revenue from paid appointments (regardless of completion status)
     const todayRevenue = useMemo(() => {
         if (!todayAppointments) return 0;
         return todayAppointments
-            .filter(apt => apt.status === 'completed' && apt.payment_status === 'paid')
+            .filter(apt => apt.payment_status === 'paid')
             .reduce((sum, apt) => sum + (apt.estimated_value || 0), 0);
     }, [todayAppointments]);
 
@@ -53,7 +53,7 @@ export function DailyFinancials() {
     const yesterdayRevenue = useMemo(() => {
         if (!yesterdayAppointments) return 0;
         return yesterdayAppointments
-            .filter(apt => apt.status === 'completed' && apt.payment_status === 'paid')
+            .filter(apt => apt.payment_status === 'paid')
             .reduce((sum, apt) => sum + (apt.estimated_value || 0), 0);
     }, [yesterdayAppointments]);
 
@@ -61,7 +61,7 @@ export function DailyFinancials() {
     const weekRevenue = useMemo(() => {
         if (!weekAppointments) return 0;
         return weekAppointments
-            .filter(apt => apt.status === 'completed' && apt.payment_status === 'paid')
+            .filter(apt => apt.payment_status === 'paid')
             .reduce((sum, apt) => sum + (apt.estimated_value || 0), 0);
     }, [weekAppointments]);
 
