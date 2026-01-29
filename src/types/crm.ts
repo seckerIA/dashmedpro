@@ -43,6 +43,10 @@ export type PatientGender = 'masculino' | 'feminino' | 'outro' | 'prefiro_nao_di
 // Tipos auxiliares para o frontend
 export interface CRMDealWithContact extends CRMDeal {
   contact?: (CRMContact & { last_contact_at?: string | null }) | null;
+  contact_id?: string | null;
+  position?: number | null;
+  is_in_treatment?: boolean;
+  is_defaulting?: boolean;
   owner_profile?: {
     id: string;
     full_name: string | null;

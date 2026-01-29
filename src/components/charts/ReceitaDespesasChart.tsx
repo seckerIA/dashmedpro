@@ -71,8 +71,8 @@ export function ReceitaDespesasChart({ data = [] }: ReceitaDespesasChartProps) {
                     <div className="border-t border-border mt-2 pt-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Saldo:</span>
-                        <span className={`font-bold ${(payload[0]?.value || 0) - (payload[1]?.value || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {formatCurrency((payload[0]?.value || 0) - (payload[1]?.value || 0))}
+                        <span className={`font-bold ${(Number(payload[0]?.value) || 0) - (Number(payload[1]?.value) || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {formatCurrency((Number(payload[0]?.value) || 0) - (Number(payload[1]?.value) || 0))}
                         </span>
                       </div>
                     </div>

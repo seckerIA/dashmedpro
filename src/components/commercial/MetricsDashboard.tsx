@@ -11,7 +11,7 @@ export function MetricsDashboard() {
   const [period, setPeriod] = useState<PeriodFilter>('month');
   const [customRange, setCustomRange] = useState<{ start: Date; end: Date } | undefined>();
 
-  const { data: metrics, isLoading } = useCommercialMetrics(period, customRange);
+  const { metrics, isLoading } = useCommercialMetrics(period, customRange);
 
   if (isLoading && !metrics) {
     return (

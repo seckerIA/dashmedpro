@@ -108,7 +108,7 @@ export function ConversionModal({
       // Buscar o lead completo para obter o procedure_id
       const { data: leadData, error: leadError } = await supabase
         .from("commercial_leads")
-        .select("procedure_id")
+        .select("*")
         .eq("id", leadId)
         .single();
 
@@ -134,7 +134,7 @@ export function ConversionModal({
         custom_fields: Object.keys(customFields).length > 0 ? customFields : undefined,
       };
 
-      const newContact = await createContact.mutateAsync(contactData);
+      const newContact = await createContact(contactData);
 
       // 2. Converter o lead
       await convertLead.mutateAsync({
