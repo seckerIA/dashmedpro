@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Loader2, KeyRound, ArrowLeft } from 'lucide-react';
-const dashmedLogo = '/dashmed transparente.png';
+const dashmedLogo = '/dashmed-logo.png';
 import { Link } from 'react-router-dom';
 
 const ResetPassword = () => {

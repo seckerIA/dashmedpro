@@ -16,7 +16,7 @@ import { TeamStep } from './steps/TeamStep';
 import { ConfirmationStep } from './steps/ConfirmationStep';
 import { useOnboarding } from '@/hooks/useOnboarding';
 // Using logo from public folder
-const dashmedLogo = '/dashmed transparente.png';
+const dashmedLogo = '/dashmed-logo.png';
 
 // Animation variants for step transitions
 const stepVariants = {

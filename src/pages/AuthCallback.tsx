@@ -14,7 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-const dashmedLogo = '/dashmed transparente.png';
+const dashmedLogo = '/dashmed-logo.png';
 
 // Whitelist agora é gerenciada via tabela `allowed_emails` no banco de dados
 // Para adicionar um novo cliente: INSERT INTO allowed_emails (email, name, plan) VALUES ('email@example.com', 'Nome', 'basic');
