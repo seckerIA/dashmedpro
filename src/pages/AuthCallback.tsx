@@ -14,15 +14,10 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import dashmedLogo from '@/assets/dashmed-logo.png';
+const dashmedLogo = '/dashmed transparente.png';
 
-// Lista de emails permitidos (whitelisted) para login via Google
-// Se vazio, BLOQUEIA todos os novos usuários
-const ALLOWED_EMAILS: string[] = [];
-
-// Lista de domínios permitidos (ex: '@seudominio.com')
-// Se vazio, não permite domínios
-const ALLOWED_DOMAINS: string[] = [];
+// Whitelist agora é gerenciada via tabela `allowed_emails` no banco de dados
+// Para adicionar um novo cliente: INSERT INTO allowed_emails (email, name, plan) VALUES ('email@example.com', 'Nome', 'basic');
 
 const AuthCallback = () => {
   const navigate = useNavigate();
@@ -77,7 +72,7 @@ const AuthCallback = () => {
         // 3. MODO "APENAS LOGIN" - Verificar se usuário já existe
         const { data: existingProfile, error: profileError } = await supabase
           .from('profiles')
-          .select('id, email, full_name, role, is_super_admin')
+          .select('id, email, full_name, role, is_super_admin, onboarding_completed')
           .eq('id', user.id)
           .single();
 
@@ -103,16 +98,22 @@ const AuthCallback = () => {
         if (!existingProfile) {
           console.warn('⚠️ [AuthCallback] Novo usuário tentou fazer login via Google:', user.email);
 
-          // Verificar whitelist de emails
-          const isEmailAllowed = ALLOWED_EMAILS.includes(user.email || '');
+          // Verificar whitelist no banco de dados (tabela allowed_emails)
+          const { data: allowedEmail, error: allowedError } = await supabase
+            .from('allowed_emails')
+            .select('id, expires_at, used_at')
+            .ilike('email', user.email || '')
+            .maybeSingle();
 
-          // Verificar whitelist de domínios
-          const userDomain = user.email?.split('@')[1];
-          const isDomainAllowed = userDomain && ALLOWED_DOMAINS.some(domain =>
-            domain.startsWith('@') ? userDomain === domain.slice(1) : userDomain === domain
-          );
+          if (allowedError) {
+            console.error('❌ [AuthCallback] Erro ao verificar whitelist:', allowedError);
+          }
 
-          if (!isEmailAllowed && !isDomainAllowed) {
+          // Verificar se email está permitido e não expirou
+          const isExpired = allowedEmail?.expires_at && new Date(allowedEmail.expires_at) < new Date();
+          const isEmailAllowed = allowedEmail && !isExpired;
+
+          if (!isEmailAllowed) {
             setStatus('error');
             setErrorMessage('Acesso negado. Seu email não está cadastrado no sistema. Entre em contato com o administrador.');
 
@@ -130,6 +131,15 @@ const AuthCallback = () => {
             return;
           }
 
+          // Marcar email como usado (para tracking)
+          if (allowedEmail && !allowedEmail.used_at) {
+            await supabase
+              .from('allowed_emails')
+              .update({ used_at: new Date().toISOString() })
+              .eq('id', allowedEmail.id);
+            console.log('✅ [AuthCallback] Email marcado como usado:', user.email);
+          }
+
           // Se passou pela whitelist, criar perfil básico
           console.log('✅ [AuthCallback] Email permitido, criando perfil...');
 
@@ -141,6 +151,7 @@ const AuthCallback = () => {
               full_name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'Usuário',
               role: 'medico', // Role padrão (pode ser ajustado pelo admin depois)
               avatar_url: user.user_metadata?.avatar_url || null,
+              onboarding_completed: false, // Novo usuário precisa completar onboarding
             });
 
           if (createError) {
@@ -160,6 +171,16 @@ const AuthCallback = () => {
           }
 
           console.log('✅ [AuthCallback] Perfil criado com sucesso');
+
+          // Novo usuário - redirecionar para onboarding
+          setStatus('success');
+          toast({
+            title: 'Bem-vindo ao DashMed Pro!',
+            description: 'Vamos configurar sua clinica.',
+          });
+
+          setTimeout(() => navigate('/onboarding'), 1500);
+          return;
         } else {
           console.log('✅ [AuthCallback] Perfil existente encontrado:', existingProfile.email);
         }
@@ -172,11 +193,18 @@ const AuthCallback = () => {
           description: `Bem-vindo, ${existingProfile?.full_name || user.user_metadata?.name || user.email}!`,
         });
 
-        // 6. Redirecionar para dashboard
+        // 6. Redirecionar baseado no status de onboarding
         setTimeout(() => {
+          // Super admin vai direto para /admin
           if (existingProfile?.is_super_admin) {
             navigate('/admin');
-          } else {
+          }
+          // Usuário que não completou onboarding vai para /onboarding
+          else if (existingProfile?.onboarding_completed === false) {
+            navigate('/onboarding');
+          }
+          // Usuário normal vai para dashboard
+          else {
             navigate('/');
           }
         }, 1500);
@@ -202,7 +230,7 @@ const AuthCallback = () => {
   return (
     <div className="w-full min-h-screen flex items-center justify-center bg-background">
       <div className="mx-auto max-w-md w-full px-6 py-12 text-center space-y-6">
-        <img src={dashmedLogo} alt="DashMed Pro Logo" className="w-16 h-16 mx-auto" />
+        <img src={dashmedLogo} alt="DashMed Pro" className="h-16 w-auto mx-auto" />
 
         {status === 'processing' && (
           <>

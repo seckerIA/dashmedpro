@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { Organization } from '@/types/organization';
@@ -11,6 +11,7 @@ interface AuthContextType {
   isSuperAdmin: boolean;
   loading: boolean;
   signOut: () => Promise<void>;
+  refreshOrganization: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,6 +23,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [orgRole, setOrgRole] = useState<string | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Function to refresh organization data (called after onboarding completes)
+  const refreshOrganization = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const { data: memberData } = await supabase
+        .from('organization_members')
+        .select('role, organization:organizations(*)')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (memberData && memberData.organization) {
+        setOrganization(memberData.organization as any);
+        setOrgRole(memberData.role);
+        console.log('[useAuth] Organization refreshed successfully');
+      }
+    } catch (err) {
+      console.error('[useAuth] Error refreshing organization:', err);
+    }
+  }, [user]);
 
   useEffect(() => {
     const loadSession = async () => {
@@ -164,6 +186,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isSuperAdmin,
     loading,
     signOut,
+    refreshOrganization,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

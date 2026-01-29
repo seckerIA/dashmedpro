@@ -1,17 +1,69 @@
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { format, addDays } from "date-fns";
+import { format, addDays, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar as CalendarIcon, Users } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useMedicalAppointments } from "@/hooks/useMedicalAppointments";
+import { useAuth } from "@/hooks/useAuth";
+import { useMemo } from "react";
 
 export function FutureOutlook() {
-    // Mock data for now
-    const nextDays = [
-        { date: addDays(new Date(), 1), appointments: 12, surgeries: 1 },
-        { date: addDays(new Date(), 2), appointments: 8, surgeries: 0 },
-        { date: addDays(new Date(), 3), appointments: 15, surgeries: 2 },
-    ];
+    const { user } = useAuth();
+    const today = useMemo(() => new Date(), []);
+
+    // Fetch appointments for the next 3 days
+    const day1 = useMemo(() => addDays(today, 1), [today]);
+    const day2 = useMemo(() => addDays(today, 2), [today]);
+    const day3 = useMemo(() => addDays(today, 3), [today]);
+
+    const { appointments: day1Appointments, isLoading: loading1 } = useMedicalAppointments({
+        startDate: startOfDay(day1),
+        endDate: endOfDay(day1),
+        doctorIds: user?.id ? [user.id] : undefined
+    });
+
+    const { appointments: day2Appointments, isLoading: loading2 } = useMedicalAppointments({
+        startDate: startOfDay(day2),
+        endDate: endOfDay(day2),
+        doctorIds: user?.id ? [user.id] : undefined
+    });
+
+    const { appointments: day3Appointments, isLoading: loading3 } = useMedicalAppointments({
+        startDate: startOfDay(day3),
+        endDate: endOfDay(day3),
+        doctorIds: user?.id ? [user.id] : undefined
+    });
+
+    const isLoading = loading1 || loading2 || loading3;
+
+    // Count appointments and procedures (procedures with longer duration)
+    const countAppointments = (appointments: typeof day1Appointments) => {
+        if (!appointments) return { appointments: 0, procedures: 0 };
+        const total = appointments.length;
+        // Consider appointments > 60 minutes as longer procedures
+        const procedures = appointments.filter(apt =>
+            apt.procedure && apt.procedure.duration_minutes && apt.procedure.duration_minutes > 60
+        ).length;
+        return { appointments: total, procedures };
+    };
+
+    const nextDays = useMemo(() => [
+        { date: day1, ...countAppointments(day1Appointments) },
+        { date: day2, ...countAppointments(day2Appointments) },
+        { date: day3, ...countAppointments(day3Appointments) },
+    ], [day1, day2, day3, day1Appointments, day2Appointments, day3Appointments]);
+
+    if (isLoading) {
+        return (
+            <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider px-1">Próximos Dias</h3>
+                <div className="flex items-center justify-center py-8 text-muted-foreground">
+                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                    <span className="text-sm">Carregando agenda...</span>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-4">
@@ -30,11 +82,16 @@ export function FutureOutlook() {
                             </div>
                             <div>
                                 <p className="text-sm font-medium text-foreground">
-                                    {day.appointments} atendimentos
+                                    {day.appointments === 0
+                                        ? 'Sem atendimentos'
+                                        : day.appointments === 1
+                                            ? '1 atendimento'
+                                            : `${day.appointments} atendimentos`
+                                    }
                                 </p>
-                                {day.surgeries > 0 && (
+                                {day.procedures > 0 && (
                                     <p className="text-xs text-orange-500 font-medium flex items-center gap-1">
-                                        {day.surgeries} cirurgia(s)
+                                        {day.procedures} procedimento{day.procedures > 1 ? 's' : ''} longo{day.procedures > 1 ? 's' : ''}
                                     </p>
                                 )}
                             </div>
@@ -42,6 +99,11 @@ export function FutureOutlook() {
                         {day.appointments > 10 && (
                             <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/10">
                                 Cheio
+                            </Badge>
+                        )}
+                        {day.appointments === 0 && (
+                            <Badge variant="secondary" className="bg-muted text-muted-foreground border-muted">
+                                Livre
                             </Badge>
                         )}
                     </div>

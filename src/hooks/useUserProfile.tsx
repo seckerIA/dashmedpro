@@ -17,6 +17,9 @@ interface Profile {
   doctor_id: string | null;
   organization_id: string | null;
   enable_agenda_alerts: boolean | null;
+  onboarding_completed: boolean | null;
+  onboarding_completed_at: string | null;
+  specialty: string | null;
 }
 
 export function useUserProfile() {
@@ -33,7 +36,7 @@ export function useUserProfile() {
         // Nota: enable_agenda_alerts pode não existir se a migration não foi executada
         const profileQuery = supabase
           .from('profiles')
-          .select('id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by, doctor_id, organization_id')
+          .select('id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by, doctor_id, organization_id, onboarding_completed, onboarding_completed_at, specialty')
           .eq('id', user.id)
           .single();
 

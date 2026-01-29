@@ -15,8 +15,8 @@ import { formatCurrency } from "@/lib/currency";
 import { useNavigate } from "react-router-dom";
 
 interface ViewModeProps {
-    viewMode?: 'vision' | 'detailed';
-    onViewModeChange?: (mode: 'vision' | 'detailed') => void;
+    viewMode?: 'vision' | 'detailed' | 'daily' | 'general';
+    onViewModeChange?: (mode: 'vision' | 'detailed' | 'daily' | 'general') => void;
 }
 
 export default function VisionDashboard({ viewMode, onViewModeChange }: ViewModeProps) {
@@ -74,18 +74,18 @@ export default function VisionDashboard({ viewMode, onViewModeChange }: ViewMode
                     {onViewModeChange && (
                         <div className="flex items-center gap-1 bg-muted/20 p-1 rounded-xl border border-border/50">
                             <Button
-                                variant="ghost"
+                                variant={viewMode === 'daily' ? 'default' : 'ghost'}
                                 size="sm"
-                                onClick={() => onViewModeChange('daily' as any)}
-                                className="text-xs h-8 px-3 rounded-lg text-muted-foreground hover:text-foreground"
+                                onClick={() => onViewModeChange('daily')}
+                                className={`text-xs h-8 px-3 rounded-lg ${viewMode === 'daily' ? 'shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                             >
                                 Dia a Dia
                             </Button>
                             <Button
-                                variant={viewMode === 'vision' ? 'default' : 'ghost'}
+                                variant={viewMode === 'vision' || viewMode === 'general' ? 'default' : 'ghost'}
                                 size="sm"
                                 onClick={() => onViewModeChange('vision')}
-                                className={`text-xs h-8 px-3 rounded-lg ${viewMode === 'vision' ? 'shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                                className={`text-xs h-8 px-3 rounded-lg ${viewMode === 'vision' || viewMode === 'general' ? 'shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                             >
                                 Visão Geral
                             </Button>

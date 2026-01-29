@@ -51,7 +51,7 @@ import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/hooks/useAuth"
 import { useToast } from "@/hooks/use-toast"
 import { useUserProfile } from "@/hooks/useUserProfile"
-import dashmedLogo from "@/assets/imgdashmed-logo.png"
+const dashmedLogo = '/dashmed transparente.png'
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { useInventoryAlerts } from "@/hooks/useInventoryAlerts"
 
@@ -242,8 +242,8 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
             >
               <img
                 src={dashmedLogo}
-                alt="DashMed Pro Logo"
-                className={`${isCollapsed ? 'w-10 h-10' : 'w-12 h-12'} transition-smooth`}
+                alt="DashMed Pro"
+                className={`${isCollapsed ? 'h-10 w-auto' : 'h-12 w-auto'} transition-smooth`}
               />
               {!isCollapsed && (
                 <div className="flex flex-col">

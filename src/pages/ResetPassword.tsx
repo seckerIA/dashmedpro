@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Loader2, KeyRound, ArrowLeft } from 'lucide-react';
-import dashmedLogo from "@/assets/dashmed-logo.png";
+const dashmedLogo = '/dashmed transparente.png';
 import { Link } from 'react-router-dom';
 
 const ResetPassword = () => {
@@ -197,7 +197,7 @@ const ResetPassword = () => {
       <div className="w-full min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center space-y-2">
-            <img src={dashmedLogo} alt="Logo" className="w-16 h-16 mx-auto" />
+            <img src={dashmedLogo} alt="DashMed Pro" className="h-16 w-auto mx-auto" />
             <CardTitle className="text-2xl font-bold text-foreground">Link Expirado ou Inválido</CardTitle>
             <CardDescription>
               {isExpired 
@@ -228,7 +228,7 @@ const ResetPassword = () => {
           <Card className="border-0 shadow-none">
             <CardHeader className="text-left space-y-2">
               <div className="flex items-center gap-3">
-                <img src={dashmedLogo} alt="Logo" className="w-10 h-10" />
+                <img src={dashmedLogo} alt="DashMed Pro" className="h-10 w-auto" />
                 <div>
                   <CardTitle className="text-2xl font-bold text-foreground">Nova Senha</CardTitle>
                   <CardDescription>
@@ -311,7 +311,7 @@ const ResetPassword = () => {
       </div>
       <div className="hidden bg-muted lg:flex items-center justify-center p-12 text-center">
         <div className="space-y-4">
-          <img src={dashmedLogo} alt="DashMed Pro Logo" className="w-24 h-24 mx-auto" />
+          <img src={dashmedLogo} alt="DashMed Pro" className="h-20 w-auto mx-auto" />
           <h1 className="text-3xl font-bold text-foreground">DashMed Pro</h1>
           <p className="text-muted-foreground">
             Redefina sua senha para continuar acessando a plataforma.

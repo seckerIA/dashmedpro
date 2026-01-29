@@ -13,8 +13,8 @@ import { Button } from "@/components/ui/button" // Import Button
 const Dashboard = () => {
   const { isSecretaria, isMedico, profile } = useUserProfile();
   const { isLoading, error } = useDashboardMetrics();
-  // State for view mode
-  const [viewMode, setViewMode] = useState<'vision' | 'detailed'>('vision');
+  // State for view mode - includes 'daily' for day-to-day view
+  const [viewMode, setViewMode] = useState<'vision' | 'detailed' | 'daily'>('vision');
 
   if (isLoading) {
     return (
@@ -47,7 +47,9 @@ const Dashboard = () => {
   // Vision Dashboard (New UI) for Everyone else (Admin, Vendedor)
   return (
     <div className="min-h-screen bg-background relative">
-      {viewMode === 'vision' ? (
+      {viewMode === 'daily' ? (
+        <DoctorDashboard viewMode={viewMode} onViewModeChange={setViewMode} />
+      ) : viewMode === 'vision' ? (
         <VisionDashboard viewMode={viewMode} onViewModeChange={setViewMode} />
       ) : (
         <DetailedDashboard viewMode={viewMode} onViewModeChange={setViewMode} />

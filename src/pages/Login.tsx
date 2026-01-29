@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { supabase, CURRENT_PROJECT_REF } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, LogIn, UserPlus, Loader2, RefreshCw, Lock } from 'lucide-react';
-import dashmedLogo from "@/assets/dashmed-logo.png";
+const dashmedLogo = '/dashmed transparente.png';
 
 // CONFIGURAÇÃO: Definir como false para reabilitar o registro de contas
 const REGISTRATION_DISABLED = true;
@@ -307,7 +307,7 @@ const Login = () => {
             <Card className="border-0 shadow-none">
               <CardHeader className="text-left space-y-2">
                 <div className="flex items-center gap-3">
-                  <img src={dashmedLogo} alt="Logo" className="w-10 h-10" />
+                  <img src={dashmedLogo} alt="DashMed Pro" className="h-10 w-auto" />
                   <div>
                     <CardTitle className="text-2xl font-bold text-foreground">Recuperar Senha</CardTitle>
                     <CardDescription>
@@ -356,7 +356,7 @@ const Login = () => {
         </div>
         <div className="hidden bg-muted lg:flex items-center justify-center p-12 text-center">
           <div className="space-y-4">
-            <img src={dashmedLogo} alt="DashMed Pro Logo" className="w-24 h-24 mx-auto" />
+            <img src={dashmedLogo} alt="DashMed Pro" className="h-20 w-auto mx-auto" />
             <h1 className="text-3xl font-bold text-foreground">DashMed Pro</h1>
             <p className="text-muted-foreground">
               Recupere o acesso à sua conta.
@@ -374,7 +374,7 @@ const Login = () => {
           <Card className="border-0 shadow-none">
             <CardHeader className="text-left space-y-2">
               <div className="flex items-center gap-3">
-                <img src={dashmedLogo} alt="DashMed Pro Logo" className="w-10 h-10" />
+                <img src={dashmedLogo} alt="DashMed Pro" className="h-10 w-auto" />
                 <div>
                   <CardTitle className="text-2xl font-bold text-foreground">Bem-vindo</CardTitle>
                   <CardDescription>
@@ -593,7 +593,7 @@ const Login = () => {
       </div>
       <div className="hidden bg-muted lg:flex items-center justify-center p-12 text-center">
         <div className="space-y-4">
-          <img src={dashmedLogo} alt="DashMed Pro Logo" className="w-24 h-24 mx-auto" />
+          <img src={dashmedLogo} alt="DashMed Pro" className="h-20 w-auto mx-auto" />
           <h1 className="text-3xl font-bold text-foreground">DashMed Pro</h1>
           <p className="text-muted-foreground">
             A plataforma completa para impulsionar o seu negócio.

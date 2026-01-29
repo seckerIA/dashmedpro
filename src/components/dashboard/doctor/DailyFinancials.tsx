@@ -1,22 +1,90 @@
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DollarSign, TrendingUp, TrendingDown, ArrowRight, CreditCard, AlertCircle } from "lucide-react";
-import { useFinancialMetrics } from "@/hooks/useFinancialMetrics"; // Assuming this exists or use a generic hook
-import { formatCurrency } from "@/lib/currency"; // Assuming utility exists
+import { DollarSign, TrendingUp, AlertCircle, ArrowRight } from "lucide-react";
 import { SkeletonShimmer } from "@/components/ui/skeleton-shimmer";
 import { AnimatedCurrency, AnimatedNumber } from "@/components/ui/animated-number";
 import { useNavigate } from "react-router-dom";
+import { useMedicalAppointments } from "@/hooks/useMedicalAppointments";
+import { useAuth } from "@/hooks/useAuth";
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, subDays } from "date-fns";
+import { useMemo } from "react";
 
 export function DailyFinancials() {
     const navigate = useNavigate();
-    // For now, using mock data or simple hooks. 
-    // In a real scenario, useFinancialMetrics would be used.
-    const isLoading = false;
-    const todayRevenue = 1250.00;
-    const weekRevenue = 8400.00;
-    const pendingPayments = 2;
+    const { user } = useAuth();
+
+    const today = useMemo(() => new Date(), []);
+    const yesterday = useMemo(() => subDays(today, 1), [today]);
+
+    // Today's appointments
+    const { appointments: todayAppointments, isLoading: loadingToday } = useMedicalAppointments({
+        startDate: startOfDay(today),
+        endDate: endOfDay(today),
+        doctorIds: user?.id ? [user.id] : undefined
+    });
+
+    // Yesterday's appointments (for comparison)
+    const { appointments: yesterdayAppointments, isLoading: loadingYesterday } = useMedicalAppointments({
+        startDate: startOfDay(yesterday),
+        endDate: endOfDay(yesterday),
+        doctorIds: user?.id ? [user.id] : undefined
+    });
+
+    // This week's appointments
+    const { appointments: weekAppointments, isLoading: loadingWeek } = useMedicalAppointments({
+        startDate: startOfWeek(today, { weekStartsOn: 1 }),
+        endDate: endOfWeek(today, { weekStartsOn: 1 }),
+        doctorIds: user?.id ? [user.id] : undefined
+    });
+
+    const isLoading = loadingToday || loadingYesterday || loadingWeek;
+
+    // Calculate today's revenue from completed/paid appointments
+    const todayRevenue = useMemo(() => {
+        if (!todayAppointments) return 0;
+        return todayAppointments
+            .filter(apt => apt.status === 'completed' && apt.payment_status === 'paid')
+            .reduce((sum, apt) => sum + (apt.estimated_value || 0), 0);
+    }, [todayAppointments]);
+
+    // Calculate yesterday's revenue for comparison
+    const yesterdayRevenue = useMemo(() => {
+        if (!yesterdayAppointments) return 0;
+        return yesterdayAppointments
+            .filter(apt => apt.status === 'completed' && apt.payment_status === 'paid')
+            .reduce((sum, apt) => sum + (apt.estimated_value || 0), 0);
+    }, [yesterdayAppointments]);
+
+    // Calculate week's total revenue
+    const weekRevenue = useMemo(() => {
+        if (!weekAppointments) return 0;
+        return weekAppointments
+            .filter(apt => apt.status === 'completed' && apt.payment_status === 'paid')
+            .reduce((sum, apt) => sum + (apt.estimated_value || 0), 0);
+    }, [weekAppointments]);
+
+    // Count pending signals (sinal not paid)
+    const pendingSignals = useMemo(() => {
+        if (!todayAppointments) return 0;
+        return todayAppointments.filter(apt =>
+            apt.sinal_amount && apt.sinal_amount > 0 && !apt.sinal_paid
+        ).length;
+    }, [todayAppointments]);
+
+    // Calculate percentage change
+    const percentChange = useMemo(() => {
+        if (yesterdayRevenue === 0) return todayRevenue > 0 ? 100 : 0;
+        return ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100;
+    }, [todayRevenue, yesterdayRevenue]);
+
+    // Calculate week progress (what percentage of appointments completed)
+    const weekProgress = useMemo(() => {
+        if (!weekAppointments || weekAppointments.length === 0) return 0;
+        const completed = weekAppointments.filter(apt => apt.status === 'completed').length;
+        return Math.round((completed / weekAppointments.length) * 100);
+    }, [weekAppointments]);
 
     if (isLoading) {
         return (
@@ -48,9 +116,18 @@ export function DailyFinancials() {
                             <span className="text-2xl font-bold text-foreground">
                                 <AnimatedCurrency value={todayRevenue} duration={1.2} />
                             </span>
-                            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] h-5 px-1.5 gap-0.5">
-                                <TrendingUp className="w-2.5 h-2.5" /> +12%
-                            </Badge>
+                            {percentChange !== 0 && (
+                                <Badge
+                                    variant="outline"
+                                    className={`${percentChange >= 0
+                                        ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                                        : 'bg-red-500/10 text-red-600 border-red-500/20'
+                                    } text-[10px] h-5 px-1.5 gap-0.5`}
+                                >
+                                    <TrendingUp className={`w-2.5 h-2.5 ${percentChange < 0 ? 'rotate-180' : ''}`} />
+                                    {percentChange >= 0 ? '+' : ''}{percentChange.toFixed(0)}%
+                                </Badge>
+                            )}
                         </div>
                         <p className="text-xs text-muted-foreground mt-2">vs. ontem</p>
                     </div>
@@ -68,12 +145,14 @@ export function DailyFinancials() {
                             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Sinais Pendentes</p>
                             <div className="flex items-baseline gap-2">
                                 <span className="text-2xl font-bold text-foreground">
-                                    <AnimatedNumber value={pendingPayments} duration={0.8} />
+                                    <AnimatedNumber value={pendingSignals} duration={0.8} />
                                 </span>
-                                <span className="text-xs text-muted-foreground">aguardando liberacao</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {pendingSignals === 0 ? 'tudo em dia' : 'aguardando liberacao'}
+                                </span>
                             </div>
                         </div>
-                        <div className="bg-orange-500/10 p-2 rounded-lg text-orange-600">
+                        <div className={`${pendingSignals > 0 ? 'bg-orange-500/10 text-orange-600' : 'bg-emerald-500/10 text-emerald-600'} p-2 rounded-lg`}>
                             <AlertCircle className="w-5 h-5" />
                         </div>
                     </div>
@@ -103,9 +182,14 @@ export function DailyFinancials() {
                         </div>
                     </div>
                     <div className="w-full bg-secondary/50 h-1.5 rounded-full mt-auto overflow-hidden">
-                        <div className="bg-blue-600 h-full rounded-full w-[70%]" />
+                        <div
+                            className="bg-blue-600 h-full rounded-full transition-all duration-500"
+                            style={{ width: `${weekProgress}%` }}
+                        />
                     </div>
-                    <p className="text-[10px] text-muted-foreground mt-1 text-right">70% da meta semanal</p>
+                    <p className="text-[10px] text-muted-foreground mt-1 text-right">
+                        {weekProgress}% concluído
+                    </p>
                 </CardContent>
             </Card>
         </div>

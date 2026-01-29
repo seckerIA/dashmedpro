@@ -60,6 +60,7 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import AuthCallback from "./pages/AuthCallback";
+import Onboarding from "./pages/Onboarding";
 import TeamManagement from "./pages/TeamManagement";
 import Procedimentos from "./pages/Procedimentos";
 import Tasks from "./pages/Tasks";
@@ -432,6 +433,7 @@ const RoleProtectedRoute = ({
 
 const AppRoutes = () => {
   const { user, loading, isSuperAdmin } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -470,6 +472,26 @@ const AppRoutes = () => {
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
       </SuperAdminLayout>
+    );
+  }
+
+  // Auth Callback Route - Needs to be accessible for authenticated users too
+  // (User is already signed in by Supabase when they land here after Google OAuth)
+  if (location.pathname === '/auth/callback') {
+    return (
+      <Routes>
+        <Route path="/auth/callback" element={<AuthCallback />} />
+      </Routes>
+    );
+  }
+
+  // Onboarding Route - Separate from main app layout
+  // Uses its own full-screen layout with dedicated styling
+  if (location.pathname === '/onboarding') {
+    return (
+      <Routes>
+        <Route path="/onboarding" element={<Onboarding />} />
+      </Routes>
     );
   }
 

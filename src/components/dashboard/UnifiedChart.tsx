@@ -107,17 +107,6 @@ export function UnifiedChart({ className }: UnifiedChartProps) {
                     };
                 }) || [];
 
-                // Se não houver dados, criar dados placeholder
-                if (conversionData.length === 0) {
-                    return [
-                        { name: "Lead Novo", value: 100 },
-                        { name: "Qualificado", value: 75 },
-                        { name: "Apresentação", value: 50 },
-                        { name: "Proposta", value: 30 },
-                        { name: "Fechado", value: 20 },
-                    ];
-                }
-
                 return conversionData;
             default:
                 return [];
@@ -248,6 +237,17 @@ export function UnifiedChart({ className }: UnifiedChartProps) {
             <CardContent className="pt-0">
                 {/* Gráfico */}
                 <div className="h-[280px] mt-4">
+                    {chartData.length === 0 ? (
+                        <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+                            <BarChart3 className="h-12 w-12 mb-3 opacity-30" />
+                            <p className="text-sm">Sem dados disponíveis</p>
+                            <p className="text-xs mt-1">
+                                {activeChart === "receita" && "Registre transações para ver o gráfico de receita"}
+                                {activeChart === "pacientes" && "Adicione pacientes para ver o crescimento"}
+                                {activeChart === "conversao" && "Crie negociações no CRM para ver o funil de conversão"}
+                            </p>
+                        </div>
+                    ) : (
                     <ResponsiveContainer width="100%" height="100%">
                         {activeChart === "conversao" ? (
                             <BarChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
@@ -317,6 +317,7 @@ export function UnifiedChart({ className }: UnifiedChartProps) {
                             </AreaChart>
                         )}
                     </ResponsiveContainer>
+                    )}
                 </div>
 
                 {/* Insight */}
