@@ -102,6 +102,26 @@ const createFinancialTransactionForAppointment = async (
       return null;
     }
 
+    // Atualizar saldo da conta (entrada aumenta saldo)
+    const { data: account } = await supabase
+      .from('financial_accounts')
+      .select('current_balance')
+      .eq('id', accountId)
+      .single();
+
+    if (account) {
+      const currentBalance = account.current_balance || 0;
+      const amount = Number(appointment.estimated_value) || 0;
+      const newBalance = currentBalance + amount; // Entrada sempre soma
+
+      await supabase
+        .from('financial_accounts')
+        .update({ current_balance: newBalance })
+        .eq('id', accountId);
+
+      console.log('[Financial] Saldo da conta atualizado:', currentBalance, '->', newBalance);
+    }
+
     console.log('[Financial] Transação criada:', transaction.id);
     return transaction.id;
   } catch (error) {

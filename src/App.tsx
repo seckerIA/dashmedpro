@@ -9,7 +9,7 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { useUserProfile } from "./hooks/useUserProfile";
 import { SupabaseProjectValidator } from "./components/SupabaseProjectValidator";
-import { CortanaProvider, CortanaOverlay } from "./components/cortana";
+// import { CortanaProvider, CortanaOverlay } from "./components/cortana"; // Cortana desativada
 import { initHeartbeatRecovery, isPostRecoveryMode } from "@/lib/heartbeatRecovery";
 
 // Componente para inicializar o Heartbeat de recuperação
@@ -498,7 +498,8 @@ const AppRoutes = () => {
 
 
   return (
-    <CortanaProvider>
+    // CortanaProvider removido - Cortana desativada
+    <>
       <AppLayout>
         <Routes>
           <Route path="/login" element={<Navigate to="/" replace />} />
@@ -707,13 +708,13 @@ const AppRoutes = () => {
         </Routes>
       </AppLayout>
 
-      {/* Cortana - Assistente de Voz IA */}
-      <CortanaOverlay />
+      {/* Cortana desativada */}
+      {/* <CortanaOverlay /> */}
 
       {/* VOIP Components */}
       <CallOverlay />
       <IncomingCallModal />
-    </CortanaProvider>
+    </>
   );
 };
 

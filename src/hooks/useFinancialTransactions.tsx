@@ -166,6 +166,31 @@ export const useFinancialTransactions = (filters?: TransactionFilters) => {
         .single();
 
       if (error) throw error;
+
+      // Atualizar saldo da conta se a transação estiver concluída
+      if (data.account_id && data.status === 'concluida') {
+        // Buscar saldo atual da conta
+        const { data: account } = await supabase
+          .from('financial_accounts')
+          .select('current_balance')
+          .eq('id', data.account_id)
+          .single();
+
+        if (account) {
+          const currentBalance = account.current_balance || 0;
+          const amount = data.amount || 0;
+          // Entrada aumenta saldo, saída diminui
+          const newBalance = data.type === 'entrada'
+            ? currentBalance + amount
+            : currentBalance - amount;
+
+          await supabase
+            .from('financial_accounts')
+            .update({ current_balance: newBalance })
+            .eq('id', data.account_id);
+        }
+      }
+
       return data;
     },
     onSuccess: () => {

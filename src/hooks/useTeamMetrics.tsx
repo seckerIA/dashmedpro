@@ -556,7 +556,7 @@ function calculateUserMetricsFromData(
     userRole: profile?.role || undefined,
     totalPipeline,
     totalRevenue,
-    activeDeals: activeDeals.length,
+    activeDeals, // activeDeals já é um número (linha 446)
     wonDeals: wonDeals.length,
     lostDeals: lostDeals.length,
     conversionRate,

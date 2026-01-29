@@ -253,7 +253,7 @@ export function ProceduresStep({
                     type="number"
                     min={0}
                     max={12}
-                    value={customProcedure.durationHours || ''}
+                    value={customProcedure.durationHours}
                     onChange={(e) => setCustomProcedure(prev => ({
                       ...prev,
                       durationHours: Math.min(12, parseInt(e.target.value) || 0)
@@ -268,7 +268,7 @@ export function ProceduresStep({
                     type="number"
                     min={0}
                     max={59}
-                    value={customProcedure.durationMinutes || ''}
+                    value={customProcedure.durationMinutes}
                     onChange={(e) => setCustomProcedure(prev => ({
                       ...prev,
                       durationMinutes: Math.min(59, parseInt(e.target.value) || 0)

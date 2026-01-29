@@ -10,6 +10,7 @@ import type {
   CashFlowProjection,
   CostBreakdown
 } from "@/types/financial";
+import { startOfDay, endOfDay } from "date-fns";
 import { useCostsBreakdown } from "./useTransactionCosts";
 import { startOfMonth, endOfMonth, subMonths, format, addMonths } from "date-fns";
 
@@ -71,6 +72,24 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
         .filter(t => t.type === "saida")
         .reduce((sum, t) => sum + (t.amount || 0), 0);
 
+      // 2.1 Buscar transações de HOJE para receita do dia
+      const todayStart = format(startOfDay(now), "yyyy-MM-dd");
+      const todayEnd = format(endOfDay(now), "yyyy-MM-dd");
+
+      const todayTransactionsQuery = supabase
+        .from("financial_transactions")
+        .select("type, amount, status")
+        .eq("status", "concluida")
+        .eq("type", "entrada")
+        .gte("transaction_date", todayStart)
+        .lte("transaction_date", todayEnd);
+
+      const todayResult = await supabaseQueryWithTimeout(todayTransactionsQuery as any, undefined, signal);
+      const { data: todayTransactions } = todayResult;
+      const todayData = (todayTransactions || []) as Array<{ type: string; amount: number }>;
+
+      const todayRevenue = todayData.reduce((sum, t) => sum + (t.amount || 0), 0);
+
       // Calcular custos totais (apenas de entradas)
       const monthTotalCosts = transactionsData
         .filter(t => t.type === "entrada" && t.has_costs)
@@ -105,6 +124,7 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
         monthTotalCosts,
         monthNetProfit,
         netProfitMargin,
+        todayRevenue,
       };
 
       return metricsData;

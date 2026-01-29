@@ -421,7 +421,7 @@ export function useOnboarding(): UseOnboardingReturn {
         doctor: state.doctorData,
         procedures: state.procedures
           .filter(p => p.isSelected)
-          .map(({ id, isSelected, ...rest }) => rest),
+          .map(({ id, isSelected, isCustom, ...rest }) => rest), // Remove isCustom - not a DB column
         teamMembers: state.teamMembers.map(({ id, ...rest }) => rest),
       };
 

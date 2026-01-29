@@ -149,18 +149,33 @@ export function HeroMetrics({ className }: HeroMetricsProps) {
         }
 
         // Admin/Dono/Médico (padrão)
+        const todayRevenue = financialMetrics?.todayRevenue || 0;
         const monthProfit = financialMetrics?.monthNetProfit || 0;
         const profitTrend = financialMetrics?.netProfitMargin || 0;
         const newPatients = enhancedMetrics?.appointmentsThisMonth || 0;
-        const conversionRate = dashboardMetrics?.conversionRate || 0;
 
         return [
+            {
+                id: "today-revenue",
+                title: "Receita Hoje",
+                value: formatCurrency(todayRevenue),
+                status: todayRevenue > 0 ? "success" : "neutral",
+                icon: DollarSign,
+                trend: {
+                    direction: todayRevenue > 0 ? "up" : "stable",
+                    value: formatCurrency(monthProfit),
+                    label: "lucro do mês"
+                },
+                insight: todayRevenue > 0
+                    ? `Ótimo! Você já faturou ${formatCurrency(todayRevenue)} hoje`
+                    : "Ainda não há receitas registradas hoje"
+            },
             {
                 id: "profit",
                 title: "Lucro do Mês",
                 value: formatCurrency(monthProfit),
                 status: monthProfit > 0 ? "success" : monthProfit < 0 ? "danger" : "neutral",
-                icon: DollarSign,
+                icon: Activity,
                 trend: {
                     direction: profitTrend > 0 ? "up" : profitTrend < 0 ? "down" : "stable",
                     value: `${Math.abs(profitTrend).toFixed(1)}%`,
@@ -184,21 +199,6 @@ export function HeroMetrics({ className }: HeroMetricsProps) {
                 insight: newPatients > 0
                     ? `${newPatients} consultas agendadas este mês`
                     : "Considere ações de captação"
-            },
-            {
-                id: "conversion",
-                title: "Taxa de Conversão",
-                value: `${conversionRate.toFixed(1)}%`,
-                status: conversionRate >= 15 ? "success" : conversionRate >= 8 ? "warning" : "danger",
-                icon: Target,
-                trend: {
-                    direction: conversionRate >= 15 ? "up" : "stable",
-                    value: `${dashboardMetrics?.wonDeals || 0}`,
-                    label: "negócios ganhos"
-                },
-                insight: conversionRate >= 15
-                    ? "Excelente taxa de conversão!"
-                    : "Há espaço para melhorar o funil"
             }
         ];
     };

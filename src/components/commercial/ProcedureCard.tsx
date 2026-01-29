@@ -58,7 +58,7 @@ export function ProcedureCard({ procedure, onEdit, onDelete, showDoctor = false 
           <div>
             <p className="text-xs text-muted-foreground">Duração</p>
             <p className="text-sm font-medium text-card-foreground">
-              {procedure.duration_minutes} dias
+              {procedure.duration_minutes} min
             </p>
           </div>
         </div>

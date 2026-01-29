@@ -49,13 +49,15 @@ const Tasks = () => {
         return;
       }
 
-      await createTask(data);
-      console.log('[Tasks] Tarefa criada com sucesso');
+      const newTask = await createTask(data);
+      console.log('[Tasks] Tarefa criada com sucesso:', newTask);
 
       toast({
         title: "Tarefa criada",
         description: "A tarefa foi criada com sucesso!",
       });
+
+      return newTask; // Retornar a tarefa criada para permitir upload de anexos
     } catch (error) {
       console.error('[Tasks] Erro ao criar tarefa:', error);
       toast({

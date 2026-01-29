@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useUserProfile } from "./useUserProfile";
+import { useToast } from "./use-toast";
 
 export type Supplier = {
     id: string;
@@ -24,6 +25,7 @@ export function useSuppliers() {
     const { user } = useAuth();
     const { profile } = useUserProfile();
     const queryClient = useQueryClient();
+    const { toast } = useToast();
 
     const suppliersQuery = useQuery({
         queryKey: ["inventory-suppliers"],
@@ -86,6 +88,25 @@ export function useSuppliers() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["inventory-suppliers"] });
+            toast({
+                title: "Fornecedor excluído",
+                description: "O fornecedor foi removido com sucesso.",
+            });
+        },
+        onError: (error: any) => {
+            console.error("Erro ao excluir fornecedor:", error);
+            // Verificar se é erro de FK constraint
+            const isFKError = error?.message?.includes('violates foreign key') ||
+                error?.message?.includes('referenced') ||
+                error?.code === '23503';
+
+            toast({
+                variant: "destructive",
+                title: "Erro ao excluir",
+                description: isFKError
+                    ? "Este fornecedor possui itens de estoque vinculados. Remova os itens primeiro."
+                    : "Não foi possível excluir o fornecedor. Tente novamente.",
+            });
         },
     });
 

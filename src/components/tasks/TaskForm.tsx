@@ -181,14 +181,21 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
 
       console.log('[TaskForm] Dados formatados:', formData);
       const savedTask = await onSave(formData);
-      console.log('[TaskForm] Tarefa salva com sucesso');
+      console.log('[TaskForm] Tarefa salva com sucesso:', savedTask);
 
       // Upload de anexos pendentes após salvar a tarefa
-      if (pendingFiles.length > 0 && task?.id) {
-        console.log('[TaskForm] Fazendo upload de', pendingFiles.length, 'anexos...');
+      // Usar o ID da tarefa salva (retornada) OU o ID da tarefa existente
+      const taskIdForUpload = (savedTask as any)?.id || task?.id;
+      if (pendingFiles.length > 0 && taskIdForUpload) {
+        console.log('[TaskForm] Fazendo upload de', pendingFiles.length, 'anexos para tarefa:', taskIdForUpload);
         for (const file of pendingFiles) {
-          await uploadAttachment({ file, taskId: task.id });
+          try {
+            await uploadAttachment({ file, taskId: taskIdForUpload });
+          } catch (uploadError) {
+            console.error('[TaskForm] Erro ao fazer upload do anexo:', file.name, uploadError);
+          }
         }
+        console.log('[TaskForm] Upload de anexos concluído');
       }
 
       if (!isEditing) {
