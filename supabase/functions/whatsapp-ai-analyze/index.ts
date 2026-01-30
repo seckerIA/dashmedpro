@@ -9,7 +9,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, cache-control, pragma, expires, x-requested-with',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
@@ -17,7 +17,7 @@ const corsHeaders = {
 type LeadStatus = 'novo' | 'frio' | 'morno' | 'quente' | 'convertido' | 'perdido';
 type UrgencyLevel = 'baixa' | 'media' | 'alta' | 'urgente';
 type Sentiment = 'positivo' | 'neutro' | 'negativo';
-type SuggestionType = 'quick_reply' | 'full_message' | 'procedure_info' | 'scheduling' | 'follow_up';
+type SuggestionType = 'quick_reply' | 'full_message' | 'procedure_info' | 'scheduling' | 'follow_up' | 'system_message';
 
 interface Suggestion {
   type: SuggestionType;
@@ -502,9 +502,7 @@ Analise a conversa, extraia dados e gere respostas.`;
     // Auto-Reply
     // Somente se a configuração global permitir E o modo autônomo da conversa estiver ligado
     if (aiConfig?.auto_reply_enabled === true && conversation.ai_autonomous_mode !== false) {
-      const bestSuggestion = suggestionsToInsert[0];
-      const CONFIDENCE_THRESHOLD = 0.85;
-
+      let bestSuggestion = suggestionsToInsert[0];
       const CONFIDENCE_THRESHOLD = 0.85;
       let shouldSend = true;
 

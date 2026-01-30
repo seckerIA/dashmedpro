@@ -222,6 +222,17 @@ supabase/functions/
 - **Frontend Fixes**:
   - `TeamManagement.tsx`: Adicionada validação de permissões no frontend para criação de usuários.
 
+### Contexto Atual (30/01/2026 - Realtime AI & RLS Fixes)
+- **WhatsApp AI Realtime Subscriptions**:
+  - `useWhatsAppAI.tsx`: Adicionado subscriptions de realtime para atualizar análises e sugestões de IA automaticamente quando há mudanças no banco.
+  - Channels: `whatsapp_conversation_analysis` e `whatsapp_ai_suggestions` com invalidação automática de queries.
+- **Edge Function Fixes**:
+  - `whatsapp-ai-analyze`: Corrigido CORS headers (adicionados `cache-control`, `pragma`, `expires`, `x-requested-with`).
+  - Fix de variável duplicada `CONFIDENCE_THRESHOLD` e adicionado tipo `system_message` ao enum `SuggestionType`.
+- **Database Migrations**:
+  - `20260221000005_fix_whatsapp_assignment_pool_fkey.sql`: Correção de FK no pool de atribuição de WhatsApp.
+  - `20260221000006_fix_ai_rls_policies.sql`: Ajustes em políticas RLS para análise de IA.
+
 ### Contexto Atual (26/01/2026 - AI Data Extraction & UI Fixes)
 - **WhatsApp AI Data Enrichment**:
   - Implementada lógica de extração autônoma de dados (CPF, Email, Nome, Endereço) diretamente da conversa do WhatsApp na Edge Function `whatsapp-ai-analyze`.
@@ -229,7 +240,7 @@ supabase/functions/
   - Adicionado log de debug (`debug_logs`) para rastrear atualizações de contatos via IA (`CRM Contact Enriched`).
 - **UI/UX Fixes**:
   - `WhatsAppLayout.tsx`: Corrigido bug de sobreposição do botão de toggle da sidebar adicionando `relative` ao container.
-  - `ContactInfo.tsx`: 
+  - `ContactInfo.tsx`:
     - Corrigido layout dos botões de ação ("Agendar" e "Ver no CRM") para ficarem lado a lado em grid.
     - Estilização aprimorada: removidas bordas brancas, aplicado background colorido suave (blue/green tints) para melhor contraste no tema dark.
     - Botão "Agendar" tornado sempre visível, com alerta amigável se o contato não estiver vinculado.

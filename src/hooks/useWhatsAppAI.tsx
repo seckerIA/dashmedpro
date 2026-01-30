@@ -3,6 +3,7 @@
  * Gerencia análise de IA para conversas do WhatsApp
  */
 
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -47,6 +48,50 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
 
   // Determinar quem é o dono da config
   const configOwnerId = targetUserId || conversationData?.user_id || user?.id;
+
+  // =====================================================
+  // Realtime Subscriptions
+  // =====================================================
+
+  useEffect(() => {
+    if (!conversationId) return;
+
+    console.log('[useWhatsAppAI] Subscribing to AI updates for:', conversationId);
+
+    const channel = supabase
+      .channel(`ai-analysis-${conversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'whatsapp_conversation_analysis',
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          console.log('[useWhatsAppAI] Analysis updated:', payload);
+          queryClient.invalidateQueries({ queryKey: ['whatsapp-analysis', conversationId] });
+          queryClient.invalidateQueries({ queryKey: ['hot-leads'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'whatsapp_ai_suggestions',
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['whatsapp-suggestions', conversationId] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [conversationId, queryClient]);
 
 
 
