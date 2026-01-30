@@ -789,6 +789,10 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
       // Invalidar queries do CRM/pipeline para refletir mudanças
       queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
       queryClient.invalidateQueries({ queryKey: ['crm-pipeline'] });
+      // Invalidar queries financeiras (caso tenha criado transação para consulta paga)
+      queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-accounts'] });
       toast({
         title: 'Consulta agendada com sucesso!',
         description: 'A consulta foi adicionada à agenda.',
@@ -839,6 +843,10 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
       queryClient.invalidateQueries({ queryKey: ['crm-pipeline'] });
       // Invalidar métricas de sinais para secretárias
       queryClient.invalidateQueries({ queryKey: ['secretary-sinal-metrics'] });
+      // Invalidar queries financeiras (caso payment_status tenha mudado para paid)
+      queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-accounts'] });
     },
   });
 

@@ -563,11 +563,16 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         l.status === 'finalizado'
       ).length || 0;
 
+      // Contar TODOS os agendamentos (não só os completed) para taxa de conversão lead -> consulta
+      const allScheduledAppointments = appointments?.filter(a =>
+        a.status === 'scheduled' || a.status === 'confirmed' || a.status === 'completed'
+      ) || [];
+
       const leadsToAppointments = totalLeads > 0
-        ? (completedAppointments.length / totalLeads) * 100
+        ? (allScheduledAppointments.length / totalLeads) * 100
         : 0;
-      const appointmentsToSales = completedAppointments.length > 0
-        ? ((sales?.length || 0) / completedAppointments.length) * 100
+      const appointmentsToSales = allScheduledAppointments.length > 0
+        ? ((sales?.length || 0) / allScheduledAppointments.length) * 100
         : 0;
 
       // Leads perdidos (status que indicam perda)
@@ -622,7 +627,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       const workDays = differenceInDays(period.end, period.start) + 1;
       const workHoursPerDay = 8; // Assumindo 8 horas de trabalho por dia
       const totalAvailableSlots = workDays * workHoursPerDay * 4; // 4 slots de 15min por hora
-      const scheduledSlots = completedAppointments.length;
+      const scheduledSlots = allScheduledAppointments.length;
       const occupancyRate = totalAvailableSlots > 0
         ? (scheduledSlots / totalAvailableSlots) * 100
         : 0;
@@ -705,7 +710,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         },
         {
           stage: 'Consultas',
-          count: completedAppointments.length,
+          count: allScheduledAppointments.length,
           percentage: funnelBaseCount > 0
             ? Math.min((completedAppointments.length / funnelBaseCount) * 100, 100)
             : (completedAppointments.length > 0 ? 100 : 0)
@@ -884,7 +889,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
             overall: overallConversion,
             funnel: [
               { stage: 'Leads', count: totalLeads, percentage: 100 },
-              { stage: 'Consultas', count: completedAppointments.length, percentage: leadsToAppointments },
+              { stage: 'Consultas', count: allScheduledAppointments.length, percentage: leadsToAppointments },
               { stage: 'Vendas', count: sales?.length || 0, percentage: overallConversion },
             ],
           },
