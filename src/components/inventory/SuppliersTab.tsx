@@ -1,6 +1,6 @@
 
 import React, { useState } from "react";
-import { Plus, Search, Edit, Trash2, Building2 } from "lucide-react";
+import { Plus, Search, Edit, EyeOff, Building2 } from "lucide-react";
 import { useSuppliers, Supplier, SupplierInsert } from "@/hooks/useSuppliers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,11 +34,11 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 
 export function SuppliersTab() {
-    const { suppliers, isLoading, createSupplier, updateSupplier, deleteSupplier } = useSuppliers();
+    const { suppliers, isLoading, createSupplier, updateSupplier, deactivateSupplier } = useSuppliers();
     const [searchTerm, setSearchTerm] = useState("");
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
-    const [supplierToDelete, setSupplierToDelete] = useState<string | null>(null);
+    const [supplierToDeactivate, setSupplierToDeactivate] = useState<string | null>(null);
     const { user } = useAuth();
 
     const [formData, setFormData] = useState<SupplierInsert>({
@@ -97,10 +97,10 @@ export function SuppliersTab() {
         }
     };
 
-    const handleDelete = async () => {
-        if (supplierToDelete) {
-            await deleteSupplier.mutateAsync(supplierToDelete);
-            setSupplierToDelete(null);
+    const handleDeactivate = async () => {
+        if (supplierToDeactivate) {
+            await deactivateSupplier.mutateAsync(supplierToDeactivate);
+            setSupplierToDeactivate(null);
         }
     }
 
@@ -164,8 +164,8 @@ export function SuppliersTab() {
                                         <Button variant="ghost" size="icon" onClick={() => handleOpenModal(supplier)}>
                                             <Edit className="h-4 w-4" />
                                         </Button>
-                                        <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-700 hover:bg-red-100" onClick={() => setSupplierToDelete(supplier.id)}>
-                                            <Trash2 className="h-4 w-4" />
+                                        <Button variant="ghost" size="icon" className="text-amber-500 hover:text-amber-700 hover:bg-amber-100" onClick={() => setSupplierToDeactivate(supplier.id)} title="Desativar fornecedor">
+                                            <EyeOff className="h-4 w-4" />
                                         </Button>
                                     </TableCell>
                                 </TableRow>
@@ -241,23 +241,24 @@ export function SuppliersTab() {
                 </DialogContent>
             </Dialog>
 
-            {/* Delete Confirmation Dialog */}
-            <AlertDialog open={!!supplierToDelete} onOpenChange={(open) => !open && setSupplierToDelete(null)}>
+            {/* Deactivate Confirmation Dialog */}
+            <AlertDialog open={!!supplierToDeactivate} onOpenChange={(open) => !open && setSupplierToDeactivate(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Excluir Fornecedor</AlertDialogTitle>
+                        <AlertDialogTitle>Desativar Fornecedor</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Tem certeza que deseja excluir este fornecedor? Esta ação não pode ser desfeita.
-                            Se houver itens de estoque vinculados, a exclusão não será permitida.
+                            Tem certeza que deseja desativar este fornecedor?
+                            Ele não aparecerá mais na lista, mas o histórico de transações será preservado.
+                            Você pode reativá-lo posteriormente se necessário.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={handleDelete}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={handleDeactivate}
+                            className="bg-amber-600 text-white hover:bg-amber-700"
                         >
-                            Excluir
+                            Desativar
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

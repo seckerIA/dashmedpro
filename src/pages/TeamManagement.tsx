@@ -147,35 +147,52 @@ const TeamManagement = () => {
   // Verificar limite de membros da organização
   const checkMemberLimit = async () => {
     try {
-      // Buscar organização do usuário atual
+      // Buscar organização do usuário atual com limite e owner
       const { data: orgMember } = await supabase
         .from('organization_members')
-        .select('organization_id')
+        .select(`
+          organization_id,
+          organization:organizations(
+            id,
+            member_limit,
+            additional_member_price,
+            owner_id
+          )
+        `)
         .eq('user_id', user?.id)
         .single();
 
       if (!orgMember?.organization_id) return;
 
-      // Buscar limite e contagem de membros
-      const { data: org } = await supabase
-        .from('organizations')
-        .select('member_limit, additional_member_price')
-        .eq('id', orgMember.organization_id)
-        .single();
+      const org = orgMember.organization as any;
+      const ownerId = org?.owner_id;
 
-      const { count } = await supabase
+      // Buscar contagem de membros EXCLUINDO o dono (owner não conta no limite)
+      let countQuery = supabase
         .from('organization_members')
         .select('*', { count: 'exact', head: true })
         .eq('organization_id', orgMember.organization_id);
 
+      // Se temos owner_id, excluir da contagem
+      if (ownerId) {
+        countQuery = countQuery.neq('user_id', ownerId);
+      }
+
+      const { count } = await countQuery;
+
       const currentMembers = count || 0;
-      const limit = org?.member_limit || 1;
-      const price = org?.additional_member_price || 89.90;
+      // Usar valores da organização ou defaults
+      const limit = org?.member_limit ?? 1;
+      const price = org?.additional_member_price ?? 89.90;
 
       setMemberLimitInfo({ current: currentMembers, limit, price });
+      // Limite atingido se membros adicionais >= limite permitido
       setMemberLimitReached(currentMembers >= limit);
     } catch (error) {
       console.error('Erro ao verificar limite de membros:', error);
+      // Em caso de erro, usar valores padrão seguros
+      setMemberLimitInfo({ current: 0, limit: 1, price: 89.90 });
+      setMemberLimitReached(false);
     }
   };
 
@@ -557,6 +574,22 @@ const TeamManagement = () => {
           </DialogContent>
         </Dialog>
 
+        {/* Botão de adicionar membro - verifica limite antes de abrir dialog */}
+        <Button onClick={() => {
+          // Verificar limite antes de abrir o dialog
+          if (memberLimitReached) {
+            setUpgradeDialogOpen(true);
+          } else {
+            setEditingProfile(null);
+            setFormData({ email: '', password: '', full_name: '', role: 'vendedor', doctor_id: '', consultation_value: '' });
+            setSelectedDoctorIds([]);
+            setDialogOpen(true);
+          }
+        }}>
+          <UserPlus className="mr-2 h-4 w-4" />
+          Adicionar Membro
+        </Button>
+
         <Dialog open={dialogOpen} onOpenChange={(open) => {
           setDialogOpen(open);
           if (!open) {
@@ -565,18 +598,6 @@ const TeamManagement = () => {
             setSelectedDoctorIds([]);
           }
         }}>
-          <DialogTrigger asChild>
-            <Button onClick={(e) => {
-              // Verificar limite antes de abrir o dialog
-              if (memberLimitReached && !editingProfile) {
-                e.preventDefault();
-                setUpgradeDialogOpen(true);
-              }
-            }}>
-              <UserPlus className="mr-2 h-4 w-4" />
-              Adicionar Membro
-            </Button>
-          </DialogTrigger>
           <DialogContent className="sm:max-w-md">
             <form onSubmit={handleCreateUser}>
               <DialogHeader>

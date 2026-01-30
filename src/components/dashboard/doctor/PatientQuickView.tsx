@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { usePatientMedicalHistory } from "@/hooks/useMedicalRecords";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useNavigate } from "react-router-dom";
 
 interface PatientQuickViewProps {
     open: boolean;
@@ -23,7 +24,22 @@ interface PatientQuickViewProps {
 }
 
 export function PatientQuickView({ open, onOpenChange, patientId, patientName }: PatientQuickViewProps) {
+    const navigate = useNavigate();
     const { data: history, isLoading } = usePatientMedicalHistory(open && patientId ? patientId : null);
+
+    const handleViewProfile = () => {
+        if (patientId) {
+            onOpenChange(false);
+            navigate(`/comercial?tab=leads`);
+        }
+    };
+
+    const handleStartConsultation = () => {
+        if (patientId) {
+            onOpenChange(false);
+            navigate(`/prontuarios?patientId=${patientId}&openNewRecord=true`);
+        }
+    };
 
     const latestRecord = history?.records?.[0];
     const latestExam = latestRecord?.physical_exam_notes; // Fallback if no structured vital signs yet
@@ -53,10 +69,21 @@ export function PatientQuickView({ open, onOpenChange, patientId, patientName }:
                                 )}
                             </DialogDescription>
                             <div className="flex gap-2 mt-2">
-                                <Button size="sm" variant="outline" className="h-7 text-xs">
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 text-xs"
+                                    onClick={handleViewProfile}
+                                    disabled={!patientId}
+                                >
                                     <User className="w-3 h-3 mr-1.5" /> Perfil Completo
                                 </Button>
-                                <Button size="sm" className="h-7 text-xs bg-primary/10 text-primary hover:bg-primary/20 border-primary/20">
+                                <Button
+                                    size="sm"
+                                    className="h-7 text-xs bg-primary/10 text-primary hover:bg-primary/20 border-primary/20"
+                                    onClick={handleStartConsultation}
+                                    disabled={!patientId}
+                                >
                                     Iniciar Atendimento
                                 </Button>
                             </div>

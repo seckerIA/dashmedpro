@@ -549,10 +549,16 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       // Taxa de conversão
       const totalLeads = leads?.length || 0;
 
+      // Contar TODOS os agendamentos (não só os completed) para taxa de conversão lead -> consulta
+      const allScheduledAppointments = appointments?.filter(a =>
+        a.status === 'scheduled' || a.status === 'confirmed' || a.status === 'completed'
+      ) || [];
+
       console.log('📊 [Conversion Debug]', {
         totalLeads,
         statuses: leads?.map(l => l.status),
-        salesCount: sales?.length || 0
+        salesCount: sales?.length || 0,
+        appointmentsCount: allScheduledAppointments.length
       });
 
       const convertedLeadsCount = leads?.filter(l =>
@@ -562,11 +568,6 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         l.status === 'em_tratamento' ||
         l.status === 'finalizado'
       ).length || 0;
-
-      // Contar TODOS os agendamentos (não só os completed) para taxa de conversão lead -> consulta
-      const allScheduledAppointments = appointments?.filter(a =>
-        a.status === 'scheduled' || a.status === 'confirmed' || a.status === 'completed'
-      ) || [];
 
       const leadsToAppointments = totalLeads > 0
         ? (allScheduledAppointments.length / totalLeads) * 100
@@ -584,14 +585,20 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         l.status === 'desqualificado'
       ).length || 0;
 
-      // Taxa de sucesso: leads convertidos / leads finalizados (convertidos + perdidos)
-      // Ignora leads em andamento para dar uma visão real da eficácia de fechamento
-      const totalFinalizedLeads = convertedLeadsCount + lostLeadsCount;
-      const overallConversion = totalFinalizedLeads > 0
-        ? (sales?.length && sales.length > 0)
-          ? (sales.length / totalFinalizedLeads) * 100
-          : (convertedLeadsCount / totalFinalizedLeads) * 100
-        : 0;
+      // Taxa de conversão: leads que viraram agendamento / total de leads
+      // Conta leads únicos que têm pelo menos 1 agendamento associado
+      const leadsWithAppointmentsSet = new Set(
+        allScheduledAppointments
+          ?.filter(a => a.contact_id)
+          .map(a => a.contact_id)
+      );
+      const leadsWithAppointmentsCount = leadsWithAppointmentsSet.size;
+
+      // Se há leads, calcula % que viraram agendamento
+      // Se não há leads mas há agendamentos, considera 100% (agendamentos diretos)
+      const overallConversion = totalLeads > 0
+        ? (leadsWithAppointmentsCount / totalLeads) * 100
+        : (allScheduledAppointments.length > 0 ? 100 : 0);
 
       // Buscar procedimentos do catálogo (total de procedimentos ativos cadastrados) - MOVER PARA ANTES DO LOG
       const proceduresQuery = applyUserFilter(

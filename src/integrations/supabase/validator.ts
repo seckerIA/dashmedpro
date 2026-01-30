@@ -73,6 +73,16 @@ export async function validateSession(): Promise<{
 }> {
   const errors: string[] = [];
 
+  // Pular validação completamente se estiver no callback de auth
+  // (o AuthCallback vai criar o perfil para novos usuários)
+  if (typeof window !== 'undefined' && window.location.pathname.includes('/auth/callback')) {
+    return {
+      isValid: true,
+      isFromCorrectProject: true,
+      errors: [],
+    };
+  }
+
   try {
     const { data: { session }, error } = await supabase.auth.getSession();
 
@@ -119,6 +129,15 @@ export async function validateSession(): Promise<{
         .single();
 
       if (profileError || !profile) {
+        // Se estamos no callback de auth, permitir (o AuthCallback vai criar o perfil)
+        if (typeof window !== 'undefined' && window.location.pathname.includes('/auth/callback')) {
+          return {
+            isValid: true,
+            isFromCorrectProject: true,
+            errors: [],
+          };
+        }
+
         errors.push(
           `Usuário autenticado não existe no banco de dados atual! User ID: ${session.user.id}`
         );

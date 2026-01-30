@@ -118,12 +118,12 @@ export function AgendaCard({ appointment, onStatusChange }: AgendaCardProps) {
                                     <Avatar className="h-10 w-10 border-2 border-background shadow-sm group-hover:border-primary/20 transition-colors">
                                         <AvatarImage />
                                         <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">
-                                            {appointment.patient?.name?.substring(0, 2).toUpperCase() || 'PAC'}
+                                            {(appointment.contact?.full_name || appointment.patient?.name)?.substring(0, 2).toUpperCase() || 'PAC'}
                                         </AvatarFallback>
                                     </Avatar>
                                     <div className="min-w-0">
                                         <h3 className="font-semibold text-sm leading-none truncate group-hover:text-primary transition-colors">
-                                            {appointment.patient?.name || 'Paciente não identificado'}
+                                            {appointment.contact?.full_name || appointment.patient?.name || 'Paciente não identificado'}
                                         </h3>
                                         <p className="text-xs text-muted-foreground mt-1 truncate flex items-center gap-1.5">
                                             {appointment.appointment_type && (
@@ -148,8 +148,8 @@ export function AgendaCard({ appointment, onStatusChange }: AgendaCardProps) {
                                         <DropdownMenuItem onClick={() => setShowQuickView(true)}>
                                             Ver Prontuário
                                         </DropdownMenuItem>
-                                        {appointment.patient?.phone && (
-                                            <DropdownMenuItem onClick={() => window.open(`https://wa.me/${appointment.patient.phone}`, '_blank')}>
+                                        {(appointment.contact?.phone || appointment.patient?.phone) && (
+                                            <DropdownMenuItem onClick={() => window.open(`https://wa.me/${appointment.contact?.phone || appointment.patient?.phone}`, '_blank')}>
                                                 <Phone className="mr-2 h-4 w-4" /> WhatsApp
                                             </DropdownMenuItem>
                                         )}
@@ -182,8 +182,8 @@ export function AgendaCard({ appointment, onStatusChange }: AgendaCardProps) {
             <PatientQuickView
                 open={showQuickView}
                 onOpenChange={setShowQuickView}
-                patientId={appointment.patient_id}
-                patientName={appointment.patient?.name}
+                patientId={appointment.contact_id || appointment.patient_id}
+                patientName={appointment.contact?.full_name || appointment.patient?.name}
             />
         </>
     );

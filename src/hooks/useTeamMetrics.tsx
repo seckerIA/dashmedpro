@@ -31,6 +31,7 @@ export interface TeamMetrics {
   activeDeals: number;
   wonDeals: number;
   lostDeals: number;
+  totalDeals: number; // Total de deals únicos (para cálculo de conversão sem duplicação)
   conversionRate: number;
   totalContacts: number;
   totalLeads: number;
@@ -255,14 +256,20 @@ const fetchTeamMetrics = async (
     });
 
     // Calcular métricas consolidadas
+    const totalWonDeals = teamMetrics.reduce((sum, tm) => sum + tm.wonDeals, 0);
+    const totalLostDeals = teamMetrics.reduce((sum, tm) => sum + tm.lostDeals, 0);
+    // Total de deals únicos da equipe (sem duplicação)
+    const totalDealsForConversion = teamMetrics.reduce((sum, tm) => sum + tm.totalDeals, 0);
+
     return {
       totalPipeline: teamMetrics.reduce((sum, tm) => sum + tm.totalPipeline, 0),
       totalRevenue: teamMetrics.reduce((sum, tm) => sum + tm.totalRevenue, 0),
       totalActiveDeals: teamMetrics.reduce((sum, tm) => sum + tm.activeDeals, 0),
-      totalWonDeals: teamMetrics.reduce((sum, tm) => sum + tm.wonDeals, 0),
-      totalLostDeals: teamMetrics.reduce((sum, tm) => sum + tm.lostDeals, 0),
-      averageConversionRate: teamMetrics.length > 0
-        ? teamMetrics.reduce((sum, tm) => sum + tm.conversionRate, 0) / teamMetrics.length
+      totalWonDeals,
+      totalLostDeals,
+      // Conversão global: total de deals ganhos / total de deals da equipe
+      averageConversionRate: totalDealsForConversion > 0
+        ? (totalWonDeals / totalDealsForConversion) * 100
         : 0,
       totalContacts: teamMetrics.reduce((sum, tm) => sum + tm.totalContacts, 0),
       totalLeads: teamMetrics.reduce((sum, tm) => sum + tm.totalLeads, 0),
@@ -392,14 +399,20 @@ const fetchTeamMetrics = async (
   });
 
   // Calcular métricas consolidadas
+  const totalWonDeals = teamMetrics.reduce((sum, tm) => sum + tm.wonDeals, 0);
+  const totalLostDeals = teamMetrics.reduce((sum, tm) => sum + tm.lostDeals, 0);
+  // Total de deals únicos da equipe (sem duplicação)
+  const totalDealsForConversion = teamMetrics.reduce((sum, tm) => sum + tm.totalDeals, 0);
+
   return {
     totalPipeline: teamMetrics.reduce((sum, tm) => sum + tm.totalPipeline, 0),
     totalRevenue: teamMetrics.reduce((sum, tm) => sum + tm.totalRevenue, 0),
     totalActiveDeals: teamMetrics.reduce((sum, tm) => sum + tm.activeDeals, 0),
-    totalWonDeals: teamMetrics.reduce((sum, tm) => sum + tm.wonDeals, 0),
-    totalLostDeals: teamMetrics.reduce((sum, tm) => sum + tm.lostDeals, 0),
-    averageConversionRate: teamMetrics.length > 0
-      ? teamMetrics.reduce((sum, tm) => sum + tm.conversionRate, 0) / teamMetrics.length
+    totalWonDeals,
+    totalLostDeals,
+    // Conversão global: total de deals ganhos / total de deals da equipe
+    averageConversionRate: totalDealsForConversion > 0
+      ? (totalWonDeals / totalDealsForConversion) * 100
       : 0,
     totalContacts: teamMetrics.reduce((sum, tm) => sum + tm.totalContacts, 0),
     totalLeads: teamMetrics.reduce((sum, tm) => sum + tm.totalLeads, 0),
@@ -435,8 +448,17 @@ function calculateUserMetricsFromData(
   profile: any
 ): TeamMetrics {
   const activeDealsList = userDeals.filter(d => !d.stage.includes('fechado'));
-  const wonDeals = userDeals.filter(d => d.stage === 'fechado_ganho');
-  const lostDeals = userDeals.filter(d => d.stage === 'fechado_perdido');
+  // Considerar como "ganho" tanto o stage tradicional quanto os stages médicos de conversão
+  const wonDeals = userDeals.filter(d =>
+    d.stage === 'fechado_ganho' ||
+    d.stage === 'agendado' ||           // Paciente agendou consulta
+    d.stage === 'em_tratamento' ||      // Paciente em tratamento ativo
+    d.stage === 'aguardando_retorno'    // Paciente aguardando retorno (convertido)
+  );
+  const lostDeals = userDeals.filter(d =>
+    d.stage === 'fechado_perdido' ||
+    d.stage === 'inadimplente'          // Paciente inadimplente (perda)
+  );
 
   const totalPipeline = activeDealsList.reduce((sum, deal) => {
     const value = typeof deal.value === 'string' ? parseFloat(deal.value) : deal.value;
@@ -559,6 +581,7 @@ function calculateUserMetricsFromData(
     activeDeals, // activeDeals já é um número (linha 446)
     wonDeals: wonDeals.length,
     lostDeals: lostDeals.length,
+    totalDeals: userDeals.length, // Total de deals únicos do usuário
     conversionRate,
     totalContacts: userContacts.length,
     totalLeads: userLeads.length,

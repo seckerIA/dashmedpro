@@ -14,11 +14,12 @@ export type Supplier = {
     phone: string | null;
     contact_person: string | null;
     address: string | null;
+    is_active: boolean;
     created_at: string;
     updated_at: string;
 };
 
-export type SupplierInsert = Omit<Supplier, "id" | "created_at" | "updated_at">;
+export type SupplierInsert = Omit<Supplier, "id" | "created_at" | "updated_at" | "is_active">;
 export type SupplierUpdate = Partial<SupplierInsert>;
 
 export function useSuppliers() {
@@ -27,12 +28,14 @@ export function useSuppliers() {
     const queryClient = useQueryClient();
     const { toast } = useToast();
 
+    // Buscar apenas fornecedores ativos
     const suppliersQuery = useQuery({
         queryKey: ["inventory-suppliers"],
         queryFn: async () => {
             const { data, error } = await supabase
                 .from("inventory_suppliers")
                 .select("*")
+                .eq("is_active", true)
                 .order("name");
 
             if (error) throw error;
@@ -47,7 +50,8 @@ export function useSuppliers() {
                 .from("inventory_suppliers")
                 .insert([{
                     ...supplier,
-                    organization_id: profile?.organization_id
+                    organization_id: profile?.organization_id,
+                    is_active: true
                 }])
                 .select()
                 .single();
@@ -57,6 +61,17 @@ export function useSuppliers() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["inventory-suppliers"] });
+            toast({
+                title: "Fornecedor criado",
+                description: "Fornecedor cadastrado com sucesso.",
+            });
+        },
+        onError: (error: any) => {
+            toast({
+                variant: "destructive",
+                title: "Erro ao criar fornecedor",
+                description: error.message || "Não foi possível criar o fornecedor.",
+            });
         },
     });
 
@@ -74,38 +89,46 @@ export function useSuppliers() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["inventory-suppliers"] });
+            toast({
+                title: "Fornecedor atualizado",
+                description: "Dados do fornecedor atualizados com sucesso.",
+            });
+        },
+        onError: (error: any) => {
+            toast({
+                variant: "destructive",
+                title: "Erro ao atualizar",
+                description: error.message || "Não foi possível atualizar o fornecedor.",
+            });
         },
     });
 
-    const deleteSupplier = useMutation({
+    // Desativar fornecedor (em vez de excluir)
+    const deactivateSupplier = useMutation({
         mutationFn: async (id: string) => {
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from("inventory_suppliers")
-                .delete()
-                .eq("id", id);
+                .update({ is_active: false })
+                .eq("id", id)
+                .select()
+                .single();
 
             if (error) throw error;
+            return data;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["inventory-suppliers"] });
             toast({
-                title: "Fornecedor excluído",
-                description: "O fornecedor foi removido com sucesso.",
+                title: "Fornecedor desativado",
+                description: "O fornecedor foi desativado e não aparecerá mais na lista.",
             });
         },
         onError: (error: any) => {
-            console.error("Erro ao excluir fornecedor:", error);
-            // Verificar se é erro de FK constraint
-            const isFKError = error?.message?.includes('violates foreign key') ||
-                error?.message?.includes('referenced') ||
-                error?.code === '23503';
-
+            console.error("Erro ao desativar fornecedor:", error);
             toast({
                 variant: "destructive",
-                title: "Erro ao excluir",
-                description: isFKError
-                    ? "Este fornecedor possui itens de estoque vinculados. Remova os itens primeiro."
-                    : "Não foi possível excluir o fornecedor. Tente novamente.",
+                title: "Erro ao desativar",
+                description: error.message || "Não foi possível desativar o fornecedor.",
             });
         },
     });
@@ -115,6 +138,6 @@ export function useSuppliers() {
         isLoading: suppliersQuery.isLoading,
         createSupplier,
         updateSupplier,
-        deleteSupplier,
+        deactivateSupplier,
     };
 }

@@ -152,14 +152,53 @@ export const useInventory = () => {
         }
     });
 
-    // Excluir Item
+    // Excluir Item (com lotes e movimentações em cascata)
     const deleteItem = useMutation({
         mutationFn: async (id: string) => {
-            const { error } = await supabase
+            // 1. Buscar todos os lotes do item
+            const { data: batches } = await supabase
+                .from("inventory_batches")
+                .select("id")
+                .eq("item_id", id);
+
+            // 2. Deletar movimentações de todos os lotes
+            if (batches && batches.length > 0) {
+                const batchIds = batches.map(b => b.id);
+                const { error: movementsError } = await supabase
+                    .from("inventory_movements")
+                    .delete()
+                    .in("batch_id", batchIds);
+
+                if (movementsError) {
+                    console.error("Erro ao deletar movimentações:", movementsError);
+                }
+
+                // 3. Deletar os lotes
+                const { error: batchesError } = await supabase
+                    .from("inventory_batches")
+                    .delete()
+                    .eq("item_id", id);
+
+                if (batchesError) {
+                    throw new Error("Erro ao excluir lotes do produto: " + batchesError.message);
+                }
+            }
+
+            // 4. Deletar o item
+            const { data, error } = await supabase
                 .from("inventory_items")
                 .delete()
-                .eq("id", id);
+                .eq("id", id)
+                .select();
+
             if (error) throw error;
+
+            // Se data está vazio, nada foi deletado (RLS bloqueou)
+            if (!data || data.length === 0) {
+                throw new Error("Não foi possível excluir. Verifique se você tem permissão.");
+            }
+
+            return data;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["inventory-items"] });

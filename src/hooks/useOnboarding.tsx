@@ -134,15 +134,33 @@ export function useOnboarding(): UseOnboardingReturn {
   });
 
   // ============================================
+  // Helper to deduplicate procedures by normalized name
+  // ============================================
+  const deduplicateProcedures = useCallback((procedures: OnboardingProcedure[]) => {
+    const seen = new Map<string, OnboardingProcedure>();
+    for (const proc of procedures) {
+      const normalizedName = proc.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      // Keep the first occurrence (or prefer the one with isSelected: true)
+      if (!seen.has(normalizedName) || (proc.isSelected && !seen.get(normalizedName)?.isSelected)) {
+        seen.set(normalizedName, proc);
+      }
+    }
+    return Array.from(seen.values());
+  }, []);
+
+  // ============================================
   // Initialize state from saved data
   // ============================================
   useEffect(() => {
     if (savedState) {
+      // Deduplicate procedures from saved state to remove any legacy duplicates
+      const cleanedProcedures = deduplicateProcedures(savedState.procedures_data || []);
+
       setState({
         currentStep: savedState.current_step || 1,
         clinicData: savedState.clinic_data || DEFAULT_ONBOARDING_STATE.clinicData,
         doctorData: savedState.doctor_data || DEFAULT_ONBOARDING_STATE.doctorData,
-        procedures: savedState.procedures_data || [],
+        procedures: cleanedProcedures,
         teamMembers: savedState.team_data || [],
       });
 
@@ -151,7 +169,7 @@ export function useOnboarding(): UseOnboardingReturn {
         setSelectedSpecialty(savedState.doctor_data.specialty);
       }
     }
-  }, [savedState]);
+  }, [savedState, deduplicateProcedures]);
 
   // ============================================
   // Save state to database (debounced)
@@ -349,14 +367,20 @@ export function useOnboarding(): UseOnboardingReturn {
     setSelectedSpecialty(specialty);
   }, []);
 
+  // Helper function to normalize names for comparison (removes accents, lowercase)
+  const normalizeName = useCallback((name: string) =>
+    name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''),
+  []);
+
   // Convert specialty procedures to onboarding procedures when loaded
   useEffect(() => {
     if (specialtyProcedures.length > 0 && selectedSpecialty) {
       // Only add if not already in state (to preserve selections)
+      // Use normalized name comparison to avoid duplicates with different accents
       setState(prev => {
-        const existingIds = new Set(prev.procedures.map(p => p.id));
+        const existingNames = new Set(prev.procedures.map(p => normalizeName(p.name)));
         const newProcedures = specialtyProcedures
-          .filter(sp => !existingIds.has(sp.id))
+          .filter(sp => !existingNames.has(normalizeName(sp.name)))
           .map(sp => ({
             id: sp.id,
             name: sp.name,
@@ -376,7 +400,7 @@ export function useOnboarding(): UseOnboardingReturn {
         };
       });
     }
-  }, [specialtyProcedures, selectedSpecialty]);
+  }, [specialtyProcedures, selectedSpecialty, normalizeName]);
 
   // ============================================
   // Slug Availability Check

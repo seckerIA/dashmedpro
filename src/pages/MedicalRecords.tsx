@@ -50,7 +50,8 @@ const MedicalRecords = () => {
   useEffect(() => {
     const patientIdFromUrl = searchParams.get('patientId');
     const tabFromUrl = searchParams.get('tab');
-    
+    const openNewRecordFromUrl = searchParams.get('openNewRecord');
+
     if (patientIdFromUrl) {
       setSelectedPatientId(patientIdFromUrl);
       // Buscar o nome do paciente se disponível
@@ -61,16 +62,22 @@ const MedicalRecords = () => {
         }
       }
     }
-    
+
     if (tabFromUrl && ['ficha', 'historico', 'receitas'].includes(tabFromUrl)) {
       setActiveTab(tabFromUrl);
     }
-    
+
+    // Se openNewRecord=true, abrir o modal de novo prontuário
+    if (openNewRecordFromUrl === 'true' && patientIdFromUrl) {
+      setIsNewRecordModalOpen(true);
+    }
+
     // Limpar query params após processar para evitar problemas de navegação
-    if (patientIdFromUrl || tabFromUrl) {
+    if (patientIdFromUrl || tabFromUrl || openNewRecordFromUrl) {
       const newSearchParams = new URLSearchParams(searchParams);
       newSearchParams.delete('patientId');
       newSearchParams.delete('tab');
+      newSearchParams.delete('openNewRecord');
       setSearchParams(newSearchParams, { replace: true });
     }
   }, [searchParams, patients, setSearchParams]);
