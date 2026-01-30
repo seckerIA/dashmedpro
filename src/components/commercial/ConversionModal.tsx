@@ -148,18 +148,39 @@ export function ConversionModal({
 
         if (user) {
           // Buscar primeira categoria de entrada
-          const { data: categories } = await supabase
+          let { data: categories } = await supabase
             .from("financial_categories")
             .select("id")
-            .eq("user_id", user.id)
             .eq("type", "entrada")
             .limit(1);
+
+          // Se não existir categoria de entrada, criar uma automaticamente
+          if (!categories || categories.length === 0) {
+            console.log('[ConversionModal] Nenhuma categoria de entrada encontrada, criando categoria padrão "Receitas"');
+            const { data: newCategory, error: categoryError } = await supabase
+              .from('financial_categories')
+              .insert({
+                name: 'Receitas',
+                type: 'entrada',
+                color: '#10b981', // Verde
+                is_system: false,
+              })
+              .select('id')
+              .single();
+
+            if (!categoryError && newCategory) {
+              categories = [newCategory];
+              console.log('[ConversionModal] ✅ Categoria "Receitas" criada automaticamente');
+            } else {
+              console.error('[ConversionModal] Erro ao criar categoria padrão:', categoryError);
+            }
+          }
 
           // Buscar primeira conta
           const { data: accounts } = await supabase
             .from("financial_accounts")
             .select("id")
-            .eq("user_id", user.id)
+            .eq("is_active", true)
             .order("is_default", { ascending: false }) // Priorizar conta padrão
             .limit(1);
 

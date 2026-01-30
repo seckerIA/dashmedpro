@@ -37,12 +37,17 @@ export function FinancialRequirementModal({
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
                 <DialogHeader>
-                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 mb-4">
-                        <HandCoins className="h-6 w-6 text-orange-600" />
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-950 mb-4">
+                        <HandCoins className="h-6 w-6 text-orange-600 dark:text-orange-400" />
                     </div>
-                    <DialogTitle className="text-center text-xl">Configuração Financeira Necessária</DialogTitle>
-                    <DialogDescription className="text-center pt-2">
-                        Para finalizar consultas e gerar lançamentos financeiros automaticamente, você precisa cadastrar pelo menos uma <strong>Conta Bancária</strong> (caixa, banco, etc).
+                    <DialogTitle className="text-center text-xl">⚠️ Conta Bancária Obrigatória</DialogTitle>
+                    <DialogDescription className="text-center pt-2 space-y-2">
+                        <p className="font-semibold text-orange-600 dark:text-orange-400">
+                            Antes de marcar consultas como pagas, você PRECISA cadastrar uma conta bancária!
+                        </p>
+                        <p className="text-sm">
+                            Sem uma conta cadastrada, os pagamentos das consultas <strong className="text-destructive">NÃO serão registrados</strong> no financeiro e você perderá o controle do seu faturamento.
+                        </p>
                     </DialogDescription>
                 </DialogHeader>
 

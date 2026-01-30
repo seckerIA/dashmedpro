@@ -1,10 +1,11 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Clock, User, Phone } from "lucide-react";
+import { CheckCircle, XCircle, Clock, User, Phone, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useMedicalAppointments } from "@/hooks/useMedicalAppointments";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useFinancialAccounts } from "@/hooks/useFinancialAccounts";
 import { format, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -14,8 +15,9 @@ import { AlertTriangle } from "lucide-react";
 export function AttendanceChecklist() {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { isMedico, isAdmin } = useUserProfile();
+  const { isMedico, isAdmin, isSecretaria } = useUserProfile();
   const { appointments, markAsCompleted, markAsNoShow } = useMedicalAppointments({});
+  const { accounts } = useFinancialAccounts();
 
   // Filtrar apenas consultas de hoje com pagamento pendente
   const todayPendingAppointments = appointments?.filter((apt) => {
@@ -45,13 +47,23 @@ export function AttendanceChecklist() {
   }) || [];
 
   const handleMarkAttended = async (appointmentId: string) => {
+    // Verificar se existe conta bancária antes de prosseguir (exceto para secretárias que usam conta do médico)
+    if (!isSecretaria && accounts && accounts.length === 0) {
+      toast({
+        title: "Conta Bancária Obrigatória",
+        description: "Cadastre uma conta bancária ANTES de marcar pagamentos. Sem isso, a receita NÃO será registrada no financeiro.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       await markAsCompleted.mutateAsync(appointmentId);
       toast({
         title: "Comparecimento confirmado",
         description: "Pagamento registrado no financeiro automaticamente.",
       });
-      
+
       // Se for médico ou admin, buscar o appointment completo e redirecionar
       if ((isMedico || isAdmin) && appointments) {
         const appointment = appointments.find(apt => apt.id === appointmentId);
@@ -88,8 +100,22 @@ export function AttendanceChecklist() {
     return null;
   }
 
+  const hasNoBankAccounts = !isSecretaria && accounts && accounts.length === 0;
+
   return (
     <div className="space-y-4">
+      {/* Alerta de conta bancária ausente */}
+      {hasNoBankAccounts && (
+        <Alert variant="destructive" className="border-orange-500 bg-orange-50 dark:bg-orange-950">
+          <Wallet className="h-5 w-5" />
+          <AlertDescription className="font-medium">
+            <span className="font-bold">⚠️ Atenção!</span> Você não tem nenhuma conta bancária cadastrada.
+            Cadastre uma conta no módulo <span className="font-bold">Financeiro</span> ANTES de marcar consultas como pagas,
+            caso contrário os pagamentos NÃO serão registrados.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Alerta de consultas atrasadas */}
       {overdueAppointments.length > 0 && (
         <Alert variant="destructive" className="border-red-500 bg-red-50 dark:bg-red-950">

@@ -191,7 +191,7 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, onCancel, 
                 />
                 {isEditing && (
                     <p className="text-xs text-muted-foreground">
-                        O saldo inicial não pode ser alterado após a criação. Para ajustar, crie uma transação.
+                        O saldo atual não pode ser alterado após a criação. Para ajustar, crie uma transação.
                     </p>
                 )}
             </div>

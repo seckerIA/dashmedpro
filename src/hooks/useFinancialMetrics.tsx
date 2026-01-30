@@ -130,9 +130,9 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
       return metricsData;
     },
     enabled: !!user && !!profile,
-    staleTime: 5 * 60 * 1000, // 5 minutos
+    staleTime: 30 * 1000, // 30 segundos - dados financeiros precisam estar atualizados
     gcTime: 10 * 60 * 1000,
-    refetchOnMount: false,
+    refetchOnMount: true, // Sempre refetch ao montar para ter dados atualizados
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     retry: 1,
@@ -178,9 +178,9 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
       return monthlyResults;
     },
     enabled: !!user && !!profile,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000, // 30 segundos - dados financeiros precisam estar atualizados
     gcTime: 10 * 60 * 1000,
-    refetchOnMount: false,
+    refetchOnMount: true, // Sempre refetch ao montar para ter dados atualizados
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     retry: 1,
@@ -243,9 +243,9 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
       return categoryResults.sort((a, b) => b.value - a.value);
     },
     enabled: !!user && !!profile,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000, // 30 segundos - dados financeiros precisam estar atualizados
     gcTime: 10 * 60 * 1000,
-    refetchOnMount: false,
+    refetchOnMount: true, // Sempre refetch ao montar para ter dados atualizados
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     retry: 1,

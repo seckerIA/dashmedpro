@@ -195,6 +195,10 @@ const fetchTeamMetrics = async (
   signal?: AbortSignal,
   isMedico?: boolean // Novo parâmetro
 ): Promise<ConsolidatedTeamMetrics> => {
+  // Calcular data de início do mês atual para filtrar métricas
+  const now = new Date();
+  const monthStart = startOfMonth(now).toISOString();
+
   // Se for médico (não admin), buscar métricas próprias + secretárias vinculadas
   if (isMedico && !isAdminOrDono) {
     // Buscar IDs de secretárias vinculadas ao médico
@@ -228,11 +232,19 @@ const fetchTeamMetrics = async (
       .select('id, email, full_name, role')
       .in('id', allUserIds);
 
-    const [dealsResult, contactsResult, leadsResult, profilesResult] = await Promise.all([
+    // NOVA QUERY: Buscar consultas agendadas no mês atual
+    const appointmentsQuery = supabase
+      .from('medical_appointments')
+      .select('id, user_id, estimated_value, payment_status, created_at')
+      .in('user_id', allUserIds)
+      .gte('created_at', monthStart);
+
+    const [dealsResult, contactsResult, leadsResult, profilesResult, appointmentsResult] = await Promise.all([
       supabaseQueryWithTimeout(dealsQuery, 25000, signal),
       supabaseQueryWithTimeout(contactsQuery, 25000, signal),
       supabaseQueryWithTimeout(leadsQuery, 25000, signal),
       supabaseQueryWithTimeout(profilesQuery, 25000, signal),
+      supabaseQueryWithTimeout(appointmentsQuery, 25000, signal),
     ]);
 
     if (dealsResult.error) throw new Error(`Erro ao buscar deals: ${dealsResult.error.message}`);
@@ -242,6 +254,7 @@ const fetchTeamMetrics = async (
     const contacts = contactsResult.data || [];
     const leads = leadsResult.data || [];
     const profiles = profilesResult.data || [];
+    const appointments = appointmentsResult.data || [];
 
     const profilesMap = new Map(profiles.map(p => [p.id, p]));
 
@@ -250,16 +263,17 @@ const fetchTeamMetrics = async (
       const userDeals = deals.filter(d => d.user_id === targetUserId || d.assigned_to === targetUserId);
       const userContacts = contacts.filter(c => c.user_id === targetUserId);
       const userLeads = leads.filter(l => l.user_id === targetUserId);
+      const userAppointments = appointments.filter(a => a.user_id === targetUserId);
       const profile = profilesMap.get(targetUserId);
 
-      return calculateUserMetricsFromData(targetUserId, userDeals, userContacts, userLeads, profile);
+      return calculateUserMetricsFromData(targetUserId, userDeals, userContacts, userLeads, profile, userAppointments, monthStart);
     });
 
     // Calcular métricas consolidadas
     const totalWonDeals = teamMetrics.reduce((sum, tm) => sum + tm.wonDeals, 0);
     const totalLostDeals = teamMetrics.reduce((sum, tm) => sum + tm.lostDeals, 0);
-    // Total de deals únicos da equipe (sem duplicação)
-    const totalDealsForConversion = teamMetrics.reduce((sum, tm) => sum + tm.totalDeals, 0);
+    // Total de leads criados no mês para cálculo de conversão
+    const totalLeadsThisMonth = teamMetrics.reduce((sum, tm) => sum + tm.totalLeads, 0);
 
     return {
       totalPipeline: teamMetrics.reduce((sum, tm) => sum + tm.totalPipeline, 0),
@@ -267,12 +281,12 @@ const fetchTeamMetrics = async (
       totalActiveDeals: teamMetrics.reduce((sum, tm) => sum + tm.activeDeals, 0),
       totalWonDeals,
       totalLostDeals,
-      // Conversão global: total de deals ganhos / total de deals da equipe
-      averageConversionRate: totalDealsForConversion > 0
-        ? (totalWonDeals / totalDealsForConversion) * 100
+      // Conversão global: total de consultas agendadas / total de leads criados no mês
+      averageConversionRate: totalLeadsThisMonth > 0
+        ? (totalWonDeals / totalLeadsThisMonth) * 100
         : 0,
       totalContacts: teamMetrics.reduce((sum, tm) => sum + tm.totalContacts, 0),
-      totalLeads: teamMetrics.reduce((sum, tm) => sum + tm.totalLeads, 0),
+      totalLeads: totalLeadsThisMonth,
       teamMetrics,
     };
   }
@@ -300,11 +314,19 @@ const fetchTeamMetrics = async (
       .select('id, email, full_name, role')
       .eq('id', userId);
 
-    const [dealsResult, contactsResult, leadsResult, profilesResult] = await Promise.all([
+    // NOVA QUERY: Buscar consultas agendadas no mês atual
+    const appointmentsQuery = supabase
+      .from('medical_appointments')
+      .select('id, user_id, estimated_value, payment_status, created_at')
+      .eq('user_id', userId)
+      .gte('created_at', monthStart);
+
+    const [dealsResult, contactsResult, leadsResult, profilesResult, appointmentsResult] = await Promise.all([
       supabaseQueryWithTimeout(dealsQuery, 25000, signal),
       supabaseQueryWithTimeout(contactsQuery, 25000, signal),
       supabaseQueryWithTimeout(leadsQuery, 25000, signal),
       supabaseQueryWithTimeout(profilesQuery, 25000, signal),
+      supabaseQueryWithTimeout(appointmentsQuery, 25000, signal),
     ]);
 
     if (dealsResult.error) throw new Error(`Erro ao buscar deals: ${dealsResult.error.message}`);
@@ -314,9 +336,10 @@ const fetchTeamMetrics = async (
     const contacts = contactsResult.data || [];
     const leads = leadsResult.data || [];
     const profiles = profilesResult.data || [];
+    const appointments = appointmentsResult.data || [];
 
     const profile = profiles[0];
-    const userMetrics = calculateUserMetrics(userId, deals, contacts, leads, profile);
+    const userMetrics = calculateUserMetrics(userId, deals, contacts, leads, profile, appointments, monthStart);
 
     return {
       ...userMetrics,
@@ -371,11 +394,19 @@ const fetchTeamMetrics = async (
     .select('id, email, full_name, role')
     .in('id', targetUserIds);
 
-  const [dealsResult, contactsResult, leadsResult, profilesResult] = await Promise.all([
+  // NOVA QUERY: Buscar consultas agendadas no mês atual
+  const appointmentsQuery = supabase
+    .from('medical_appointments')
+    .select('id, user_id, estimated_value, payment_status, created_at')
+    .in('user_id', targetUserIds)
+    .gte('created_at', monthStart);
+
+  const [dealsResult, contactsResult, leadsResult, profilesResult, appointmentsResult] = await Promise.all([
     supabaseQueryWithTimeout(dealsQuery, 25000, signal),
     supabaseQueryWithTimeout(contactsQuery, 25000, signal),
     supabaseQueryWithTimeout(leadsQuery, 25000, signal),
     supabaseQueryWithTimeout(profilesQuery, 25000, signal),
+    supabaseQueryWithTimeout(appointmentsQuery, 25000, signal),
   ]);
 
   if (dealsResult.error) throw new Error(`Erro ao buscar deals: ${dealsResult.error.message}`);
@@ -385,6 +416,7 @@ const fetchTeamMetrics = async (
   const contacts = contactsResult.data || [];
   const leads = leadsResult.data || [];
   const profiles = profilesResult.data || [];
+  const appointments = appointmentsResult.data || [];
 
   const profilesMap = new Map(profiles.map(p => [p.id, p]));
 
@@ -393,16 +425,17 @@ const fetchTeamMetrics = async (
     const userDeals = deals.filter(d => d.user_id === targetUserId || d.assigned_to === targetUserId);
     const userContacts = contacts.filter(c => c.user_id === targetUserId);
     const userLeads = leads.filter(l => l.user_id === targetUserId);
+    const userAppointments = appointments.filter(a => a.user_id === targetUserId);
     const profile = profilesMap.get(targetUserId);
 
-    return calculateUserMetricsFromData(targetUserId, userDeals, userContacts, userLeads, profile);
+    return calculateUserMetricsFromData(targetUserId, userDeals, userContacts, userLeads, profile, userAppointments, monthStart);
   });
 
   // Calcular métricas consolidadas
   const totalWonDeals = teamMetrics.reduce((sum, tm) => sum + tm.wonDeals, 0);
   const totalLostDeals = teamMetrics.reduce((sum, tm) => sum + tm.lostDeals, 0);
-  // Total de deals únicos da equipe (sem duplicação)
-  const totalDealsForConversion = teamMetrics.reduce((sum, tm) => sum + tm.totalDeals, 0);
+  // Total de leads criados no mês para cálculo de conversão
+  const totalLeadsThisMonth = teamMetrics.reduce((sum, tm) => sum + tm.totalLeads, 0);
 
   return {
     totalPipeline: teamMetrics.reduce((sum, tm) => sum + tm.totalPipeline, 0),
@@ -410,12 +443,12 @@ const fetchTeamMetrics = async (
     totalActiveDeals: teamMetrics.reduce((sum, tm) => sum + tm.activeDeals, 0),
     totalWonDeals,
     totalLostDeals,
-    // Conversão global: total de deals ganhos / total de deals da equipe
-    averageConversionRate: totalDealsForConversion > 0
-      ? (totalWonDeals / totalDealsForConversion) * 100
+    // Conversão global: total de consultas agendadas / total de leads criados no mês
+    averageConversionRate: totalLeadsThisMonth > 0
+      ? (totalWonDeals / totalLeadsThisMonth) * 100
       : 0,
     totalContacts: teamMetrics.reduce((sum, tm) => sum + tm.totalContacts, 0),
-    totalLeads: teamMetrics.reduce((sum, tm) => sum + tm.totalLeads, 0),
+    totalLeads: totalLeadsThisMonth,
     teamMetrics,
   };
 };
@@ -425,9 +458,11 @@ function calculateUserMetrics(
   deals: any[],
   contacts: any[],
   leads: any[],
-  profile: any
+  profile: any,
+  appointments: any[],
+  monthStart: string
 ): ConsolidatedTeamMetrics & TeamMetrics {
-  const metrics = calculateUserMetricsFromData(userId, deals, contacts, leads, profile);
+  const metrics = calculateUserMetricsFromData(userId, deals, contacts, leads, profile, appointments, monthStart);
   return {
     ...metrics,
     totalActiveDeals: metrics.activeDeals,
@@ -445,7 +480,9 @@ function calculateUserMetricsFromData(
   userDeals: any[],
   userContacts: any[],
   userLeads: any[],
-  profile: any
+  profile: any,
+  userAppointments: any[] = [],
+  monthStart?: string
 ): TeamMetrics {
   const activeDealsList = userDeals.filter(d => !d.stage.includes('fechado'));
   // Considerar como "ganho" tanto o stage tradicional quanto os stages médicos de conversão
@@ -467,13 +504,26 @@ function calculateUserMetricsFromData(
 
   const activeDeals = activeDealsList.length;
 
-  const totalRevenue = wonDeals.reduce((sum, deal) => {
-    const value = typeof deal.value === 'string' ? parseFloat(deal.value) : deal.value;
-    return sum + (value || 0);
+  // NOVA LÓGICA: Receita total vem de consultas PAGAS no mês
+  const totalRevenue = userAppointments.reduce((sum, appointment) => {
+    if (appointment.payment_status === 'paid' && appointment.estimated_value) {
+      const value = typeof appointment.estimated_value === 'string'
+        ? parseFloat(appointment.estimated_value)
+        : appointment.estimated_value;
+      return sum + (value || 0);
+    }
+    return sum;
   }, 0);
 
-  const conversionRate = userDeals.length > 0
-    ? (wonDeals.length / userDeals.length) * 100
+  // NOVA LÓGICA: Filtrar leads criados NO MÊS ATUAL para cálculo de conversão
+  const leadsThisMonth = monthStart
+    ? userLeads.filter(l => l.created_at >= monthStart)
+    : userLeads;
+
+  // NOVA LÓGICA: Conversão = (consultas agendadas no mês) / (leads criados no mês) * 100
+  const scheduledAppointmentsCount = userAppointments.length;
+  const conversionRate = leadsThisMonth.length > 0
+    ? (scheduledAppointmentsCount / leadsThisMonth.length) * 100
     : 0;
 
   const dealsByStage: Record<string, { count: number; value: number }> = {};
@@ -578,13 +628,13 @@ function calculateUserMetricsFromData(
     userRole: profile?.role || undefined,
     totalPipeline,
     totalRevenue,
-    activeDeals, // activeDeals já é um número (linha 446)
-    wonDeals: wonDeals.length,
+    activeDeals, // activeDeals já é um número
+    wonDeals: scheduledAppointmentsCount, // ALTERADO: Agora representa consultas agendadas no mês
     lostDeals: lostDeals.length,
     totalDeals: userDeals.length, // Total de deals únicos do usuário
     conversionRate,
     totalContacts: userContacts.length,
-    totalLeads: userLeads.length,
+    totalLeads: leadsThisMonth.length, // ALTERADO: Apenas leads criados no mês
     dealsByStage,
     averageDealValue,
     averageTimeInPipeline,

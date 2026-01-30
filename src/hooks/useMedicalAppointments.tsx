@@ -44,11 +44,33 @@ const createFinancialTransactionForAppointment = async (
     }
 
     // Buscar categoria padrão de entrada
-    const { data: categories } = await supabase
+    let { data: categories } = await supabase
       .from('financial_categories')
       .select('id')
       .eq('type', 'entrada')
       .limit(1);
+
+    // Se não existir categoria de entrada, criar uma automaticamente
+    if (!categories || categories.length === 0) {
+      console.log('[Financial] Nenhuma categoria de entrada encontrada, criando categoria padrão "Receitas"');
+      const { data: newCategory, error: categoryError } = await supabase
+        .from('financial_categories')
+        .insert({
+          name: 'Receitas',
+          type: 'entrada',
+          color: '#10b981', // Verde
+          is_system: false,
+        })
+        .select('id')
+        .single();
+
+      if (!categoryError && newCategory) {
+        categories = [newCategory];
+        console.log('[Financial] ✅ Categoria "Receitas" criada automaticamente');
+      } else {
+        console.error('[Financial] Erro ao criar categoria padrão:', categoryError);
+      }
+    }
 
     // Buscar conta ativa
     const { data: accounts } = await supabase
@@ -62,7 +84,23 @@ const createFinancialTransactionForAppointment = async (
     const accountId = accounts?.[0]?.id;
 
     if (!accountId || !categoryId) {
-      console.warn('[Financial] Conta ou categoria não encontrada');
+      const missingItems = [];
+      if (!accountId) missingItems.push('conta bancária ativa');
+      if (!categoryId) missingItems.push('categoria de entrada (erro ao criar automaticamente)');
+
+      const errorMessage = `Consulta marcada como PAGA, mas a transação financeira NÃO foi criada porque não há ${missingItems.join(' e ')}. Cadastre uma conta bancária no módulo Financeiro para que os pagamentos sejam registrados automaticamente.`;
+      console.warn('[Financial] ' + errorMessage);
+
+      // Importar toast dinamicamente e notificar usuário
+      import('@/hooks/use-toast').then(({ toast }) => {
+        toast({
+          title: '⚠️ Pagamento NÃO Registrado no Financeiro',
+          description: errorMessage,
+          variant: 'destructive',
+          duration: 8000, // 8 segundos para dar tempo de ler
+        });
+      });
+
       return null;
     }
 
@@ -567,6 +605,8 @@ const createAppointment = async (
 
   // Se payment_status = 'paid', criar transação financeira IMEDIATAMENTE
   if (appointmentData.payment_status === 'paid' && appointmentData.estimated_value && appointmentData.estimated_value > 0) {
+    console.log('[Create] Consulta marcada como PAGA - criando transação financeira imediatamente');
+
     const transactionId = await createFinancialTransactionForAppointment({
       id: data.id,
       user_id: appointmentData.user_id,
@@ -586,7 +626,16 @@ const createAppointment = async (
         .update({ financial_transaction_id: transactionId })
         .eq('id', data.id);
 
-      console.log('[Create] Transação financeira criada e vinculada:', transactionId);
+      console.log('[Create] ✅ Transação financeira criada e vinculada:', transactionId);
+
+      // Notificar sucesso
+      import('@/hooks/use-toast').then(({ toast }) => {
+        toast({
+          title: '✅ Pagamento Registrado no Financeiro',
+          description: `Receita de R$ ${appointmentData.estimated_value?.toFixed(2)} registrada automaticamente.`,
+          duration: 4000,
+        });
+      });
     }
   }
 
@@ -642,6 +691,8 @@ const updateAppointment = async ({
     appointment.estimated_value &&
     appointment.estimated_value > 0
   ) {
+    console.log('[Update] Status mudou para PAGO - criando transação financeira imediatamente');
+
     const transactionId = await createFinancialTransactionForAppointment({
       id: appointment.id,
       user_id: appointment.user_id,
@@ -661,7 +712,16 @@ const updateAppointment = async ({
         .update({ financial_transaction_id: transactionId })
         .eq('id', appointment.id);
 
-      console.log('[Update] Transação financeira criada e vinculada:', transactionId);
+      console.log('[Update] ✅ Transação financeira criada e vinculada:', transactionId);
+
+      // Notificar sucesso
+      import('@/hooks/use-toast').then(({ toast }) => {
+        toast({
+          title: '✅ Pagamento Registrado no Financeiro',
+          description: `Receita de R$ ${appointment.estimated_value?.toFixed(2)} registrada automaticamente.`,
+          duration: 4000,
+        });
+      });
     }
   }
 
@@ -906,7 +966,7 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
       if (shouldCreateTransaction) {
         // VALIDAÇÃO PRÉVIA: Verificar se account e category existem antes de tentar criar transação
         // Buscar categoria padrão de entrada (consultas médicas)
-        const { data: categories, error: categoriesError } = await supabase
+        let { data: categories, error: categoriesError } = await supabase
           .from('financial_categories')
           .select('id, name')
           .eq('type', 'entrada')
@@ -915,6 +975,28 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
         if (categoriesError) {
           console.error('Erro ao buscar categorias:', categoriesError);
           throw new Error(`Erro ao verificar categorias financeiras: ${categoriesError.message}`);
+        }
+
+        // Se não existir categoria de entrada, criar uma automaticamente
+        if (!categories || categories.length === 0) {
+          console.log('[Financial] Nenhuma categoria de entrada encontrada, criando categoria padrão "Receitas"');
+          const { data: newCategory, error: categoryError } = await supabase
+            .from('financial_categories')
+            .insert({
+              name: 'Receitas',
+              type: 'entrada',
+              color: '#10b981', // Verde
+              is_system: false,
+            })
+            .select('id, name')
+            .single();
+
+          if (!categoryError && newCategory) {
+            categories = [newCategory];
+            console.log('[Financial] ✅ Categoria "Receitas" criada automaticamente');
+          } else {
+            console.error('[Financial] Erro ao criar categoria padrão:', categoryError);
+          }
         }
 
         // Buscar primeira conta disponível (sempre precisa ter uma conta)
@@ -937,9 +1019,9 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
         if (!accountId || !categoryId) {
           const missingItems = [];
           if (!accountId) missingItems.push('conta financeira ativa');
-          if (!categoryId) missingItems.push('categoria de entrada');
+          if (!categoryId) missingItems.push('categoria de entrada (erro ao criar automaticamente)');
 
-          const errorMessage = `Não foi possível criar a transação financeira: ${missingItems.join(' e ')} não encontrada(s). Por favor, configure uma conta financeira ativa e uma categoria de entrada no sistema antes de finalizar consultas.`;
+          const errorMessage = `Não foi possível criar a transação financeira: ${missingItems.join(' e ')} não encontrada(s). Por favor, configure uma conta financeira ativa no módulo Financeiro antes de finalizar consultas.`;
 
           console.warn(errorMessage);
 
