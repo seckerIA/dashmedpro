@@ -24,6 +24,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { generateTimeSlots } from '@/types/medicalAppointments';
 import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 
 // Schema de validação
 const taskSchema = z.object({
@@ -57,8 +58,11 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
   const [isSaving, setIsSaving] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [failedFiles, setFailedFiles] = useState<File[]>([]);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const { toast } = useToast();
+
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(
     task?.due_date ? new Date(task.due_date) : undefined
   );
@@ -95,6 +99,10 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
       contact_id: task?.contact_id || '',
     },
   });
+
+  const handleRemoveFailedFile = (index: number) => {
+    setFailedFiles(prev => prev.filter((_, i) => i !== index));
+  };
 
   const watchedPriority = watch('priority');
   const watchedDueDate = watch('due_date');
@@ -188,22 +196,41 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
       const taskIdForUpload = (savedTask as any)?.id || task?.id;
       if (pendingFiles.length > 0 && taskIdForUpload) {
         console.log('[TaskForm] Fazendo upload de', pendingFiles.length, 'anexos para tarefa:', taskIdForUpload);
+
+        const currentFailedFiles: File[] = [];
+
         for (const file of pendingFiles) {
           try {
+            // Força a atualização do cache após cada upload bem sucedido
             await uploadAttachment({ file, taskId: taskIdForUpload });
-          } catch (uploadError) {
+          } catch (uploadError: any) {
             console.error('[TaskForm] Erro ao fazer upload do anexo:', file.name, uploadError);
+            currentFailedFiles.push(file);
+            toast({
+              variant: 'destructive',
+              title: 'Erro no upload',
+              description: `Falha ao enviar ${file.name}: ${uploadError.message || 'Erro desconhecido'}`
+            });
           }
         }
-        console.log('[TaskForm] Upload de anexos concluído');
+
+        // Adiciona os arquivos que falharam à lista de falhas
+        if (currentFailedFiles.length > 0) {
+          setFailedFiles(prev => [...prev, ...currentFailedFiles]);
+          console.warn('[TaskForm] Alguns arquivos falharam no upload:', currentFailedFiles.length);
+        } else {
+          console.log('[TaskForm] Upload de todos os anexos concluído com sucesso');
+          onCancel();
+        }
+
+        // Limpa a lista de pendentes pois ou foram salvos ou movidos para falhas
+        setPendingFiles([]);
+
+      } else {
+        // Se não tinha arquivos para upload, fecha direto
+        onCancel();
       }
 
-      if (!isEditing) {
-        reset();
-        setSelectedUsers([]);
-        setPendingFiles([]);
-        setSelectedDate(undefined);
-      }
     } catch (error) {
       console.error('[TaskForm] Erro ao salvar tarefa:', error);
     } finally {
@@ -594,7 +621,9 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
               isEditing={true}
               onFilesSelected={handleFilesSelected}
               pendingFiles={pendingFiles}
+              failedFiles={failedFiles}
               onRemovePendingFile={handleRemovePendingFile}
+              onRemoveFailedFile={handleRemoveFailedFile}
             />
           </div>
 

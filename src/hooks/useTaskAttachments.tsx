@@ -76,21 +76,29 @@ export function useTaskAttachments(taskId?: string) {
     // Upload de arquivo
     const uploadAttachment = useMutation({
         mutationFn: async ({ file, taskId }: { file: File; taskId: string }) => {
-            if (!user?.id) throw new Error('Usuário não autenticado');
+            console.log('[useTaskAttachments] Iniciando upload:', file.name, 'para tarefa:', taskId);
+
+            if (!user?.id) {
+                console.error('[useTaskAttachments] Erro: Usuário não autenticado');
+                throw new Error('Usuário não autenticado');
+            }
 
             // Validar tipo de arquivo
             if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+                console.error('[useTaskAttachments] Tipo inválido:', file.type);
                 throw new Error('Tipo de arquivo não permitido');
             }
 
             // Validar tamanho
             if (file.size > MAX_FILE_SIZE) {
-                throw new Error('Arquivo muito grande (máximo 10MB)');
+                console.error('[useTaskAttachments] Arquivo muito grande:', file.size);
+                throw new Error('Arquivo muito grande (máximo 50MB)');
             }
 
             // Gerar nome único
             const fileExt = file.name.split('.').pop();
             const fileName = `${taskId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+            console.log('[useTaskAttachments] Nome do arquivo gerado:', fileName);
 
             // Upload para storage
             const { data: uploadData, error: uploadError } = await supabase.storage
@@ -101,14 +109,17 @@ export function useTaskAttachments(taskId?: string) {
                 });
 
             if (uploadError) {
-                console.error('Erro no upload:', uploadError);
-                throw new Error('Falha no upload do arquivo');
+                console.error('[useTaskAttachments] Erro no storage.upload:', uploadError);
+                throw new Error(`Falha no upload do arquivo: ${uploadError.message}`);
             }
+            console.log('[useTaskAttachments] Upload storage sucesso:', uploadData);
 
             // Obter URL pública
             const { data: urlData } = supabase.storage
                 .from('task-attachments')
                 .getPublicUrl(fileName);
+
+            console.log('[useTaskAttachments] URL gerada:', urlData.publicUrl);
 
             // Salvar registro no banco
             const { data: attachmentData, error: dbError } = await (supabase
@@ -126,11 +137,15 @@ export function useTaskAttachments(taskId?: string) {
                 .single() as any);
 
             if (dbError) {
+                console.error('[useTaskAttachments] Erro no DB insert:', dbError);
                 // Se falhou no banco, deletar do storage
-                await supabase.storage.from('task-attachments').remove([fileName]);
-                throw dbError;
+                const { error: deleteError } = await supabase.storage.from('task-attachments').remove([fileName]);
+                if (deleteError) console.error('[useTaskAttachments] Falha ao limpar arquivo órfão:', deleteError);
+
+                throw new Error(`Erro ao salvar no banco: ${dbError.message}`);
             }
 
+            console.log('[useTaskAttachments] Sucesso total:', attachmentData);
             return attachmentData as TaskAttachment;
         },
         onSuccess: () => {

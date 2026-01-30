@@ -18,7 +18,8 @@ import {
     Loader2,
     FileText,
     Image as ImageIcon,
-    File
+    File,
+    AlertCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -27,7 +28,9 @@ interface TaskAttachmentsProps {
     isEditing?: boolean;
     onFilesSelected?: (files: File[]) => void;
     pendingFiles?: File[];
+    failedFiles?: File[];
     onRemovePendingFile?: (index: number) => void;
+    onRemoveFailedFile?: (index: number) => void;
 }
 
 export function TaskAttachments({
@@ -35,7 +38,9 @@ export function TaskAttachments({
     isEditing = false,
     onFilesSelected,
     pendingFiles = [],
-    onRemovePendingFile
+    failedFiles = [],
+    onRemovePendingFile,
+    onRemoveFailedFile
 }: TaskAttachmentsProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const {
@@ -74,8 +79,9 @@ export function TaskAttachments({
         return <File className="h-4 w-4" />;
     };
 
-    const allFiles: Array<{ type: 'pending'; file: File; index: number } | { type: 'saved'; attachment: TaskAttachment }> = [
+    const allFiles: Array<{ type: 'pending' | 'failed'; file: File; index: number } | { type: 'saved'; attachment: TaskAttachment }> = [
         ...pendingFiles.map((f, i) => ({ type: 'pending' as const, file: f, index: i })),
+        ...failedFiles.map((f, i) => ({ type: 'failed' as const, file: f, index: i })),
         ...attachments.map(a => ({ type: 'saved' as const, attachment: a }))
     ];
 
@@ -136,6 +142,35 @@ export function TaskAttachments({
                                                 size="icon"
                                                 className="h-8 w-8"
                                                 onClick={() => onRemovePendingFile(item.index as number)}
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </Button>
+                                        )}
+                                    </div>
+                                );
+                            } else if (item.type === 'failed') {
+                                const file = item.file as File;
+                                return (
+                                    <div
+                                        key={`failed-${idx}`}
+                                        className="flex items-center gap-3 p-2 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-200 dark:border-red-800"
+                                    >
+                                        <div className="flex-shrink-0 text-red-500">
+                                            <AlertCircle className="h-4 w-4" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium truncate text-red-700 dark:text-red-400">{file.name}</p>
+                                            <p className="text-xs text-red-600 dark:text-red-500">
+                                                Falha no upload
+                                            </p>
+                                        </div>
+                                        {onRemoveFailedFile && (
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/20"
+                                                onClick={() => onRemoveFailedFile(item.index as number)}
                                             >
                                                 <X className="h-4 w-4" />
                                             </Button>

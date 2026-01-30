@@ -28,8 +28,8 @@ import { useAuth } from '@/hooks/useAuth';
 
 interface TaskListProps {
   tasks: TaskWithCRM[];
-  onTaskCreate: (data: CreateTaskData) => Promise<void>;
-  onTaskUpdate: (taskId: string, data: UpdateTaskData) => Promise<void>;
+  onTaskCreate: (data: CreateTaskData) => Promise<any>;
+  onTaskUpdate: (taskId: string, data: UpdateTaskData) => Promise<any>;
   onTaskDelete: (taskId: string) => Promise<void>;
   onTaskReorder: (taskIds: string[]) => Promise<void>;
   onAssignmentToggle?: (assignmentId: string) => Promise<void>;
@@ -82,9 +82,9 @@ export function TaskList({
   const handleTaskCreate = async (data: CreateTaskData) => {
     try {
       console.log('[TaskList] Iniciando criação de tarefa:', data);
-      await onTaskCreate(data);
-      console.log('[TaskList] Tarefa criada com sucesso');
-      setIsCreating(false);
+      // Retornamos a tarefa criada para que o TaskForm possa usar o ID para uploads
+      // Não fechamos o modal aqui (setIsCreating(false)) para permitir que o TaskForm termine os uploads
+      return await onTaskCreate(data);
     } catch (error) {
       console.error('[TaskList] Erro ao criar tarefa:', error);
       throw error;
@@ -93,8 +93,8 @@ export function TaskList({
 
   const handleTaskUpdate = async (data: UpdateTaskData) => {
     if (selectedTask) {
-      await onTaskUpdate(selectedTask.id, data);
-      setSelectedTask(null);
+      // Mesma lógica: retornamos e não fechamos o modal aqui
+      return await onTaskUpdate(selectedTask.id, data);
     }
   };
 
