@@ -150,13 +150,13 @@ const Login = () => {
           .single();
 
         if (profileError || !profileData) {
-
+          // Usuário autenticado mas sem perfil = precisa fazer onboarding
+          console.log('📝 Perfil não encontrado, redirecionando para onboarding...');
           toast({
-            variant: 'destructive',
-            title: 'Erro no perfil',
-            description: 'Usuário autenticado mas perfil não encontrado. Entre em contato com o administrador.',
+            title: 'Bem-vindo!',
+            description: 'Complete seu cadastro para continuar.',
           });
-          await supabase.auth.signOut();
+          navigate('/onboarding');
           return;
         }
       }

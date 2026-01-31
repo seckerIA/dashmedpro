@@ -81,6 +81,7 @@ import Commercial from "./pages/Commercial";
 import FollowUps from "./pages/FollowUps";
 import Marketing from "./pages/Marketing";
 import MedicalRecords from "./pages/MedicalRecords";
+import Prontuario from "./pages/Prontuario";
 import WhatsAppInbox from "./pages/WhatsAppInbox";
 import WhatsAppSettings from "./pages/WhatsAppSettings";
 import InventoryPage from "./pages/Inventory";
@@ -433,6 +434,7 @@ const RoleProtectedRoute = ({
 
 const AppRoutes = () => {
   const { user, loading, isSuperAdmin } = useAuth();
+  const { profile, isLoading: profileLoading, error: profileError } = useUserProfile();
   const location = useLocation();
 
   if (loading) {
@@ -452,6 +454,31 @@ const AppRoutes = () => {
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );
+  }
+
+  // Permitir acesso à rota de onboarding e auth callback sem verificar perfil
+  if (location.pathname === '/onboarding' || location.pathname === '/auth/callback') {
+    return (
+      <Routes>
+        <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+      </Routes>
+    );
+  }
+
+  // Aguardar carregamento do perfil
+  if (profileLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center text-muted-foreground animate-pulse">Carregando perfil...</div>
+      </div>
+    );
+  }
+
+  // Usuário autenticado mas sem perfil = precisa fazer onboarding
+  if (!profile || profileError) {
+    console.log('📝 [AppRoutes] Perfil não encontrado, redirecionando para onboarding...');
+    return <Navigate to="/onboarding" replace />;
   }
 
   // Super Admin Redirection Logic - Use Custom Layout
@@ -474,28 +501,6 @@ const AppRoutes = () => {
       </SuperAdminLayout>
     );
   }
-
-  // Auth Callback Route - Needs to be accessible for authenticated users too
-  // (User is already signed in by Supabase when they land here after Google OAuth)
-  if (location.pathname === '/auth/callback') {
-    return (
-      <Routes>
-        <Route path="/auth/callback" element={<AuthCallback />} />
-      </Routes>
-    );
-  }
-
-  // Onboarding Route - Separate from main app layout
-  // Uses its own full-screen layout with dedicated styling
-  if (location.pathname === '/onboarding') {
-    return (
-      <Routes>
-        <Route path="/onboarding" element={<Onboarding />} />
-      </Routes>
-    );
-  }
-
-
 
   return (
     // CortanaProvider removido - Cortana desativada
@@ -642,6 +647,8 @@ const AppRoutes = () => {
             }
           />
           <Route path="/calendar" element={<MedicalCalendar />} />
+          <Route path="/prontuario/:patientId" element={<Prontuario />} />
+          <Route path="/prontuario/:patientId/:appointmentId" element={<Prontuario />} />
           <Route path="/inventory" element={
             <RoleProtectedRoute allowedRoles={['admin', 'dono', 'medico', 'secretaria']}>
               <InventoryPage />

@@ -32,3 +32,5 @@ nul
 # Security - never commit secrets
 scripts/.env
 *.env.local
+.env.backup
+.env.production

@@ -154,23 +154,34 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // 4. Update user's profile
-    console.log(`📝 [complete-onboarding] Updating user profile`);
-    const { error: profileError } = await supabaseAdmin
+    // 4. Create or Update user's profile (upsert)
+    // IMPORTANT: Only use columns that exist in the profiles table
+    // Missing columns will cause silent failures!
+    console.log(`📝 [complete-onboarding] Creating/Updating user profile for user: ${user.id}`);
+
+    const profileData = {
+      id: user.id,
+      email: user.email,
+      full_name: doctor.fullName,
+      specialty: doctor.specialty,
+      organization_id: organization.id,
+      onboarding_completed: true,
+      onboarding_completed_at: new Date().toISOString(),
+      role: 'medico',
+      is_active: true,
+    };
+
+    console.log(`📝 [complete-onboarding] Profile data:`, JSON.stringify(profileData));
+
+    const { data: upsertedProfile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .update({
-        full_name: doctor.fullName,
-        specialty: doctor.specialty,
-        consultation_value: doctor.consultationValue || 0,
-        organization_id: organization.id,
-        onboarding_completed: true,
-        onboarding_completed_at: new Date().toISOString(),
-        role: 'medico', // Ensure role is set
-      })
-      .eq('id', user.id);
+      .upsert(profileData, { onConflict: 'id' })
+      .select()
+      .single();
 
     if (profileError) {
-      console.error('Error updating profile:', profileError);
+      console.error('❌ [complete-onboarding] Error updating profile:', profileError);
+      console.error('❌ [complete-onboarding] Profile error details:', JSON.stringify(profileError));
       // Rollback
       await supabaseAdmin.from('organization_members').delete().eq('user_id', user.id);
       await supabaseAdmin.from('organizations').delete().eq('id', organization.id);
@@ -179,6 +190,8 @@ const handler = async (req: Request): Promise<Response> => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log(`✅ [complete-onboarding] Profile created/updated:`, upsertedProfile?.id);
 
     // 5. Create Financial Account for the doctor
     console.log(`💰 [complete-onboarding] Creating financial account`);
@@ -205,6 +218,7 @@ const handler = async (req: Request): Promise<Response> => {
 
       const proceduresToInsert = procedures.map(proc => ({
         user_id: user.id,
+        organization_id: organization.id,
         name: proc.name,
         category: proc.category || 'procedure',
         price: proc.price || 0,

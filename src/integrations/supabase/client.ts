@@ -1,7 +1,7 @@
-
-export const SUPABASE_URL = "https://adzaqkduxnpckbcuqpmg.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkemFxa2R1eG5wY2tiY3VxcG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5ODgyMDksImV4cCI6MjA4MTU2NDIwOX0.WO9-vzv_Vuh86TQWgNWuQ45cXa-L4GoGQfpSbvQiVMc";
-export const CURRENT_PROJECT_REF = "adzaqkduxnpckbcuqpmg";
+// Lê do .env (permite alternar entre produção e backup)
+export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://adzaqkduxnpckbcuqpmg.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkemFxa2R1eG5wY2tiY3VxcG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5ODgyMDksImV4cCI6MjA4MTU2NDIwOX0.WO9-vzv_Vuh86TQWgNWuQ45cXa-L4GoGQfpSbvQiVMc";
+export const CURRENT_PROJECT_REF = import.meta.env.VITE_SUPABASE_PROJECT_ID || "adzaqkduxnpckbcuqpmg";
 
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
