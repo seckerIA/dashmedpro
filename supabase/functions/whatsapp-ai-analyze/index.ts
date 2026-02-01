@@ -199,25 +199,52 @@ const handler = async (req: Request): Promise<Response> => {
       .neq('status', 'cancelled')
       .order('start_time', { ascending: true });
 
+    // Buscar horas de trabalho
+    const { data: workingHours } = await supabaseAdmin
+      .from('doctor_working_hours')
+      .select('user_id, day_of_week, start_time, end_time')
+      .in('user_id', targetUserIds);
+
     const formatAgenda = (targetDoctors: any[]) => {
       const daysContext: string[] = [];
-      const startHour = 8;
-      const endHour = 18;
-      const nowInBrStr = new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' });
-      const nowInBrDate = new Date(nowInBrStr);
-      const bridgeTime = nowInBrDate.getTime();
+      const nowAbs = new Date();
+      // Adjust Brazil Time (Fixed UTC-3) - Edge Runtime Safety
+      const OFFSET_MS = -3 * 60 * 60 * 1000;
+
+      // Calculate "Approximated Brazil Date" for iteration (shifting absolute time)
+      const nowInBrTimestamp = nowAbs.getTime() + OFFSET_MS;
 
       for (let i = 0; i < 5; i++) {
-        const d = new Date(nowInBrDate);
-        d.setDate(d.getDate() + i);
-        d.setHours(0, 0, 0, 0);
-        if (d.getDay() === 0 || d.getDay() === 6) continue;
+        // Target Date in Brazil (Shifted)
+        const targetTs = nowInBrTimestamp + (i * 24 * 60 * 60 * 1000);
+        const d = new Date(targetTs);
+        const dayOfWeek = d.getUTCDay();
 
-        const dateString = d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: '2-digit' });
-        let dayOutput = `\n[${dateString}]`;
+        // Safe Date Formatting
+        const brDateString = `${d.getUTCDate().toString().padStart(2, '0')}/${(d.getUTCMonth() + 1).toString().padStart(2, '0')}`;
+        const weekDayStr = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][dayOfWeek];
+
+        let dayOutput = `\n[${weekDayStr}, ${brDateString}]`;
         let hasSlots = false;
 
         for (const docId of targetDoctors) {
+          // Check if doctor has ANY working hours defined
+          const docAllHours = (workingHours || []).filter((h: any) => h.user_id === docId);
+          const hasCustomSchedule = docAllHours.length > 0;
+
+          // Get hours for THIS day of week
+          let docDayHours = docAllHours.filter((h: any) => h.day_of_week === dayOfWeek);
+
+          // Fallback to default if NO layout defined at all
+          if (!hasCustomSchedule) {
+            if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Mon-Fri
+              docDayHours = [{ start_time: '08:00:00', end_time: '18:00:00' }];
+            }
+          }
+
+          if (docDayHours.length === 0) continue; // Doctor doesn't work today
+
+          // Gather appointments/meetings
           const docAppointments = (appointments || []).filter((a: any) => a.doctor_id === docId);
           const docMeetings = (meetings || []).filter((m: any) => m.user_id === docId);
 
@@ -227,22 +254,67 @@ const handler = async (req: Request): Promise<Response> => {
           ].sort((a, b) => a.start - b.start);
 
           const freeSlots: string[] = [];
-          for (let hour = startHour; hour < endHour; hour++) {
-            for (let min of [0, 30]) {
-              const slotUtc = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), hour + 3, min, 0));
-              const slotStamp = slotUtc.getTime();
-              if (slotStamp < bridgeTime) continue;
-              const isBusy = docEvents.some(evt => slotStamp >= evt.start && slotStamp < evt.end);
-              if (!isBusy) freeSlots.push(`${hour}:${min.toString().padStart(2, '0')}`);
+
+          // Iterate over each working interval
+          for (const interval of docDayHours) {
+            const [startH, startM] = interval.start_time.split(':').map(Number);
+            const [endH, endM] = interval.end_time.split(':').map(Number);
+
+            // Construct ABSOLUTE Start/End times for this slot in UTC
+            // Logic: We have Brazil YMD from 'd' (which is shifted). 
+            // We want "08:00 Brazil". 08:00 Brazil is 11:00 UTC.
+            // So we add 3 hours to the DB time (assuming DB time is wall-clock 08:00).
+
+            const startHourUTC = startH + 3;
+            const endHourUTC = endH + 3;
+
+            // Base Date in UTC (using the Brazil YMD components)
+            let currentSlotAbs = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), startHourUTC, startM, 0));
+            const endTimeAbs = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), endHourUTC, endM, 0));
+
+            while (currentSlotAbs < endTimeAbs) {
+              const slotStartStamp = currentSlotAbs.getTime();
+              // Slot duration 30 mins
+              const slotEndStamp = slotStartStamp + (30 * 60 * 1000);
+
+              if (slotEndStamp > endTimeAbs.getTime()) break;
+
+              // CRITICAL: Filter Past Slots
+              // Compare slot start vs NOW (absolute)
+              // Buffer of 15 mins to avoid offering "now"
+              if (slotStartStamp > (nowAbs.getTime() + 15 * 60 * 1000)) {
+
+                const isBusy = docEvents.some(evt => {
+                  return slotStartStamp < evt.end && slotEndStamp > evt.start;
+                });
+
+                if (!isBusy) {
+                  // Display back in Brazil Time (-3)
+                  // Since we are using UTC Date object that represents Real UTC time (e.g. 11:00),
+                  // getUTCHours() gives 11. To show Brazil time we subtract 3 => 8.
+                  // Wait, if currentSlotAbs is 11:00 UTC (which is 08:00 Brazil), getUTCHours is 11. 11-3=8. Correct.
+                  const dispHour = currentSlotAbs.getUTCHours() - 3;
+                  const dispMin = currentSlotAbs.getUTCMinutes();
+                  freeSlots.push(`${dispHour.toString().padStart(2, '0')}:${dispMin.toString().padStart(2, '0')}`);
+                }
+              }
+              // Increment 30 mins
+              currentSlotAbs.setMinutes(currentSlotAbs.getUTCMinutes() + 30);
             }
           }
+
           if (freeSlots.length > 0) {
             hasSlots = true;
             dayOutput += `\n  - Médico ${docId.slice(0, 4)}...: ${freeSlots.join(', ')}`;
           }
         }
-        if (!hasSlots) dayOutput += "\n  (Sem horários livres)";
-        daysContext.push(dayOutput);
+
+        if (hasSlots) {
+          daysContext.push(dayOutput);
+        } else if (i < 3) {
+          // Only show "No slots" for near future to inform user, but don't spam for 5 days out
+          daysContext.push(dayOutput + "\n  (Sem horários livres)");
+        }
       }
       return daysContext.join('\n');
     };
@@ -283,13 +355,23 @@ NUNCA ofereça horários fora desses intervalos.`;
 
 DATA E HORA ATUAL: ${brazilTime} (Dia de hoje).
 
+INSTRUÇÕES PERSONALIZADAS DA CLÍNICA:
+${aiConfig?.custom_prompt_instructions || 'Seja cordial e eficiente.'}
+
 OBJETIVO EXTRA: DATA ENRICHMENT
 Analise toda a conversa em busca de dados do paciente que possam ser salvos no banco de dados.
 Se o paciente informou CPF, email, nome completo correto ou endereço, extraia-os.
 Se o paciente mandou uma foto de documento ou disse dados, extraia.
 
-INTERPRETAÇÃO DA AGENDA:
-Dê ao paciente APENAS horários que estão explicitamente listados como "DISPONÍVEIS" abaixo.
+INTERPRETAÇÃO DA AGENDA (IMPORTANTE):
+1. Dê ao paciente APENAS horários que estão explicitamente listados como "DISPONÍVEIS" abaixo.
+2. REGRA DE OURO PARA HORÁRIOS:
+   - JAMAIS envie uma lista longa ("08:00, 08:30, 09:00, 09:30..."). ISSO É PROIBIDO.
+   - Seja natural. Ofereça no MÁXIMO 3 ou 4 opções de cada vez.
+   - Dê preferência por oferecer turnos se estiver muito livre (ex: "Tenho horários livres na manhã e tarde. Qual prefere?").
+   - Se for citar horários, use formato lista ou texto fluido (ex: "Tenho às 09:00, 14:00 e 16:30").
+   - Sempre cite o dia da semana e a data (ex: "📅 Terça-feira (12/10)").
+
 ${agendaContext}
 
  PROCEDIMENTOS E PREÇOS:
@@ -659,12 +741,66 @@ Analise a conversa, extraia dados e gere respostas.`;
             .single();
 
           if (newMessage) {
-            const { data: waConfig } = await supabaseAdmin
+            let waConfig;
+
+            // 1. Tentar buscar config do próprio usuário (dono da conversa)
+            const { data: userConfig } = await supabaseAdmin
               .from('whatsapp_config')
               .select('phone_number_id, access_token')
               .eq('user_id', conversation.user_id)
               .eq('is_active', true)
+              .filter('access_token', 'not.is', null)
               .maybeSingle();
+
+            waConfig = userConfig;
+
+            // 2. Se não achou, e for secretária, busca de médicos vinculados
+            if (!waConfig) {
+              const { data: profile } = await supabaseAdmin
+                .from('profiles')
+                .select('role')
+                .eq('id', conversation.user_id)
+                .single();
+
+              if (profile?.role === 'secretaria') {
+                const { data: links } = await supabaseAdmin
+                  .from('secretary_doctor_links')
+                  .select('doctor_id')
+                  .eq('secretary_id', conversation.user_id)
+                  .eq('is_active', true);
+
+                if (links && links.length > 0) {
+                  const doctorIds = links.map((l: any) => l.doctor_id);
+                  const { data: doctorConfig } = await supabaseAdmin
+                    .from('whatsapp_config')
+                    .select('phone_number_id, access_token')
+                    .in('user_id', doctorIds)
+                    .eq('is_active', true)
+                    .filter('access_token', 'not.is', null)
+                    .limit(1)
+                    .maybeSingle();
+
+                  if (doctorConfig) {
+                    waConfig = doctorConfig;
+                  }
+                }
+              }
+            }
+
+            // 3. Último recurso: buscar QUALQUER config ativa com token (útil para admins)
+            if (!waConfig) {
+              const { data: genericConfig } = await supabaseAdmin
+                .from('whatsapp_config')
+                .select('phone_number_id, access_token')
+                .eq('is_active', true)
+                .filter('access_token', 'not.is', null)
+                .limit(1)
+                .maybeSingle();
+
+              if (genericConfig) {
+                waConfig = genericConfig;
+              }
+            }
 
             if (waConfig) {
               const waRes = await fetch(
