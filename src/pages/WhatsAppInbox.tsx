@@ -5,7 +5,7 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Settings, MessageCircle, Loader2 } from 'lucide-react';
+import { Settings, MessageCircle, Loader2, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { WhatsAppLayout } from '@/components/whatsapp/WhatsAppLayout';
 import { ConversationList } from '@/components/whatsapp/inbox/ConversationList';
@@ -204,13 +204,22 @@ export default function WhatsAppInbox() {
   // Inbox content
   const inboxContent = (
     <div className="flex flex-col h-full">
-      {/* Seletor de Secretária (apenas para médicos) */}
+      {/* Seletor de Secretária + Follow-Up (apenas para médicos) */}
       {hasLinkedSecretaries && (
-        <div className="p-2 border-b">
+        <div className="p-2 border-b flex items-center gap-2">
           <InboxSourceSelector
             currentOwnerId={filters.ownerId}
             onOwnerChange={handleOwnerChange}
           />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/followup')}
+            className="flex-shrink-0 gap-2"
+          >
+            <Zap className="h-4 w-4 text-yellow-500" />
+            Follow-Up
+          </Button>
         </div>
       )}
 
