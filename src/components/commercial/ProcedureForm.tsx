@@ -174,10 +174,6 @@ export function ProcedureForm({ open, onOpenChange, procedure, required = false,
   };
 
   const handleOpenChange = (newOpen: boolean) => {
-    // Se required é true e está tentando fechar, não permitir
-    if (required && !newOpen) {
-      return;
-    }
     onOpenChange(newOpen);
   };
 

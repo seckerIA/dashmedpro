@@ -306,16 +306,6 @@ const TeamManagement = () => {
           throw error;
         }
 
-        // Se for secretaria, criar vinculos com medicos na tabela secretary_doctor_links
-        if (formData.role === 'secretaria' && data?.user?.id && selectedDoctorIds.length > 0) {
-          try {
-            await updateSecretaryLinks(data.user.id, selectedDoctorIds);
-          } catch (linkError) {
-            console.error('Erro ao criar vinculos de secretaria:', linkError);
-            // Nao falhar a criacao do usuario se os vinculos falharem
-          }
-        }
-
         toast({
           title: 'Usuario criado com sucesso!',
           description: `${formData.full_name || formData.email} foi adicionado a equipe.`,
@@ -355,7 +345,7 @@ const TeamManagement = () => {
         updateData.password = formData.password;
       }
 
-      // Se for secretaria, validar e incluir doctor_id
+      // Se for secretaria, validar e incluir doctor_ids
       if (formData.role === 'secretaria') {
         if (selectedDoctorIds.length === 0) {
           toast({
@@ -365,11 +355,9 @@ const TeamManagement = () => {
           });
           throw new Error('Medico obrigatorio para secretaria');
         }
-        // Usar o primeiro medico como doctor_id principal (compatibilidade)
-        updateData.doctor_id = selectedDoctorIds[0];
+        updateData.doctor_ids = selectedDoctorIds;
       } else {
-        // Remover doctor_id se nao for mais secretaria
-        updateData.doctor_id = null;
+        updateData.doctor_ids = [];
       }
 
       // Se for medico/dono, incluir/atualizar consultation_value
@@ -404,16 +392,6 @@ const TeamManagement = () => {
 
       if (error) {
         throw error;
-      }
-
-      // Se for secretaria, atualizar vinculos com medicos
-      if (formData.role === 'secretaria') {
-        try {
-          await updateSecretaryLinks(editingProfile.id, selectedDoctorIds);
-        } catch (linkError) {
-          console.error('Erro ao atualizar vinculos de secretaria:', linkError);
-          // Nao falhar a atualizacao se os vinculos falharem
-        }
       }
 
       toast({

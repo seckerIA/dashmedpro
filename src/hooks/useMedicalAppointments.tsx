@@ -907,6 +907,10 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
       queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['financial-metrics'] });
       queryClient.invalidateQueries({ queryKey: ['financial-accounts'] });
+      // Invalidar histórico de uso de estoque
+      queryClient.invalidateQueries({ queryKey: ['stock-usage-history'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-reports'] });
     },
   });
 

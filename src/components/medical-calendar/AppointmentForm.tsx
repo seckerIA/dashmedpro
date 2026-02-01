@@ -38,6 +38,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { useSinalReceipts } from '@/hooks/useSinalReceipts';
 import { useFinancialAccounts } from '@/hooks/useFinancialAccounts';
+import { StockUsageSelector, StockUsageItem } from '@/components/inventory/StockUsageSelector';
 
 // Ensure ptBR is available (defensive check)
 const locale = ptBR || undefined;
@@ -114,6 +115,7 @@ export function AppointmentForm({
   const { uploadReceipt, isUploading } = useSinalReceipts();
   const { accounts, isLoading: isLoadingAccounts } = useFinancialAccounts();
   const hasActiveAccount = accounts && accounts.length > 0;
+  const [stockUsage, setStockUsage] = useState<StockUsageItem[]>([]);
 
   // Refs para evitar loops infinitos de re-renders
   const contactsRef = useRef(contacts);
@@ -156,6 +158,60 @@ export function AppointmentForm({
       }
     }
   }, [open, user?.id, queryClient, refetchContacts, isLoadingContacts, contacts.length]);
+
+  // Fetch existing stock usage when editing
+  useEffect(() => {
+    if (appointment?.id && open) {
+      const fetchUsage = async () => {
+        const { data, error } = await supabase
+          .from('appointment_stock_usage')
+          .select(`
+            inventory_item_id, 
+            quantity, 
+            inventory_items(
+              name, 
+              unit, 
+              min_stock,
+              inventory_batches(expiration_date, is_active, quantity)
+            )
+          `)
+          .eq('appointment_id', appointment.id);
+
+        if (data) {
+          const formatted: StockUsageItem[] = data.map((d: any) => {
+            const item = d.inventory_items;
+            const batches = item?.inventory_batches || [];
+
+            // Get nearest active expiry
+            const validDates = batches
+              .filter((b: any) => b.is_active !== false && b.expiration_date)
+              .map((b: any) => parseISO(b.expiration_date));
+
+            const nearestExpiry = validDates.length > 0
+              ? validDates.sort((a: any, b: any) => a.getTime() - b.getTime())[0].toISOString()
+              : null;
+
+            // Calculate total quantity from batches since it's not a real column
+            const totalQuantity = batches.reduce((acc: number, b: any) => acc + (b.quantity || 0), 0);
+
+            return {
+              inventory_item_id: d.inventory_item_id,
+              quantity: Number(d.quantity),
+              name: item?.name || 'Item desconhecido',
+              unit: item?.unit || 'un',
+              total_quantity: totalQuantity,
+              min_stock: item?.min_stock,
+              nearest_expiry: nearestExpiry
+            };
+          });
+          setStockUsage(formatted);
+        }
+      };
+      fetchUsage();
+    } else if (!open) {
+      setStockUsage([]);
+    }
+  }, [appointment, open]);
 
   const timeSlots = generateTimeSlots();
 
@@ -252,6 +308,25 @@ export function AppointmentForm({
       };
 
       const result = await onSubmit(submitData);
+
+      // Save stock usage if any (only for procedures)
+      if (result && stockUsage.length > 0 && data.appointment_type === 'procedure') {
+        // Delete existing (simple strategy to handle updates)
+        await supabase.from('appointment_stock_usage').delete().eq('appointment_id', result.id);
+
+        const usageToInsert = stockUsage.map(item => ({
+          appointment_id: result.id,
+          inventory_item_id: item.inventory_item_id,
+          quantity: item.quantity,
+          deducted: false // Will be deducted by trigger when status becomes 'completed'
+        }));
+
+        if (usageToInsert.length > 0) {
+          const { error: usageError } = await supabase.from('appointment_stock_usage').insert(usageToInsert);
+          if (usageError) console.error('Error saving stock usage:', usageError);
+        }
+      }
+
       setAvailabilityError(null);
       setEstimatedValueDisplay('');
       // Resetar estados de sinal
@@ -792,6 +867,14 @@ export function AppointmentForm({
                 <p className="text-sm text-amber-600">Selecione um médico primeiro</p>
               )}
             </div>
+          )}
+
+          {/* Stock Usage Selector - Only for Procedures */}
+          {selectedType === 'procedure' && (
+            <StockUsageSelector
+              value={stockUsage}
+              onChange={setStockUsage}
+            />
           )}
 
           {/* Title */}

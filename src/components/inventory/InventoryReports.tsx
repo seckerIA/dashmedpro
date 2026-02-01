@@ -22,10 +22,12 @@ import {
     ShoppingCart,
     Trash2,
     BarChart3,
-    Calendar
+    Calendar,
+    History
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { StockUsageHistory } from "./StockUsageHistory";
 
 const formatCurrency = (value: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -139,6 +141,9 @@ export function InventoryReports() {
                     </TabsTrigger>
                     <TabsTrigger value="losses">
                         <Trash2 className="h-4 w-4 mr-2" /> Perdas
+                    </TabsTrigger>
+                    <TabsTrigger value="history">
+                        <History className="h-4 w-4 mr-2" /> Histórico de Uso
                     </TabsTrigger>
                 </TabsList>
 
@@ -357,6 +362,11 @@ export function InventoryReports() {
                             )}
                         </CardContent>
                     </Card>
+                </TabsContent>
+
+                {/* Histórico de Uso */}
+                <TabsContent value="history">
+                    <StockUsageHistory />
                 </TabsContent>
             </Tabs>
         </div>

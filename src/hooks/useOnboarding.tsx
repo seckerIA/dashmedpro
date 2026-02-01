@@ -370,16 +370,36 @@ export function useOnboarding(): UseOnboardingReturn {
   // Helper function to normalize names for comparison (removes accents, lowercase)
   const normalizeName = useCallback((name: string) =>
     name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''),
-  []);
+    []);
 
   // Convert specialty procedures to onboarding procedures when loaded
   useEffect(() => {
-    if (specialtyProcedures.length > 0 && selectedSpecialty) {
-      // Only add if not already in state (to preserve selections)
-      // Use normalized name comparison to avoid duplicates with different accents
+    // We always want a "Consulta" item at the very least
+    const ensureConsultationExists = (existingProcedures: OnboardingProcedure[]) => {
+      const hasConsultation = existingProcedures.some(p => p.category === 'consultation' || normalizeName(p.name).includes('consulta'));
+      if (!hasConsultation && state.doctorData.consultationValue > 0) {
+        return [
+          {
+            id: 'default-consultation',
+            name: 'Consulta',
+            category: 'consultation' as const,
+            price: state.doctorData.consultationValue,
+            durationMinutes: 30,
+            isSelected: true,
+            isCustom: false,
+          },
+          ...existingProcedures
+        ];
+      }
+      return existingProcedures;
+    };
+
+    if (selectedSpecialty) {
       setState(prev => {
         const existingNames = new Set(prev.procedures.map(p => normalizeName(p.name)));
-        const newProcedures = specialtyProcedures
+
+        // Map new specialty procedures
+        const newSpecialtyProcs = specialtyProcedures
           .filter(sp => !existingNames.has(normalizeName(sp.name)))
           .map(sp => ({
             id: sp.id,
@@ -392,15 +412,39 @@ export function useOnboarding(): UseOnboardingReturn {
             isCustom: false,
           }));
 
-        if (newProcedures.length === 0) return prev;
+        const combined = [...prev.procedures, ...newSpecialtyProcs];
+        const withConsultation = ensureConsultationExists(combined);
+
+        if (withConsultation.length === prev.procedures.length) return prev;
 
         return {
           ...prev,
-          procedures: [...prev.procedures, ...newProcedures],
+          procedures: withConsultation,
         };
       });
     }
-  }, [specialtyProcedures, selectedSpecialty, normalizeName]);
+  }, [specialtyProcedures, selectedSpecialty, normalizeName, state.doctorData.consultationValue]);
+
+  // Sync consultationValue from Step 2 with the main "Consulta" procedure
+  useEffect(() => {
+    if (state.doctorData.consultationValue > 0) {
+      setState(prev => {
+        const consultIdx = prev.procedures.findIndex(p => p.category === 'consultation');
+        if (consultIdx !== -1) {
+          if (prev.procedures[consultIdx].price !== state.doctorData.consultationValue) {
+            const newProcedures = [...prev.procedures];
+            newProcedures[consultIdx] = {
+              ...newProcedures[consultIdx],
+              price: state.doctorData.consultationValue,
+              isSelected: true
+            };
+            return { ...prev, procedures: newProcedures };
+          }
+        }
+        return prev;
+      });
+    }
+  }, [state.doctorData.consultationValue]);
 
   // ============================================
   // Slug Availability Check
@@ -439,13 +483,25 @@ export function useOnboarding(): UseOnboardingReturn {
     mutationFn: async () => {
       if (!user?.id) throw new Error('User not authenticated');
 
-      // Prepare payload
+      // Prepare procedures, ensuring at least one consultation matches doctor's input
+      let finalProcedures = state.procedures
+        .filter(p => p.isSelected)
+        .map(({ id, isSelected, isCustom, ...rest }) => rest);
+
+      const hasConsultation = finalProcedures.some(p => p.category === 'consultation');
+      if (!hasConsultation && state.doctorData.consultationValue > 0) {
+        finalProcedures.push({
+          name: 'Consulta',
+          category: 'consultation',
+          price: state.doctorData.consultationValue,
+          durationMinutes: 30,
+        });
+      }
+
       const payload: OnboardingCompletionPayload = {
         clinic: state.clinicData,
         doctor: state.doctorData,
-        procedures: state.procedures
-          .filter(p => p.isSelected)
-          .map(({ id, isSelected, isCustom, ...rest }) => rest), // Remove isCustom - not a DB column
+        procedures: finalProcedures,
         teamMembers: state.teamMembers.map(({ id, ...rest }) => rest),
       };
 

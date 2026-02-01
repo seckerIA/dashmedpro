@@ -47,7 +47,8 @@
       "Read(//e/**)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:groups.google.com)",
-      "WebFetch(domain:supabase.com)"
+      "WebFetch(domain:supabase.com)",
+      "Bash(npx tsx:*)"
     ],
     "additionalDirectories": [
       "e:\\dashmedpro-main\\dashmedpro-1\\dashmed-nextjs",

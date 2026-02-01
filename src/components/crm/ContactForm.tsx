@@ -979,11 +979,6 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
         <ProcedureForm
           open={showProcedureForm}
           onOpenChange={(open) => {
-            // Só permitir fechar se já houver procedimento CONSULTA cadastrado
-            if (!open && !hasConsultationProcedure && !contact) {
-              // Não permitir fechar se não há procedimento e é novo contato
-              return;
-            }
             setShowProcedureForm(open);
           }}
           procedure={null}

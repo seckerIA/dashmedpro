@@ -1,302 +1,107 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, cache-control, pragma, expires",
+  "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE"
 };
 
-interface UpdateUserRequest {
-  userId: string;
-  full_name?: string;
-  role?: 'admin' | 'dono' | 'vendedor' | 'gestor_trafego' | 'secretaria' | 'medico';
-  password?: string;
-  doctor_id?: string | null;
-  consultation_value?: number | null;
-}
-
 const handler = async (req: Request): Promise<Response> => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
   }
 
+  // DEBUG: Immediate response
+  // return new Response(JSON.stringify({ debug: true }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
   try {
-    const authHeader = req.headers.get('Authorization')!;
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Missing Authorization header' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    const body = await req.json();
+    const { userId, doctor_ids, full_name, role, password, consultation_value } = body;
+
+    if (!userId) {
+      return new Response(JSON.stringify({ error: 'User ID is required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    const { data: targetProfile, error: targetError } = await supabaseAdmin
+      .from('profiles')
+      .select('organization_id, role')
+      .eq('id', userId)
+      .single();
+
+    if (targetError) {
+      return new Response(JSON.stringify({ error: 'Target user not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const { data: profile } = await supabase.from('profiles').select('role, id').eq('id', user.id).single();
-    if (!profile || !['admin', 'dono', 'medico'].includes(profile.role)) {
-      return new Response(JSON.stringify({ error: 'Insufficient permissions' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
-    const { userId, full_name, role, password, doctor_id, consultation_value }: UpdateUserRequest = await req.json();
-    if (!userId) {
-      return new Response(JSON.stringify({ error: 'User ID is required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
-    // Verificar se usuário alvo foi criado pelo médico (quando é médico)
-    // Verificar se usuário alvo foi criado pelo médico (quando é médico)
-    if (profile.role === 'medico') {
-      const { data: targetUser } = await supabaseAdmin
-        .from('profiles')
-        .select('invited_by, role')
-        .eq('id', userId)
-        .single();
-
-      let hasPermission = false;
-
-      // 1. Check if invited by doctor
-      if (targetUser && targetUser.invited_by === profile.id) {
-        hasPermission = true;
-      }
-
-      // 2. If not invited by doctor, check if is linked secretary
-      if (!hasPermission && targetUser?.role === 'secretaria') {
-        const { data: link } = await supabaseAdmin
-          .from('secretary_doctor_links')
-          .select('id')
-          .eq('secretary_id', userId)
-          .eq('doctor_id', profile.id)
-          .single();
-
-        if (link) {
-          hasPermission = true;
-        }
-      }
-
-      if (!hasPermission) {
-        return new Response(
-          JSON.stringify({ error: 'Médicos só podem editar usuários que eles criaram ou secretárias vinculadas' }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Médicos só podem atualizar para roles 'medico' ou 'secretaria'
-      if (role && !['medico', 'secretaria'].includes(role)) {
-        return new Response(
-          JSON.stringify({ error: 'Médicos só podem definir role como medico ou secretaria' }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
-
-    // Dono: validar que doctor_id está na hierarquia (se fornecido)
-    if (profile.role === 'dono' && doctor_id) {
-      const { data: hierarchyData } = await supabaseAdmin
-        .rpc('get_user_hierarchy', { user_id: user.id });
-
-      const hierarchyIds = (hierarchyData || []).map((h: any) => h.profile_id);
-
-      if (!hierarchyIds.includes(doctor_id)) {
-        return new Response(
-          JSON.stringify({ error: 'Você só pode atribuir secretárias a médicos da sua hierarquia' }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
-
-    // Validate: secretaria must have doctor_id
-    // Validation removed to support multi-doctor linking via secretary_doctor_links table
-    // if (role === 'secretaria' && doctor_id === undefined) { ... }
-
-    // Check if target user exists
-    const { data: targetProfile, error: profileError } = await supabaseAdmin.from('profiles').select('role').eq('id', userId).single();
-    if (profileError || !targetProfile) {
-      return new Response(JSON.stringify({ error: 'User not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
-    // Prevent non-dono from updating dono accounts
-    if (targetProfile.role === 'dono' && profile.role !== 'dono') {
-      return new Response(JSON.stringify({ error: 'Cannot update owner account' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
+    const orgId = targetProfile?.organization_id;
 
     // Update profile
-    const updateData: any = {};
-    if (full_name !== undefined) updateData.full_name = full_name || null;
+    const profilesUpdate: any = {};
+    if (full_name !== undefined) profilesUpdate.full_name = full_name || null;
+    if (role !== undefined) profilesUpdate.role = role;
 
-    // Try to update role in profiles table (if column exists)
-    if (role !== undefined) {
-      updateData.role = role;
+    if (doctor_ids && doctor_ids.length > 0) {
+      profilesUpdate.doctor_id = doctor_ids[0];
+    } else if (role && role !== 'secretaria') {
+      profilesUpdate.doctor_id = null;
     }
 
-    // Update doctor_id if provided
-    if (doctor_id !== undefined) {
-      // Legacy: If provided, usage it. If not, rely on secretary_doctor_links table managed by frontend.
-      // if (role === 'secretaria' && !doctor_id) {
-      // return new Response(
-      //   JSON.stringify({ error: 'Secretária deve ser vinculada a um médico (doctor_id obrigatório)' }),
-      //   { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      // );
-      // }
-      // Se não for secretária, garantir que doctor_id seja NULL
-      updateData.doctor_id = (role === 'secretaria' && doctor_id) ? doctor_id : null;
-    } else if (role !== undefined && role !== 'secretaria') {
-      // Se mudou role para algo que não é secretaria, remover doctor_id
-      updateData.doctor_id = null;
-    }
-
-    // Update consultation_value if provided
     if (consultation_value !== undefined) {
-      if ((role === 'medico' || role === 'dono') && (!consultation_value || consultation_value <= 0)) {
-        return new Response(
-          JSON.stringify({ error: 'Médico/dono deve ter um valor de consulta maior que zero' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      // Se não for médico/dono, garantir que consultation_value seja NULL
-      updateData.consultation_value = ((role === 'medico' || role === 'dono') && consultation_value) ? consultation_value : null;
-    } else if (role !== undefined && role !== 'medico' && role !== 'dono') {
-      // Se mudou role para algo que não é médico/dono, remover consultation_value
-      updateData.consultation_value = null;
+      profilesUpdate.consultation_value = consultation_value;
     }
 
-    if (Object.keys(updateData).length > 0) {
+    if (Object.keys(profilesUpdate).length > 0) {
       const { error: updateError } = await supabaseAdmin
         .from('profiles')
-        .update(updateData)
+        .update(profilesUpdate)
         .eq('id', userId);
 
       if (updateError) {
-        // If role column doesn't exist, try user_roles table
-        if (updateError.message.includes('column') && updateError.message.includes('role')) {
-          // Remove role from updateData and try again
-          delete updateData.role;
-          if (Object.keys(updateData).length > 0) {
-            const { error: retryError } = await supabaseAdmin
-              .from('profiles')
-              .update(updateData)
-              .eq('id', userId);
-
-            if (retryError) {
-              return new Response(JSON.stringify({ error: retryError.message }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-            }
-          }
-        } else {
-          return new Response(JSON.stringify({ error: updateError.message }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-        }
+        return new Response(JSON.stringify({ error: updateError.message }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
     }
 
-    // Update user_roles table if role was provided
-    // First delete existing roles for this user, then insert new one
-    if (role !== undefined) {
-      try {
-        // Delete existing roles
+    // Sync secretary_doctor_links table
+    if (doctor_ids !== undefined && orgId) {
+      await supabaseAdmin
+        .from('secretary_doctor_links')
+        .delete()
+        .eq('secretary_id', userId);
+
+      if (doctor_ids.length > 0) {
+        const links = doctor_ids.map(docId => ({
+          secretary_id: userId,
+          doctor_id: docId,
+          organization_id: orgId
+        }));
         await supabaseAdmin
-          .from('user_roles')
-          .delete()
-          .eq('user_id', userId);
-
-        // Insert new role
-        const { error: roleError } = await supabaseAdmin
-          .from('user_roles')
-          .insert({
-            user_id: userId,
-            role: role
-          });
-
-        // Ignore error if table doesn't exist (some databases use profiles.role directly)
-        if (roleError && !roleError.message.includes('does not exist') && !roleError.message.includes('relation')) {
-          console.warn('Could not update user_roles table:', roleError.message);
-        }
-      } catch (e) {
-        // Silently fail if user_roles table doesn't exist
-        console.warn('user_roles table may not exist, using profiles.role instead');
+          .from('secretary_doctor_links')
+          .insert(links);
       }
     }
 
-    // Update password if provided
     if (password) {
-      const { error: passwordError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      await supabaseAdmin.auth.admin.updateUserById(userId, {
         password: password
       });
-
-      if (passwordError) {
-        return new Response(JSON.stringify({ error: passwordError.message }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
     }
 
-    // Criar ou atualizar procedimento "CONSULTA" se for médico/dono e tiver consultation_value
-    if ((role === 'medico' || role === 'dono') && consultation_value && consultation_value > 0) {
-      // Verificar se já existe procedimento CONSULTA para este médico
-      const { data: existingConsultation } = await supabaseAdmin
-        .from('commercial_procedures')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('name', 'CONSULTA')
-        .eq('category', 'consultation')
-        .single();
+    return new Response(JSON.stringify({ success: true }), { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } });
 
-      if (existingConsultation) {
-        // Atualizar procedimento existente
-        const { error: updateProcedureError } = await supabaseAdmin
-          .from('commercial_procedures')
-          .update({
-            price: consultation_value,
-            is_active: true
-          })
-          .eq('id', existingConsultation.id);
-
-        if (updateProcedureError) {
-          console.error('Error updating consultation procedure:', updateProcedureError);
-        }
-      } else {
-        // Criar novo procedimento CONSULTA
-        const { error: createProcedureError } = await supabaseAdmin
-          .from('commercial_procedures')
-          .insert({
-            user_id: userId,
-            name: 'CONSULTA',
-            category: 'consultation',
-            price: consultation_value,
-            duration_minutes: 30,
-            description: 'Consulta médica padrão',
-            is_active: true
-          });
-
-        if (createProcedureError) {
-          console.error('Error creating consultation procedure:', createProcedureError);
-        }
-      }
-    }
-
-    return new Response(JSON.stringify({ success: true, message: 'User updated successfully' }), { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } });
   } catch (error: any) {
-    console.error("Error in update-team-user function:", error);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
+    return new Response(JSON.stringify({ error: error.message || 'Internal Server Error' }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
   }
 };
 
 serve(handler);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
