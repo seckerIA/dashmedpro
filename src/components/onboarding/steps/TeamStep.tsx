@@ -4,23 +4,27 @@
  * Step 4: Team member management (optional)
  * - Add secretaries or other doctors
  * - Can be skipped
+ * - Limited to memberLimit in free tier
  */
 
 import { useState } from 'react';
-import { Users, Plus, X, Mail } from 'lucide-react';
+import { Users, Plus, X, Mail, AlertCircle, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { OnboardingTeamMember, isValidEmail } from '@/types/onboarding';
 import { cn } from '@/lib/utils';
 
 interface TeamStepProps {
   members: OnboardingTeamMember[];
-  onAdd: (member: Omit<OnboardingTeamMember, 'id'>) => void;
+  onAdd: (member: Omit<OnboardingTeamMember, 'id'>) => boolean;
   onRemove: (memberId: string) => void;
+  memberLimit: number;
+  memberLimitReached: boolean;
 }
 
-export function TeamStep({ members, onAdd, onRemove }: TeamStepProps) {
+export function TeamStep({ members, onAdd, onRemove, memberLimit, memberLimitReached }: TeamStepProps) {
   const [showForm, setShowForm] = useState(false);
   const [newMember, setNewMember] = useState({
     name: '',
@@ -44,10 +48,13 @@ export function TeamStep({ members, onAdd, onRemove }: TeamStepProps) {
 
     if (!newMember.name.trim()) return;
 
-    onAdd(newMember);
-    setNewMember({ name: '', email: '', role: 'secretaria' });
-    setEmailError('');
-    setShowForm(false);
+    // onAdd returns false if limit is reached
+    const success = onAdd(newMember);
+    if (success) {
+      setNewMember({ name: '', email: '', role: 'secretaria' });
+      setEmailError('');
+      setShowForm(false);
+    }
   };
 
   const handleEmailChange = (email: string) => {
@@ -66,6 +73,18 @@ export function TeamStep({ members, onAdd, onRemove }: TeamStepProps) {
         <p className="text-muted-foreground text-lg">
           Adicione membros agora ou depois
         </p>
+        {/* Member counter */}
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-card rounded-full border border-border">
+          <span className={cn(
+            "text-sm font-medium",
+            memberLimitReached ? "text-amber-400" : "text-muted-foreground"
+          )}>
+            {members.length} de {memberLimit} membro(s)
+          </span>
+          {memberLimitReached && (
+            <Crown className="w-4 h-4 text-amber-400" />
+          )}
+        </div>
       </div>
 
       {/* Members List */}
@@ -190,6 +209,14 @@ export function TeamStep({ members, onAdd, onRemove }: TeamStepProps) {
               </Button>
             </div>
           </div>
+        ) : memberLimitReached ? (
+          <Alert className="bg-amber-500/10 border-amber-500/30">
+            <Crown className="h-4 w-4 text-amber-400" />
+            <AlertTitle className="text-amber-400">Limite atingido</AlertTitle>
+            <AlertDescription className="text-amber-200/80">
+              Voce pode adicionar ate {memberLimit} membro(s) no plano atual. Faça upgrade de plano para adicionar mais.
+            </AlertDescription>
+          </Alert>
         ) : (
           <button
             onClick={() => setShowForm(true)}

@@ -61,6 +61,8 @@ export function OnboardingWizard() {
     isSlugAvailable,
     checkingSlug,
     checkSlugAvailability,
+    memberLimit,
+    memberLimitReached,
   } = useOnboarding();
 
   // Track direction for animation
@@ -103,6 +105,8 @@ export function OnboardingWizard() {
             members={state.teamMembers}
             onAdd={addTeamMember}
             onRemove={removeTeamMember}
+            memberLimit={memberLimit}
+            memberLimitReached={memberLimitReached}
           />
         );
       case 5:

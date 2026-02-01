@@ -113,7 +113,8 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // 2. Create Organization
+    // 2. Create Organization (with default member_limit = 1 for free tier)
+    const DEFAULT_MEMBER_LIMIT = 1;
     console.log(`🏥 [complete-onboarding] Creating organization: ${clinic.name}`);
     const { data: organization, error: orgError } = await supabaseAdmin
       .from('organizations')
@@ -122,6 +123,7 @@ const handler = async (req: Request): Promise<Response> => {
         slug: clinic.slug,
         phone: clinic.phone || null,
         city: clinic.city || null,
+        member_limit: DEFAULT_MEMBER_LIMIT, // Free tier: 1 team member
       })
       .select()
       .single();
@@ -237,13 +239,20 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    // 7. Invite Team Members (optional)
+    // 7. Invite Team Members (optional, limited by member_limit)
     const invitedMembers: Array<{ email: string; success: boolean; error?: string }> = [];
 
-    if (teamMembers && teamMembers.length > 0) {
-      console.log(`👥 [complete-onboarding] Inviting ${teamMembers.length} team members`);
+    // Enforce member limit - truncate if exceeds limit
+    let membersToProcess = teamMembers || [];
+    if (membersToProcess.length > DEFAULT_MEMBER_LIMIT) {
+      console.warn(`⚠️ [complete-onboarding] User tried to add ${membersToProcess.length} members, but limit is ${DEFAULT_MEMBER_LIMIT}. Truncating.`);
+      membersToProcess = membersToProcess.slice(0, DEFAULT_MEMBER_LIMIT);
+    }
 
-      for (const member of teamMembers) {
+    if (membersToProcess.length > 0) {
+      console.log(`👥 [complete-onboarding] Inviting ${membersToProcess.length} team members (limit: ${DEFAULT_MEMBER_LIMIT})`);
+
+      for (const member of membersToProcess) {
         try {
           // Check if user already exists
           const { data: existingUser } = await supabaseAdmin

@@ -24,6 +24,11 @@ import {
 } from '@/types/onboarding';
 
 // ============================================
+// Constants
+// ============================================
+const DEFAULT_MEMBER_LIMIT = 1; // Free tier: 1 team member
+
+// ============================================
 // Hook Return Type
 // ============================================
 interface UseOnboardingReturn {
@@ -49,8 +54,12 @@ interface UseOnboardingReturn {
   toggleProcedure: (procedureId: string) => void;
   addCustomProcedure: (procedure: Omit<OnboardingProcedure, 'id' | 'isSelected' | 'isCustom'>) => void;
   updateTeamMembers: (members: OnboardingTeamMember[]) => void;
-  addTeamMember: (member: Omit<OnboardingTeamMember, 'id'>) => void;
+  addTeamMember: (member: Omit<OnboardingTeamMember, 'id'>) => boolean;
   removeTeamMember: (memberId: string) => void;
+
+  // Team Member Limits
+  memberLimit: number;
+  memberLimitReached: boolean;
 
   // Specialty Procedures
   specialtyProcedures: SpecialtyProcedure[];
@@ -334,7 +343,17 @@ export function useOnboarding(): UseOnboardingReturn {
     });
   }, [saveState]);
 
-  const addTeamMember = useCallback((member: Omit<OnboardingTeamMember, 'id'>) => {
+  const addTeamMember = useCallback((member: Omit<OnboardingTeamMember, 'id'>): boolean => {
+    // Check if limit is reached before adding
+    if (state.teamMembers.length >= DEFAULT_MEMBER_LIMIT) {
+      toast({
+        variant: 'destructive',
+        title: 'Limite atingido',
+        description: `Voce pode adicionar ate ${DEFAULT_MEMBER_LIMIT} membro(s) no plano atual. Faça upgrade de plano para adicionar mais.`,
+      });
+      return false;
+    }
+
     setState(prev => {
       const newMember: OnboardingTeamMember = {
         ...member,
@@ -347,7 +366,8 @@ export function useOnboarding(): UseOnboardingReturn {
       saveState(newState);
       return newState;
     });
-  }, [saveState]);
+    return true;
+  }, [saveState, state.teamMembers.length, toast]);
 
   const removeTeamMember = useCallback((memberId: string) => {
     setState(prev => {
@@ -516,17 +536,26 @@ export function useOnboarding(): UseOnboardingReturn {
       return data;
     },
     onSuccess: async () => {
-      // Invalidate relevant queries
-      queryClient.invalidateQueries({ queryKey: ['user-profile'] });
-      queryClient.invalidateQueries({ queryKey: ['onboarding-state'] });
+      // 1. Remover query de onboarding-state PRIMEIRO (antes de qualquer update que possa causar redirect)
+      queryClient.removeQueries({ queryKey: ['onboarding-state'] });
 
-      // Refresh organization context so dashboard loads correctly
+      // 2. Atualizar organização
       await refreshOrganization();
 
+      // 3. Limpar todas as queries antigas para garantir estado limpo
+      queryClient.removeQueries({ queryKey: ['user-profile'] });
+      queryClient.removeQueries({ queryKey: ['dashboard'] });
+      queryClient.removeQueries({ queryKey: ['financial'] });
+
+      // 4. Toast antes do redirect
       toast({
         title: 'Configuracao concluida!',
         description: 'Sua clinica esta pronta para uso.',
       });
+
+      // 5. Forçar reload completo para garantir estado limpo no dashboard
+      // Isso evita race conditions com useEffect que detecta profile.onboarding_completed
+      window.location.replace('/');
     },
     onError: (error: Error) => {
       console.error('Onboarding completion error:', error);
@@ -541,6 +570,11 @@ export function useOnboarding(): UseOnboardingReturn {
   const completeOnboarding = useCallback(async () => {
     await completeMutation.mutateAsync();
   }, [completeMutation]);
+
+  // ============================================
+  // Member Limit
+  // ============================================
+  const memberLimitReached = state.teamMembers.length >= DEFAULT_MEMBER_LIMIT;
 
   // ============================================
   // Return
@@ -567,6 +601,10 @@ export function useOnboarding(): UseOnboardingReturn {
     updateTeamMembers,
     addTeamMember,
     removeTeamMember,
+
+    // Team Member Limits
+    memberLimit: DEFAULT_MEMBER_LIMIT,
+    memberLimitReached,
 
     specialtyProcedures,
     loadingSpecialtyProcedures,
