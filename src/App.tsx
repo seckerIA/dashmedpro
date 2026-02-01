@@ -78,6 +78,7 @@ import SecretaryFinancial from "./pages/SecretaryFinancial";
 import TransactionForm from "./components/financial/TransactionForm";
 import ProspectingGuide from "./pages/ProspectingGuide";
 import Commercial from "./pages/Commercial";
+import FollowUpPage from "./pages/FollowUpPage";
 import FollowUps from "./pages/FollowUps";
 import Marketing from "./pages/Marketing";
 import MedicalRecords from "./pages/MedicalRecords";
@@ -627,6 +628,14 @@ const AppRoutes = () => {
             element={
               <RoleProtectedRoute allowedRoles={['admin', 'dono', 'secretaria', 'medico']}>
                 <WhatsAppSettings />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="/followup"
+            element={
+              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'medico']}>
+                <FollowUpPage />
               </RoleProtectedRoute>
             }
           />
