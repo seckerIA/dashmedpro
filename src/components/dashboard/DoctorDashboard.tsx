@@ -5,7 +5,7 @@ import { useMedicalAppointments } from '@/hooks/useMedicalAppointments';
 import { TodaysAgenda } from './doctor/TodaysAgenda';
 import { DailyFinancials } from './doctor/DailyFinancials';
 import { FutureOutlook } from './doctor/FutureOutlook';
-import { SecretaryActivities } from './doctor/SecretaryActivities';
+import { SecretaryActivitiesV2 } from './doctor/SecretaryActivitiesV2';
 import { NegotiationsWidget } from './doctor/NegotiationsWidget';
 import { MedicalRecordSearch } from './doctor/MedicalRecordSearch';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -134,12 +134,14 @@ export function DoctorDashboard({ viewMode, onViewModeChange }: DoctorDashboardP
                         <NegotiationsWidget />
                     </div>
 
+
                     {/* Secretary Activities */}
                     <Card hierarchy="tertiary" className="flex-1 min-h-[250px] overflow-hidden flex flex-col">
-                        <SecretaryActivities />
+                        <SecretaryActivitiesV2 />
                     </Card>
                 </div>
             </div>
         </div>
     );
 }
+

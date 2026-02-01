@@ -65,6 +65,7 @@ export function createClientTools(context: CortanaContext) {
   });
 
   const userId = context.userId;
+  const organizationId = context.organizationId;
   const doctorIds = context.doctorIds || [];
   const targetUserIds = [userId, ...doctorIds];
 
@@ -450,6 +451,7 @@ export function createClientTools(context: CortanaContext) {
               status: 'scheduled',
               payment_status: 'pending',
               notes: params.notes,
+              organization_id: organizationId,
             })
             .select()
             .single();

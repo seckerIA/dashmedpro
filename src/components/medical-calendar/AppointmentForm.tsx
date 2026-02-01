@@ -95,7 +95,7 @@ export function AppointmentForm({
   const { checkAvailability } = useAvailability();
   const { procedures, isLoading: isLoadingProcedures } = useCommercialProcedures();
   const { doctors, isLoading: isLoadingDoctors } = useDoctors();
-  const { canScheduleForOthers } = useUserProfile();
+  const { canScheduleForOthers, profile } = useUserProfile();
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [estimatedValueDisplay, setEstimatedValueDisplay] = useState<string>('');
@@ -300,11 +300,11 @@ export function AppointmentForm({
         estimated_value: data.estimated_value || null,
         payment_status: data.payment_status,
         paid_in_advance: data.paid_in_advance || false,
-        // Campos de Sinal - se hasNoSinal for true, definir como null/false
         sinal_amount: hasNoSinal ? null : (sinalAmount || null),
         sinal_paid: hasNoSinal ? false : sinalPaid,
         sinal_receipt_url: hasNoSinal ? null : sinalReceiptUrl,
         sinal_paid_at: (hasNoSinal || !sinalPaid) ? null : new Date().toISOString(),
+        organization_id: profile?.organization_id,
       };
 
       const result = await onSubmit(submitData);

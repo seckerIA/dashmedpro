@@ -20,7 +20,8 @@ interface SecretaryDoctorLink {
 export function buildCortanaContext(
   user: { id: string } | null,
   profile: UserProfile | null,
-  doctorLinks: SecretaryDoctorLink[] = []
+  doctorLinks: SecretaryDoctorLink[] = [],
+  organizationId?: string | null
 ): CortanaContext | null {
   if (!user || !profile) {
     return null;
@@ -72,6 +73,7 @@ export function buildCortanaContext(
     userRole: role,
     userId: user.id,
     doctorIds: role === 'secretaria' ? doctorIds : undefined,
+    organizationId,
     allowedActions,
   };
 }

@@ -62,7 +62,8 @@ export function CortanaProvider({ children }: { children: React.ReactNode }) {
     return buildCortanaContext(
       user,
       profile,
-      doctorIds?.map(id => ({ doctor_id: id })) || []
+      doctorIds?.map(id => ({ doctor_id: id })) || [],
+      profile.organization_id
     );
   }, [user, profile, doctorIds]);
 

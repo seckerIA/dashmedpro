@@ -37,8 +37,8 @@ export function NegotiationsWidget() {
     };
 
     return (
-        <Card className="h-full border-border shadow-sm">
-            <CardHeader className="pb-3">
+        <Card className="h-full border-border shadow-sm flex flex-col overflow-hidden">
+            <CardHeader className="pb-3 shrink-0">
                 <div className="flex items-center justify-between">
                     <div>
                         <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -49,8 +49,8 @@ export function NegotiationsWidget() {
                     </div>
                 </div>
             </CardHeader>
-            <CardContent className="p-0">
-                <ScrollArea className="h-[300px]">
+            <CardContent className="p-0 flex-1 flex flex-col min-h-0">
+                <ScrollArea className="flex-1">
                     <div className="divide-y divide-border/50">
                         {activeDeals.length > 0 ? (
                             activeDeals.map((deal) => {
@@ -114,7 +114,7 @@ export function NegotiationsWidget() {
                         )}
                     </div>
                 </ScrollArea>
-                <div className="p-3 border-t bg-muted/20">
+                <div className="p-3 border-t bg-muted/20 shrink-0">
                     <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => navigate('/crm')}>
                         Ver todas as negociações
                     </Button>

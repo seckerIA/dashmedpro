@@ -246,3 +246,19 @@ supabase/functions/
     - Botão "Agendar" tornado sempre visível, com alerta amigável se o contato não estiver vinculado.
     - Corrigidos erros de tipagem TypeScript (`name` -> `full_name`, `avatar_url` removido).
 
+### Contexto Atual (01/02/2026 - Cortana Integration Refactor)
+- **Cortana AI Assistant Updates**:
+  - `CortanaProvider.tsx`: Melhorias no gerenciamento de contexto e estado da assistente de voz.
+  - `clientTools.ts`: Adicionadas novas ferramentas para integração Cortana-CRM.
+  - `contextBuilder.ts`: Refatorado builder de contexto para melhor performance e precisão.
+  - `cortana.ts`: Atualizações nas interfaces TypeScript para novos recursos.
+- **Dashboard Components Refactor**:
+  - `DoctorDashboard.tsx`: Estrutura de componentes mais limpa e otimizada.
+  - `FutureOutlook.tsx`: Melhorias na exibição de dados de projeções futuras.
+  - `NegotiationsWidget.tsx`: Aprimoramentos visuais e de performance no widget de negociações.
+  - `SecretaryActivities.tsx`: Substituído pela versão V2 (arquivo original movido para `_DEPRECATED`).
+  - `SecretaryActivitiesV2.tsx`: Nova versão com melhor arquitetura e UX.
+- **Medical Calendar**:
+  - `AppointmentForm.tsx`: Validações aprimoradas e melhor tratamento de erros.
+- **Status**: Refatoração focada em manutenibilidade e preparação para futuras features da Cortana.
+

@@ -42,7 +42,7 @@ export function FutureOutlook() {
         const total = appointments.length;
         // Consider appointments > 60 minutes as longer procedures
         const procedures = appointments.filter(apt =>
-            apt.procedure && apt.procedure.duration_minutes && apt.procedure.duration_minutes > 60
+            (apt as any).procedure && (apt as any).procedure.duration_minutes && (apt as any).procedure.duration_minutes > 60
         ).length;
         return { appointments: total, procedures };
     };
@@ -71,12 +71,12 @@ export function FutureOutlook() {
             <div className="space-y-3">
                 {nextDays.map((day, idx) => (
                     <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-card border border-border/50 hover:border-primary/20 transition-colors">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-muted/50 w-10 h-10 rounded-lg flex flex-col items-center justify-center border border-border/50">
-                                <span className="text-[10px] uppercase font-bold text-muted-foreground">
-                                    {format(day.date, 'EEE', { locale: ptBR })}
+                        <div className="flex items-center gap-4">
+                            <div className="bg-muted/50 w-12 h-12 shrink-0 rounded-lg flex flex-col items-center justify-center border border-border/50">
+                                <span className="text-[10px] uppercase font-bold text-muted-foreground leading-none mb-1">
+                                    {format(day.date, 'EEE', { locale: ptBR }).replace('.', '')}
                                 </span>
-                                <span className="text-sm font-bold leading-none text-foreground">
+                                <span className="text-base font-bold leading-none text-foreground">
                                     {format(day.date, 'dd')}
                                 </span>
                             </div>

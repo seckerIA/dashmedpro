@@ -15,6 +15,7 @@ export interface CortanaContext {
   userName: string;
   userRole: 'admin' | 'dono' | 'medico' | 'secretaria' | 'vendedor' | 'gestor_trafego';
   userId: string;
+  organizationId?: string | null;
   doctorIds?: string[]; // Para secretárias
   allowedActions: string[];
 }

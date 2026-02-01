@@ -8,7 +8,11 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useSecretaryActivities, ActivityType } from "@/hooks/useSecretaryActivities";
 
-export function SecretaryActivities() {
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+
+export function SecretaryActivitiesV2() {
+    const navigate = useNavigate();
     const { data: activities, isLoading } = useSecretaryActivities();
 
     const getIcon = (type: ActivityType) => {
@@ -39,14 +43,13 @@ export function SecretaryActivities() {
 
     return (
         <div className="flex flex-col h-full">
-            <div className="p-4 pb-2 border-b border-border/50 bg-muted/20">
-                <h3 className="tex-sm font-semibold flex items-center gap-2">
-                    <Avatar className="w-6 h-6">
-                        <AvatarFallback className="text-[10px] bg-primary/20 text-primary">SEC</AvatarFallback>
-                    </Avatar>
+            <div className="flex items-center gap-3 p-4 border-b border-border/50 bg-primary/5">
+                <Avatar className="w-8 h-8 rounded-lg shrink-0">
+                    <AvatarFallback className="text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 rounded-lg">SEC</AvatarFallback>
+                </Avatar>
+                <h3 className="text-sm font-semibold text-foreground">
                     Atividades da Secretaria
                 </h3>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Ver todas as negociações</p>
             </div>
             <ScrollArea className="flex-1">
                 <div className="p-4 space-y-4">
@@ -91,6 +94,11 @@ export function SecretaryActivities() {
                     )}
                 </div>
             </ScrollArea>
+            <div className="p-3 border-t bg-muted/20">
+                <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => navigate('/crm')}>
+                    Ver todas as negociações
+                </Button>
+            </div>
         </div>
     );
 }
