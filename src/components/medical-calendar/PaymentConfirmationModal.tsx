@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { MedicalAppointmentWithRelations } from '@/types/medicalAppointments';
 import { formatCurrency } from '@/lib/currency';
 import { DollarSign, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { PaymentStatusBadge } from './PaymentStatusBadge';
 
 interface PaymentConfirmationModalProps {
@@ -67,10 +68,19 @@ export function PaymentConfirmationModal({
           {/* Status atual de pagamento */}
           <div>
             <p className="text-sm text-muted-foreground mb-2">Status Atual de Pagamento</p>
-            <PaymentStatusBadge status={paymentStatus} showIcon />
+            <div className="flex flex-wrap gap-2 items-center">
+              <PaymentStatusBadge status={paymentStatus} showIcon />
+              {sinalPaid && (
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  Sinal Pago
+                </Badge>
+              )}
+            </div>
             {sinalPaid && appointment.sinal_amount && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Sinal pago: {formatCurrency(appointment.sinal_amount)}
+              <p className="text-xs text-blue-600 dark:text-blue-400 font-medium mt-2 flex items-center gap-1">
+                <DollarSign className="h-3 w-3" />
+                Valor do sinal recebido: {formatCurrency(appointment.sinal_amount)}
               </p>
             )}
           </div>

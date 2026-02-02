@@ -41,13 +41,15 @@ export function FinancialRequirementModal({
                         <HandCoins className="h-6 w-6 text-orange-600 dark:text-orange-400" />
                     </div>
                     <DialogTitle className="text-center text-xl">⚠️ Conta Bancária Obrigatória</DialogTitle>
-                    <DialogDescription className="text-center pt-2 space-y-2">
-                        <p className="font-semibold text-orange-600 dark:text-orange-400">
-                            Antes de marcar consultas como pagas, você PRECISA cadastrar uma conta bancária!
-                        </p>
-                        <p className="text-sm">
-                            Sem uma conta cadastrada, os pagamentos das consultas <strong className="text-destructive">NÃO serão registrados</strong> no financeiro e você perderá o controle do seu faturamento.
-                        </p>
+                    <DialogDescription className="text-center pt-2 space-y-2" asChild>
+                        <div className="text-sm text-muted-foreground">
+                            <p className="font-semibold text-orange-600 dark:text-orange-400">
+                                Antes de marcar consultas como pagas, você PRECISA cadastrar uma conta bancária!
+                            </p>
+                            <p>
+                                Sem uma conta cadastrada, os pagamentos das consultas <strong className="text-destructive">NÃO serão registrados</strong> no financeiro e você perderá o controle do seu faturamento.
+                            </p>
+                        </div>
                     </DialogDescription>
                 </DialogHeader>
 

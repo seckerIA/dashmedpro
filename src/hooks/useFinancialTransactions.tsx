@@ -48,6 +48,7 @@ export const useFinancialTransactions = (filters?: TransactionFilters) => {
           contact:crm_contacts(id, full_name, company)
         `)
         .order("transaction_date", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(500); // Limitar para performance
 
       // Se não for admin/dono, filtrar apenas pelo user_id
@@ -231,6 +232,9 @@ export const useFinancialTransactions = (filters?: TransactionFilters) => {
       queryClient.invalidateQueries({ queryKey: ["financial-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["financial-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["financial-metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["financial-monthly-data"] });
+      queryClient.invalidateQueries({ queryKey: ["financial-expenses-by-category"] });
+      queryClient.invalidateQueries({ queryKey: ["secretary-sinal-metrics"] });
       toast({
         title: "Transação atualizada",
         description: "Transação atualizada com sucesso!",

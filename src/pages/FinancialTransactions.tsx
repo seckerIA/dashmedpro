@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -41,21 +41,39 @@ const FinancialTransactions = ({ embedded = false }: FinancialTransactionsProps)
   const [filterType, setFilterType] = useState<"all" | "entrada" | "saida">("all")
   const [selectedTransaction, setSelectedTransaction] = useState<FinancialTransactionWithDetails | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc")
 
   // Debug logs
   // console.log('FinancialTransactions - transactions:', transactions)
   // console.log('FinancialTransactions - isLoading:', isLoading)
 
-  // Filtrar transações
-  const filteredTransactions = transactions?.filter(transaction => {
-    const matchesSearch = transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.category?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.account?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+  // Filtrar e ordenar transações
+  const filteredAndSortedTransactions = useMemo(() => {
+    let result = transactions?.filter(transaction => {
+      const matchesSearch = transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        transaction.category?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        transaction.account?.name?.toLowerCase().includes(searchTerm.toLowerCase())
 
-    const matchesType = filterType === "all" || transaction.type === filterType
+      const matchesType = filterType === "all" || transaction.type === filterType
 
-    return matchesType && matchesSearch
-  }) || []
+      return matchesType && matchesSearch
+    }) || []
+
+    // Aplicar ordenação
+    return [...result].sort((a, b) => {
+      const dateA = new Date(a.transaction_date).getTime()
+      const dateB = new Date(b.transaction_date).getTime()
+
+      if (dateA !== dateB) {
+        return sortOrder === "desc" ? dateB - dateA : dateA - dateB
+      }
+
+      // Se a data for igual, usar created_at como desempate
+      const createdA = new Date(a.created_at || 0).getTime()
+      const createdB = new Date(b.created_at || 0).getTime()
+      return sortOrder === "desc" ? createdB - createdA : createdA - createdB
+    })
+  }, [transactions, searchTerm, filterType, sortOrder])
 
   const handleDelete = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir esta transação?')) {
@@ -128,11 +146,12 @@ const FinancialTransactions = ({ embedded = false }: FinancialTransactionsProps)
                   />
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
                 <Button
                   variant={filterType === "all" ? "default" : "outline"}
                   onClick={() => setFilterType("all")}
                   size="sm"
+                  className="whitespace-nowrap"
                 >
                   Todas
                 </Button>
@@ -140,6 +159,7 @@ const FinancialTransactions = ({ embedded = false }: FinancialTransactionsProps)
                   variant={filterType === "entrada" ? "default" : "outline"}
                   onClick={() => setFilterType("entrada")}
                   size="sm"
+                  className="whitespace-nowrap"
                 >
                   <ArrowUpRight className="w-4 h-4 mr-1" />
                   Receitas
@@ -148,9 +168,22 @@ const FinancialTransactions = ({ embedded = false }: FinancialTransactionsProps)
                   variant={filterType === "saida" ? "default" : "outline"}
                   onClick={() => setFilterType("saida")}
                   size="sm"
+                  className="whitespace-nowrap"
                 >
                   <ArrowDownLeft className="w-4 h-4 mr-1" />
                   Despesas
+                </Button>
+
+                <div className="h-8 w-[1px] bg-border mx-1 hidden sm:block" />
+
+                <Button
+                  variant="outline"
+                  onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
+                  size="sm"
+                  className="whitespace-nowrap gap-2"
+                >
+                  <Filter className="w-4 h-4" />
+                  {sortOrder === "desc" ? "Mais Recentes" : "Mais Antigas"}
                 </Button>
               </div>
             </div>
@@ -162,7 +195,7 @@ const FinancialTransactions = ({ embedded = false }: FinancialTransactionsProps)
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Transações ({filteredTransactions.length})</CardTitle>
+                <CardTitle>Transações ({filteredAndSortedTransactions.length})</CardTitle>
                 <CardDescription>
                   {filterType === "all" ? "Todas as transações" :
                     filterType === "entrada" ? "Apenas receitas" : "Apenas despesas"}
@@ -175,7 +208,7 @@ const FinancialTransactions = ({ embedded = false }: FinancialTransactionsProps)
             </div>
           </CardHeader>
           <CardContent>
-            {filteredTransactions.length === 0 ? (
+            {filteredAndSortedTransactions.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <DollarSign className="w-12 h-12 mx-auto mb-4 opacity-50" />
                 <p>Nenhuma transação encontrada</p>
@@ -198,7 +231,7 @@ const FinancialTransactions = ({ embedded = false }: FinancialTransactionsProps)
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredTransactions.map((transaction) => (
+                    {filteredAndSortedTransactions.map((transaction) => (
                       <TableRow key={transaction.id}>
                         <TableCell>
                           <div className="flex items-center gap-2">

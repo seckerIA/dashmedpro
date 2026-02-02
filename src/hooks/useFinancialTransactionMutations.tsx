@@ -9,7 +9,7 @@ export const useCreateFinancialTransaction = () => {
   return useMutation({
     mutationFn: async (transaction: Omit<FinancialTransaction, 'id' | 'created_at' | 'updated_at'>) => {
       console.log('useCreateFinancialTransaction - mutationFn chamado com:', transaction)
-      
+
       const { data, error } = await supabase
         .from('financial_transactions')
         .insert([transaction])
@@ -67,7 +67,10 @@ export const useUpdateFinancialTransaction = () => {
       queryClient.invalidateQueries({ queryKey: ['financial-transactions'] })
       queryClient.invalidateQueries({ queryKey: ['financial-metrics'] })
       queryClient.invalidateQueries({ queryKey: ['financial-accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['financial-monthly-data'] })
+      queryClient.invalidateQueries({ queryKey: ['financial-expenses-by-category'] })
       queryClient.invalidateQueries({ queryKey: ['transaction-costs'] })
+      queryClient.invalidateQueries({ queryKey: ['secretary-sinal-metrics'] })
       toast({
         title: "Sucesso",
         description: "Transação atualizada com sucesso!",

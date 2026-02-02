@@ -33,15 +33,25 @@ const createFinancialTransactionForAppointment = async (
     estimated_value?: number | null;
     appointment_type: string;
     payment_status?: string;
+    amount_override?: number;
+    description_override?: string;
+    is_sinal?: boolean;
   },
   profileOrgId?: string
 ): Promise<string | null> => {
   try {
+    const finalAmount = appointment.amount_override !== undefined
+      ? appointment.amount_override
+      : Number(appointment.estimated_value || 0);
+
     // Validar se tem valor para criar transação
-    if (!appointment.estimated_value || appointment.estimated_value <= 0) {
-      console.log('[Financial] Sem valor estimado, não criando transação');
+    if (finalAmount <= 0) {
+      console.log('[Financial] Valor zero ou negativo, não criando transação');
       return null;
     }
+
+    const finalDescription = appointment.description_override
+      || `Consulta: ${appointment.title}${appointment.is_sinal ? ' (Sinal)' : ''}`;
 
     // Buscar categoria padrão de entrada
     let { data: categories } = await supabase
@@ -97,7 +107,7 @@ const createFinancialTransactionForAppointment = async (
           title: '⚠️ Pagamento NÃO Registrado no Financeiro',
           description: errorMessage,
           variant: 'destructive',
-          duration: 8000, // 8 segundos para dar tempo de ler
+          duration: 8000,
         });
       });
 
@@ -112,20 +122,21 @@ const createFinancialTransactionForAppointment = async (
       account_id: accountId,
       category_id: categoryId,
       type: 'entrada',
-      amount: Number(appointment.estimated_value),
-      description: `Consulta: ${appointment.title}`,
-      date: new Date(appointment.start_time).toISOString().split('T')[0],
-      transaction_date: new Date(appointment.start_time).toISOString().split('T')[0],
+      amount: finalAmount,
+      description: finalDescription,
+      date: new Date().toISOString().split('T')[0], // Usar data de hoje para o registro financeiro
+      transaction_date: new Date().toISOString().split('T')[0],
       contact_id: appointment.contact_id,
       payment_method: 'pix',
       status: 'concluida',
-      notes: `Consulta médica - ${appointment.appointment_type}`,
+      notes: `Consulta médica - ${appointment.appointment_type}${appointment.is_sinal ? ' (Sinal)' : ''}`,
       tags: ['consulta-medica'],
       has_costs: false,
       total_costs: 0,
       metadata: {
         appointment_id: appointment.id,
         appointment_type: appointment.appointment_type,
+        is_sinal: !!appointment.is_sinal,
       },
     };
 
@@ -140,28 +151,11 @@ const createFinancialTransactionForAppointment = async (
       return null;
     }
 
-    // Atualizar saldo da conta (entrada aumenta saldo)
-    const { data: account } = await supabase
-      .from('financial_accounts')
-      .select('current_balance')
-      .eq('id', accountId)
-      .single();
-
-    if (account) {
-      const currentBalance = account.current_balance || 0;
-      const amount = Number(appointment.estimated_value) || 0;
-      const newBalance = currentBalance + amount; // Entrada sempre soma
-
-      await supabase
-        .from('financial_accounts')
-        .update({ current_balance: newBalance })
-        .eq('id', accountId);
-
-      console.log('[Financial] Saldo da conta atualizado:', currentBalance, '->', newBalance);
+    if (transaction) {
+      return transaction.id;
     }
 
-    console.log('[Financial] Transação criada:', transaction.id);
-    return transaction.id;
+    return null;
   } catch (error) {
     console.error('[Financial] Erro inesperado:', error);
     return null;
@@ -669,9 +663,22 @@ const updateAppointment = async ({
     paid_in_advance: updates.paid_in_advance !== undefined ? updates.paid_in_advance : undefined,
   };
 
+  // Buscar dados atuais para verificar mudanças sensíveis
+  const { data: oldAppointment } = await supabase
+    .from('medical_appointments')
+    .select('sinal_paid, sinal_amount, payment_status, estimated_value, financial_transaction_id')
+    .eq('id', id)
+    .single();
+
   const { data, error } = await supabase
     .from('medical_appointments')
-    .update(updateData)
+    .update({
+      ...updateData,
+      // Se sinal_paid está vindo como true, garantir que status de pagamento seja pelo menos 'parcial'
+      ...(updates.sinal_paid === true && (!oldAppointment || oldAppointment.payment_status === 'pending')
+        ? { payment_status: 'partial' as PaymentStatus }
+        : {})
+    })
     .eq('id', id)
     .select(`
       *,
@@ -684,44 +691,85 @@ const updateAppointment = async ({
 
   const appointment = data as MedicalAppointmentWithRelations;
 
-  // Se payment_status mudou para 'paid' e não tem transação, criar IMEDIATAMENTE
+  // 1. Se sinal_paid mudou para 'true', criar transação do sinal
+  if (updates.sinal_paid === true && (!oldAppointment || !oldAppointment.sinal_paid)) {
+    const sinalAmount = updates.sinal_amount || appointment.sinal_amount || 0;
+
+    if (sinalAmount > 0) {
+      await createFinancialTransactionForAppointment({
+        id: appointment.id,
+        user_id: appointment.user_id,
+        organization_id: (appointment as any).organization_id,
+        contact_id: appointment.contact_id,
+        title: appointment.title,
+        start_time: appointment.start_time,
+        estimated_value: appointment.estimated_value,
+        appointment_type: appointment.appointment_type || 'consultation',
+        amount_override: sinalAmount,
+        description_override: `Sinal: ${appointment.title}`,
+        is_sinal: true,
+      });
+
+      // Notificar sucesso do sinal
+      import('@/hooks/use-toast').then(({ toast }) => {
+        toast({
+          title: '✅ Sinal Registrado no Financeiro',
+          description: `Valor de R$ ${sinalAmount.toFixed(2)} registrado como entrada.`,
+          duration: 4000,
+        });
+      });
+    }
+  }
+
+  // 2. Se payment_status mudou para 'paid' e não tem transação principal, criar
   if (
     updates.payment_status === 'paid' &&
+    (!oldAppointment || oldAppointment.payment_status !== 'paid') &&
     !appointment.financial_transaction_id &&
     appointment.estimated_value &&
     appointment.estimated_value > 0
   ) {
-    console.log('[Update] Status mudou para PAGO - criando transação financeira imediatamente');
+    console.log('[Update] Status mudou para PAGO - criando transação financeira principal');
 
-    const transactionId = await createFinancialTransactionForAppointment({
-      id: appointment.id,
-      user_id: appointment.user_id,
-      organization_id: (appointment as any).organization_id,
-      contact_id: appointment.contact_id,
-      title: appointment.title,
-      start_time: appointment.start_time,
-      estimated_value: appointment.estimated_value,
-      appointment_type: appointment.appointment_type || 'consultation',
-      payment_status: 'paid',
-    });
+    // Calcular o que resta pagar (subtrair sinal se já foi pago)
+    const alreadyPaidSinal = updates.sinal_paid === true || appointment.sinal_paid;
+    const sinalAmount = (alreadyPaidSinal ? (appointment.sinal_amount || 0) : 0);
+    const remainingAmount = Number(appointment.estimated_value) - sinalAmount;
 
-    // Vincular transação à consulta
-    if (transactionId) {
-      await supabase
-        .from('medical_appointments')
-        .update({ financial_transaction_id: transactionId })
-        .eq('id', appointment.id);
-
-      console.log('[Update] ✅ Transação financeira criada e vinculada:', transactionId);
-
-      // Notificar sucesso
-      import('@/hooks/use-toast').then(({ toast }) => {
-        toast({
-          title: '✅ Pagamento Registrado no Financeiro',
-          description: `Receita de R$ ${appointment.estimated_value?.toFixed(2)} registrada automaticamente.`,
-          duration: 4000,
-        });
+    if (remainingAmount > 0) {
+      const transactionId = await createFinancialTransactionForAppointment({
+        id: appointment.id,
+        user_id: appointment.user_id,
+        organization_id: (appointment as any).organization_id,
+        contact_id: appointment.contact_id,
+        title: appointment.title,
+        start_time: appointment.start_time,
+        estimated_value: appointment.estimated_value,
+        appointment_type: appointment.appointment_type || 'consultation',
+        payment_status: 'paid',
+        amount_override: remainingAmount,
+        description_override: `Consulta: ${appointment.title}${appointment.sinal_paid ? ' (Restante)' : ''}`,
+        is_sinal: false,
       });
+
+      // Vincular transação à consulta
+      if (transactionId) {
+        await supabase
+          .from('medical_appointments')
+          .update({ financial_transaction_id: transactionId })
+          .eq('id', appointment.id);
+
+        console.log('[Update] ✅ Transação principal criada e vinculada:', transactionId);
+
+        // Notificar sucesso
+        import('@/hooks/use-toast').then(({ toast }) => {
+          toast({
+            title: '✅ Pagamento Registrado no Financeiro',
+            description: `Receita de R$ ${remainingAmount.toFixed(2)} registrada automaticamente.`,
+            duration: 4000,
+          });
+        });
+      }
     }
   }
 
@@ -903,10 +951,12 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
       queryClient.invalidateQueries({ queryKey: ['crm-pipeline'] });
       // Invalidar métricas de sinais para secretárias
       queryClient.invalidateQueries({ queryKey: ['secretary-sinal-metrics'] });
-      // Invalidar queries financeiras (caso payment_status tenha mudado para paid)
+      // Invalidar status de transações financeiras e métricas
       queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['financial-metrics'] });
       queryClient.invalidateQueries({ queryKey: ['financial-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-monthly-data'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-expenses-by-category'] });
       // Invalidar histórico de uso de estoque
       queryClient.invalidateQueries({ queryKey: ['stock-usage-history'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
@@ -1037,58 +1087,13 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
             variant: 'default',
           });
         } else {
-          // Criar transação financeira
-          // Se o agendamento não tiver organization_id (antigo), usar o do perfil do usuário atual
-          const orgId = appointment.organization_id || (profile as any)?.organization_id;
+          // Removido o insert manual duplicado aqui. 
+          // O updateMutation.mutateAsync abaixo alterará o status para 'paid', 
+          // o que disparará a criação da transação no hook updateAppointment.
+          console.log('[markAsCompleted] Pulando criação manual de transação para evitar duplicidade. updateAppointment cuidará disso.');
 
-          if (!orgId) {
-            console.error('Erro: Não foi possível identificar a organização para a transação.', { appointmentOrg: appointment.organization_id, profileOrg: (profile as any)?.organization_id });
-            // Não lançar erro aqui para não travar, mas o insert provavelmente falhará
-          }
-
-          const transactionData: FinancialTransactionInsert = {
-            user_id: appointment.user_id,
-            organization_id: orgId, // Usar orgId resolvido
-            account_id: accountId,
-            category_id: categoryId,
-            type: 'entrada',
-            amount: Number(appointment.estimated_value),
-            description: `Consulta: ${appointment.title}`,
-            date: new Date(appointment.start_time).toISOString().split('T')[0],
-            transaction_date: new Date(appointment.start_time).toISOString().split('T')[0],
-            contact_id: appointment.contact_id,
-            payment_method: (appointment.payment_status === 'paid' || appointment.payment_status === 'partial') ? 'pix' : null,
-            // Sempre criar como concluída se a consulta foi finalizada (marcada como compareceu)
-            status: 'concluida',
-            notes: `Consulta médica - ${appointment.appointment_type}`,
-            tags: ['consulta-medica'],
-            has_costs: false,
-            total_costs: 0,
-            metadata: {
-              appointment_id: appointment.id,
-              appointment_type: appointment.appointment_type,
-            },
-          };
-
-          const { data: transaction, error: transactionError } = await supabase
-            .from('financial_transactions')
-            .insert(transactionData)
-            .select()
-            .single();
-
-          if (transactionError) {
-            console.error('Erro ao criar transação financeira:', transactionError);
-            console.error('Dados da transação:', transactionData);
-            toast({
-              title: 'Aviso',
-              description: `Consulta concluída, mas não foi possível criar a transação financeira: ${transactionError.message}`,
-              variant: 'default',
-            });
-            // Não falha a operação principal se não conseguir criar a transação
-          } else {
-            financialTransactionId = transaction.id;
-            console.log('Transação financeira criada com sucesso:', transaction.id);
-          }
+          // Opcional: apenas sinalizar que o pagamento deve ser registrado
+          financialTransactionId = null;
         }
       }
 
