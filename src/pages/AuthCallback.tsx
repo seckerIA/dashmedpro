@@ -221,9 +221,9 @@ const AuthCallback = () => {
           else if (existingProfile?.onboarding_completed === false) {
             navigate('/onboarding');
           }
-          // Usuário normal vai para dashboard
+          // Usuário normal vai para dashboard - força reload para evitar race condition
           else {
-            navigate('/');
+            window.location.replace('/');
           }
         }, 1500);
 
