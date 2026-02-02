@@ -790,7 +790,7 @@ const serializeFilters = (filters?: UseMedicalAppointmentsFilters): string => {
 // Hook principal
 export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) {
   const { user, loading: authLoading } = useAuth();
-  const { profile, isSecretaria } = useUserProfile();
+  const { profile, isSecretaria, isLoading: isLoadingProfile } = useUserProfile();
   const { doctorIds, isLoading: isLoadingDoctors } = useSecretaryDoctors();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -831,7 +831,7 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
       doctorIdsToUse.length > 0 ? doctorIdsToUse : undefined,
       canViewAll // Passando a flag correta
     ),
-    enabled: !!user?.id && !authLoading && (!isSecretaria || !isLoadingDoctors),
+    enabled: !!user?.id && !!profile && !authLoading && !isLoadingProfile && (!isSecretaria || !isLoadingDoctors),
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
     refetchOnMount: false,

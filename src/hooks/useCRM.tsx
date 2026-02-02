@@ -199,7 +199,7 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
   const { data: contacts = [], isLoading: isLoadingContacts, refetch: refetchContacts } = useQuery({
     queryKey: ['crm-contacts', user?.id, fetchAllContacts, doctorIdsToUse],
     queryFn: ({ signal }) => fetchContacts(user?.id || '', fetchAllContacts, signal, doctorIdsToUse),
-    enabled: !!user?.id || fetchAllContacts || doctorIdsToUse.length > 0,
+    enabled: (!!user?.id && !loading) || fetchAllContacts || doctorIdsToUse.length > 0,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -209,7 +209,7 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
   const { data: deals = [], isLoading: isLoadingDeals } = useQuery({
     queryKey: ['crm-deals', user?.id, viewAsUserIds?.join(','), doctorIdsToUse, canViewAll],
     queryFn: ({ signal }) => fetchDeals(user?.id || '', viewAsUserIds, signal, doctorIdsToUse, canViewAll),
-    enabled: !!user?.id || doctorIdsToUse.length > 0,
+    enabled: (!!user?.id && !loading) || doctorIdsToUse.length > 0,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
