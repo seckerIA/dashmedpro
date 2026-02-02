@@ -88,6 +88,7 @@ import WhatsAppSettings from "./pages/WhatsAppSettings";
 import InventoryPage from "./pages/Inventory";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import { SuperAdminLayout } from "./components/admin/SuperAdminLayout";
+import { PasswordChangePrompt } from "./components/auth/PasswordChangePrompt";
 import AdminClinics from "./pages/admin/AdminClinics";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminMetrics from "./pages/admin/AdminMetrics";
@@ -506,6 +507,7 @@ const AppRoutes = () => {
   return (
     // CortanaProvider removido - Cortana desativada
     <>
+      <PasswordChangePrompt />
       <AppLayout>
         <Routes>
           <Route path="/login" element={<Navigate to="/" replace />} />

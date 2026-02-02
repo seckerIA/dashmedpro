@@ -3,9 +3,9 @@
  * Com suporte a OAuth do Facebook para conexão automática
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MessageCircle, Settings, ArrowLeft, Loader2, Users, Phone, CheckCircle, XCircle, Sparkles } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,8 +24,12 @@ export default function WhatsAppSettings() {
   const { isAdmin } = useUserProfile();
   const { teamConfigs, isLoading: isLoadingTeam } = useTeamWhatsAppConfigs();
   const { hasOAuthSession, isLoadingSession } = useWhatsAppOAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [webhookUrl, setWebhookUrl] = useState<string>('');
   const [webhookVerifyToken, setWebhookVerifyToken] = useState<string>('');
+
+  // Sincronizar tab com URL
+  const activeTab = searchParams.get('tab') || (isAdmin ? 'team' : (isConfigured ? 'credentials' : 'connect'));
 
   const handleCredentialsSuccess = (url: string, token: string) => {
     setWebhookUrl(url);
@@ -112,7 +116,11 @@ export default function WhatsAppSettings() {
       )}
 
       {/* Tabs de configuração */}
-      <Tabs defaultValue={isAdmin ? 'team' : (isConfigured ? 'credentials' : 'connect')} className="space-y-6">
+      <Tabs
+        value={activeTab}
+        onValueChange={(val) => setSearchParams({ tab: val })}
+        className="space-y-6"
+      >
         <TabsList>
           {isAdmin && (
             <TabsTrigger value="team">

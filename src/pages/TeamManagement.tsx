@@ -34,7 +34,7 @@ const TeamManagement = () => {
   const [memberLimitInfo, setMemberLimitInfo] = useState<{ current: number; limit: number; price: number } | null>(null);
   const [formData, setFormData] = useState({
     email: '',
-    password: '',
+    password: '12345678',
     full_name: '',
     role: 'vendedor' as Profile['role'],
     doctor_id: '' as string | undefined,
@@ -312,7 +312,7 @@ const TeamManagement = () => {
         });
       }
 
-      setFormData({ email: '', password: '', full_name: '', role: 'vendedor', doctor_id: '', consultation_value: '' });
+      setFormData({ email: '', password: '12345678', full_name: '', role: 'vendedor', doctor_id: '', consultation_value: '' });
       setSelectedDoctorIds([]);
       setEditingProfile(null);
       setDialogOpen(false);
@@ -559,7 +559,7 @@ const TeamManagement = () => {
             setUpgradeDialogOpen(true);
           } else {
             setEditingProfile(null);
-            setFormData({ email: '', password: '', full_name: '', role: 'vendedor', doctor_id: '', consultation_value: '' });
+            setFormData({ email: '', password: '12345678', full_name: '', role: 'vendedor', doctor_id: '', consultation_value: '' });
             setSelectedDoctorIds([]);
             setDialogOpen(true);
           }
@@ -572,7 +572,7 @@ const TeamManagement = () => {
           setDialogOpen(open);
           if (!open) {
             setEditingProfile(null);
-            setFormData({ email: '', password: '', full_name: '', role: 'vendedor', doctor_id: '', consultation_value: '' });
+            setFormData({ email: '', password: '12345678', full_name: '', role: 'vendedor', doctor_id: '', consultation_value: '' });
             setSelectedDoctorIds([]);
           }
         }}>
@@ -622,8 +622,8 @@ const TeamManagement = () => {
                       type={showPassword ? 'text' : 'password'}
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      placeholder={editingProfile ? "Deixe em branco para manter a senha atual" : "Senha temporária"}
-                      required={!editingProfile}
+                      placeholder={editingProfile ? "Deixe em branco para manter a senha atual" : "Senha inicial (Padrão: 12345678)"}
+                      required={false}
                     />
                     <Button
                       type="button"
@@ -750,7 +750,7 @@ const TeamManagement = () => {
                   onClick={() => {
                     setDialogOpen(false);
                     setEditingProfile(null);
-                    setFormData({ email: '', password: '', full_name: '', role: 'vendedor', doctor_id: '', consultation_value: '' });
+                    setFormData({ email: '', password: '12345678', full_name: '', role: 'vendedor', doctor_id: '', consultation_value: '' });
                     setSelectedDoctorIds([]);
                   }}
                   disabled={loading}

@@ -20,6 +20,7 @@ interface Profile {
   onboarding_completed: boolean | null;
   onboarding_completed_at: string | null;
   specialty: string | null;
+  force_password_change: boolean | null;
 }
 
 export function useUserProfile() {
@@ -36,7 +37,7 @@ export function useUserProfile() {
         // Nota: enable_agenda_alerts pode não existir se a migration não foi executada
         const profileQuery = supabase
           .from('profiles')
-          .select('id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by, doctor_id, organization_id, onboarding_completed, onboarding_completed_at, specialty')
+          .select('id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by, doctor_id, organization_id, onboarding_completed, onboarding_completed_at, specialty, force_password_change')
           .eq('id', user.id)
           .single();
 
@@ -57,7 +58,7 @@ export function useUserProfile() {
             // Tentar buscar sem doctor_id mas COM organization_id
             const basicQuery = supabase
               .from('profiles')
-              .select('id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by, organization_id')
+              .select('id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by, organization_id, force_password_change')
               .eq('id', user.id)
               .single();
 
@@ -117,7 +118,7 @@ export function useUserProfile() {
           console.log('useUserProfile - enable_agenda_alerts fetch failed, using default true');
         }
 
-        const result = { ...profileData, enable_agenda_alerts: enableAgendaAlerts } as Profile;
+        const result = { ...(profileData as any), enable_agenda_alerts: enableAgendaAlerts } as Profile;
         console.log('useUserProfile - Profile carregado com sucesso:', result);
         return result;
 

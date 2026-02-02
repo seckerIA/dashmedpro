@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -62,6 +63,7 @@ export default function SecretaryFinancial() {
   const [markPaidOpen, setMarkPaidOpen] = useState(false);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
 
   // Redirecionar se não for secretária
   if (!isSecretaria) {
@@ -120,10 +122,11 @@ export default function SecretaryFinancial() {
   const handleMarkAsPaid = async () => {
     if (!selectedAppointmentId) return;
 
-    let receiptUrl: string | null = null;
+    // Usar a URL já carregada no upload imediato se disponível
+    let finalReceiptUrl = receiptUrl;
 
-    if (receiptFile) {
-      receiptUrl = await uploadReceipt(receiptFile, selectedAppointmentId);
+    if (receiptFile && !finalReceiptUrl) {
+      finalReceiptUrl = await uploadReceipt(receiptFile, selectedAppointmentId);
     }
 
     await updateAppointment.mutateAsync({
@@ -131,13 +134,14 @@ export default function SecretaryFinancial() {
       updates: {
         sinal_paid: true,
         sinal_paid_at: new Date().toISOString(),
-        ...(receiptUrl && { sinal_receipt_url: receiptUrl }),
+        ...(finalReceiptUrl && { sinal_receipt_url: finalReceiptUrl }),
       },
     });
 
     setMarkPaidOpen(false);
     setSelectedAppointmentId(null);
     setReceiptFile(null);
+    setReceiptUrl(null);
   };
 
   const handleDownloadReceipt = async () => {
@@ -522,13 +526,32 @@ export default function SecretaryFinancial() {
                 id="receipt"
                 type="file"
                 accept="image/*,application/pdf"
-                onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0] || null;
+                  setReceiptFile(file);
+                  if (file && selectedAppointmentId) {
+                    const url = await uploadReceipt(file, selectedAppointmentId);
+                    setReceiptUrl(url);
+                  }
+                }}
               />
               {receiptFile && (
-                <p className="text-xs text-green-600 flex items-center gap-1">
-                  <Upload className="h-3 w-3" />
-                  {receiptFile.name}
-                </p>
+                <div className="flex flex-col gap-1 mt-2">
+                  <p className={cn(
+                    "text-xs flex items-center gap-1.5",
+                    receiptUrl ? "text-green-600" : "text-amber-600"
+                  )}>
+                    {isUploading ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : receiptUrl ? (
+                      <CheckCircle2 className="h-3 w-3" />
+                    ) : (
+                      <Upload className="h-3 w-3" />
+                    )}
+                    <span className="truncate max-w-[200px]">{receiptFile.name}</span>
+                    • {isUploading ? "Enviando..." : receiptUrl ? "Upload concluído" : "Pronto para enviar"}
+                  </p>
+                </div>
               )}
               <p className="text-xs text-muted-foreground">
                 Formatos aceitos: JPG, PNG, PDF (máx. 5MB)

@@ -107,6 +107,7 @@ export function AppointmentForm({
   // Estados para Sinal (entrada/depósito)
   const [sinalPaid, setSinalPaid] = useState(false);
   const [sinalFile, setSinalFile] = useState<File | null>(null);
+  const [sinalReceiptUrl, setSinalReceiptUrl] = useState<string | null>(null);
   const [sinalAmount, setSinalAmount] = useState<number | null>(null);
   const [sinalAmountDisplay, setSinalAmountDisplay] = useState<string>('');
   const [hasNoSinal, setHasNoSinal] = useState(false);
@@ -274,11 +275,14 @@ export function AppointmentForm({
         return;
       }
 
-      // Upload do comprovante de sinal se existir
-      let sinalReceiptUrl: string | null = null;
-      if (sinalPaid && sinalFile && !hasNoSinal) {
-        sinalReceiptUrl = await uploadReceipt(sinalFile, `appointment-${Date.now()}`);
-        if (!sinalReceiptUrl) {
+      // Usar a URL já carregada no upload imediato se disponível
+      let finalSinalReceiptUrl = sinalReceiptUrl;
+
+      // Se ainda não foi feito o upload (ex: novo agendamento onde não disparou imediato)
+      // Faz o upload agora
+      if (sinalPaid && sinalFile && !finalSinalReceiptUrl && !hasNoSinal) {
+        finalSinalReceiptUrl = await uploadReceipt(sinalFile, `appointment-${Date.now()}`);
+        if (!finalSinalReceiptUrl) {
           setAvailabilityError('Erro ao fazer upload do comprovante. Tente novamente.');
           setIsSubmitting(false);
           return;
@@ -302,7 +306,7 @@ export function AppointmentForm({
         paid_in_advance: data.paid_in_advance || false,
         sinal_amount: hasNoSinal ? null : (sinalAmount || null),
         sinal_paid: hasNoSinal ? false : sinalPaid,
-        sinal_receipt_url: hasNoSinal ? null : sinalReceiptUrl,
+        sinal_receipt_url: hasNoSinal ? null : finalSinalReceiptUrl,
         sinal_paid_at: (hasNoSinal || !sinalPaid) ? null : new Date().toISOString(),
         organization_id: profile?.organization_id,
       };
@@ -373,6 +377,11 @@ export function AppointmentForm({
         payment_status: appointment.payment_status,
         paid_in_advance: appointment.paid_in_advance || false,
       });
+
+      if (appointment.sinal_receipt_url) {
+        setSinalReceiptUrl(appointment.sinal_receipt_url);
+        setSinalPaid(appointment.sinal_paid);
+      }
     } else if (!appointment && open) {
       // Reset to defaults for new appointment
       const isConversion = conversionData && conversionData.contactId;
@@ -1113,29 +1122,59 @@ export function AppointmentForm({
                 <Label htmlFor="sinal_receipt" className="text-sm">Comprovante de Pagamento</Label>
                 <div className="flex items-center gap-2">
                   <Input
-                    id="sinal_receipt"
-                    type="file"
-                    accept="image/*,application/pdf"
-                    onChange={(e) => setSinalFile(e.target.files?.[0] || null)}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0] || null;
+                      setSinalFile(file);
+                      if (file && appointment?.id) {
+                        const url = await uploadReceipt(file, appointment.id);
+                        setSinalReceiptUrl(url);
+                      }
+                    }}
                     className="flex-1"
                   />
-                  {sinalFile && (
+                  {(sinalFile || sinalReceiptUrl) && (
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => setSinalFile(null)}
+                      onClick={() => {
+                        setSinalFile(null);
+                        setSinalReceiptUrl(null);
+                      }}
                       className="h-8 w-8 p-0"
                     >
                       <X className="h-4 w-4" />
                     </Button>
                   )}
                 </div>
-                {sinalFile && (
-                  <p className="text-xs text-green-600 flex items-center gap-1">
-                    <Upload className="h-3 w-3" />
-                    {sinalFile.name}
-                  </p>
+                {(sinalFile || sinalReceiptUrl) && (
+                  <div className="flex flex-col gap-1">
+                    <p className={cn(
+                      "text-xs flex items-center gap-1.5",
+                      sinalReceiptUrl ? "text-green-600" : "text-amber-600"
+                    )}>
+                      {isUploading ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : sinalReceiptUrl ? (
+                        <CheckCircle2 className="h-3 w-3" />
+                      ) : (
+                        <Upload className="h-3 w-3" />
+                      )}
+                      <span className="truncate max-w-[200px]">{sinalFile?.name || 'Comprovante carregado'}</span>
+                      • {isUploading ? "Enviando..." : sinalReceiptUrl ? "Upload concluído" : "Pronto para enviar"}
+                    </p>
+                    {sinalReceiptUrl && (
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 text-xs text-blue-500 w-fit"
+                        onClick={() => window.open(sinalReceiptUrl, '_blank')}
+                      >
+                        <Eye className="h-3 w-3 mr-1" /> Visualizar
+                      </Button>
+                    )}
+                  </div>
                 )}
                 <p className="text-xs text-muted-foreground">
                   Formatos aceitos: JPG, PNG, PDF (máx. 5MB)

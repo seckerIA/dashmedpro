@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Settings as SettingsIcon, User, Lock, Palette, Info } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,6 +13,15 @@ import AccountTab from '@/components/settings/AccountTab';
 const Settings = () => {
   const { profile, isLoading } = useUserProfile();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState('profile');
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && ['profile', 'security', 'preferences', 'account'].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
 
   if (isLoading) {
     return (
@@ -42,7 +52,7 @@ const Settings = () => {
       {/* Tabs */}
       <Card className="bg-gradient-card shadow-card border-border">
         <CardContent className="p-6">
-          <Tabs defaultValue="profile" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-6">
               <TabsTrigger value="profile" className="flex items-center justify-center gap-2">
                 <User className="w-4 h-4" />

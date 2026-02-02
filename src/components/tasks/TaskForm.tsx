@@ -59,6 +59,7 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [failedFiles, setFailedFiles] = useState<File[]>([]);
+  const [currentlyUploading, setCurrentlyUploading] = useState<string[]>([]);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const { toast } = useToast();
@@ -201,6 +202,7 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
 
         for (const file of pendingFiles) {
           try {
+            setCurrentlyUploading(prev => [...prev, file.name]);
             // Força a atualização do cache após cada upload bem sucedido
             await uploadAttachment({ file, taskId: taskIdForUpload });
           } catch (uploadError: any) {
@@ -211,6 +213,8 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
               title: 'Erro no upload',
               description: `Falha ao enviar ${file.name}: ${uploadError.message || 'Erro desconhecido'}`
             });
+          } finally {
+            setCurrentlyUploading(prev => prev.filter(name => name !== file.name));
           }
         }
 
@@ -252,8 +256,27 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
   };
 
   // Funções para gerenciar anexos
-  const handleFilesSelected = (files: File[]) => {
-    setPendingFiles(prev => [...prev, ...files]);
+  const handleFilesSelected = async (files: File[]) => {
+    if (task?.id) {
+      // Upload imediato se a tarefa já existir
+      const taskId = task.id;
+      for (const file of files) {
+        try {
+          setCurrentlyUploading(prev => [...prev, file.name]);
+          setPendingFiles(prev => [...prev, file]);
+          await uploadAttachment({ file, taskId });
+          setPendingFiles(prev => prev.filter(f => f.name !== file.name));
+        } catch (error: any) {
+          console.error('[TaskForm] Erro no upload imediato:', error);
+          setFailedFiles(prev => [...prev, file]);
+          setPendingFiles(prev => prev.filter(f => f.name !== file.name));
+        } finally {
+          setCurrentlyUploading(prev => prev.filter(name => name !== file.name));
+        }
+      }
+    } else {
+      setPendingFiles(prev => [...prev, ...files]);
+    }
   };
 
   const handleRemovePendingFile = (index: number) => {
@@ -622,6 +645,7 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
               onFilesSelected={handleFilesSelected}
               pendingFiles={pendingFiles}
               failedFiles={failedFiles}
+              currentlyUploading={currentlyUploading}
               onRemovePendingFile={handleRemovePendingFile}
               onRemoveFailedFile={handleRemoveFailedFile}
             />

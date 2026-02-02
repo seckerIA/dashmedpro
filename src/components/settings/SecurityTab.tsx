@@ -90,6 +90,12 @@ const SecurityTab = ({ user }: SecurityTabProps) => {
         throw updateError;
       }
 
+      // If successful, clear the force_password_change flag in the profile
+      await supabase
+        .from('profiles')
+        .update({ force_password_change: false } as any)
+        .eq('id', user.id);
+
       toast({
         title: 'Senha atualizada!',
         description: 'Sua senha foi alterada com sucesso.',
@@ -107,7 +113,7 @@ const SecurityTab = ({ user }: SecurityTabProps) => {
 
   const getPasswordStrength = (password: string) => {
     if (!password) return { strength: 0, label: '', color: '' };
-    
+
     let strength = 0;
     if (password.length >= 8) strength++;
     if (password.length >= 12) strength++;
@@ -213,11 +219,10 @@ const SecurityTab = ({ user }: SecurityTabProps) => {
                       return (
                         <div
                           key={level}
-                          className={`flex-1 rounded ${
-                            level <= strength.strength
-                              ? strength.color
-                              : 'bg-muted'
-                          }`}
+                          className={`flex-1 rounded ${level <= strength.strength
+                            ? strength.color
+                            : 'bg-muted'
+                            }`}
                         />
                       );
                     })}

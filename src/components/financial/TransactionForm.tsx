@@ -136,6 +136,7 @@ const TransactionForm = () => {
 
   const [newTag, setNewTag] = useState('')
   const [dragActive, setDragActive] = useState(false)
+  const [currentlyUploading, setCurrentlyUploading] = useState<string[]>([])
 
   // Preencher formulário com dados do deal (via query params)
   useEffect(() => {
@@ -294,7 +295,13 @@ const TransactionForm = () => {
     if (!files) return
 
     for (let i = 0; i < files.length; i++) {
-      await uploadFile(files[i])
+      const file = files[i];
+      setCurrentlyUploading(prev => [...prev, file.name]);
+      try {
+        await uploadFile(file);
+      } finally {
+        setCurrentlyUploading(prev => prev.filter(name => name !== file.name));
+      }
     }
   }
 
@@ -986,9 +993,27 @@ const TransactionForm = () => {
                 </div>
               </div>
 
-              {/* Arquivos enviados */}
-              {uploadedFiles.length > 0 && (
+              {/* Arquivos enviados e enviando */}
+              {(uploadedFiles.length > 0 || currentlyUploading.length > 0) && (
                 <div className="space-y-2">
+                  {/* Enviando... */}
+                  {currentlyUploading.map((fileName) => (
+                    <div key={fileName} className="flex items-center justify-between p-3 bg-muted/20 border border-border border-dashed rounded-lg animate-pulse">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-muted rounded-lg">
+                          <Loader2 className="w-5 h-5 text-emerald-500 animate-spin" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{fileName}</p>
+                          <p className="text-xs text-emerald-500 font-medium flex items-center gap-1">
+                            Enviando...
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Já enviados */}
                   {uploadedFiles.map((file) => (
                     <div key={file.id} className="flex items-center justify-between p-3 bg-muted/20 border border-border rounded-lg">
                       <div className="flex items-center gap-3">

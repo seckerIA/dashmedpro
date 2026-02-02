@@ -47,10 +47,16 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const body: CreateUserRequest = await req.json();
-    const { email, password, full_name, role, doctor_ids, consultation_value } = body;
+    const { email, full_name, role, doctor_ids, consultation_value } = body;
+    let { password } = body;
 
-    if (!email || !password || !role) {
-      return new Response(JSON.stringify({ error: 'Email, password, and role are required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    // Usar senha padrão se não for fornecida
+    if (!password || password.trim() === '') {
+      password = "12345678";
+    }
+
+    if (!email || !role) {
+      return new Response(JSON.stringify({ error: 'Email and role are required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
@@ -69,7 +75,8 @@ const handler = async (req: Request): Promise<Response> => {
         role,
         full_name: full_name || null,
         invited_by: user.id,
-        organization_id: profile.organization_id // Associa a mesma org do criador
+        organization_id: profile.organization_id, // Associa a mesma org do criador
+        force_password_change: true // Obriga a troca no primeiro login
       };
 
       if (doctor_ids && doctor_ids.length > 0) {

@@ -31,6 +31,7 @@ interface TaskAttachmentsProps {
     failedFiles?: File[];
     onRemovePendingFile?: (index: number) => void;
     onRemoveFailedFile?: (index: number) => void;
+    currentlyUploading?: string[];
 }
 
 export function TaskAttachments({
@@ -40,7 +41,8 @@ export function TaskAttachments({
     pendingFiles = [],
     failedFiles = [],
     onRemovePendingFile,
-    onRemoveFailedFile
+    onRemoveFailedFile,
+    currentlyUploading = []
 }: TaskAttachmentsProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const {
@@ -131,9 +133,14 @@ export function TaskAttachments({
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-medium truncate">{file.name}</p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {formatFileSize(file.size)} • Aguardando upload
-                                            </p>
+                                            <div className="flex items-center gap-1.5">
+                                                {currentlyUploading.includes(file.name) && (
+                                                    <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                                                )}
+                                                <p className="text-xs text-muted-foreground">
+                                                    {formatFileSize(file.size)} • {currentlyUploading.includes(file.name) ? "Enviando..." : "Pronto para enviar"}
+                                                </p>
+                                            </div>
                                         </div>
                                         {onRemovePendingFile && (
                                             <Button
