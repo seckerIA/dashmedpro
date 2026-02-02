@@ -260,6 +260,7 @@ All colors MUST be HSL.
   }
 
   html {
+    font-size: 15px;
     scroll-behavior: smooth !important;
     -webkit-overflow-scrolling: touch;
   }

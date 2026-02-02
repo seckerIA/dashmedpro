@@ -70,9 +70,9 @@ export function FutureOutlook() {
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider px-1">Próximos Dias</h3>
             <div className="space-y-3">
                 {nextDays.map((day, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-card border border-border/50 hover:border-primary/20 transition-colors">
+                    <div key={idx} className="flex items-center justify-between p-2.5 rounded-xl bg-card border border-border/50 hover:border-primary/20 transition-colors">
                         <div className="flex items-center gap-4">
-                            <div className="bg-muted/50 w-12 h-12 shrink-0 rounded-lg flex flex-col items-center justify-center border border-border/50">
+                            <div className="bg-muted/50 w-10 h-10 shrink-0 rounded-lg flex flex-col items-center justify-center border border-border/50">
                                 <span className="text-[10px] uppercase font-bold text-muted-foreground leading-none mb-1">
                                     {format(day.date, 'EEE', { locale: ptBR }).replace('.', '')}
                                 </span>

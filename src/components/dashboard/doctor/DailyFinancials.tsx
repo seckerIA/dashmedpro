@@ -109,11 +109,11 @@ export function DailyFinancials() {
                 <div className="absolute top-0 right-0 p-3 opacity-10">
                     <DollarSign className="w-16 h-16 text-emerald-500" />
                 </div>
-                <CardContent className="p-5">
+                <CardContent className="p-4">
                     <div className="space-y-1">
                         <p className="text-xs font-medium text-emerald-600/80 uppercase tracking-wider">Faturamento Hoje</p>
                         <div className="flex items-baseline gap-2">
-                            <span className="text-2xl font-bold text-foreground">
+                            <span className="text-xl font-bold text-foreground">
                                 <AnimatedCurrency value={todayRevenue} duration={1.2} />
                             </span>
                             {percentChange !== 0 && (
@@ -122,7 +122,7 @@ export function DailyFinancials() {
                                     className={`${percentChange >= 0
                                         ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
                                         : 'bg-red-500/10 text-red-600 border-red-500/20'
-                                    } text-[10px] h-5 px-1.5 gap-0.5`}
+                                        } text-[10px] h-5 px-1.5 gap-0.5`}
                                 >
                                     <TrendingUp className={`w-2.5 h-2.5 ${percentChange < 0 ? 'rotate-180' : ''}`} />
                                     {percentChange >= 0 ? '+' : ''}{percentChange.toFixed(0)}%
@@ -139,12 +139,12 @@ export function DailyFinancials() {
                 className="bg-card border-border shadow-sm cursor-pointer hover:bg-muted/50 transition-colors"
                 onClick={() => navigate('/financeiro?tab=sinais')}
             >
-                <CardContent className="p-5 flex flex-col justify-between h-full">
+                <CardContent className="p-4 flex flex-col justify-between h-full">
                     <div className="flex justify-between items-start">
                         <div className="space-y-1">
                             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Sinais Pendentes</p>
                             <div className="flex items-baseline gap-2">
-                                <span className="text-2xl font-bold text-foreground">
+                                <span className="text-xl font-bold text-foreground">
                                     <AnimatedNumber value={pendingSignals} duration={0.8} />
                                 </span>
                                 <span className="text-xs text-muted-foreground">
@@ -167,12 +167,12 @@ export function DailyFinancials() {
                 className="bg-card border-border shadow-sm hidden md:block cursor-pointer hover:bg-muted/50 transition-colors"
                 onClick={() => navigate('/financeiro?tab=dashboard')}
             >
-                <CardContent className="p-5 flex flex-col justify-between h-full">
+                <CardContent className="p-4 flex flex-col justify-between h-full">
                     <div className="flex justify-between items-start">
                         <div className="space-y-1">
                             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Acumulado Semana</p>
                             <div className="flex items-baseline gap-2">
-                                <span className="text-2xl font-bold text-foreground">
+                                <span className="text-xl font-bold text-foreground">
                                     <AnimatedCurrency value={weekRevenue} duration={1.5} delay={0.3} />
                                 </span>
                             </div>

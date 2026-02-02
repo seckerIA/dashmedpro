@@ -50,11 +50,11 @@ export function DoctorDashboard({ viewMode, onViewModeChange }: DoctorDashboardP
     };
 
     return (
-        <div className="min-h-screen bg-background p-4 md:p-8 space-y-8 font-sans transition-colors duration-300">
+        <div className="min-h-screen bg-background p-4 md:p-6 space-y-5 font-sans transition-colors duration-300">
             {/* Header / Welcome */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex flex-col space-y-1">
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">
                         {timeGreeting}, Dr. <span className="text-primary">{firstName}</span>
                     </h1>
                     <p className="text-muted-foreground mt-1 font-light tracking-wide">
@@ -98,17 +98,17 @@ export function DoctorDashboard({ viewMode, onViewModeChange }: DoctorDashboardP
             </div>
 
             {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-full">
 
                 {/* Left Column: Agenda (Main Focus) */}
-                <div className="lg:col-span-8 flex flex-col space-y-6 h-full">
+                <div className="lg:col-span-8 flex flex-col space-y-4 h-full">
                     {/* Financials Overview - Top of feed */}
                     <div className="shrink-0">
                         <DailyFinancials />
                     </div>
 
                     {/* Today's Agenda - Primary focus card */}
-                    <Card hierarchy="primary" className="min-h-[350px] overflow-hidden flex flex-col">
+                    <Card hierarchy="primary" className="min-h-[300px] overflow-hidden flex flex-col">
                         <ScrollArea className="h-full">
                             <div className="p-6">
                                 <TodaysAgenda />
@@ -123,7 +123,7 @@ export function DoctorDashboard({ viewMode, onViewModeChange }: DoctorDashboardP
                 </div>
 
                 {/* Right Column: Future & Quick Actions */}
-                <div className="lg:col-span-4 flex flex-col gap-6">
+                <div className="lg:col-span-4 flex flex-col gap-4">
                     {/* Future Outlook */}
                     <Card hierarchy="tertiary" className="p-4">
                         <FutureOutlook />

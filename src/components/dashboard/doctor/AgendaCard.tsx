@@ -87,11 +87,11 @@ export function AgendaCard({ appointment, onStatusChange }: AgendaCardProps) {
                     "group transition-all duration-300 border hover:border-primary/20 bg-card/50 hover:bg-card"
                 )}
             >
-                <CardContent className="p-4">
+                <CardContent className="p-3">
                     <div className="flex flex-col sm:flex-row gap-4">
                         {/* Time & Indicator */}
                         <div className="flex sm:flex-col items-center sm:items-start gap-3 sm:gap-1 min-w-[80px] border-b sm:border-b-0 sm:border-r border-border/50 pb-3 sm:pb-0 sm:pr-4">
-                            <div className="text-xl font-bold tracking-tight">
+                            <div className="text-lg font-bold tracking-tight">
                                 {format(new Date(appointment.start_time), 'HH:mm')}
                             </div>
                             <div className="flex items-center gap-1.5">
@@ -114,8 +114,8 @@ export function AgendaCard({ appointment, onStatusChange }: AgendaCardProps) {
                         <div className="flex-1 flex flex-col gap-3 min-w-0">
                             {/* Patient Info */}
                             <div className="flex items-start justify-between gap-2">
-                                <div className="flex items-center gap-3 min-w-0 cursor-pointer" onClick={() => setShowQuickView(true)}>
-                                    <Avatar className="h-10 w-10 border-2 border-background shadow-sm group-hover:border-primary/20 transition-colors">
+                                <div className="flex items-center gap-2 min-w-0 cursor-pointer" onClick={() => setShowQuickView(true)}>
+                                    <Avatar className="h-9 w-9 border-2 border-background shadow-sm group-hover:border-primary/20 transition-colors">
                                         <AvatarImage />
                                         <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">
                                             {(appointment.contact?.full_name || appointment.patient?.name)?.substring(0, 2).toUpperCase() || 'PAC'}

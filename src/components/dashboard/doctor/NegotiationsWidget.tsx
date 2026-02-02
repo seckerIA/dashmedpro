@@ -38,7 +38,7 @@ export function NegotiationsWidget() {
 
     return (
         <Card className="h-full border-border shadow-sm flex flex-col overflow-hidden">
-            <CardHeader className="pb-3 shrink-0">
+            <CardHeader className="pb-2 shrink-0">
                 <div className="flex items-center justify-between">
                     <div>
                         <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -56,7 +56,7 @@ export function NegotiationsWidget() {
                             activeDeals.map((deal) => {
                                 const probability = getWinProbability(deal.id);
                                 return (
-                                    <div key={deal.id} className="p-4 hover:bg-muted/40 transition-colors">
+                                    <div key={deal.id} className="p-3 hover:bg-muted/40 transition-colors">
                                         <div className="flex justify-between items-start mb-2">
                                             <div className="space-y-1">
                                                 <p className="font-medium text-sm text-foreground">

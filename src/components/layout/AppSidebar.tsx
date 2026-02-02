@@ -235,7 +235,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
             <div
               className={`
                 flex items-center
-                ${isCollapsed ? 'justify-center px-3 py-3' : 'gap-4 px-5 py-4'}
+                ${isCollapsed ? 'justify-center px-1 py-2' : 'gap-3 px-3 py-2'}
                 rounded-2xl bg-white/5 shadow-sm
                 transition-all duration-300
               `}
@@ -247,10 +247,10 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
               />
               {!isCollapsed && (
                 <div className="flex flex-col">
-                  <span className="text-foreground font-semibold text-xl tracking-wide whitespace-nowrap overflow-hidden">
+                  <span className="text-foreground font-semibold text-lg tracking-wide whitespace-nowrap overflow-hidden">
                     {organization?.name || "DASHMED PRO"}
                   </span>
-                  <span className="text-muted-foreground text-sm whitespace-nowrap overflow-hidden">
+                  <span className="text-muted-foreground text-xs whitespace-nowrap overflow-hidden">
                     {organization ? "DASHMED PRO" : "Dashboard"}
                   </span>
                 </div>
@@ -467,7 +467,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                               }}
                               className={`
                                 group relative w-full flex items-center justify-between
-                                px-4 py-3.5 rounded-2xl text-base font-medium
+                                px-4 py-2.5 rounded-2xl text-base font-medium
                                 transition-all duration-200
                                 ${active
                                   ? 'bg-primary/15 text-primary border border-primary/20 shadow-[0_0_15px_rgba(37,99,235,0.15)]'
@@ -495,7 +495,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                                 )}
                                 <span
                                   className={`
-                                    text-lg font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden
+                                    text-base font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden
                                     ${active ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}
                                   `}
                                 >
@@ -539,7 +539,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                                         to={subItem.url}
                                         onClick={() => onNavigate?.()}
                                         className={`
-                                        group flex items-center gap-3 px-4 py-2.5 rounded-xl
+                                        group flex items-center gap-3 px-4 py-2 rounded-xl
                                         text-sm font-medium transition-all duration-200
                                         ${subActive
                                             ? 'bg-primary text-primary-foreground shadow-sm'
@@ -587,7 +587,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                             {!isCollapsed && (
                               <span
                                 className={`
-                                  text-lg font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden
+                                  text-base font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden
                                   ${active ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}
                                 `}
                               >
@@ -639,7 +639,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                               }}
                               className={`
                                 group relative w-full block
-                                ${isCollapsed ? 'p-2.5' : 'px-4 py-3.5'}
+                                ${isCollapsed ? 'p-2' : 'px-4 py-2.5'}
                                 rounded-2xl text-base font-medium
                                 transition-all duration-200
                                 ${active
@@ -694,7 +694,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                   {!isCollapsed && (
                     <span
                       className={`
-                        text-lg font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden
+                        text-base font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden
                         ${active ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}
                       `}
                     >
@@ -713,7 +713,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                     onClick={() => onNavigate?.()}
                     className={`
                       group relative w-full block
-                      ${isCollapsed ? 'p-2.5' : 'px-4 py-3.5'}
+                      ${isCollapsed ? 'p-2' : 'px-4 py-2.5'}
                       rounded-2xl text-base font-medium
                       transition-all duration-200
                       ${active
