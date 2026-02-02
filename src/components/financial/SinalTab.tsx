@@ -39,6 +39,7 @@ import {
   X,
   Loader2,
   FileImage,
+  Download,
 } from 'lucide-react';
 
 type SinalFilter = 'all' | 'pending' | 'paid';
@@ -152,6 +153,29 @@ export function SinalTab() {
     setMarkPaidOpen(false);
     setSelectedAppointmentId(null);
     setReceiptFile(null);
+  };
+
+  const handleDownloadReceipt = async () => {
+    if (!viewReceiptUrl) return;
+
+    try {
+      const response = await fetch(viewReceiptUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `comprovante-sinal-${selectedAppointmentId || 'download'}.png`;
+
+      const fileName = viewReceiptUrl.split('/').pop()?.split('?')[0] || 'comprovante';
+      a.download = fileName;
+
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Erro ao baixar comprovante:', error);
+    }
   };
 
   // Abrir modal para marcar como pago
@@ -436,11 +460,17 @@ export function SinalTab() {
               Fechar
             </Button>
             {viewReceiptUrl && (
-              <Button asChild>
-                <a href={viewReceiptUrl} target="_blank" rel="noopener noreferrer">
-                  Abrir em nova aba
-                </a>
-              </Button>
+              <>
+                <Button variant="secondary" className="gap-2" onClick={handleDownloadReceipt}>
+                  <Download className="h-4 w-4" />
+                  Baixar
+                </Button>
+                <Button asChild>
+                  <a href={viewReceiptUrl} target="_blank" rel="noopener noreferrer">
+                    Abrir em nova aba
+                  </a>
+                </Button>
+              </>
             )}
           </DialogFooter>
         </DialogContent>

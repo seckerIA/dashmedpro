@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -76,6 +77,7 @@ import {
   Play,
   Pause,
   Eye,
+  ArrowLeft,
 } from 'lucide-react';
 
 // Utils
@@ -309,6 +311,7 @@ function TriggerTypeBadge({ type }: { type: string }) {
 // ============================================
 
 export default function FollowUpPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { linkedDoctorIds } = useSecretaryDoctors();
@@ -616,14 +619,20 @@ export default function FollowUpPage() {
       <div className="border-b bg-card">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold flex items-center gap-2">
-                <Zap className="h-6 w-6 text-yellow-500" />
-                Follow-Up Center
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Automação de acompanhamento com análise de satisfação
-              </p>
+            <div className="flex items-center gap-4">
+              <Button variant="secondary" size="sm" onClick={() => navigate('/whatsapp')}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Voltar para WhatsApp
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold flex items-center gap-2">
+                  <Zap className="h-6 w-6 text-yellow-500" />
+                  Follow-Up Center
+                </h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Automação de acompanhamento com análise de satisfação
+                </p>
+              </div>
             </div>
             <div className="flex items-center gap-3">
               {(templatesData?.length === 0) && (
@@ -991,7 +1000,7 @@ export default function FollowUpPage() {
                               <span className={cn(
                                 "text-lg font-bold",
                                 response.nps_score >= 9 ? 'text-green-500' :
-                                response.nps_score >= 7 ? 'text-yellow-500' : 'text-red-500'
+                                  response.nps_score >= 7 ? 'text-yellow-500' : 'text-red-500'
                               )}>
                                 {response.nps_score}
                               </span>

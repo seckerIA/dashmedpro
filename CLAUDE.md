@@ -262,3 +262,14 @@ supabase/functions/
   - `AppointmentForm.tsx`: Validações aprimoradas e melhor tratamento de erros.
 - **Status**: Refatoração focada em manutenibilidade e preparação para futuras features da Cortana.
 
+### Contexto Atual (02/02/2026 - Receipt Download & Follow-Up UI)
+- **Receipt Download Fix**:
+  - Implementada função `handleDownloadReceipt` em `SecretaryFinancial.tsx` e `SinalTab.tsx`.
+  - Resolve problema de abrir recibos em nova aba criando um Blob URL e forçando o download programático com atributo `download`.
+  - Corrigido import duplicado de `Loader2`.
+- **Follow-Up Page Improvements**:
+  - Adicionado botão "Voltar para WhatsApp" em `FollowUpPage.tsx`.
+  - Botão estilizado com `variant="secondary"` para melhor visibilidade no tema dark.
+  - Corrigido erro de sintaxe `Duplicate identifier 'Pause'` causado por import duplicado acidental.
+- **Badge Component Fix**:
+  - Atualizado `AppointmentStatusBadge` para corrigir warning do React sobre props booleanas inválidas no DOM.

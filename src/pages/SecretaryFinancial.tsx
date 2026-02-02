@@ -41,6 +41,7 @@ import {
   FileImage,
   ArrowLeft,
   DollarSign,
+  Download,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUserProfile } from '@/hooks/useUserProfile';
@@ -137,6 +138,30 @@ export default function SecretaryFinancial() {
     setMarkPaidOpen(false);
     setSelectedAppointmentId(null);
     setReceiptFile(null);
+  };
+
+  const handleDownloadReceipt = async () => {
+    if (!viewReceiptUrl) return;
+
+    try {
+      const response = await fetch(viewReceiptUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `comprovante-sinal-${selectedAppointmentId || 'download'}.png`; // Tenta adivinhar extensão ou usa default
+
+      // Tenta pegar o nome do arquivo da URL
+      const fileName = viewReceiptUrl.split('/').pop()?.split('?')[0] || 'comprovante';
+      a.download = fileName;
+
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Erro ao baixar comprovante:', error);
+    }
   };
 
   const openMarkPaidModal = (appointmentId: string) => {
@@ -383,8 +408,8 @@ export default function SecretaryFinancial() {
                       <TableCell className="text-center">
                         <Badge variant="outline">
                           {appointment.paymentStatus === 'paid' ? 'Pago' :
-                           appointment.paymentStatus === 'partial' ? 'Parcial' :
-                           appointment.paymentStatus === 'cancelled' ? 'Cancelado' : 'Pendente'}
+                            appointment.paymentStatus === 'partial' ? 'Parcial' :
+                              appointment.paymentStatus === 'cancelled' ? 'Cancelado' : 'Pendente'}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
@@ -461,11 +486,17 @@ export default function SecretaryFinancial() {
               Fechar
             </Button>
             {viewReceiptUrl && (
-              <Button asChild>
-                <a href={viewReceiptUrl} target="_blank" rel="noopener noreferrer">
-                  Abrir em nova aba
-                </a>
-              </Button>
+              <>
+                <Button variant="secondary" className="gap-2" onClick={handleDownloadReceipt}>
+                  <Download className="h-4 w-4" />
+                  Baixar
+                </Button>
+                <Button asChild>
+                  <a href={viewReceiptUrl} target="_blank" rel="noopener noreferrer">
+                    Abrir em nova aba
+                  </a>
+                </Button>
+              </>
             )}
           </DialogFooter>
         </DialogContent>
