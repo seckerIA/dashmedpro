@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Package, Truck, Import, BarChart, Plus, Search, AlertTriangle, DollarSign, Bell, TrendingUp, PieChart, FileText, Pencil, Calendar, Trash2 } from "lucide-react";
+import { Package, Truck, Import, BarChart, Plus, Search, AlertTriangle, DollarSign, Bell, TrendingUp, PieChart, FileText, Pencil, Calendar, Trash2, ArrowUpDown } from "lucide-react";
 import { SuppliersTab } from "@/components/inventory/SuppliersTab";
 import { InboundForm } from "@/components/inventory/InboundForm";
 import { InventoryDashboard } from "@/components/inventory/InventoryDashboard";
@@ -9,6 +9,7 @@ import { AlertsPanel } from "@/components/inventory/AlertsPanel";
 import { TurnoverAnalysis } from "@/components/inventory/TurnoverAnalysis";
 import { ABCChart } from "@/components/inventory/ABCChart";
 import { InventoryReports } from "@/components/inventory/InventoryReports";
+import { StockAdjustmentDialog } from "@/components/inventory/StockAdjustmentDialog";
 import { useInventory } from "@/hooks/useInventory";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -258,13 +259,14 @@ const ProductFormFields = ({ formInstance, showBatchFields = false, suppliers = 
 );
 
 const InventoryProductsTab = () => {
-    const { items, isLoading, createItem, updateItem, deleteItem, addBatch } = useInventory();
+    const { items, isLoading, createItem, updateItem, deleteItem, addBatch, registerMovement } = useInventory();
     const { suppliers } = useSuppliers();
     const [searchTerm, setSearchTerm] = useState("");
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
     const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
+    const [adjustingItem, setAdjustingItem] = useState<InventoryItem | null>(null);
 
     const form = useForm<InventoryItemFormValues>({
         resolver: zodResolver(inventoryItemSchema),
@@ -514,6 +516,14 @@ const InventoryProductsTab = () => {
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
+                                                onClick={() => setAdjustingItem(item)}
+                                                title="Ajustar estoque"
+                                            >
+                                                <ArrowUpDown className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
                                                 onClick={() => handleEditClick(item)}
                                                 title="Editar produto"
                                             >
@@ -563,6 +573,20 @@ const InventoryProductsTab = () => {
                     </TableBody>
                 </Table>
             </div>
+
+            {/* Dialog de Ajuste de Estoque */}
+            {adjustingItem && (
+                <StockAdjustmentDialog
+                    open={!!adjustingItem}
+                    onOpenChange={(open) => !open && setAdjustingItem(null)}
+                    item={adjustingItem}
+                    onConfirm={async (data) => {
+                        await registerMovement.mutateAsync(data);
+                        setAdjustingItem(null);
+                    }}
+                    isPending={registerMovement.isPending}
+                />
+            )}
         </div>
     );
 };
