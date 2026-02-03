@@ -12,7 +12,7 @@ import { useNavigate } from 'react-router-dom';
 const DISMISSED_ALERTS_KEY = 'dashmed_dismissed_appointment_alerts';
 
 // Alert time window in minutes (show alert when appointment is within this many minutes)
-const ALERT_WINDOW_MINUTES = 10;
+const ALERT_WINDOW_MINUTES = 15;
 
 // Polling interval in milliseconds
 const POLL_INTERVAL_MS = 60 * 1000; // 60 seconds
@@ -24,7 +24,7 @@ interface DismissedAlert {
 
 /**
  * Hook that monitors upcoming appointments and triggers alerts
- * 10 minutes before each scheduled consultation.
+ * 15 minutes before each scheduled consultation.
  *
  * Features:
  * - Respects user's enable_agenda_alerts preference
