@@ -23,6 +23,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { InventoryItem } from "@/types/inventory";
+import { useSuppliers } from "@/hooks/useSuppliers";
 
 import { MoneyInput } from "@/components/ui/money-input";
 
@@ -35,6 +36,7 @@ const inventoryItemSchema = z.object({
     sell_price: z.number().optional(),
     cost_price: z.number().optional(),
     description: z.string().optional(),
+    supplier_id: z.string().optional(),
     // Campos opcionais para lote inicial
     initial_quantity: z.coerce.number().min(0).optional(),
     batch_number: z.string().optional(),
@@ -60,8 +62,10 @@ const formatDateString = (date: Date | undefined): string => {
     return `${year}-${month}-${day}`;
 };
 
+import type { Supplier } from "@/hooks/useSuppliers";
+
 // Componente de campos do formulário - FORA do componente pai para evitar re-render
-const ProductFormFields = ({ formInstance, showBatchFields = false }: { formInstance: any, showBatchFields?: boolean }) => (
+const ProductFormFields = ({ formInstance, showBatchFields = false, suppliers = [] }: { formInstance: any, showBatchFields?: boolean, suppliers?: Supplier[] }) => (
     <>
         <FormField
             control={formInstance.control}
@@ -165,6 +169,31 @@ const ProductFormFields = ({ formInstance, showBatchFields = false }: { formInst
                 </FormItem>
             )}
         />
+        <FormField
+            control={formInstance.control}
+            name="supplier_id"
+            render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Fornecedor</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Selecione um fornecedor (opcional)" />
+                            </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            <SelectItem value="">Nenhum</SelectItem>
+                            {suppliers.map((supplier) => (
+                                <SelectItem key={supplier.id} value={supplier.id}>
+                                    {supplier.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <FormMessage />
+                </FormItem>
+            )}
+        />
 
         {showBatchFields && (
             <>
@@ -230,6 +259,7 @@ const ProductFormFields = ({ formInstance, showBatchFields = false }: { formInst
 
 const InventoryProductsTab = () => {
     const { items, isLoading, createItem, updateItem, deleteItem, addBatch } = useInventory();
+    const { suppliers } = useSuppliers();
     const [searchTerm, setSearchTerm] = useState("");
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -244,6 +274,7 @@ const InventoryProductsTab = () => {
             unit: "unidade",
             min_stock: 5,
             description: "",
+            supplier_id: "",
             initial_quantity: 0,
             batch_number: "",
             expiration_date: "",
@@ -265,6 +296,7 @@ const InventoryProductsTab = () => {
                 sell_price: editingItem.sell_price || undefined,
                 cost_price: editingItem.cost_price || undefined,
                 description: editingItem.description || "",
+                supplier_id: editingItem.supplier_id || "",
             });
         }
     }, [editingItem, editForm]);
@@ -280,6 +312,7 @@ const InventoryProductsTab = () => {
                 sell_price: data.sell_price,
                 cost_price: data.cost_price,
                 description: data.description,
+                supplier_id: data.supplier_id || null,
             });
 
             // 2. Se tiver quantidade inicial, criar lote inicial
@@ -312,6 +345,7 @@ const InventoryProductsTab = () => {
                     sell_price: data.sell_price,
                     cost_price: data.cost_price,
                     description: data.description,
+                    supplier_id: data.supplier_id || null,
                 },
             });
             setIsEditModalOpen(false);
@@ -352,7 +386,7 @@ const InventoryProductsTab = () => {
                         </DialogHeader>
                         <Form {...form}>
                             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                                <ProductFormFields formInstance={form} showBatchFields={true} />
+                                <ProductFormFields formInstance={form} showBatchFields={true} suppliers={suppliers} />
                                 <DialogFooter>
                                     <Button type="submit" disabled={createItem.isPending}>
                                         {createItem.isPending ? "Salvando..." : "Salvar Produto"}
@@ -371,7 +405,7 @@ const InventoryProductsTab = () => {
                         </DialogHeader>
                         <Form {...editForm}>
                             <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
-                                <ProductFormFields formInstance={editForm} showBatchFields={false} />
+                                <ProductFormFields formInstance={editForm} showBatchFields={false} suppliers={suppliers} />
                                 <DialogFooter>
                                     <Button variant="outline" type="button" onClick={() => setIsEditModalOpen(false)}>
                                         Cancelar
@@ -433,6 +467,7 @@ const InventoryProductsTab = () => {
                         <TableRow>
                             <TableHead>Nome</TableHead>
                             <TableHead>Categoria</TableHead>
+                            <TableHead>Fornecedor</TableHead>
                             <TableHead>Saldo Atual</TableHead>
                             <TableHead>Preço Venda</TableHead>
                             <TableHead>Status</TableHead>
@@ -442,11 +477,11 @@ const InventoryProductsTab = () => {
                     <TableBody>
                         {isLoading ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center py-8">Carregando...</TableCell>
+                                <TableCell colSpan={7} className="text-center py-8">Carregando...</TableCell>
                             </TableRow>
                         ) : filteredItems?.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum produto encontrado</TableCell>
+                                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nenhum produto encontrado</TableCell>
                             </TableRow>
                         ) : (
                             filteredItems?.map((item) => (
@@ -454,6 +489,9 @@ const InventoryProductsTab = () => {
                                     <TableCell className="font-medium">{item.name}</TableCell>
                                     <TableCell>
                                         <Badge variant="outline">{item.category}</Badge>
+                                    </TableCell>
+                                    <TableCell className="text-muted-foreground">
+                                        {item.supplier?.name || '-'}
                                     </TableCell>
                                     <TableCell>{item.total_quantity} {item.unit}</TableCell>
                                     <TableCell>

@@ -12,7 +12,7 @@ export const useInventory = () => {
     const { toast } = useToast();
     const queryClient = useQueryClient();
 
-    // Buscar Items (com batches e saldo total) - timeout: 20s
+    // Buscar Items (com batches, supplier e saldo total) - timeout: 20s
     const { data: items, isLoading } = useQuery({
         queryKey: ["inventory-items"],
         queryFn: async () => {
@@ -21,7 +21,8 @@ export const useInventory = () => {
                 .from("inventory_items")
                 .select(`
                     *,
-                    batches:inventory_batches(*)
+                    batches:inventory_batches(*),
+                    supplier:inventory_suppliers(id, name)
                 `)
                 .order("name");
 

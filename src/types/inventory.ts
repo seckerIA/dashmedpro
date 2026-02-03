@@ -11,11 +11,13 @@ export interface InventoryItem {
     sell_price: number | null;
     cost_price: number | null;
     description: string | null;
+    supplier_id: string | null; // FK para inventory_suppliers
     created_at: string;
     updated_at: string;
     // Join fields (opcionais)
     batches?: InventoryBatch[];
     total_quantity?: number; // Calculado no frontend ou via view
+    supplier?: { id: string; name: string }; // Join opcional
 }
 
 export type InventoryItemInsert = Omit<InventoryItem, 'id' | 'created_at' | 'updated_at' | 'batches' | 'total_quantity'>;
