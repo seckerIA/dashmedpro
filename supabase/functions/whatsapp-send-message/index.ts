@@ -48,6 +48,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // HANDOVER: Se um humano está enviando mensagem, desligar o modo autônomo da conversa
+    // Isso garante que a UI reflita que a IA parou e o usuário assumiu.
     const { error: handoverError } = await supabaseAdmin
       .from('whatsapp_conversations')
       .update({ ai_autonomous_mode: false } as any)

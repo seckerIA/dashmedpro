@@ -505,7 +505,7 @@ async function getOrCreateConversation(
       status: 'open',
       priority: 'normal',
       unread_count: 0,
-      ai_autonomous_mode: aiConfig?.auto_reply_enabled === true ? true : null, // Se Global ON -> True, Se OFF -> Null (herda)
+      ai_autonomous_mode: null, // Sempre nulo para herdar do Global por padrão (Sincronização Total)
     })
     .select('id')
     .single();

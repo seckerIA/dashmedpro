@@ -157,6 +157,12 @@ const handler = async (req: Request): Promise<Response> => {
       console.log(`[AI] Found linked doctors for secretary ${conversation.user_id}:`, linkedDoctors.map(l => l.doctor_id));
     }
 
+    // Buscar perfis dos médicos para nomes reais
+    const { data: doctorProfiles } = await supabaseAdmin
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', targetUserIds);
+
     // Buscar procedimentos
     const { data: procedures } = await supabaseAdmin
       .from('commercial_procedures')
@@ -305,7 +311,9 @@ const handler = async (req: Request): Promise<Response> => {
 
           if (freeSlots.length > 0) {
             hasSlots = true;
-            dayOutput += `\n  - Médico ${docId.slice(0, 4)}...: ${freeSlots.join(', ')}`;
+            const docProfile = (doctorProfiles || []).find((p: any) => p.id === docId);
+            const docDisplayName = docProfile?.full_name || `Médico ${docId.slice(0, 4)}`;
+            dayOutput += `\n  - ${docDisplayName}: ${freeSlots.join(', ')}`;
           }
         }
 
@@ -380,7 +388,10 @@ ${aiConfig?.knowledge_base || 'Use as diretrizes padrão de atendimento.'}
 INFORMAÇÕES QUE JÁ SABEMOS (NÃO PERGUNTE ISTO):
 ${aiConfig?.already_known_info || 'Nenhuma informação extra cadastrada.'}
 
-ESTAS SÃO AS ÚNICAS INFORMAÇÕES VERDADEIRAS SOBRE A CLÍNICA. SE ALGO NÃO ESTIVER AQUI OU NOS PROCEDIMENTOS, DIGA QUE VAI SE INFORMAR COM A EQUIPE. NUNCA INVENTE ESPECIALIDADES OU SERVIÇOS.
+ESTAS SÃO AS ÚNICAS INFORMAÇÕES VERDADEIRAS SOBRE A CLÍNICA E OS MÉDICOS. 
+USE O NOME COMPLETO DOS MÉDICOS CONFORME LISTADO NA AGENDA ABAIXO. 
+RELACIONE AS ESPECIALIDADES DA 'BASE DE CONHECIMENTO' COM OS NOMES DA 'AGENDA'.
+SE ALGO NÃO ESTIVER AQUI OU NOS PROCEDIMENTOS, DIGA QUE VAI SE INFORMAR COM A EQUIPE. NUNCA INVENTE ESPECIALIDADES OU SERVIÇOS.
 
  PROCEDIMENTOS E PREÇOS:
 ${proceduresContext}
