@@ -156,23 +156,28 @@ export function ConversionModal({
 
           // Se não existir categoria de entrada, criar uma automaticamente
           if (!categories || categories.length === 0) {
-            console.log('[ConversionModal] Nenhuma categoria de entrada encontrada, criando categoria padrão "Receitas"');
-            const { data: newCategory, error: categoryError } = await supabase
-              .from('financial_categories')
-              .insert({
-                name: 'Receitas',
-                type: 'entrada',
-                color: '#10b981', // Verde
-                is_system: false,
-              })
-              .select('id')
-              .single();
-
-            if (!categoryError && newCategory) {
-              categories = [newCategory];
-              console.log('[ConversionModal] ✅ Categoria "Receitas" criada automaticamente');
+            if (!profile?.organization_id) {
+              console.error('[ConversionModal] Não foi possível criar categoria: organization_id não encontrado');
             } else {
-              console.error('[ConversionModal] Erro ao criar categoria padrão:', categoryError);
+              console.log('[ConversionModal] Nenhuma categoria de entrada encontrada, criando categoria padrão "Receitas"');
+              const { data: newCategory, error: categoryError } = await supabase
+                .from('financial_categories')
+                .insert({
+                  name: 'Receitas',
+                  type: 'entrada',
+                  color: '#10b981', // Verde
+                  is_system: false,
+                  organization_id: profile.organization_id,
+                })
+                .select('id')
+                .single();
+
+              if (!categoryError && newCategory) {
+                categories = [newCategory];
+                console.log('[ConversionModal] ✅ Categoria "Receitas" criada automaticamente');
+              } else {
+                console.error('[ConversionModal] Erro ao criar categoria padrão:', categoryError);
+              }
             }
           }
 

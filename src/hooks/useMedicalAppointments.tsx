@@ -62,6 +62,11 @@ const createFinancialTransactionForAppointment = async (
 
     // Se não existir categoria de entrada, criar uma automaticamente
     if (!categories || categories.length === 0) {
+      const orgId = appointment.organization_id || profileOrgId;
+      if (!orgId) {
+        console.error('[Financial] Não foi possível criar categoria: organization_id não encontrado');
+        return null;
+      }
       console.log('[Financial] Nenhuma categoria de entrada encontrada, criando categoria padrão "Receitas"');
       const { data: newCategory, error: categoryError } = await supabase
         .from('financial_categories')
@@ -70,6 +75,7 @@ const createFinancialTransactionForAppointment = async (
           type: 'entrada',
           color: '#10b981', // Verde
           is_system: false,
+          organization_id: orgId,
         })
         .select('id')
         .single();
@@ -1033,6 +1039,11 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
 
         // Se não existir categoria de entrada, criar uma automaticamente
         if (!categories || categories.length === 0) {
+          const orgId = appointment.organization_id || profile?.organization_id;
+          if (!orgId) {
+            console.error('[Financial] Não foi possível criar categoria: organization_id não encontrado');
+            throw new Error('Organization ID não encontrado para criar categoria');
+          }
           console.log('[Financial] Nenhuma categoria de entrada encontrada, criando categoria padrão "Receitas"');
           const { data: newCategory, error: categoryError } = await supabase
             .from('financial_categories')
@@ -1041,6 +1052,7 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
               type: 'entrada',
               color: '#10b981', // Verde
               is_system: false,
+              organization_id: orgId,
             })
             .select('id, name')
             .single();
