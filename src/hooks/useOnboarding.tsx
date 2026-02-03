@@ -10,6 +10,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { cacheDelete, CacheKeys } from '@/lib/cache';
 import {
   OnboardingState,
   OnboardingClinicData,
@@ -536,25 +537,21 @@ export function useOnboarding(): UseOnboardingReturn {
       return data;
     },
     onSuccess: async () => {
-      // 1. Remover query de onboarding-state PRIMEIRO (antes de qualquer update que possa causar redirect)
-      queryClient.removeQueries({ queryKey: ['onboarding-state'] });
+      // 1. Limpar cache do profile (localStorage/Redis) PRIMEIRO
+      if (user?.id) {
+        await cacheDelete(CacheKeys.userProfile(user.id));
+      }
 
-      // 2. Atualizar organização
-      await refreshOrganization();
+      // 2. Limpar TODAS as queries do React Query (evita cache stale)
+      queryClient.clear();
 
-      // 3. Limpar todas as queries antigas para garantir estado limpo
-      queryClient.removeQueries({ queryKey: ['user-profile'] });
-      queryClient.removeQueries({ queryKey: ['dashboard'] });
-      queryClient.removeQueries({ queryKey: ['financial'] });
-
-      // 4. Toast antes do redirect
+      // 3. Toast antes do redirect
       toast({
-        title: 'Configuracao concluida!',
-        description: 'Sua clinica esta pronta para uso.',
+        title: 'Configuração concluída!',
+        description: 'Sua clínica está pronta para uso.',
       });
 
-      // 5. Forçar reload completo para garantir estado limpo no dashboard
-      // Isso evita race conditions com useEffect que detecta profile.onboarding_completed
+      // 4. Forçar reload completo para garantir estado limpo no dashboard
       window.location.replace('/');
     },
     onError: (error: Error) => {
