@@ -214,6 +214,34 @@ const handler = async (req: Request): Promise<Response> => {
       // Non-critical, continue
     }
 
+    // 5.5. Create default financial categories (1 entrada, 1 saida)
+    console.log(`📂 [complete-onboarding] Creating default financial categories`);
+    const { error: categoriesError } = await supabaseAdmin
+      .from('financial_categories')
+      .insert([
+        {
+          name: 'Receitas Gerais',
+          type: 'entrada',
+          color: '#10b981',
+          organization_id: organization.id,
+          is_system: false,
+        },
+        {
+          name: 'Despesas Gerais',
+          type: 'saida',
+          color: '#ef4444',
+          organization_id: organization.id,
+          is_system: false,
+        }
+      ]);
+
+    if (categoriesError) {
+      console.error('Error creating financial categories:', categoriesError);
+      // Non-critical, continue
+    } else {
+      console.log('✅ [complete-onboarding] Default financial categories created');
+    }
+
     // 6. Create Commercial Procedures
     if (procedures && procedures.length > 0) {
       console.log(`📋 [complete-onboarding] Creating ${procedures.length} procedures`);

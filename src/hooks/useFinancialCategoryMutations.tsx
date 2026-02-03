@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
 import { FinancialCategory } from '@/types/financial'
+import { useUserProfile } from './useUserProfile'
 
 interface CreateCategoryData {
     name: string
@@ -11,9 +12,14 @@ interface CreateCategoryData {
 
 export const useCreateFinancialCategory = () => {
     const queryClient = useQueryClient()
+    const { profile } = useUserProfile()
 
     return useMutation({
         mutationFn: async (category: CreateCategoryData) => {
+            if (!profile?.organization_id) {
+                throw new Error('Organização não encontrada')
+            }
+
             const { data, error } = await supabase
                 .from('financial_categories')
                 .insert({
@@ -21,7 +27,8 @@ export const useCreateFinancialCategory = () => {
                     type: category.type,
                     color: category.color || '#64748b',
                     icon: category.icon || null,
-                    is_system: false
+                    is_system: false,
+                    organization_id: profile.organization_id
                 } as any)
                 .select()
                 .single()
@@ -42,17 +49,18 @@ export const useCreateFinancialCategory = () => {
 
 export const useCreateDefaultCategories = () => {
     const queryClient = useQueryClient()
+    const { profile } = useUserProfile()
 
     return useMutation({
         mutationFn: async () => {
+            if (!profile?.organization_id) {
+                throw new Error('Organização não encontrada')
+            }
+
+            // Apenas 2 categorias default (1 entrada, 1 saída)
             const defaultCategories = [
-                { name: 'Vendas', type: 'entrada', color: '#10b981' },
-                { name: 'Serviços', type: 'entrada', color: '#3b82f6' },
-                { name: 'Outras Receitas', type: 'entrada', color: '#8b5cf6' },
-                { name: 'Despesas Operacionais', type: 'saida', color: '#ef4444' },
-                { name: 'Fornecedores', type: 'saida', color: '#f59e0b' },
-                { name: 'Marketing', type: 'saida', color: '#ec4899' },
-                { name: 'Impostos', type: 'saida', color: '#6366f1' },
+                { name: 'Receitas Gerais', type: 'entrada', color: '#10b981', organization_id: profile.organization_id, is_system: false },
+                { name: 'Despesas Gerais', type: 'saida', color: '#ef4444', organization_id: profile.organization_id, is_system: false },
             ]
 
             const { data, error } = await supabase
