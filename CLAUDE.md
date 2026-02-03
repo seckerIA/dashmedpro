@@ -273,3 +273,14 @@ supabase/functions/
   - Corrigido erro de sintaxe `Duplicate identifier 'Pause'` causado por import duplicado acidental.
 - **Badge Component Fix**:
   - Atualizado `AppointmentStatusBadge` para corrigir warning do React sobre props booleanas inválidas no DOM.
+
+### Contexto Atual (02/02/2026 - AI Auto-Reply & Lead Creation)
+- **Otimização de Auto-Resposta do WhatsApp**:
+  - Implementada lógica hierárquica em `whatsapp-ai-analyze`: Configuração Local da conversa tem prioridade, mas usa Configuração Global como fallback para novas conversas.
+  - Banco de Dados: Removido valor padrão `true` da coluna `ai_autonomous_mode` em `whatsapp_conversations` para permitir estado `NULL` (herança).
+- **Auto-Cadastramento de Leads**:
+  - Atualizado `whatsapp-webhook` para criar automaticamente registros em `crm_contacts` e `crm_deals` (Pipeline Stage: Lead Novo) quando uma mensagem chega de um número desconhecido.
+  - A conversa é criada com link automático para este novo contato.
+- **Correções Adicionais**:
+  - `WhatsAppSettings.tsx`: Correção na navegação de abas via URL params.
+  - `whatsapp-ai-analyze`: Prompt da IA reforçado para priorizar "Base de Conhecimento" e evitar alucinações.

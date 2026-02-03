@@ -439,7 +439,52 @@ async function getOrCreateConversation(
     .select('id, full_name')
     .or(`phone.eq.${phoneNumber},phone.eq.+${phoneNumber}`)
     .limit(1)
-    .single();
+    .maybeSingle();
+
+  let contactId = contact?.id;
+  let finalContactName = contactName || contact?.full_name || phoneNumber;
+
+  // SE NÃO EXISTE CONTATO: CRIAR AUTO-LEAD E DEAL
+  if (!contactId) {
+    console.log('[Webhook] Contact not found, creating new Lead/Deal for:', phoneNumber);
+
+    // 1. Criar Contato
+    const { data: newContact, error: createContactError } = await supabase
+      .from('crm_contacts')
+      .insert({
+        user_id: userId,
+        full_name: finalContactName,
+        phone: phoneNumber,
+        tags: ['whatsapp_auto'],
+        lead_score: 10, // Score inicial
+      })
+      .select('id')
+      .single();
+
+    if (!createContactError && newContact) {
+      contactId = newContact.id;
+
+      // 2. Criar Deal no Pipeline (Lead Novo)
+      const { error: createDealError } = await supabase
+        .from('crm_deals')
+        .insert({
+          user_id: userId,
+          contact_id: contactId,
+          title: `Oportunidade: ${finalContactName}`,
+          stage: 'lead_novo',
+          value: 0,
+          description: 'Lead criado automaticamente via WhatsApp'
+        });
+
+      if (createDealError) {
+        console.error('[Webhook] Error creating auto-deal:', createDealError);
+      } else {
+        console.log('[Webhook] Auto-deal created successfully');
+      }
+    } else {
+      console.error('[Webhook] Error creating auto-contact:', createContactError);
+    }
+  }
 
   // Buscar config de IA do usuário para definir modo inicial
   const { data: aiConfig } = await supabase
@@ -455,12 +500,12 @@ async function getOrCreateConversation(
       user_id: userId,
       phone_number_id: phoneNumberId,
       phone_number: phoneNumber,
-      contact_id: contact?.id || null,
-      contact_name: contactName || contact?.full_name || phoneNumber,
+      contact_id: contactId || null,
+      contact_name: finalContactName,
       status: 'open',
       priority: 'normal',
       unread_count: 0,
-      ai_autonomous_mode: aiConfig?.auto_reply_enabled === true, // Herda do config global
+      ai_autonomous_mode: aiConfig?.auto_reply_enabled === true ? true : null, // Se Global ON -> True, Se OFF -> Null (herda)
     })
     .select('id')
     .single();

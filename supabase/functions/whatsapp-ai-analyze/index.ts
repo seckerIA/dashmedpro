@@ -104,7 +104,7 @@ const handler = async (req: Request): Promise<Response> => {
     // DEBOUNCE / BUFFER STEP
     // ==========================================
     if (!force_reanalyze) {
-      const BUFFER_SECONDS = 15;
+      const BUFFER_SECONDS = 8; // Reduzido de 15 para 8 para maior agilidade
       const checkTime = new Date().toISOString();
 
       console.log(`[AI-DEBOUNCE] Waiting ${BUFFER_SECONDS}s buffer...`);
@@ -374,6 +374,14 @@ INTERPRETAÇÃO DA AGENDA (IMPORTANTE):
 
 ${agendaContext}
 
+CONHECIMENTO ESPECÍFICO DA CLÍNICA (PRIORIDADE TOTAL):
+${aiConfig?.knowledge_base || 'Use as diretrizes padrão de atendimento.'}
+
+INFORMAÇÕES QUE JÁ SABEMOS (NÃO PERGUNTE ISTO):
+${aiConfig?.already_known_info || 'Nenhuma informação extra cadastrada.'}
+
+ESTAS SÃO AS ÚNICAS INFORMAÇÕES VERDADEIRAS SOBRE A CLÍNICA. SE ALGO NÃO ESTIVER AQUI OU NOS PROCEDIMENTOS, DIGA QUE VAI SE INFORMAR COM A EQUIPE. NUNCA INVENTE ESPECIALIDADES OU SERVIÇOS.
+
  PROCEDIMENTOS E PREÇOS:
 ${proceduresContext}
 
@@ -581,9 +589,21 @@ Analise a conversa, extraia dados e gere respostas.`;
       }
     }
 
-    // Auto-Reply
-    // Somente se a configuração global permitir E o modo autônomo da conversa estiver ligado
-    if (aiConfig?.auto_reply_enabled === true && conversation.ai_autonomous_mode !== false) {
+    // Auto-Reply Logic Updated (Hierarchy):
+    // 1. Local overrides Global logic?
+    // User Rule: "se o interruptor geral (global) estiver desligado, e a analise autonoma (local) estiver ligada, DEVE responder"
+    // Result: Local TRUE -> Always Send.
+    // Result: Local FALSE -> Never Send.
+    // Result: Local NULL (New Default) -> Send if Global is ON.
+
+    // Condition:
+    // (Local === true) OR (Local !== false AND Global === true)
+
+    const isLocalEnabled = conversation.ai_autonomous_mode === true;
+    const isLocalDisabled = conversation.ai_autonomous_mode === false;
+    const isGlobalEnabled = aiConfig?.auto_reply_enabled === true;
+
+    if (isLocalEnabled || (!isLocalDisabled && isGlobalEnabled)) {
       let bestSuggestion = suggestionsToInsert[0];
       const CONFIDENCE_THRESHOLD = 0.85;
       let shouldSend = true;
@@ -730,11 +750,12 @@ Analise a conversa, extraia dados e gere respostas.`;
               user_id: conversation.user_id,
               conversation_id: conversation_id,
               phone_number: conversation.phone_number,
-              content: bestSuggestion.content, // Use bestSuggestion.content directly
+              content: bestSuggestion.content,
               direction: 'outbound',
               message_type: 'text',
               status: 'pending',
               sent_at: new Date().toISOString(),
+              reply_to_wa_id: messages[0]?.message_id || null, // Adiciona contexto de resposta
               metadata: { auto_reply: true, confidence: bestSuggestion.confidence, ai_generated: true }
             })
             .select('id')
@@ -815,7 +836,8 @@ Analise a conversa, extraia dados e gere respostas.`;
                     messaging_product: 'whatsapp',
                     to: conversation.phone_number,
                     type: 'text',
-                    text: { body: bestSuggestion.content } // Use bestSuggestion.content directly
+                    text: { body: bestSuggestion.content },
+                    context: messages[0]?.message_id ? { message_id: messages[0].message_id } : undefined
                   }),
                 }
               );
