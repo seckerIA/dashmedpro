@@ -183,15 +183,15 @@ const handler = async (req: Request): Promise<Response> => {
     const brazilTime = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 
     // ... (Mantendo código da agenda igual)
-    const next5Days = new Date();
-    next5Days.setDate(now.getDate() + 5);
+    const next21Days = new Date();
+    next21Days.setDate(now.getDate() + 21);
 
     const { data: appointments } = await supabaseAdmin
       .from('medical_appointments')
       .select('start_time, end_time, status, doctor_id')
       .in('doctor_id', targetUserIds)
       .gte('start_time', now.toISOString())
-      .lte('start_time', next5Days.toISOString())
+      .lte('start_time', next21Days.toISOString())
       .neq('status', 'cancelled')
       .order('start_time', { ascending: true });
 
@@ -201,7 +201,7 @@ const handler = async (req: Request): Promise<Response> => {
       .in('user_id', targetUserIds)
       .eq('is_busy', true)
       .gte('start_time', now.toISOString())
-      .lte('start_time', next5Days.toISOString())
+      .lte('start_time', next21Days.toISOString())
       .neq('status', 'cancelled')
       .order('start_time', { ascending: true });
 
@@ -220,7 +220,8 @@ const handler = async (req: Request): Promise<Response> => {
       // Calculate "Approximated Brazil Date" for iteration (shifting absolute time)
       const nowInBrTimestamp = nowAbs.getTime() + OFFSET_MS;
 
-      for (let i = 0; i < 5; i++) {
+      // Aumentado para 21 dias (3 semanas) para cobrir "segunda que vem" e "próximo mês"
+      for (let i = 0; i < 21; i++) {
         // Target Date in Brazil (Shifted)
         const targetTs = nowInBrTimestamp + (i * 24 * 60 * 60 * 1000);
         const d = new Date(targetTs);
