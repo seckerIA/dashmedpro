@@ -108,6 +108,7 @@ export const useFinancialAccounts = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["financial-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["financial-metrics"] });
       toast({
         title: "Conta criada",
         description: "Conta bancária criada com sucesso!",
@@ -147,6 +148,7 @@ export const useFinancialAccounts = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["financial-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["financial-metrics"] });
       toast({
         title: "Conta atualizada",
         description: "Conta bancária atualizada com sucesso!",
@@ -186,6 +188,7 @@ export const useFinancialAccounts = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["financial-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["financial-metrics"] });
       toast({
         title: "Conta removida",
         description: "Conta bancária removida com sucesso!",
@@ -226,6 +229,7 @@ export const useFinancialAccounts = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["financial-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["financial-metrics"] });
       toast({
         title: "Conta padrão atualizada",
         description: "A conta foi definida como padrão para recebimentos.",
