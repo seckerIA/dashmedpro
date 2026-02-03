@@ -1,5 +1,5 @@
 /**
- * Edge Function: whatsapp-ai-analyze
+ * Edge Function: whatsapp-ai-analyze (v2 - Extended Agenda 21 days)
  * Analisa conversas do WhatsApp usando GPT-3.5 Turbo
  * Qualifica leads e gera sugestões de resposta
  */
