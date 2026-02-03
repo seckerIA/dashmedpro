@@ -1,4 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { AnimatedCurrency } from "@/components/ui/animated-number"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -409,7 +410,7 @@ const Financial = () => {
                   <Wallet className="w-5 h-5 text-emerald-100" />
                 </div>
                 <p className="text-xl 2xl:text-2xl font-bold mb-1" title={formatCurrency(metrics?.totalBalance || 0)}>
-                  {formatCurrency(metrics?.totalBalance || 0)}
+                  <AnimatedCurrency value={metrics?.totalBalance || 0} duration={1.2} />
                 </p>
                 <p className="text-xs text-emerald-100">{isSecretaria ? "Acumulado" : "Todas as contas"}</p>
               </CardContent>
@@ -423,7 +424,7 @@ const Financial = () => {
                   <ArrowUpRight className="w-5 h-5 text-emerald-500" />
                 </div>
                 <p className="text-xl 2xl:text-2xl font-bold text-emerald-500 mb-1" title={formatCurrency(metrics?.monthRevenue || 0)}>
-                  {formatCurrency(metrics?.monthRevenue || 0)}
+                  <AnimatedCurrency value={metrics?.monthRevenue || 0} duration={1.2} />
                 </p>
                 <div className="flex items-center gap-1">
                   <TrendingUp className="w-3 h-3 text-emerald-500" />
@@ -443,7 +444,7 @@ const Financial = () => {
                       <ArrowDownLeft className="w-5 h-5 text-red-500" />
                     </div>
                     <p className="text-xl 2xl:text-2xl font-bold text-red-500 mb-1" title={formatCurrency((metrics?.monthExpenses || 0) + (metrics?.monthTotalCosts || 0))}>
-                      {formatCurrency((metrics?.monthExpenses || 0) + (metrics?.monthTotalCosts || 0))}
+                      <AnimatedCurrency value={(metrics?.monthExpenses || 0) + (metrics?.monthTotalCosts || 0)} duration={1.2} />
                     </p>
                     <div className="flex items-center gap-1">
                       <TrendingUp className="w-3 h-3 text-red-500" />
@@ -460,7 +461,7 @@ const Financial = () => {
                       <ShoppingCart className="w-5 h-5 text-orange-500" />
                     </div>
                     <p className="text-xl 2xl:text-2xl font-bold text-orange-500 mb-1" title={formatCurrency(metrics?.monthTotalCosts || 0)}>
-                      {formatCurrency(metrics?.monthTotalCosts || 0)}
+                      <AnimatedCurrency value={metrics?.monthTotalCosts || 0} duration={1.2} />
                     </p>
                     <div className="flex items-center gap-1">
                       <TrendingUp className="w-3 h-3 text-orange-500" />
@@ -477,7 +478,7 @@ const Financial = () => {
                       <DollarSign className="w-5 h-5 text-blue-500" />
                     </div>
                     <p className="text-xl 2xl:text-2xl font-bold text-blue-500 mb-1" title={formatCurrency(metrics?.monthNetProfit || 0)}>
-                      {formatCurrency(metrics?.monthNetProfit || 0)}
+                      <AnimatedCurrency value={metrics?.monthNetProfit || 0} duration={1.2} />
                     </p>
                     <div className="flex items-center gap-1">
                       <TrendingUp className="w-3 h-3 text-blue-500" />

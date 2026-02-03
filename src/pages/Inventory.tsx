@@ -25,6 +25,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { InventoryItem } from "@/types/inventory";
 import { useSuppliers } from "@/hooks/useSuppliers";
+import { useAuth } from "@/hooks/useAuth";
 
 import { MoneyInput } from "@/components/ui/money-input";
 
@@ -37,7 +38,7 @@ const inventoryItemSchema = z.object({
     sell_price: z.number().optional(),
     cost_price: z.number().optional(),
     description: z.string().optional(),
-    supplier_id: z.string().optional(),
+    supplier_id: z.string().min(1, "Selecione um fornecedor"),
     // Campos opcionais para lote inicial
     initial_quantity: z.coerce.number().min(0).optional(),
     batch_number: z.string().optional(),
@@ -66,7 +67,7 @@ const formatDateString = (date: Date | undefined): string => {
 import type { Supplier } from "@/hooks/useSuppliers";
 
 // Componente de campos do formulário - FORA do componente pai para evitar re-render
-const ProductFormFields = ({ formInstance, showBatchFields = false, suppliers = [] }: { formInstance: any, showBatchFields?: boolean, suppliers?: Supplier[] }) => (
+const ProductFormFields = ({ formInstance, showBatchFields = false, suppliers = [], onAddSupplier }: { formInstance: any, showBatchFields?: boolean, suppliers?: Supplier[], onAddSupplier?: () => void }) => (
     <>
         <FormField
             control={formInstance.control}
@@ -114,7 +115,7 @@ const ProductFormFields = ({ formInstance, showBatchFields = false, suppliers = 
                     <FormItem>
                         <FormLabel>Estoque Mínimo</FormLabel>
                         <FormControl>
-                            <Input type="number" {...field} />
+                            <Input type="number" {...field} onFocus={(e) => e.target.select()} />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -175,20 +176,61 @@ const ProductFormFields = ({ formInstance, showBatchFields = false, suppliers = 
             name="supplier_id"
             render={({ field }) => (
                 <FormItem>
-                    <FormLabel>Fornecedor</FormLabel>
+                    <FormLabel>Fornecedor *</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value || ""}>
                         <FormControl>
                             <SelectTrigger>
-                                <SelectValue placeholder="Selecione um fornecedor (opcional)" />
+                                <SelectValue placeholder="Selecione um fornecedor" />
                             </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                            <SelectItem value="">Nenhum</SelectItem>
-                            {suppliers.map((supplier) => (
-                                <SelectItem key={supplier.id} value={supplier.id}>
-                                    {supplier.name}
-                                </SelectItem>
-                            ))}
+                            {suppliers.length === 0 ? (
+                                <div className="py-6 text-center text-sm">
+                                    <p className="text-muted-foreground mb-3">Nenhum fornecedor cadastrado.</p>
+                                    {onAddSupplier && (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                onAddSupplier();
+                                            }}
+                                            className="gap-2"
+                                        >
+                                            <Plus className="h-4 w-4" />
+                                            Adicionar Fornecedor
+                                        </Button>
+                                    )}
+                                </div>
+                            ) : (
+                                <>
+                                    {suppliers.map((supplier) => (
+                                        <SelectItem key={supplier.id} value={supplier.id}>
+                                            {supplier.name}
+                                        </SelectItem>
+                                    ))}
+                                    {onAddSupplier && (
+                                        <div className="border-t mt-1 pt-1">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    onAddSupplier();
+                                                }}
+                                                className="w-full justify-start gap-2 text-primary"
+                                            >
+                                                <Plus className="h-4 w-4" />
+                                                Adicionar Fornecedor
+                                            </Button>
+                                        </div>
+                                    )}
+                                </>
+                            )}
                         </SelectContent>
                     </Select>
                     <FormMessage />
@@ -210,7 +252,7 @@ const ProductFormFields = ({ formInstance, showBatchFields = false, suppliers = 
                                 <FormItem>
                                     <FormLabel>Quantidade Inicial</FormLabel>
                                     <FormControl>
-                                        <Input type="number" placeholder="0" {...field} />
+                                        <Input type="number" placeholder="0" {...field} onFocus={(e) => e.target.select()} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -260,13 +302,30 @@ const ProductFormFields = ({ formInstance, showBatchFields = false, suppliers = 
 
 const InventoryProductsTab = () => {
     const { items, isLoading, createItem, updateItem, deleteItem, addBatch, registerMovement } = useInventory();
-    const { suppliers } = useSuppliers();
+    const { suppliers, createSupplier } = useSuppliers();
+    const { user } = useAuth();
     const [searchTerm, setSearchTerm] = useState("");
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
     const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
     const [adjustingItem, setAdjustingItem] = useState<InventoryItem | null>(null);
+    const [isQuickSupplierModalOpen, setIsQuickSupplierModalOpen] = useState(false);
+    const [quickSupplierName, setQuickSupplierName] = useState("");
+
+    const handleQuickAddSupplier = async () => {
+        if (!quickSupplierName.trim() || !user?.id) return;
+        try {
+            await createSupplier.mutateAsync({
+                user_id: user.id,
+                name: quickSupplierName.trim(),
+            });
+            setQuickSupplierName("");
+            setIsQuickSupplierModalOpen(false);
+        } catch (error) {
+            console.error("Erro ao criar fornecedor:", error);
+        }
+    };
 
     const form = useForm<InventoryItemFormValues>({
         resolver: zodResolver(inventoryItemSchema),
@@ -388,7 +447,7 @@ const InventoryProductsTab = () => {
                         </DialogHeader>
                         <Form {...form}>
                             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                                <ProductFormFields formInstance={form} showBatchFields={true} suppliers={suppliers} />
+                                <ProductFormFields formInstance={form} showBatchFields={true} suppliers={suppliers} onAddSupplier={() => setIsQuickSupplierModalOpen(true)} />
                                 <DialogFooter>
                                     <Button type="submit" disabled={createItem.isPending}>
                                         {createItem.isPending ? "Salvando..." : "Salvar Produto"}
@@ -407,7 +466,7 @@ const InventoryProductsTab = () => {
                         </DialogHeader>
                         <Form {...editForm}>
                             <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
-                                <ProductFormFields formInstance={editForm} showBatchFields={false} suppliers={suppliers} />
+                                <ProductFormFields formInstance={editForm} showBatchFields={false} suppliers={suppliers} onAddSupplier={() => setIsQuickSupplierModalOpen(true)} />
                                 <DialogFooter>
                                     <Button variant="outline" type="button" onClick={() => setIsEditModalOpen(false)}>
                                         Cancelar
@@ -587,6 +646,43 @@ const InventoryProductsTab = () => {
                     isPending={registerMovement.isPending}
                 />
             )}
+
+            {/* Modal de Adicionar Fornecedor Rápido */}
+            <Dialog open={isQuickSupplierModalOpen} onOpenChange={setIsQuickSupplierModalOpen}>
+                <DialogContent className="sm:max-w-[400px]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Truck className="h-5 w-5" />
+                            Novo Fornecedor
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label>Nome do Fornecedor *</Label>
+                            <Input
+                                value={quickSupplierName}
+                                onChange={(e) => setQuickSupplierName(e.target.value)}
+                                placeholder="Ex: Farmacêutica ABC"
+                                autoFocus
+                            />
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Para adicionar mais detalhes (CNPJ, contato, etc.), acesse a aba Fornecedores.
+                        </p>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsQuickSupplierModalOpen(false)}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={handleQuickAddSupplier}
+                            disabled={!quickSupplierName.trim() || createSupplier.isPending}
+                        >
+                            {createSupplier.isPending ? "Salvando..." : "Cadastrar"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };

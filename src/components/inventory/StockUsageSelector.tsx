@@ -289,6 +289,7 @@ export function StockUsageSelector({ value, onChange, readOnly = false }: StockU
                                                 step={1}
                                                 value={item.quantity}
                                                 onChange={(e) => handleQuantityChange(item.inventory_item_id, parseInt(e.target.value) || 0)}
+                                                onFocus={(e) => e.target.select()}
                                                 className="h-8 bg-zinc-900 border-white/10 focus:ring-primary/20 text-xs font-bold text-center pr-2"
                                             />
                                         </div>

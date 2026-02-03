@@ -1,10 +1,8 @@
-import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useToast } from "./use-toast";
 import { useUserProfile } from "./useUserProfile";
-import { supabaseQueryWithTimeout } from "@/utils/supabaseQuery";
 import type {
   FinancialTransaction,
   FinancialTransactionInsert,
@@ -24,16 +22,6 @@ export const useFinancialTransactions = (filters?: TransactionFilters) => {
     queryKey: ["financial-transactions", user?.id, profile?.role, filters],
     queryFn: async () => {
       if (!user) throw new Error("Usuário não autenticado");
-
-      // Verificar sessão antes da query
-      let session, sessionError;
-      try {
-        const sessionResult = await supabase.auth.getSession();
-        session = sessionResult.data?.session;
-        sessionError = sessionResult.error;
-      } catch (err: any) {
-        throw err;
-      }
 
       // Admin e Dono veem dados de TODOS os usuários
       const isAdminOrDono = profile?.role === 'admin' || profile?.role === 'dono';
@@ -85,27 +73,20 @@ export const useFinancialTransactions = (filters?: TransactionFilters) => {
         query = query.ilike("description", `%${filters.search}%`);
       }
 
-      // Usar wrapper com timeout de 30 segundos
-      const queryStartTime = Date.now();
-      const queryPromise = query;
+      // Query direta sem wrapper complexo
+      const { data, error } = await query;
 
-      let data, error;
-      try {
-        const result = await supabaseQueryWithTimeout(queryPromise, 45000); // Timeout aumentado para 45s
-        data = result.data;
-        error = result.error;
-      } catch (err: any) {
-        throw err;
+      if (error) {
+        console.error('[Financial] Query error:', error);
+        throw error;
       }
-
-      if (error) throw error;
 
       return data;
     },
     enabled: !!user && !!profile, // Aguardar profile carregar também
     staleTime: 2 * 60 * 1000, // 2 minutos
     gcTime: 5 * 60 * 1000,
-    refetchOnMount: false,
+    refetchOnMount: true,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
     retry: 2,

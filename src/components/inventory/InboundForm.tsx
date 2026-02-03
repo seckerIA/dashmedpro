@@ -40,6 +40,30 @@ export function InboundForm({ onSuccess }: { onSuccess?: () => void }) {
         unit_price: 0,
     });
 
+    // Auto-preencher dados quando produto é selecionado
+    const handleProductSelect = (productId: string) => {
+        const product = products?.find(p => p.id === productId);
+
+        if (product) {
+            // Buscar o lote mais recente ativo
+            const latestBatch = product.batches
+                ?.filter(b => b.is_active)
+                ?.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+
+            setCurrentItem({
+                ...currentItem,
+                item_id: productId,
+                batch_number: latestBatch?.batch_number || "",
+                expiration_date: latestBatch?.expiration_date
+                    ? new Date(latestBatch.expiration_date)
+                    : undefined,
+                unit_price: product.cost_price || 0,
+            });
+        } else {
+            setCurrentItem({ ...currentItem, item_id: productId });
+        }
+    };
+
     const handleAddItem = () => {
         if (!currentItem.item_id || !currentItem.quantity || !currentItem.unit_price) {
             toast({
@@ -182,7 +206,7 @@ export function InboundForm({ onSuccess }: { onSuccess?: () => void }) {
                             <Label>Produto</Label>
                             <Select
                                 value={currentItem.item_id}
-                                onValueChange={(val) => setCurrentItem({ ...currentItem, item_id: val })}
+                                onValueChange={handleProductSelect}
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Busque o produto..." />
@@ -220,6 +244,7 @@ export function InboundForm({ onSuccess }: { onSuccess?: () => void }) {
                                     type="number"
                                     value={currentItem.quantity}
                                     onChange={(e) => setCurrentItem({ ...currentItem, quantity: Number(e.target.value) })}
+                                    onFocus={(e) => e.target.select()}
                                 />
                             </div>
                             <div className="grid gap-2">

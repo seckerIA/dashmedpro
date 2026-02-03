@@ -158,6 +158,25 @@ const createFinancialTransactionForAppointment = async (
     }
 
     if (transaction) {
+      // Atualizar saldo da conta (entrada aumenta, saída diminui)
+      const { data: account } = await supabase
+        .from('financial_accounts')
+        .select('current_balance')
+        .eq('id', accountId)
+        .single();
+
+      if (account) {
+        const currentBalance = account.current_balance || 0;
+        const newBalance = currentBalance + finalAmount; // Entrada sempre soma
+
+        await supabase
+          .from('financial_accounts')
+          .update({ current_balance: newBalance })
+          .eq('id', accountId);
+
+        console.log(`[Financial] ✅ Saldo atualizado: R$ ${currentBalance.toFixed(2)} → R$ ${newBalance.toFixed(2)} (+R$ ${finalAmount.toFixed(2)}${appointment.is_sinal ? ' sinal' : ''})`);
+      }
+
       return transaction.id;
     }
 
@@ -165,6 +184,117 @@ const createFinancialTransactionForAppointment = async (
   } catch (error) {
     console.error('[Financial] Erro inesperado:', error);
     return null;
+  }
+};
+
+/**
+ * Deduz os itens de estoque vinculados a uma consulta
+ * Usa método FEFO (First Expire First Out) para selecionar os lotes
+ */
+const deductStockForAppointment = async (
+  appointmentId: string,
+  userId: string,
+  organizationId?: string
+): Promise<{ success: boolean; deductedItems: number }> => {
+  try {
+    // 1. Buscar itens de estoque vinculados que ainda não foram deduzidos
+    const { data: stockUsage, error: fetchError } = await supabase
+      .from('appointment_stock_usage')
+      .select(`
+        id,
+        inventory_item_id,
+        quantity,
+        deducted
+      `)
+      .eq('appointment_id', appointmentId)
+      .eq('deducted', false);
+
+    if (fetchError) {
+      console.error('[Stock] Erro ao buscar itens de estoque:', fetchError);
+      return { success: false, deductedItems: 0 };
+    }
+
+    if (!stockUsage || stockUsage.length === 0) {
+      console.log('[Stock] Nenhum item de estoque para deduzir');
+      return { success: true, deductedItems: 0 };
+    }
+
+    console.log(`[Stock] ${stockUsage.length} item(ns) de estoque para deduzir`);
+
+    let deductedCount = 0;
+
+    // 2. Para cada item, deduzir usando FEFO
+    for (const usage of stockUsage) {
+      let remainingQuantity = usage.quantity;
+
+      // Buscar batches ativos ordenados por data de validade (FEFO)
+      const { data: batches, error: batchError } = await supabase
+        .from('inventory_batches')
+        .select('id, quantity, expiration_date')
+        .eq('item_id', usage.inventory_item_id)
+        .eq('is_active', true)
+        .gt('quantity', 0)
+        .order('expiration_date', { ascending: true, nullsFirst: false });
+
+      if (batchError) {
+        console.error('[Stock] Erro ao buscar batches:', batchError);
+        continue;
+      }
+
+      if (!batches || batches.length === 0) {
+        console.warn(`[Stock] Nenhum batch disponível para item ${usage.inventory_item_id}`);
+        continue;
+      }
+
+      // Deduzir de cada batch até cobrir a quantidade total
+      for (const batch of batches) {
+        if (remainingQuantity <= 0) break;
+
+        const deductQuantity = Math.min(remainingQuantity, batch.quantity);
+
+        // Criar movimento de saída (OUT) - o trigger do banco atualiza o saldo
+        const { error: movementError } = await supabase
+          .from('inventory_movements')
+          .insert({
+            batch_id: batch.id,
+            type: 'OUT',
+            quantity: deductQuantity,
+            created_by: userId,
+            organization_id: organizationId,
+            description: `Dedução automática - Consulta concluída (ID: ${appointmentId})`
+          });
+
+        if (movementError) {
+          console.error('[Stock] Erro ao criar movimento:', movementError);
+          continue;
+        }
+
+        remainingQuantity -= deductQuantity;
+        console.log(`[Stock] Deduzido ${deductQuantity} do batch ${batch.id}`);
+      }
+
+      // Marcar como deduzido se conseguiu deduzir tudo
+      if (remainingQuantity <= 0) {
+        const { error: updateError } = await supabase
+          .from('appointment_stock_usage')
+          .update({ deducted: true })
+          .eq('id', usage.id);
+
+        if (updateError) {
+          console.error('[Stock] Erro ao marcar como deduzido:', updateError);
+        } else {
+          deductedCount++;
+        }
+      } else {
+        console.warn(`[Stock] Estoque insuficiente para item ${usage.inventory_item_id}. Faltam ${remainingQuantity} unidades.`);
+      }
+    }
+
+    console.log(`[Stock] ✅ ${deductedCount} item(ns) deduzido(s) com sucesso`);
+    return { success: true, deductedItems: deductedCount };
+  } catch (error) {
+    console.error('[Stock] Erro inesperado:', error);
+    return { success: false, deductedItems: 0 };
   }
 };
 
@@ -639,6 +769,46 @@ const createAppointment = async (
     }
   }
 
+  // Se sinal foi pago na criação, criar transação do sinal
+  if (appointmentData.sinal_paid === true && appointmentData.sinal_amount && appointmentData.sinal_amount > 0) {
+    // Verificar se já existe transação de sinal para evitar duplicatas
+    const { data: existingSinalTransaction } = await supabase
+      .from('financial_transactions')
+      .select('id')
+      .eq('metadata->>appointment_id', data.id)
+      .eq('metadata->>is_sinal', 'true')
+      .maybeSingle();
+
+    if (!existingSinalTransaction) {
+      console.log('[Create] Sinal pago na criação - criando transação financeira do sinal');
+
+      await createFinancialTransactionForAppointment({
+        id: data.id,
+        user_id: appointmentData.user_id,
+        organization_id: (data as any).organization_id,
+        contact_id: appointmentData.contact_id,
+        title: appointmentData.title,
+        start_time: appointmentData.start_time,
+        estimated_value: appointmentData.estimated_value,
+        appointment_type: appointmentData.appointment_type || 'consultation',
+        amount_override: appointmentData.sinal_amount,
+        description_override: `Sinal: ${appointmentData.title}`,
+        is_sinal: true,
+      });
+
+      // Notificar sucesso
+      import('@/hooks/use-toast').then(({ toast }) => {
+        toast({
+          title: '✅ Sinal Registrado no Financeiro',
+          description: `Valor de R$ ${appointmentData.sinal_amount?.toFixed(2)} registrado como entrada.`,
+          duration: 4000,
+        });
+      });
+    } else {
+      console.log('[Create] Transação de sinal já existe, pulando criação');
+    }
+  }
+
   // Atualizar pipeline automaticamente ao criar consulta
   await updateDealPipeline(
     appointmentData.contact_id,
@@ -702,28 +872,40 @@ const updateAppointment = async ({
     const sinalAmount = updates.sinal_amount || appointment.sinal_amount || 0;
 
     if (sinalAmount > 0) {
-      await createFinancialTransactionForAppointment({
-        id: appointment.id,
-        user_id: appointment.user_id,
-        organization_id: (appointment as any).organization_id,
-        contact_id: appointment.contact_id,
-        title: appointment.title,
-        start_time: appointment.start_time,
-        estimated_value: appointment.estimated_value,
-        appointment_type: appointment.appointment_type || 'consultation',
-        amount_override: sinalAmount,
-        description_override: `Sinal: ${appointment.title}`,
-        is_sinal: true,
-      });
+      // Verificar se já existe transação de sinal para evitar duplicatas
+      const { data: existingSinalTransaction } = await supabase
+        .from('financial_transactions')
+        .select('id')
+        .eq('metadata->>appointment_id', appointment.id)
+        .eq('metadata->>is_sinal', 'true')
+        .maybeSingle();
 
-      // Notificar sucesso do sinal
-      import('@/hooks/use-toast').then(({ toast }) => {
-        toast({
-          title: '✅ Sinal Registrado no Financeiro',
-          description: `Valor de R$ ${sinalAmount.toFixed(2)} registrado como entrada.`,
-          duration: 4000,
+      if (!existingSinalTransaction) {
+        await createFinancialTransactionForAppointment({
+          id: appointment.id,
+          user_id: appointment.user_id,
+          organization_id: (appointment as any).organization_id,
+          contact_id: appointment.contact_id,
+          title: appointment.title,
+          start_time: appointment.start_time,
+          estimated_value: appointment.estimated_value,
+          appointment_type: appointment.appointment_type || 'consultation',
+          amount_override: sinalAmount,
+          description_override: `Sinal: ${appointment.title}`,
+          is_sinal: true,
         });
-      });
+
+        // Notificar sucesso do sinal
+        import('@/hooks/use-toast').then(({ toast }) => {
+          toast({
+            title: '✅ Sinal Registrado no Financeiro',
+            description: `Valor de R$ ${sinalAmount.toFixed(2)} registrado como entrada.`,
+            duration: 4000,
+          });
+        });
+      } else {
+        console.log('[Update] Transação de sinal já existe, pulando criação');
+      }
     }
   }
 
@@ -1134,11 +1316,37 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
 
       // Verificar se uma transação foi criada
       const hasTransaction = data?.financial_transaction_id;
+
+      // Deduzir estoque vinculado à consulta
+      let stockDeducted = false;
+      if (data?.id && user?.id) {
+        try {
+          const result = await deductStockForAppointment(data.id, user.id, profile?.organization_id);
+          stockDeducted = result.success && result.deductedItems > 0;
+
+          // Invalidar queries de inventário para refletir as mudanças
+          if (stockDeducted) {
+            queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
+            queryClient.invalidateQueries({ queryKey: ['stock-usage-history'] });
+          }
+        } catch (error) {
+          console.error('[markAsCompleted] Erro ao deduzir estoque:', error);
+        }
+      }
+
+      // Montar mensagem de sucesso
+      let successMessage = 'A consulta foi marcada como concluída.';
+      if (hasTransaction && stockDeducted) {
+        successMessage = 'Consulta concluída! Transação financeira criada e estoque deduzido automaticamente.';
+      } else if (hasTransaction) {
+        successMessage = 'Consulta concluída! Transação financeira criada automaticamente.';
+      } else if (stockDeducted) {
+        successMessage = 'Consulta concluída! Estoque deduzido automaticamente.';
+      }
+
       toast({
         title: 'Consulta concluída',
-        description: hasTransaction
-          ? 'A consulta foi marcada como concluída e a transação financeira foi criada automaticamente.'
-          : 'A consulta foi marcada como concluída.',
+        description: successMessage,
       });
 
       // Verificar se paciente deve ir para "Aguardando Retorno"

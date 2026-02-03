@@ -2,9 +2,21 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { MedicalAppointmentWithRelations } from '@/types/medicalAppointments';
 import { formatCurrency } from '@/lib/currency';
-import { DollarSign, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { DollarSign, CheckCircle2, XCircle, AlertCircle, Package, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { PaymentStatusBadge } from './PaymentStatusBadge';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+
+interface StockUsageItem {
+  id: string;
+  quantity: number;
+  deducted: boolean;
+  inventory_items: {
+    name: string;
+    unit: string;
+  } | null;
+}
 
 interface PaymentConfirmationModalProps {
   open: boolean;
@@ -21,6 +33,41 @@ export function PaymentConfirmationModal({
   onConfirm,
   isProcessing = false,
 }: PaymentConfirmationModalProps) {
+  const [stockUsageItems, setStockUsageItems] = useState<StockUsageItem[]>([]);
+  const [isLoadingStock, setIsLoadingStock] = useState(false);
+
+  useEffect(() => {
+    if (open && appointment?.id) {
+      fetchStockUsage();
+    }
+  }, [open, appointment?.id]);
+
+  const fetchStockUsage = async () => {
+    if (!appointment?.id) return;
+
+    setIsLoadingStock(true);
+    try {
+      const { data, error } = await supabase
+        .from('appointment_stock_usage')
+        .select(`
+          id,
+          quantity,
+          deducted,
+          inventory_items:inventory_item_id(name, unit)
+        `)
+        .eq('appointment_id', appointment.id)
+        .eq('deducted', false);
+
+      if (error) throw error;
+      setStockUsageItems((data as unknown as StockUsageItem[]) || []);
+    } catch (error) {
+      console.error('Erro ao buscar itens de estoque:', error);
+      setStockUsageItems([]);
+    } finally {
+      setIsLoadingStock(false);
+    }
+  };
+
   if (!appointment) return null;
 
   const estimatedValue = appointment.estimated_value || 0;
@@ -112,6 +159,38 @@ export function PaymentConfirmationModal({
                   Nenhuma transação financeira será criada.
                 </p>
               </div>
+            </div>
+          )}
+
+          {/* Itens de estoque vinculados */}
+          {isLoadingStock ? (
+            <div className="flex items-center justify-center py-2">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              <span className="text-xs text-muted-foreground ml-2">Carregando estoque...</span>
+            </div>
+          ) : stockUsageItems.length > 0 && (
+            <div className="border border-orange-200 dark:border-orange-800 rounded-lg p-3 bg-orange-50 dark:bg-orange-950/20">
+              <div className="flex items-center gap-2 mb-2">
+                <Package className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                <p className="text-sm font-medium text-orange-800 dark:text-orange-200">
+                  Itens do Estoque a Descontar
+                </p>
+              </div>
+              <ul className="space-y-1.5">
+                {stockUsageItems.map((item) => (
+                  <li key={item.id} className="flex items-center justify-between text-sm">
+                    <span className="text-orange-700 dark:text-orange-300">
+                      {item.inventory_items?.name || 'Item desconhecido'}
+                    </span>
+                    <Badge variant="outline" className="bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700">
+                      {item.quantity} {item.inventory_items?.unit || 'un'}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-orange-600 dark:text-orange-400 mt-2">
+                Ao confirmar, estes itens serão descontados do estoque automaticamente.
+              </p>
             </div>
           )}
         </div>

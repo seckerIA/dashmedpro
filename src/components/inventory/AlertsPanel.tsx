@@ -282,6 +282,7 @@ export function AlertsPanel() {
                                 max={selectedAlert?.quantity || 0}
                                 value={lossQuantity}
                                 onChange={(e) => setLossQuantity(e.target.value)}
+                                onFocus={(e) => e.target.select()}
                             />
                             <p className="text-xs text-muted-foreground">
                                 Disponível no lote: {selectedAlert?.quantity} unidades

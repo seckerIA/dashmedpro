@@ -32,7 +32,7 @@ import {
 } from '@/types/medicalAppointments';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarIcon, Loader2, AlertCircle, Upload, Eye, X, Search } from 'lucide-react';
+import { CalendarIcon, Loader2, AlertCircle, Upload, Eye, X, Search, CheckCircle2, Download } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -1122,6 +1122,8 @@ export function AppointmentForm({
                 <Label htmlFor="sinal_receipt" className="text-sm">Comprovante de Pagamento</Label>
                 <div className="flex items-center gap-2">
                   <Input
+                    type="file"
+                    accept="image/jpeg,image/png,application/pdf"
                     onChange={async (e) => {
                       const file = e.target.files?.[0] || null;
                       setSinalFile(file);
@@ -1164,15 +1166,41 @@ export function AppointmentForm({
                       • {isUploading ? "Enviando..." : sinalReceiptUrl ? "Upload concluído" : "Pronto para enviar"}
                     </p>
                     {sinalReceiptUrl && (
-                      <Button
-                        type="button"
-                        variant="link"
-                        size="sm"
-                        className="h-auto p-0 text-xs text-blue-500 w-fit"
-                        onClick={() => window.open(sinalReceiptUrl, '_blank')}
-                      >
-                        <Eye className="h-3 w-3 mr-1" /> Visualizar
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="link"
+                          size="sm"
+                          className="h-auto p-0 text-xs text-blue-500"
+                          onClick={() => window.open(sinalReceiptUrl, '_blank')}
+                        >
+                          <Eye className="h-3 w-3 mr-1" /> Visualizar
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="link"
+                          size="sm"
+                          className="h-auto p-0 text-xs text-green-500"
+                          onClick={async () => {
+                            try {
+                              const response = await fetch(sinalReceiptUrl);
+                              const blob = await response.blob();
+                              const url = window.URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `comprovante-sinal.pdf`;
+                              document.body.appendChild(a);
+                              a.click();
+                              window.URL.revokeObjectURL(url);
+                              document.body.removeChild(a);
+                            } catch (error) {
+                              console.error('Erro ao baixar comprovante:', error);
+                            }
+                          }}
+                        >
+                          <Download className="h-3 w-3 mr-1" /> Baixar
+                        </Button>
+                      </div>
                     )}
                   </div>
                 )}

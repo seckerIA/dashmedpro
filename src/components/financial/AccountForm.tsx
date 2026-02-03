@@ -108,7 +108,13 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, onCancel, 
                 onSuccess: () => {
                     if (onOpenChange) onOpenChange(false);
                     if (onSuccess) onSuccess();
-                    reset();
+                    reset({
+                        name: "",
+                        type: "conta_corrente",
+                        bank_name: "",
+                        initial_balance: 0,
+                        color: "#3b82f6",
+                    });
                 }
             });
         } else {
@@ -124,7 +130,13 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, onCancel, 
                 onSuccess: () => {
                     if (onOpenChange) onOpenChange(false);
                     if (onSuccess) onSuccess();
-                    reset();
+                    reset({
+                        name: "",
+                        type: "conta_corrente",
+                        bank_name: "",
+                        initial_balance: 0,
+                        color: "#3b82f6",
+                    });
                 }
             });
         }

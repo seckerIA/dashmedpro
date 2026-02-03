@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useFinancialAccounts } from '@/hooks/useFinancialAccounts';
 import {
     Dialog,
@@ -27,7 +27,14 @@ export function FinancialDistributionConfig({ open, onOpenChange }: FinancialDis
 
     // Encontrar conta padrão atual
     const defaultAccount = accounts?.find(acc => acc.is_default);
-    const [selectedAccountId, setSelectedAccountId] = useState<string | undefined>(defaultAccount?.id);
+    const [selectedAccountId, setSelectedAccountId] = useState<string>(defaultAccount?.id ?? "");
+
+    // Sincronizar selectedAccountId quando accounts carregar
+    useEffect(() => {
+        if (defaultAccount?.id && !selectedAccountId) {
+            setSelectedAccountId(defaultAccount.id);
+        }
+    }, [defaultAccount?.id, selectedAccountId]);
 
     const handleSave = async () => {
         if (!selectedAccountId) return;
@@ -82,7 +89,7 @@ export function FinancialDistributionConfig({ open, onOpenChange }: FinancialDis
                         </div>
                     ) : (
                         <RadioGroup
-                            value={selectedAccountId || defaultAccount?.id}
+                            value={selectedAccountId}
                             onValueChange={setSelectedAccountId}
                             className="space-y-3"
                         >

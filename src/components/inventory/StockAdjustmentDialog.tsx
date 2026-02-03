@@ -158,6 +158,7 @@ export function StockAdjustmentDialog({
                             max={maxQuantity}
                             value={quantity}
                             onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                            onFocus={(e) => e.target.select()}
                         />
                         {operation === "remove" && selectedBatch && (
                             <p className="text-xs text-muted-foreground">

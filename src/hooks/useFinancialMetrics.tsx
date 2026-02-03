@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useUserProfile } from "./useUserProfile";
-import { supabaseQueryWithTimeout } from "@/utils/supabaseQuery";
 import type {
   FinancialMetrics,
   MonthlyData,
@@ -30,33 +29,26 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
 
   const { data: metrics, isLoading, error } = useQuery({
     queryKey: ["financial-metrics", user?.id, profile?.role, filters?.startDate, filters?.endDate],
-    queryFn: async ({ signal }) => {
+    queryFn: async () => {
       if (!user) throw new Error("Usuário não autenticado");
 
-      // RLS will automatically filter by organization_id based on user's membership
-      // No need for manual user_id filtering - this was causing cross-org data leaks
-
       // 1. Buscar todas as contas ativas (RLS will filter by organization)
-      const accountsQuery = supabase
+      const { data: accounts } = await supabase
         .from("financial_accounts")
         .select("current_balance")
         .eq("is_active", true);
 
-      const accountsResult = await supabaseQueryWithTimeout(accountsQuery as any, undefined, signal);
-      const { data: accounts } = accountsResult;
       const accountsData = (accounts || []) as Array<{ current_balance: number }>;
       const totalBalance = accountsData.reduce((sum, acc) => sum + (acc.current_balance || 0), 0);
 
       // 2. Buscar transações do mês atual (com custos) - RLS handles organization filtering
-      const transactionsQuery = supabase
+      const { data: currentMonthTransactions } = await supabase
         .from("financial_transactions")
         .select("type, amount, status, total_costs, has_costs")
         .eq("status", "concluida")
         .gte("transaction_date", format(currentMonthStart, "yyyy-MM-dd"))
         .lte("transaction_date", format(currentMonthEnd, "yyyy-MM-dd"));
 
-      const transactionsResult = await supabaseQueryWithTimeout(transactionsQuery as any, undefined, signal);
-      const { data: currentMonthTransactions } = transactionsResult;
       const transactionsData = (currentMonthTransactions || []) as Array<{
         type: string;
         amount: number;
@@ -76,7 +68,7 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
       const todayStart = format(startOfDay(now), "yyyy-MM-dd");
       const todayEnd = format(endOfDay(now), "yyyy-MM-dd");
 
-      const todayTransactionsQuery = supabase
+      const { data: todayTransactions } = await supabase
         .from("financial_transactions")
         .select("type, amount, status")
         .eq("status", "concluida")
@@ -84,10 +76,7 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
         .gte("transaction_date", todayStart)
         .lte("transaction_date", todayEnd);
 
-      const todayResult = await supabaseQueryWithTimeout(todayTransactionsQuery as any, undefined, signal);
-      const { data: todayTransactions } = todayResult;
       const todayData = (todayTransactions || []) as Array<{ type: string; amount: number }>;
-
       const todayRevenue = todayData.reduce((sum, t) => sum + (t.amount || 0), 0);
 
       // Calcular custos totais (apenas de entradas)
@@ -105,13 +94,10 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
       const netProfitMargin = monthRevenue > 0 ? (monthNetProfit / monthRevenue) * 100 : 0;
 
       // 3. Contar transações ativas - RLS handles organization filtering
-      const countQuery = supabase
+      const { count: activeTransactions } = await supabase
         .from("financial_transactions")
         .select("*", { count: "exact", head: true })
         .eq("status", "concluida");
-
-      const countResult = await supabaseQueryWithTimeout(countQuery as any, undefined, signal);
-      const activeTransactions = (countResult as any).count || 0;
 
       const metricsData: FinancialMetrics = {
         totalBalance,
@@ -130,9 +116,9 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
       return metricsData;
     },
     enabled: !!user && !!profile,
-    staleTime: 30 * 1000, // 30 segundos - dados financeiros precisam estar atualizados
+    staleTime: 30 * 1000, // 30 segundos
     gcTime: 10 * 60 * 1000,
-    refetchOnMount: true, // Sempre refetch ao montar para ter dados atualizados
+    refetchOnMount: true,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     retry: 1,
@@ -142,7 +128,7 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
   // Dados mensais dos últimos 5 meses
   const { data: monthlyData } = useQuery({
     queryKey: ["financial-monthly-data", user?.id, profile?.role],
-    queryFn: async ({ signal }) => {
+    queryFn: async () => {
       if (!user) throw new Error("Usuário não autenticado");
 
       const now = new Date();
@@ -153,15 +139,13 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
         const monthStart = startOfMonth(monthDate);
         const monthEnd = endOfMonth(monthDate);
 
-        const query = supabase
+        const { data } = await supabase
           .from("financial_transactions")
           .select("type, amount")
           .eq("status", "concluida")
           .gte("transaction_date", format(monthStart, "yyyy-MM-dd"))
           .lte("transaction_date", format(monthEnd, "yyyy-MM-dd"));
 
-        const queryResult = await supabaseQueryWithTimeout(query as any, undefined, signal);
-        const { data } = queryResult;
         const transactionsData = (data || []) as Array<{ type: string; amount: number }>;
 
         const receitas = transactionsData.filter(t => t.type === "entrada").reduce((sum, t) => sum + (t.amount || 0), 0);
@@ -178,9 +162,9 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
       return monthlyResults;
     },
     enabled: !!user && !!profile,
-    staleTime: 30 * 1000, // 30 segundos - dados financeiros precisam estar atualizados
+    staleTime: 30 * 1000,
     gcTime: 10 * 60 * 1000,
-    refetchOnMount: true, // Sempre refetch ao montar para ter dados atualizados
+    refetchOnMount: true,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     retry: 1,
@@ -190,13 +174,13 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
   // Despesas por categoria (período selecionado)
   const { data: expensesByCategory } = useQuery({
     queryKey: ["financial-expenses-by-category", user?.id, profile?.role, filters?.startDate, filters?.endDate],
-    queryFn: async ({ signal }) => {
+    queryFn: async () => {
       if (!user) throw new Error("Usuário não autenticado");
 
       const monthStart = currentMonthStart;
       const monthEnd = currentMonthEnd;
 
-      const query = supabase
+      const { data } = await supabase
         .from("financial_transactions")
         .select(`
           amount,
@@ -207,8 +191,6 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
         .gte("transaction_date", format(monthStart, "yyyy-MM-dd"))
         .lte("transaction_date", format(monthEnd, "yyyy-MM-dd"));
 
-      const queryResult = await supabaseQueryWithTimeout(query as any, undefined, signal);
-      const { data } = queryResult;
       const transactionsData = (data || []) as Array<{
         amount: number;
         category?: { name: string; color: string } | null;
@@ -243,9 +225,9 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
       return categoryResults.sort((a, b) => b.value - a.value);
     },
     enabled: !!user && !!profile,
-    staleTime: 30 * 1000, // 30 segundos - dados financeiros precisam estar atualizados
+    staleTime: 30 * 1000,
     gcTime: 10 * 60 * 1000,
-    refetchOnMount: true, // Sempre refetch ao montar para ter dados atualizados
+    refetchOnMount: true,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     retry: 1,
@@ -255,22 +237,19 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
   // Projeção de fluxo de caixa
   const { data: cashFlowProjection } = useQuery({
     queryKey: ["financial-cash-flow-projection", user?.id, profile?.role],
-    queryFn: async ({ signal }) => {
+    queryFn: async () => {
       if (!user) throw new Error("Usuário não autenticado");
 
       const now = new Date();
       const projectionData: CashFlowProjection[] = [];
 
       // Buscar saldo inicial - RLS handles organization filtering
-      const accountsQuery = supabase
+      const { data: accounts } = await supabase
         .from("financial_accounts")
         .select("current_balance")
         .eq("is_active", true);
 
-      const accountsResult = await supabaseQueryWithTimeout(accountsQuery as any, undefined, signal);
-      const { data: accounts } = accountsResult;
       const accountsData = (accounts || []) as Array<{ current_balance: number }>;
-
       let runningBalance = accountsData.reduce((sum, acc) => sum + (acc.current_balance || 0), 0);
 
       // Últimos 5 meses (real)
@@ -320,4 +299,3 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
     error,
   };
 };
-
