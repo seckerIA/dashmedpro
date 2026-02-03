@@ -466,8 +466,19 @@ Analise a conversa, extraia dados e gere respostas.`;
       aiResponse = JSON.parse(cleanContent);
     } catch (parseError) {
       console.error('Parse error:', aiContent);
+      await supabaseAdmin.from('debug_logs').insert({
+        function_name: 'whatsapp-ai-analyze',
+        message: 'Parse Error',
+        data: { conversation_id, content: aiContent }
+      });
       throw new Error('Failed to parse AI response');
     }
+
+    await supabaseAdmin.from('debug_logs').insert({
+      function_name: 'whatsapp-ai-analyze',
+      message: 'AI Parsed Successfully',
+      data: { conversation_id, lead_status: aiResponse.lead_status, suggestionsCount: aiResponse.suggestions?.length }
+    });
 
     // Validar
     const validStatuses: LeadStatus[] = ['novo', 'frio', 'morno', 'quente', 'convertido', 'perdido'];
@@ -614,10 +625,22 @@ Analise a conversa, extraia dados e gere respostas.`;
     const isLocalDisabled = conversation.ai_autonomous_mode === false;
     const isGlobalEnabled = aiConfig?.auto_reply_enabled === true;
 
+    await supabaseAdmin.from('debug_logs').insert({
+      function_name: 'whatsapp-ai-analyze',
+      message: 'Auto-Reply Check',
+      data: { conversation_id, isLocalEnabled, isLocalDisabled, isGlobalEnabled }
+    });
+
     if (isLocalEnabled || (!isLocalDisabled && isGlobalEnabled)) {
       let bestSuggestion = suggestionsToInsert[0];
       const CONFIDENCE_THRESHOLD = 0.85;
       let shouldSend = true;
+
+      await supabaseAdmin.from('debug_logs').insert({
+        function_name: 'whatsapp-ai-analyze',
+        message: 'Entering Auto-Reply Block',
+        data: { conversation_id, bestSuggestionContent: bestSuggestion?.content, confidence: bestSuggestion?.confidence }
+      });
 
       // ==========================================
       // AUTONOMOUS SCHEDULING & REPLY
@@ -755,7 +778,13 @@ Analise a conversa, extraia dados e gere respostas.`;
 
       if (shouldSend && bestSuggestion && bestSuggestion.confidence >= CONFIDENCE_THRESHOLD) {
         try {
-          const { data: newMessage } = await supabaseAdmin
+          await supabaseAdmin.from('debug_logs').insert({
+            function_name: 'whatsapp-ai-analyze',
+            message: 'Attempting Insert whatsapp_messages',
+            data: { conversation_id, content: bestSuggestion.content }
+          });
+
+          const { data: newMessage, error: insertError } = await supabaseAdmin
             .from('whatsapp_messages')
             .insert({
               user_id: conversation.user_id,
@@ -766,13 +795,28 @@ Analise a conversa, extraia dados e gere respostas.`;
               message_type: 'text',
               status: 'pending',
               sent_at: new Date().toISOString(),
-              reply_to_wa_id: messages[0]?.message_id || null, // Adiciona contexto de resposta
+              reply_to_message_id: messages[0]?.message_id || null, // Adiciona contexto de resposta
               metadata: { auto_reply: true, confidence: bestSuggestion.confidence, ai_generated: true }
             })
             .select('id')
             .single();
 
+          if (insertError) {
+            await supabaseAdmin.from('debug_logs').insert({
+              function_name: 'whatsapp-ai-analyze',
+              message: 'whatsapp_messages Insert Error',
+              data: { conversation_id, error: insertError }
+            });
+            throw insertError;
+          }
+
           if (newMessage) {
+            await supabaseAdmin.from('debug_logs').insert({
+              function_name: 'whatsapp-ai-analyze',
+              message: 'whatsapp_messages Insert Success',
+              data: { conversation_id, message_id: newMessage.id }
+            });
+
             let waConfig;
 
             // 1. Tentar buscar config do próprio usuário (dono da conversa)
@@ -867,8 +911,13 @@ Analise a conversa, extraia dados e gere respostas.`;
               }
             }
           }
-        } catch (e) {
+        } catch (e: any) {
           console.error('[AutoReply] Error:', e);
+          await supabaseAdmin.from('debug_logs').insert({
+            function_name: 'whatsapp-ai-analyze',
+            message: 'AutoReply Send Error',
+            data: { conversation_id, error: e.message }
+          });
         }
       }
     }
