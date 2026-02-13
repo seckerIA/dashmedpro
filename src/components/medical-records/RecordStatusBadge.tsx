@@ -9,6 +9,8 @@ const MEDICAL_RECORD_STATUS_LABELS: Record<MedicalRecordStatus, string> = {
   draft: 'Rascunho',
   completed: 'Completo',
   signed: 'Assinado',
+  reviewed: 'Revisado',
+  archived: 'Arquivado',
 };
 
 interface RecordStatusBadgeProps {

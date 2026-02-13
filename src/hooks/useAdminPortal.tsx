@@ -61,8 +61,8 @@ export function useAdminPortal() {
                 // but for the owner/super-admin, this usually includes their own orgs.
                 // Note: The 'admin-portal' function is needed to see ALL orgs if RLS is strict.
 
-                const { data: dbData, error: dbError } = await supabase
-                    .from('organizations')
+                const { data: dbData, error: dbError } = await (supabase
+                    .from('organizations' as any) as any)
                     .select('*')
                     .order('created_at', { ascending: false });
 
@@ -79,7 +79,7 @@ export function useAdminPortal() {
                 console.log('🏢 [AdminPortal] Fallback DB OK. Orgs encontradas:', dbData?.length);
                 // If DB fetch worked, use that data
                 // Need to map to match the interface if necessary (it matches here)
-                setOrganizations(dbData as Organization[] || []);
+                setOrganizations(dbData as unknown as Organization[] || []);
                 return;
             }
 

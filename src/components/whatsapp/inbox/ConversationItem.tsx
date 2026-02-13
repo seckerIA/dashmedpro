@@ -86,7 +86,7 @@ export function ConversationItem({
       {/* Avatar */}
       <div className="relative flex-shrink-0">
         <Avatar className="h-12 w-12">
-          <AvatarImage src={contact_profile_picture || contact?.avatar_url || undefined} />
+          <AvatarImage src={contact_profile_picture || (contact as any)?.avatar_url || undefined} />
           <AvatarFallback className="bg-green-500/10 text-green-600">
             {initials}
           </AvatarFallback>

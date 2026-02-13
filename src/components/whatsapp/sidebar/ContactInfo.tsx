@@ -230,26 +230,26 @@ export function ContactInfo({
             </div>
 
             {/* Convênio */}
-            {contact.health_insurance_type && (
+            {(contact as any).health_insurance_type && (
               <InfoRow
                 icon={<CreditCard className="h-4 w-4" />}
                 label="Convênio"
                 value={
-                  contact.health_insurance_type === 'particular'
+                  (contact as any).health_insurance_type === 'particular'
                     ? 'Particular'
-                    : contact.health_insurance_type === 'convenio'
+                    : (contact as any).health_insurance_type === 'convenio'
                       ? 'Convênio'
-                      : contact.health_insurance_type
+                      : (contact as any).health_insurance_type
                 }
               />
             )}
 
             {/* Data de nascimento */}
-            {contact.birth_date && (
+            {(contact as any).birth_date && (
               <InfoRow
                 icon={<Calendar className="h-4 w-4" />}
                 label="Nascimento"
-                value={new Date(contact.birth_date).toLocaleDateString('pt-BR')}
+                value={new Date((contact as any).birth_date).toLocaleDateString('pt-BR')}
               />
             )}
           </div>

@@ -38,12 +38,12 @@ const AccountTab = ({ profile, user }: AccountTabProps) => {
       }
 
       const [contactsRes, dealsRes] = await Promise.all([
-        supabase
-          .from('crm_contacts')
+        (supabase
+          .from('crm_contacts') as any)
           .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id),
-        supabase
-          .from('crm_deals')
+        (supabase
+          .from('crm_deals') as any)
           .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id),
       ]);

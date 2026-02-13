@@ -106,7 +106,7 @@ export function useBottleneckMetrics() {
             userIds
           )
             .gte("start_time", currentMonthStart.toISOString())
-            .lte("start_time", currentMonthEnd.toISOString()) as any,
+            .lte("start_time", currentMonthEnd.toISOString()),
           30000,
           signal
         ),
@@ -119,12 +119,11 @@ export function useBottleneckMetrics() {
             userIds
           )
             .gte("start_time", prevMonthStart.toISOString())
-            .lte("start_time", prevMonthEnd.toISOString()) as any,
+            .lte("start_time", prevMonthEnd.toISOString()),
           30000,
           signal
         ),
         // Current month leads
-        // Note: last_contact_at does NOT exist in commercial_leads table, only in crm_contacts
         supabaseQueryWithTimeout(
           applyUserFilter(
             supabase
@@ -132,7 +131,7 @@ export function useBottleneckMetrics() {
               .select("id, status, created_at"),
             userIds
           )
-            .gte("created_at", currentMonthStart.toISOString()) as any,
+            .gte("created_at", currentMonthStart.toISOString()),
           30000,
           signal
         ),
@@ -145,19 +144,19 @@ export function useBottleneckMetrics() {
             userIds
           )
             .gte("created_at", prevMonthStart.toISOString())
-            .lte("created_at", prevMonthEnd.toISOString()) as any,
+            .lte("created_at", prevMonthEnd.toISOString()),
           30000,
           signal
         ),
         // Current deals
         supabaseQueryWithTimeout(
           applyUserFilter(
-            supabase
-              .from("crm_deals")
+            (supabase
+              .from("crm_deals") as any)
               .select("id, stage, value, created_at, closed_at, updated_at, is_defaulting, is_in_treatment"),
             userIds
           )
-            .gte("created_at", last30Days.toISOString()) as any,
+            .gte("created_at", last30Days.toISOString()),
           30000,
           signal
         ),
@@ -170,31 +169,31 @@ export function useBottleneckMetrics() {
             userIds
           )
             .gte("created_at", subDays(now, 60).toISOString())
-            .lt("created_at", last30Days.toISOString()) as any,
+            .lt("created_at", last30Days.toISOString()),
           30000,
           signal
         ),
         // WhatsApp conversations for response time
         supabaseQueryWithTimeout(
           applyUserFilter(
-            supabase
-              .from("whatsapp_conversations")
+            (supabase
+              .from("whatsapp_conversations" as any) as any)
               .select("id, last_message_at, status, created_at"),
             userIds
           )
-            .gte("created_at", last7Days.toISOString()) as any,
+            .gte("created_at", last7Days.toISOString()),
           30000,
           signal
         ),
-        // Call sessions - Wrap in extra try/catch inside implementation if needed, but allSettled handles rejection
+        // Call sessions
         supabaseQueryWithTimeout(
           applyUserFilter(
-            supabase
-              .from("voip_call_sessions" as any)
+            (supabase
+              .from("voip_call_sessions" as any) as any)
               .select("id, status, duration_seconds, direction, initiated_at"),
             userIds
           )
-            .gte("initiated_at", last7Days.toISOString()) as any,
+            .gte("initiated_at", last7Days.toISOString()),
           30000,
           signal
         ),

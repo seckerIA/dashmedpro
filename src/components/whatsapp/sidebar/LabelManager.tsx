@@ -33,7 +33,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useWhatsAppLabels, useConversationLabels } from '@/hooks/useWhatsAppLabels';
-import type { WhatsAppConversationLabel } from '@/types/whatsapp';
+// WhatsAppConversationLabel is not exported from types, define inline
+interface WhatsAppConversationLabel {
+  id: string;
+  name: string;
+  color: string;
+}
 
 // Cores pré-definidas para labels
 const LABEL_COLORS = [
@@ -194,7 +199,7 @@ export function LabelManager({ conversationId }: LabelManagerProps) {
                           'w-6 h-6 rounded-full flex items-center justify-center',
                           newLabelColor === color && 'ring-2 ring-offset-2 ring-offset-background'
                         )}
-                        style={{ backgroundColor: color, ringColor: color }}
+                        style={{ backgroundColor: color, outlineColor: color }}
                         onClick={() => setNewLabelColor(color)}
                       >
                         {newLabelColor === color && (

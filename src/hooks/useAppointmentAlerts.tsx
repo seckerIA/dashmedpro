@@ -120,8 +120,8 @@ export function useAppointmentAlerts() {
       const dayEnd = endOfDay(today).toISOString();
 
       // Build query for appointments
-      let query = supabase
-        .from('medical_appointments')
+      let query = (supabase
+        .from('medical_appointments') as any)
         .select(`
           id,
           title,
@@ -133,7 +133,6 @@ export function useAppointmentAlerts() {
           notes,
           contact_id,
           user_id,
-          doctor_id,
           contact:crm_contacts!medical_appointments_contact_id_fkey(
             id,
             full_name,
@@ -148,10 +147,8 @@ export function useAppointmentAlerts() {
 
       // Filter by user_id or doctor_id
       if (isSecretaria && doctorIds && doctorIds.length > 0) {
-        // Secretary sees their linked doctors' appointments
         query = query.or(`user_id.in.(${doctorIds.join(',')}),doctor_id.in.(${doctorIds.join(',')})`);
       } else {
-        // Regular user sees their own appointments
         query = query.or(`user_id.eq.${user.id},doctor_id.eq.${user.id}`);
       }
 
@@ -162,7 +159,7 @@ export function useAppointmentAlerts() {
         return [];
       }
 
-      return (data || []) as MedicalAppointmentWithRelations[];
+      return (data || []) as unknown as MedicalAppointmentWithRelations[];
     },
     enabled: shouldMonitorAlerts && !!user?.id,
     staleTime: 30 * 1000, // 30 seconds
