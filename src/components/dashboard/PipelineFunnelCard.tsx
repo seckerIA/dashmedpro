@@ -17,7 +17,7 @@ interface PipelineFunnelCardProps {
 // Mapear stages para cores do design system
 const stageConfig: Record<string, { variant: CardVariant; label: string; gradient: string }> = {
   lead_novo: {
-    variant: 'purple',
+    variant: 'cyan',
     label: 'Lead Novo',
     gradient: 'from-purple-500/10 to-purple-600/5'
   },
@@ -37,7 +37,7 @@ const stageConfig: Record<string, { variant: CardVariant; label: string; gradien
     gradient: 'from-green-500/10 to-green-600/5'
   },
   fechado_perdido: {
-    variant: 'purple',
+    variant: 'red',
     label: 'Cliente Perdido',
     gradient: 'from-gray-500/10 to-gray-600/5'
   }

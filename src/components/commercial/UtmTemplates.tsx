@@ -108,7 +108,7 @@ export function UtmTemplates() {
         await createTemplate.mutateAsync({
           user_id: user.id,
           ...data,
-        });
+        } as any);
         toast({
           title: 'Template criado',
           description: 'O template foi criado com sucesso.',

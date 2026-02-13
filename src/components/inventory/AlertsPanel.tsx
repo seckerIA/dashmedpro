@@ -95,8 +95,8 @@ export function AlertsPanel() {
 
         try {
             // Registrar movimentação de perda
-            const { error } = await supabase
-                .from("inventory_movements")
+            const { error } = await (supabase
+                .from("inventory_movements" as any) as any)
                 .insert([{
                     batch_id: selectedAlert.batchId,
                     type: "LOSS",

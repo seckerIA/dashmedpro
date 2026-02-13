@@ -164,8 +164,8 @@ export function AppointmentForm({
   useEffect(() => {
     if (appointment?.id && open) {
       const fetchUsage = async () => {
-        const { data, error } = await supabase
-          .from('appointment_stock_usage')
+        const { data, error } = await (supabase
+          .from('appointment_stock_usage' as any) as any)
           .select(`
             inventory_item_id, 
             quantity, 
@@ -316,7 +316,7 @@ export function AppointmentForm({
       // Save stock usage if any (only for procedures)
       if (result && stockUsage.length > 0 && data.appointment_type === 'procedure') {
         // Delete existing (simple strategy to handle updates)
-        await supabase.from('appointment_stock_usage').delete().eq('appointment_id', result.id);
+        await (supabase.from('appointment_stock_usage' as any) as any).delete().eq('appointment_id', result.id);
 
         const usageToInsert = stockUsage.map(item => ({
           appointment_id: result.id,
@@ -326,7 +326,7 @@ export function AppointmentForm({
         }));
 
         if (usageToInsert.length > 0) {
-          const { error: usageError } = await supabase.from('appointment_stock_usage').insert(usageToInsert);
+          const { error: usageError } = await (supabase.from('appointment_stock_usage' as any) as any).insert(usageToInsert);
           if (usageError) console.error('Error saving stock usage:', usageError);
         }
       }
@@ -489,7 +489,7 @@ export function AppointmentForm({
       }
 
       // Extrair procedure_id de custom_fields
-      let customFields: any = selectedContact.custom_fields;
+      let customFields: any = (selectedContact as any).custom_fields;
 
       // Se custom_fields for uma string, tentar fazer parse
       if (typeof customFields === 'string') {
@@ -526,7 +526,7 @@ export function AppointmentForm({
               const updatedCustomFields = { ...customFields, procedure_id: procedureId };
               await supabase
                 .from('crm_contacts')
-                .update({ custom_fields: updatedCustomFields })
+                .update({ custom_fields: updatedCustomFields } as any)
                 .eq('id', selectedContactId);
             } else {
               return;
@@ -551,7 +551,7 @@ export function AppointmentForm({
         const currentEstimatedValue = watch('estimated_value');
 
         // Preencher valor estimado se estiver vazio
-        if (!currentEstimatedValue || currentEstimatedValue === '') {
+        if (!currentEstimatedValue || currentEstimatedValue === '' as any) {
           const formattedPrice = formatCurrency(serviceValue);
           setEstimatedValueDisplay(formattedPrice);
           setValue('estimated_value', formattedPrice as any);

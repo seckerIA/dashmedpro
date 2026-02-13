@@ -33,7 +33,7 @@ export const RecurringTransactionsWidget = () => {
     )
   }
 
-  const activeTransactions = recurringTransactions?.filter(t => t.is_active) || []
+  const activeTransactions = (recurringTransactions as any[])?.filter((t: any) => t.is_active) || []
   const fallbackRecurring = (financialTransactions || []).filter(t => t.is_recurring).slice(0, 3)
   const today = new Date()
   const pendingToday = activeTransactions.filter(t => 

@@ -123,7 +123,7 @@ export function PatientQuickView({ open, onOpenChange, patientId, patientName }:
                                                         <div className="grid grid-cols-4 gap-3">
                                                             <div className="bg-muted/50 p-3 rounded-lg border border-border/50 text-center">
                                                                 <span className="text-xs text-muted-foreground block">PA</span>
-                                                                <span className="font-semibold text-foreground">{vitalSigns.blood_pressure || '-'}</span>
+                                                                <span className="font-semibold text-foreground">{vitalSigns.bp_systolic && vitalSigns.bp_diastolic ? `${vitalSigns.bp_systolic}/${vitalSigns.bp_diastolic}` : '-'}</span>
                                                             </div>
                                                             <div className="bg-muted/50 p-3 rounded-lg border border-border/50 text-center">
                                                                 <span className="text-xs text-muted-foreground block">FC</span>

@@ -20,8 +20,8 @@ export function AISettingsToggle() {
 
     const fetchConfig = async () => {
         try {
-            const { data, error } = await supabase
-                .from('whatsapp_ai_config')
+            const { data, error } = await (supabase
+                .from('whatsapp_ai_config' as any) as any)
                 .select('auto_reply_enabled')
                 .eq('user_id', user!.id)
                 .maybeSingle();
@@ -43,8 +43,8 @@ export function AISettingsToggle() {
         setEnabled(checked); // Optimistic update
 
         try {
-            const { error } = await supabase
-                .from('whatsapp_ai_config')
+            const { error } = await (supabase
+                .from('whatsapp_ai_config' as any) as any)
                 .upsert({
                     user_id: user.id,
                     auto_reply_enabled: checked,

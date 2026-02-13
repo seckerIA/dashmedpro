@@ -53,7 +53,7 @@ export function AnimatedWrapper({
     <motion.div
       initial={animation.initial}
       animate={animation.animate}
-      transition={{ ...animation.transition, delay }}
+      transition={{ ...animation.transition, delay } as any}
       className={className}
     >
       {children}

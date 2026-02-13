@@ -1,9 +1,15 @@
 import { Badge } from '@/components/ui/badge';
 import {
-  MedicalRecordStatus,
-  MEDICAL_RECORD_STATUS_LABELS,
+  MEDICAL_RECORD_TYPE_LABELS,
 } from '@/types/medicalRecords';
 import { FileText, CheckCircle, Eye, Archive } from 'lucide-react';
+
+type MedicalRecordStatus = 'draft' | 'completed' | 'signed' | 'reviewed' | 'archived';
+const MEDICAL_RECORD_STATUS_LABELS: Record<MedicalRecordStatus, string> = {
+  draft: 'Rascunho',
+  completed: 'Completo',
+  signed: 'Assinado',
+};
 
 interface RecordStatusBadgeProps {
   status: MedicalRecordStatus;

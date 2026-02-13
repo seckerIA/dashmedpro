@@ -30,8 +30,8 @@ export function LivePerformanceCard() {
     finishReport();
   };
 
-  const dailyCallsGoal = todayMetrics?.goal_calls ?? 0;
-  const dailyContactsGoal = todayMetrics?.goal_contacts ?? 0;
+  const dailyCallsGoal = (todayMetrics as any)?.goal_calls ?? 0;
+  const dailyContactsGoal = (todayMetrics as any)?.goal_contacts ?? 0;
   const totalCalls = todayStats?.total ?? 0;
   const totalContacts = todayStats?.contatosDecisores ?? 0;
   const conversionRate = totalCalls > 0 ? (totalContacts / totalCalls) * 100 : 0;
@@ -89,7 +89,7 @@ export function LivePerformanceCard() {
                 <Card
                   className={cn(
                     "relative w-full overflow-hidden border-primary/50 bg-gradient-to-br from-primary/20 via-primary/10 to-primary/20 p-8 shadow-2xl backdrop-blur-xl",
-                    todayMetrics?.is_paused && "border-yellow-500/50"
+                    todayMetrics && (todayMetrics as any)?.is_paused && "border-yellow-500/50"
                   )}
                 >
                   {/* Botão de Fechar */}
@@ -107,7 +107,7 @@ export function LivePerformanceCard() {
                   <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-primary/20 via-primary/40 to-primary/20 opacity-50 blur-xl" />
 
                   {/* Indicador de Pausa */}
-                  {todayMetrics?.is_paused && (
+                  {(todayMetrics as any)?.is_paused && (
                     <div className="absolute top-0 left-0 right-0 bg-yellow-500/20 border-b-2 border-yellow-500 p-2 text-center">
                       <p className="text-sm font-semibold text-yellow-700 flex items-center justify-center gap-2">
                         <Pause className="h-4 w-4" />
@@ -116,7 +116,7 @@ export function LivePerformanceCard() {
                     </div>
                   )}
 
-                  <div className={cn("relative z-10 space-y-6", todayMetrics?.is_paused && "mt-8")}>
+                  <div className={cn("relative z-10 space-y-6", (todayMetrics as any)?.is_paused && "mt-8")}>
                     {/* Header */}
                     <div className="flex items-center justify-between">
                 <div>
@@ -317,7 +317,7 @@ export function LivePerformanceCard() {
         <DailyReportSummaryModal 
           open={isSummaryModalOpen}
           onOpenChange={setIsSummaryModalOpen}
-          report={todayMetrics}
+          report={todayMetrics as any}
         />
       )}
     </>

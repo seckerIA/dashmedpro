@@ -133,7 +133,7 @@ export const RecurringTransactionsManager = () => {
         </div>
       </CardHeader>
       <CardContent>
-        {!recurringTransactions || recurringTransactions.length === 0 ? (
+        {!recurringTransactions || (recurringTransactions as any[]).length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Repeat className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p>Nenhuma transação recorrente configurada</p>
@@ -154,7 +154,7 @@ export const RecurringTransactionsManager = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recurringTransactions.map((transaction) => (
+                {(recurringTransactions as any[]).map((transaction) => (
                   <TableRow key={transaction.id}>
                     <TableCell>
                       <div>

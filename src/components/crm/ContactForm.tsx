@@ -127,11 +127,11 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
       full_name: contact?.full_name || initialData?.full_name || "",
       email: contact?.email || initialData?.email || "",
       phone: formatPhone(contact?.phone || initialData?.phone || ""),
-      origin: (contact?.custom_fields as any)?.origin || "other",
+      origin: ((contact as any)?.custom_fields as any)?.origin || "other",
       company: contact?.company || "",
       position: contact?.position || "",
-      notes: initialData?.notes || (contact?.custom_fields as any)?.notes || "",
-      service: contact?.service || (contact?.custom_fields as any)?.procedure_id || "none",
+      notes: initialData?.notes || ((contact as any)?.custom_fields as any)?.notes || "",
+      service: contact?.service || ((contact as any)?.custom_fields as any)?.procedure_id || "none",
       service_value: (contact?.service_value?.toString() || "") as any,
       tags: contact?.tags || [],
       create_deal: !contact ? true : !!initialStage, // Sempre true para novos contatos
@@ -293,12 +293,12 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
       console.log('🔍 ContactForm - Preparando custom_fields:', {
         contactData_service: contactData.service,
         contactData_service_type: typeof contactData.service,
-        contact_custom_fields: contact?.custom_fields,
-        contact_custom_fields_type: typeof contact?.custom_fields,
+        contact_custom_fields: (contact as any)?.custom_fields,
+        contact_custom_fields_type: typeof (contact as any)?.custom_fields,
       });
 
       // Inicializar customFields a partir do contato existente ou objeto vazio
-      const existingCustomFields = contact?.custom_fields as any;
+      const existingCustomFields = (contact as any)?.custom_fields as any;
       const customFields: any = existingCustomFields && typeof existingCustomFields === 'object'
         ? { ...existingCustomFields }
         : {};
@@ -455,7 +455,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
 
               const leadData: any = {
                 user_id: leadOwnerId,
-                organization_id: profile?.organization_id || newContact.organization_id,
+                organization_id: (profile as any)?.organization_id || (newContact as any).organization_id,
                 name: newContact.full_name,
                 email: newContact.email || null,
                 phone: newContact.phone || null,
@@ -532,7 +532,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
 
               const leadData: any = {
                 user_id: leadOwnerId,
-                organization_id: profile?.organization_id || newContact.organization_id,
+                organization_id: (profile as any)?.organization_id || (newContact as any).organization_id,
                 name: newContact.full_name,
                 email: newContact.email || null,
                 phone: newContact.phone || null,

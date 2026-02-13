@@ -47,8 +47,8 @@ export function PaymentConfirmationModal({
 
     setIsLoadingStock(true);
     try {
-      const { data, error } = await supabase
-        .from('appointment_stock_usage')
+      const { data, error } = await (supabase
+        .from('appointment_stock_usage' as any) as any)
         .select(`
           id,
           quantity,

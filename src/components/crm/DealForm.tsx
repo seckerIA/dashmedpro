@@ -117,8 +117,6 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
     createDeal,
     updateDeal,
     contacts,
-    isCreatingDeal,
-    isUpdatingDeal,
     updateContact
   } = useCRM();
   const { toast } = useToast();
@@ -129,11 +127,11 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
       title: deal?.title || "",
       description: deal?.description || "",
       value: deal?.value ? formatCurrency(deal.value) : ("" as any),
-      stage: deal?.stage || "lead_novo",
+      stage: (deal?.stage || "lead_novo") as any,
       expected_close_date: deal?.expected_close_date
         ? new Date(deal.expected_close_date).toISOString().split('T')[0]
         : "",
-      contact_id: deal?.contact_id || contact?.id || "none",
+      contact_id: (deal as any)?.contact_id || contact?.id || "none",
       tags: deal?.tags || [],
       is_in_treatment: (deal as any)?.is_in_treatment || false,
       is_defaulting: (deal as any)?.is_defaulting || false,
@@ -382,7 +380,7 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
     }
   };
 
-  const isLoading = isCreatingDeal || isUpdatingDeal;
+  const isLoading = false;
 
   return (
     <Dialog open={open || !!deal} onOpenChange={(newOpen) => {

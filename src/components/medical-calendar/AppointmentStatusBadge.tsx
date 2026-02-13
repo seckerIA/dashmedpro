@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/tooltip';
 
 // Status descriptions for tooltips
-const APPOINTMENT_STATUS_DESCRIPTIONS: Record<AppointmentStatus, string> = {
+const APPOINTMENT_STATUS_DESCRIPTIONS: Record<string, string> = {
   agendado: 'Consulta agendada, aguardando confirmação do paciente',
   confirmado: 'Paciente confirmou presença na consulta',
   em_atendimento: 'Consulta em andamento',
