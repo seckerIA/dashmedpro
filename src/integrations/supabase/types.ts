@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_settings: {
+        Row: {
+          key: string
+          updated_at: string | null
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string | null
+          updated_by?: string | null
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
       BDR_PROSPECÇÃO: {
         Row: {
           agendado: boolean | null
@@ -565,11 +586,14 @@ export type Database = {
           assigned_to: string | null
           closed_at: string | null
           created_at: string | null
+          crm: string | null
           description: string | null
           expected_close_date: string | null
           id: string
           lead_id: string | null
           lost_reason: string | null
+          monthly_revenue: string | null
+          objective: string | null
           preferred_contact_time: string | null
           priority: string | null
           source: string | null
@@ -584,11 +608,14 @@ export type Database = {
           assigned_to?: string | null
           closed_at?: string | null
           created_at?: string | null
+          crm?: string | null
           description?: string | null
           expected_close_date?: string | null
           id?: string
           lead_id?: string | null
           lost_reason?: string | null
+          monthly_revenue?: string | null
+          objective?: string | null
           preferred_contact_time?: string | null
           priority?: string | null
           source?: string | null
@@ -603,11 +630,14 @@ export type Database = {
           assigned_to?: string | null
           closed_at?: string | null
           created_at?: string | null
+          crm?: string | null
           description?: string | null
           expected_close_date?: string | null
           id?: string
           lead_id?: string | null
           lost_reason?: string | null
+          monthly_revenue?: string | null
+          objective?: string | null
           preferred_contact_time?: string | null
           priority?: string | null
           source?: string | null
@@ -791,30 +821,75 @@ export type Database = {
       }
       dashboard_leads: {
         Row: {
+          acquisition_channel: string | null
+          ad_name: string | null
+          adset_name: string | null
+          contact_time: string | null
           created_at: string | null
+          crm: string | null
+          current_revenue: string | null
+          current_situation: string | null
           email: string | null
+          external_id: string | null
+          form_name: string | null
+          has_secretary: string | null
           ia_id: string | null
           id: string
+          mentor_disposition: string | null
           name: string
+          phone: string | null
+          source: string | null
+          specialty: string | null
           status: string
+          target_revenue: string | null
           updated_at: string | null
         }
         Insert: {
+          acquisition_channel?: string | null
+          ad_name?: string | null
+          adset_name?: string | null
+          contact_time?: string | null
           created_at?: string | null
+          crm?: string | null
+          current_revenue?: string | null
+          current_situation?: string | null
           email?: string | null
+          external_id?: string | null
+          form_name?: string | null
+          has_secretary?: string | null
           ia_id?: string | null
           id?: string
+          mentor_disposition?: string | null
           name: string
+          phone?: string | null
+          source?: string | null
+          specialty?: string | null
           status?: string
+          target_revenue?: string | null
           updated_at?: string | null
         }
         Update: {
+          acquisition_channel?: string | null
+          ad_name?: string | null
+          adset_name?: string | null
+          contact_time?: string | null
           created_at?: string | null
+          crm?: string | null
+          current_revenue?: string | null
+          current_situation?: string | null
           email?: string | null
+          external_id?: string | null
+          form_name?: string | null
+          has_secretary?: string | null
           ia_id?: string | null
           id?: string
+          mentor_disposition?: string | null
           name?: string
+          phone?: string | null
+          source?: string | null
+          specialty?: string | null
           status?: string
+          target_revenue?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -960,6 +1035,66 @@ export type Database = {
           monthly_revenue?: number | null
           updated_at?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      facebook_leads: {
+        Row: {
+          ad_name: string | null
+          adset_name: string | null
+          canal_aquisicao: string | null
+          created_at: string | null
+          crm: string | null
+          disposicao_mentoria: string | null
+          email: string | null
+          especializacao: string | null
+          faturamento: string | null
+          faturamento_desejado: string | null
+          form_name: string | null
+          horario_contato: string | null
+          id: string
+          lead_name: string
+          phone: string | null
+          secretaria: string | null
+          situacao_atual: string | null
+        }
+        Insert: {
+          ad_name?: string | null
+          adset_name?: string | null
+          canal_aquisicao?: string | null
+          created_at?: string | null
+          crm?: string | null
+          disposicao_mentoria?: string | null
+          email?: string | null
+          especializacao?: string | null
+          faturamento?: string | null
+          faturamento_desejado?: string | null
+          form_name?: string | null
+          horario_contato?: string | null
+          id: string
+          lead_name: string
+          phone?: string | null
+          secretaria?: string | null
+          situacao_atual?: string | null
+        }
+        Update: {
+          ad_name?: string | null
+          adset_name?: string | null
+          canal_aquisicao?: string | null
+          created_at?: string | null
+          crm?: string | null
+          disposicao_mentoria?: string | null
+          email?: string | null
+          especializacao?: string | null
+          faturamento?: string | null
+          faturamento_desejado?: string | null
+          form_name?: string | null
+          horario_contato?: string | null
+          id?: string
+          lead_name?: string
+          phone?: string | null
+          secretaria?: string | null
+          situacao_atual?: string | null
         }
         Relationships: []
       }
