@@ -91,11 +91,11 @@ const fetchEnhancedMetrics = async (
   let pendingFollowUps = 0;
   try {
     // RLS handles organization filtering
-    const followUpsQuery = supabase
-      .from('crm_activities')
+    const followUpsQuery = (supabase
+      .from('crm_activities' as any) as any)
       .select('id')
       .eq('completed', false)
-      .eq('activity_type' as any, 'call');
+      .eq('activity_type', 'call');
 
     const followUpsResult = await supabaseQueryWithTimeout(followUpsQuery as any, 30000, signal);
     pendingFollowUps = ((followUpsResult.data || []) as any[]).length;

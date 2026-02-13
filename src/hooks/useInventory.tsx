@@ -6,19 +6,18 @@ import { useToast } from "./use-toast";
 import { InventoryItem, InventoryItemInsert, InventoryItemUpdate, InventoryBatch, InventoryBatchInsert, InventoryMovement } from "@/types/inventory";
 import { supabaseQueryWithTimeout } from "@/utils/supabaseQuery";
 
+const fromTable = (table: string) => (supabase.from(table as any) as any);
+
 export const useInventory = () => {
     const { user } = useAuth();
     const { profile } = useUserProfile();
     const { toast } = useToast();
     const queryClient = useQueryClient();
 
-    // Buscar Items (com batches, supplier e saldo total) - timeout: 20s
     const { data: items, isLoading } = useQuery({
         queryKey: ["inventory-items"],
         queryFn: async () => {
-            // Busca items com timeout de 20s
-            const itemsQuery = supabase
-                .from("inventory_items")
+            const itemsQuery = fromTable("inventory_items")
                 .select(`
                     *,
                     batches:inventory_batches(*),
@@ -26,12 +25,11 @@ export const useInventory = () => {
                 `)
                 .order("name");
 
-            const { data: itemsData, error: itemsError } = await supabaseQueryWithTimeout(itemsQuery as any, 20000);
+            const { data: itemsData, error: itemsError } = await supabaseQueryWithTimeout(itemsQuery, 20000);
 
             if (itemsError) throw itemsError;
 
-            // Calcular saldo total no frontend
-            const itemsWithTotal = itemsData.map((item: any) => ({
+            const itemsWithTotal = (itemsData as any[]).map((item: any) => ({
                 ...item,
                 total_quantity: item.batches?.reduce((acc: number, batch: any) => acc + (batch.quantity || 0), 0) || 0
             }));
@@ -41,18 +39,16 @@ export const useInventory = () => {
         enabled: !!user,
     });
 
-    // Criar Item
     const createItem = useMutation({
         mutationFn: async (newItem: InventoryItemInsert) => {
             if (!user?.id) throw new Error("Usuário não autenticado");
 
-            const { data, error } = await supabase
-                .from("inventory_items")
+            const { data, error } = await fromTable("inventory_items")
                 .insert([{ 
                     ...newItem, 
                     user_id: user.id,
-                    organization_id: profile?.organization_id
-                } as any])
+                    organization_id: (profile as any)?.organization_id
+                }])
                 .select()
                 .single();
             if (error) throw error;
@@ -67,12 +63,10 @@ export const useInventory = () => {
         }
     });
 
-    // Atualizar Item
     const updateItem = useMutation({
         mutationFn: async ({ id, updates }: { id: string, updates: InventoryItemUpdate }) => {
-            const { data, error } = await supabase
-                .from("inventory_items")
-                .update(updates as any)
+            const { data, error } = await fromTable("inventory_items")
+                .update(updates)
                 .eq("id", id)
                 .select()
                 .single();
@@ -85,33 +79,28 @@ export const useInventory = () => {
         }
     });
 
-    // Adicionar Lote (Entrada)
     const addBatch = useMutation({
         mutationFn: async (batch: InventoryBatchInsert) => {
-            // 1. Criar Lote
-            const { data: newBatch, error: batchError } = await supabase
-                .from("inventory_batches")
+            const { data: newBatch, error: batchError } = await fromTable("inventory_batches")
                 .insert([{
                     ...batch,
-                    organization_id: profile?.organization_id
-                } as any])
+                    organization_id: (profile as any)?.organization_id
+                }])
                 .select()
                 .single();
 
             if (batchError) throw batchError;
 
-            // 2. Registrar Movimento de Entrada (IN)
             if (newBatch) {
-                const { error: moveError } = await supabase
-                    .from("inventory_movements")
+                const { error: moveError } = await fromTable("inventory_movements")
                     .insert([{
-                        batch_id: newBatch.id,
+                        batch_id: (newBatch as any).id,
                         type: 'IN',
                         quantity: batch.quantity,
                         created_by: user?.id,
-                        organization_id: profile?.organization_id,
+                        organization_id: (profile as any)?.organization_id,
                         description: 'Entrada Inicial de Lote'
-                    } as any]);
+                    }]);
 
                 if (moveError) console.error("Erro ao criar movimento inicial", moveError);
             }
@@ -127,46 +116,37 @@ export const useInventory = () => {
         }
     });
 
-    // Ajuste/Movimentação Manual
     const registerMovement = useMutation({
         mutationFn: async ({ batchId, type, quantity, description }: { batchId: string, type: 'IN' | 'OUT' | 'ADJUST' | 'LOSS', quantity: number, description?: string }) => {
-            // O trigger no banco vai atualizar o saldo do batch automaticamente
-            const { error } = await supabase
-                .from("inventory_movements")
+            const { error } = await fromTable("inventory_movements")
                 .insert([{
                     batch_id: batchId,
                     type,
                     quantity,
                     created_by: user?.id,
-                    organization_id: profile?.organization_id,
+                    organization_id: (profile as any)?.organization_id,
                     description
-                } as any]);
+                }]);
 
             if (error) throw error;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["inventory-items"] });
-            // toast({ title: "Movimentação registrada" });
         },
         onError: (error) => {
             toast({ title: "Erro na movimentação", description: error.message, variant: "destructive" });
         }
     });
 
-    // Excluir Item (com lotes e movimentações em cascata)
     const deleteItem = useMutation({
         mutationFn: async (id: string) => {
-            // 1. Buscar todos os lotes do item
-            const { data: batches } = await supabase
-                .from("inventory_batches")
+            const { data: batches } = await fromTable("inventory_batches")
                 .select("id")
                 .eq("item_id", id);
 
-            // 2. Deletar movimentações de todos os lotes
-            if (batches && batches.length > 0) {
-                const batchIds = batches.map(b => b.id);
-                const { error: movementsError } = await supabase
-                    .from("inventory_movements")
+            if (batches && (batches as any[]).length > 0) {
+                const batchIds = (batches as any[]).map((b: any) => b.id);
+                const { error: movementsError } = await fromTable("inventory_movements")
                     .delete()
                     .in("batch_id", batchIds);
 
@@ -174,9 +154,7 @@ export const useInventory = () => {
                     console.error("Erro ao deletar movimentações:", movementsError);
                 }
 
-                // 3. Deletar os lotes
-                const { error: batchesError } = await supabase
-                    .from("inventory_batches")
+                const { error: batchesError } = await fromTable("inventory_batches")
                     .delete()
                     .eq("item_id", id);
 
@@ -185,17 +163,14 @@ export const useInventory = () => {
                 }
             }
 
-            // 4. Deletar o item
-            const { data, error } = await supabase
-                .from("inventory_items")
+            const { data, error } = await fromTable("inventory_items")
                 .delete()
                 .eq("id", id)
                 .select();
 
             if (error) throw error;
 
-            // Se data está vazio, nada foi deletado (RLS bloqueou)
-            if (!data || data.length === 0) {
+            if (!data || (data as any[]).length === 0) {
                 throw new Error("Não foi possível excluir. Verifique se você tem permissão.");
             }
 

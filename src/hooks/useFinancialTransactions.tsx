@@ -26,8 +26,8 @@ export const useFinancialTransactions = (filters?: TransactionFilters) => {
       // Admin e Dono veem dados de TODOS os usuários
       const isAdminOrDono = profile?.role === 'admin' || profile?.role === 'dono';
 
-      let query = supabase
-        .from("financial_transactions")
+      let query = (supabase
+        .from("financial_transactions" as any) as any)
         .select(`
           *,
           account:financial_accounts(id, name, type, bank_name),
@@ -92,9 +92,9 @@ export const useFinancialTransactions = (filters?: TransactionFilters) => {
     retry: 2,
     retryDelay: 1000,
     refetchInterval: false,
-    select: (data) => {
+    select: (data: any) => {
       // Transformar os dados para o formato esperado
-      const transformedData = data?.map(transaction => ({
+      const transformedData = (data as any[])?.map((transaction: any) => ({
         ...transaction,
         account_name: transaction.account?.name,
         category_name: transaction.category?.name,
@@ -102,7 +102,7 @@ export const useFinancialTransactions = (filters?: TransactionFilters) => {
         contact_name: transaction.contact?.full_name,
       })) || [];
 
-      return transformedData as unknown as FinancialTransactionWithDetails[];
+      return transformedData as FinancialTransactionWithDetails[];
     }
   });
 
@@ -129,7 +129,7 @@ export const useFinancialTransactions = (filters?: TransactionFilters) => {
       .single();
 
     if (error) throw error;
-    return data as FinancialTransactionWithDetails;
+    return data as unknown as FinancialTransactionWithDetails;
   };
 
   // Criar transação

@@ -96,12 +96,13 @@ export function useBottleneckMetrics() {
       // Use allSettled to prevent one failure from crashing everything
       const userIds = targetUserIds.length > 0 ? targetUserIds : [user.id];
 
+      const fromTable = (table: string) => (supabase.from(table as any) as any);
+
       const results = await Promise.allSettled([
         // Current month appointments
         supabaseQueryWithTimeout(
           applyUserFilter(
-            supabase
-              .from("medical_appointments")
+            fromTable("medical_appointments")
               .select("id, status, start_time, created_at, contact_id"),
             userIds
           )
@@ -113,8 +114,7 @@ export function useBottleneckMetrics() {
         // Previous month appointments
         supabaseQueryWithTimeout(
           applyUserFilter(
-            supabase
-              .from("medical_appointments")
+            fromTable("medical_appointments")
               .select("id, status"),
             userIds
           )
@@ -126,8 +126,7 @@ export function useBottleneckMetrics() {
         // Current month leads
         supabaseQueryWithTimeout(
           applyUserFilter(
-            supabase
-              .from("commercial_leads")
+            fromTable("commercial_leads")
               .select("id, status, created_at"),
             userIds
           )
@@ -138,8 +137,7 @@ export function useBottleneckMetrics() {
         // Previous month leads
         supabaseQueryWithTimeout(
           applyUserFilter(
-            supabase
-              .from("commercial_leads")
+            fromTable("commercial_leads")
               .select("id, status"),
             userIds
           )
@@ -151,8 +149,7 @@ export function useBottleneckMetrics() {
         // Current deals
         supabaseQueryWithTimeout(
           applyUserFilter(
-            (supabase
-              .from("crm_deals") as any)
+            fromTable("crm_deals")
               .select("id, stage, value, created_at, closed_at, updated_at, is_defaulting, is_in_treatment"),
             userIds
           )
@@ -163,8 +160,7 @@ export function useBottleneckMetrics() {
         // Previous period deals
         supabaseQueryWithTimeout(
           applyUserFilter(
-            supabase
-              .from("crm_deals")
+            fromTable("crm_deals")
               .select("id, stage, created_at, closed_at"),
             userIds
           )

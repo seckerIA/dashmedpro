@@ -1,10 +1,11 @@
-
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { differenceInDays } from "date-fns";
 import { realtimeQueryOptions, createVisibilityAwareInterval } from "@/lib/queryUtils";
 import { supabaseQueryWithTimeout } from "@/utils/supabaseQuery";
+
+const fromTable = (table: string) => (supabase.from(table as any) as any);
 
 export type AlertType = "expired" | "critical" | "warning" | "low_stock";
 
@@ -19,7 +20,7 @@ export type InventoryAlertItem = {
     expirationDate: Date | null;
     daysUntilExpiry: number | null;
     message: string;
-    severity: number; // 0 = mais grave
+    severity: number;
 };
 
 export type AlertsSummary = {
@@ -37,27 +38,23 @@ export function useInventoryAlerts() {
     const alertsQuery = useQuery({
         queryKey: ["inventory-alerts", user?.id],
         queryFn: async (): Promise<AlertsSummary> => {
-            // Preparar queries
-            const batchesQuery = supabase
-                .from("inventory_batches")
+            const batchesQuery = fromTable("inventory_batches")
                 .select(`
                     id, batch_number, quantity, expiration_date, is_active,
                     inventory_items (id, name, category)
                 `)
                 .eq("is_active", true);
 
-            const itemsQuery = supabase
-                .from("inventory_items")
+            const itemsQuery = fromTable("inventory_items")
                 .select(`
                     id, name, min_stock,
                     inventory_batches (quantity, is_active)
                 `);
 
             try {
-                // Executar queries em paralelo com controle de concorrência e timeout de 20s
                 const [batchesResult, itemsResult] = await Promise.all([
-                    supabaseQueryWithTimeout(batchesQuery as any, 20000),
-                    supabaseQueryWithTimeout(itemsQuery as any, 20000)
+                    supabaseQueryWithTimeout(batchesQuery, 20000),
+                    supabaseQueryWithTimeout(itemsQuery, 20000)
                 ]);
 
                 if (batchesResult.error) throw batchesResult.error;
@@ -73,7 +70,6 @@ export function useInventoryAlerts() {
                 let warningCount = 0;
                 let lowStockCount = 0;
 
-                // 1. Processar alertas de validade
                 for (const batch of batches) {
                     if (!batch.expiration_date || batch.quantity <= 0) continue;
 
@@ -82,98 +78,40 @@ export function useInventoryAlerts() {
                     const itemInfo = batch.inventory_items || { id: "", name: "Desconhecido" };
 
                     if (daysUntil < 0) {
-                        // Vencido
                         expiredCount++;
-                        alerts.push({
-                            id: `batch-${batch.id}`,
-                            type: "expired",
-                            itemId: itemInfo.id,
-                            itemName: itemInfo.name,
-                            batchId: batch.id,
-                            batchNumber: batch.batch_number,
-                            quantity: batch.quantity,
-                            expirationDate: expDate,
-                            daysUntilExpiry: daysUntil,
-                            message: `Vencido há ${Math.abs(daysUntil)} dia${Math.abs(daysUntil) !== 1 ? 's' : ''}`,
-                            severity: 0,
-                        });
+                        alerts.push({ id: `batch-${batch.id}`, type: "expired", itemId: itemInfo.id, itemName: itemInfo.name, batchId: batch.id, batchNumber: batch.batch_number, quantity: batch.quantity, expirationDate: expDate, daysUntilExpiry: daysUntil, message: `Vencido há ${Math.abs(daysUntil)} dia${Math.abs(daysUntil) !== 1 ? 's' : ''}`, severity: 0 });
                     } else if (daysUntil <= 7) {
-                        // Crítico - vence em até 7 dias
                         criticalCount++;
-                        alerts.push({
-                            id: `batch-${batch.id}`,
-                            type: "critical",
-                            itemId: itemInfo.id,
-                            itemName: itemInfo.name,
-                            batchId: batch.id,
-                            batchNumber: batch.batch_number,
-                            quantity: batch.quantity,
-                            expirationDate: expDate,
-                            daysUntilExpiry: daysUntil,
-                            message: daysUntil === 0 ? "Vence hoje!" : `Vence em ${daysUntil} dia${daysUntil !== 1 ? 's' : ''}`,
-                            severity: 1,
-                        });
+                        alerts.push({ id: `batch-${batch.id}`, type: "critical", itemId: itemInfo.id, itemName: itemInfo.name, batchId: batch.id, batchNumber: batch.batch_number, quantity: batch.quantity, expirationDate: expDate, daysUntilExpiry: daysUntil, message: daysUntil === 0 ? "Vence hoje!" : `Vence em ${daysUntil} dia${daysUntil !== 1 ? 's' : ''}`, severity: 1 });
                     } else if (daysUntil <= 30) {
-                        // Atenção - vence em até 30 dias
                         warningCount++;
-                        alerts.push({
-                            id: `batch-${batch.id}`,
-                            type: "warning",
-                            itemId: itemInfo.id,
-                            itemName: itemInfo.name,
-                            batchId: batch.id,
-                            batchNumber: batch.batch_number,
-                            quantity: batch.quantity,
-                            expirationDate: expDate,
-                            daysUntilExpiry: daysUntil,
-                            message: `Vence em ${daysUntil} dias`,
-                            severity: 2,
-                        });
+                        alerts.push({ id: `batch-${batch.id}`, type: "warning", itemId: itemInfo.id, itemName: itemInfo.name, batchId: batch.id, batchNumber: batch.batch_number, quantity: batch.quantity, expirationDate: expDate, daysUntilExpiry: daysUntil, message: `Vence em ${daysUntil} dias`, severity: 2 });
                     }
                 }
 
-                // 2. Processar alertas de estoque baixo
                 for (const item of items) {
                     const activeBatches = (item.inventory_batches || []).filter((b: any) => b.is_active);
                     const totalQuantity = activeBatches.reduce((sum: number, b: any) => sum + (b.quantity || 0), 0);
 
                     if (totalQuantity <= item.min_stock) {
                         lowStockCount++;
-                        alerts.push({
-                            id: `item-${item.id}`,
-                            type: "low_stock",
-                            itemId: item.id,
-                            itemName: item.name,
-                            quantity: totalQuantity,
-                            expirationDate: null,
-                            daysUntilExpiry: null,
-                            message: `Estoque: ${totalQuantity}/${item.min_stock}`,
-                            severity: 3,
-                        });
+                        alerts.push({ id: `item-${item.id}`, type: "low_stock", itemId: item.id, itemName: item.name, quantity: totalQuantity, expirationDate: null, daysUntilExpiry: null, message: `Estoque: ${totalQuantity}/${item.min_stock}`, severity: 3 });
                     }
                 }
 
-                // Ordenar por severidade
                 alerts.sort((a, b) => a.severity - b.severity);
 
-                return {
-                    total: alerts.length,
-                    expired: expiredCount,
-                    critical: criticalCount,
-                    warning: warningCount,
-                    lowStock: lowStockCount,
-                    alerts,
-                };
+                return { total: alerts.length, expired: expiredCount, critical: criticalCount, warning: warningCount, lowStock: lowStockCount, alerts };
             } catch (error) {
                 console.error('❌ [Inventory] Fetch Error:', error);
                 throw error;
             }
         },
         enabled: !!user,
-        refetchInterval: createVisibilityAwareInterval(60000), // Atualizar a cada 1 minuto (quando tab visível)
-        placeholderData: keepPreviousData, // Manter dados anteriores durante refetch
-        ...realtimeQueryOptions, // Aplicar configurações otimizadas
-        retry: 2, // Tentar mais vezes em caso de falha inicial
+        refetchInterval: createVisibilityAwareInterval(60000),
+        placeholderData: keepPreviousData,
+        ...realtimeQueryOptions,
+        retry: 2,
     });
 
     return {
@@ -181,7 +119,6 @@ export function useInventoryAlerts() {
         alerts: alertsQuery.data?.alerts || [],
         isLoading: alertsQuery.isLoading,
         refetch: alertsQuery.refetch,
-        // Helpers
         hasAlerts: (alertsQuery.data?.total || 0) > 0,
         hasCritical: (alertsQuery.data?.expired || 0) + (alertsQuery.data?.critical || 0) > 0,
         criticalCount: (alertsQuery.data?.expired || 0) + (alertsQuery.data?.critical || 0),

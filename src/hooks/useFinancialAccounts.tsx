@@ -249,7 +249,7 @@ export const useFinancialAccounts = () => {
     type: account.type as any,
     bank_name: account.bank_name,
     balance: account.current_balance || 0,
-    color: account.color || '#3b82f6',
+    color: (account as any).color || '#3b82f6',
     owner_name: (account as any).profiles?.full_name || undefined,
   })) || [];
 

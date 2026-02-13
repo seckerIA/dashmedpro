@@ -10,7 +10,7 @@ import { CommercialLead, CommercialLeadInsert, CommercialLeadUpdate } from "@/ty
 
 export function useCommercialLeads(filters?: { status?: string; origin?: string }, viewAsUserIds?: string[]) {
   const { user } = useAuth();
-  const { isSecretaria, isAdmin, isLoading: isLoadingProfile } = useUserProfile();
+  const { isSecretaria, isAdmin, isLoading: isLoadingProfile, profile } = useUserProfile();
   const { doctorIds, isLoading: isLoadingDoctors } = useSecretaryDoctors();
   const { toast } = useToast();
   const queryClient = useQueryClient();

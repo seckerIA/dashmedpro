@@ -76,7 +76,7 @@ export function useCommercialSales(filters?: { status?: string; procedure_id?: s
       const { data, error } = await query;
 
       if (error) throw error;
-      return data as CommercialSale[];
+      return data as unknown as CommercialSale[];
     },
     // Para admin, aguardar carregar a lista de usuários
     enabled: !!user && (!isAdmin || allActiveUserIds.length > 0),

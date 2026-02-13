@@ -30,9 +30,9 @@ export function useDoctorSecretaries() {
         .eq('id', user.id)
         .maybeSingle();
 
-      const { data: profile } = await supabaseQueryWithTimeout(profileQuery as any, 15000, signal);
+      const { data: profile } = await supabaseQueryWithTimeout(profileQuery as any, 15000, signal) as { data: any };
 
-      const role = profile?.role;
+      const role = (profile as any)?.role;
       const isOwnerOrAdmin = role === 'dono' || role === 'admin';
 
       // 2. Se for Dono ou Admin, retorna TODAS as secretárias COM TIMEOUT
@@ -54,8 +54,8 @@ export function useDoctorSecretaries() {
       }
 
       // 3. Comportamento padrão (Médicos): Apenas vinculadas COM TIMEOUT
-      const linksQuery = supabase
-        .from('secretary_doctor_links')
+      const linksQuery = (supabase
+        .from('secretary_doctor_links' as any) as any)
         .select('secretary_id')
         .eq('doctor_id', user.id);
 
