@@ -64,9 +64,7 @@ export function PipelineManagement() {
     deals,
     isLoading,
     updateDeal,
-    updateDealsPositions,
-    deleteDeal,
-    isDeletingDeal
+    deleteDeal
   } = useCRM(viewAllMode && selectedUserIds.length > 0 ? selectedUserIds : undefined);
   const {
     followUps,
@@ -94,7 +92,9 @@ export function PipelineManagement() {
         position: index,
       }));
 
-      await updateDealsPositions(updates);
+      for (const u of updates) {
+        await updateDeal({ dealId: u.id, data: { position: u.position } as any });
+      }
 
       toast({
         title: "Ordem atualizada",
@@ -387,7 +387,7 @@ export function PipelineManagement() {
         onEditDeal={(deal) => setEditingDeal(deal)}
         onDeleteDeal={handleDeleteDeal}
         onScheduleCall={handleScheduleCall}
-        isDeletingDeal={isDeletingDeal}
+        isDeletingDeal={false}
         onContactAdded={handleContactAdded}
         highlightedDealId={highlightedDealId}
         onToggleFollowUp={handleToggleFollowUp}

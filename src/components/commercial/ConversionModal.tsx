@@ -119,8 +119,8 @@ export function ConversionModal({
       // 1. Criar o contato (paciente) no CRM
       // Preparar custom_fields com procedure_id se existir
       const customFields: any = {};
-      if (leadData?.procedure_id) {
-        customFields.procedure_id = leadData.procedure_id;
+      if ((leadData as any)?.procedure_id) {
+        customFields.procedure_id = (leadData as any).procedure_id;
       }
 
       const contactData = {

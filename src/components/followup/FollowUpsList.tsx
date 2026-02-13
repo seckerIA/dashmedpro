@@ -35,7 +35,7 @@ export function FollowUpsList({ followups }: FollowUpsListProps) {
 
   return (
     <div className="space-y-3">
-      {followups.map((followup) => {
+      {followups.map((followup: any) => {
         const statusConfig = STATUS_CONFIG[followup.status];
         const channelConfig = CHANNEL_CONFIG[followup.channel];
 

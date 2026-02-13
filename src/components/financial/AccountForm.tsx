@@ -79,7 +79,7 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, onCancel, 
                     // O schema espera string para o formulário, mas transforma em número no submit
                     // @ts-ignore
                     initial_balance: formatCurrency(account.initial_balance || 0),
-                    color: account.color || "#3b82f6",
+                    color: (account as any).color || "#3b82f6",
                 });
             } else {
                 reset({
@@ -103,7 +103,7 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, onCancel, 
                     type: data.type,
                     bank_name: data.bank_name,
                     color: data.color
-                }
+                } as any
             }, {
                 onSuccess: () => {
                     if (onOpenChange) onOpenChange(false);
@@ -126,7 +126,7 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, onCancel, 
                 current_balance: Number(data.initial_balance),
                 color: data.color,
                 is_active: true
-            }, {
+            } as any, {
                 onSuccess: () => {
                     if (onOpenChange) onOpenChange(false);
                     if (onSuccess) onSuccess();

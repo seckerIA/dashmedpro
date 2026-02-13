@@ -29,8 +29,8 @@ export function StartDailyReportCard() {
     if (!open) return;
     // Se houver relatório ativo hoje, pré-preencher com metas atuais
     if (isReportActive && todayReport) {
-      setGoalCalls(String(todayReport.goal_calls || 0));
-      setGoalContacts(String(todayReport.goal_contacts || 0));
+      setGoalCalls(String((todayReport as any).goal_calls || 0));
+      setGoalContacts(String((todayReport as any).goal_contacts || 0));
       return;
     }
     // Caso contrário, usar metas padrão

@@ -47,7 +47,7 @@ export function PatientHistorySidebar({ contactId }: PatientHistorySidebarProps)
     );
   }
 
-  if (history.length === 0) {
+  if ((history as any[]).length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -74,12 +74,12 @@ export function PatientHistorySidebar({ contactId }: PatientHistorySidebarProps)
         <CardTitle className="text-sm">
           Histórico do Paciente
           <Badge variant="secondary" className="ml-2">
-            {history.length}
+            {(history as any[]).length}
           </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {history.map((record: any) => (
+        {(history as any[]).map((record: any) => (
           <Card key={record.id} className="border-l-4 border-l-primary">
             <CardContent className="p-3 space-y-2">
               {/* Header */}

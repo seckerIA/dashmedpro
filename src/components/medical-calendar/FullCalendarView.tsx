@@ -4,7 +4,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import listPlugin from '@fullcalendar/list';
 import ptBrLocale from '@fullcalendar/core/locales/pt-br';
-import { EventInput, EventClickArg, EventDropArg, DateSelectArg, EventResizeDoneArg } from '@fullcalendar/core';
+import { EventInput, EventClickArg, EventDropArg, DateSelectArg } from '@fullcalendar/core';
 import { MedicalAppointmentWithRelations } from '@/types/medicalAppointments';
 import { AppointmentEventCard } from './AppointmentEventCard';
 import { Loader2 } from 'lucide-react';
@@ -71,7 +71,7 @@ export function FullCalendarView({
   };
 
   // Handle event resize
-  const handleEventResize = (resizeInfo: EventResizeDoneArg) => {
+  const handleEventResize = (resizeInfo: any) => {
     const { event } = resizeInfo;
     const appointmentId = event.id;
     const newStart = event.start!;

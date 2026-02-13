@@ -25,7 +25,7 @@ export function ResponsesList({ responses }: ResponsesListProps) {
 
   return (
     <div className="space-y-3">
-      {responses.map((response) => {
+      {responses.map((response: any) => {
         const npsCategory = response.nps_score ? getNPSCategory(response.nps_score) : null;
         const sentimentConfig = response.sentiment ? SENTIMENT_CONFIG[response.sentiment] : null;
 

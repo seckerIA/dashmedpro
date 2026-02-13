@@ -232,7 +232,7 @@ export function HistoricalReportsPanel({ isOpen, onClose }: HistoricalReportsPan
               ) : reports && reports.length > 0 ? (
                 <ScrollArea className="h-96">
                   <div className="space-y-4">
-                    {reports.map((report) => (
+                    {reports.map((report: any) => (
                       <Card key={report.id} className="p-4">
                         <div className="flex items-start justify-between">
                           <div className="space-y-2 flex-1">

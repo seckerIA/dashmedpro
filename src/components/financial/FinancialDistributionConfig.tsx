@@ -26,7 +26,7 @@ export function FinancialDistributionConfig({ open, onOpenChange }: FinancialDis
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Encontrar conta padrão atual
-    const defaultAccount = accounts?.find(acc => acc.is_default);
+    const defaultAccount = accounts?.find(acc => (acc as any).is_default);
     const [selectedAccountId, setSelectedAccountId] = useState<string>(defaultAccount?.id ?? "");
 
     // Sincronizar selectedAccountId quando accounts carregar
@@ -112,7 +112,7 @@ export function FinancialDistributionConfig({ open, onOpenChange }: FinancialDis
                                         <p className="text-sm text-muted-foreground">
                                             {account.account_number ? `Conta: ${account.account_number}` : 'Sem número'}
                                         </p>
-                                        {account.is_default && (
+                                        {(account as any).is_default && (
                                             <span className="flex items-center gap-1 text-xs text-green-600 font-medium mt-1">
                                                 <CheckCircle2 className="h-3 w-3" /> Atual Padrão
                                             </span>

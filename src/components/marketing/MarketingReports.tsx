@@ -37,7 +37,7 @@ export function MarketingReports() {
     campaign_id: campaignId !== 'all' ? campaignId : undefined,
   };
 
-  const { data: reportData, isLoading } = useMarketingReports(filters);
+  const { data: reportData, isLoading } = useMarketingReports(filters as any);
 
   const handleExportCSV = () => {
     if (!reportData) return;

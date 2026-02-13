@@ -565,8 +565,7 @@ export function SinglePageRecordForm({
                   <div className="mt-1.5">
                     <DatePicker
                       date={nextAppointmentDate}
-                      onDateChange={setNextAppointmentDate}
-                      placeholder="Selecionar data..."
+                      setDate={setNextAppointmentDate}
                     />
                   </div>
                 </div>

@@ -426,17 +426,17 @@ const SecretaryDashboard = () => {
       )}
 
       {/* Médicos Disponíveis (Colapsável) */}
-      {metrics?.availableDoctors && metrics.availableDoctors.length > 0 && (
+      {metrics?.doctors && metrics.doctors.length > 0 && (
         <AnimatedWrapper animationType="slideUp" delay={0.3}>
           <CollapsibleSection
             id="secretary-doctors"
             title="Médicos Disponíveis"
             icon={Stethoscope}
-            badge={metrics.availableDoctors.length}
+            badge={metrics.doctors.length}
             defaultOpen={true}
           >
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {metrics.availableDoctors.map((doctor: any, index: number) => (
+              {metrics.doctors.map((doctor: any, index: number) => (
                 <div
                   key={doctor.id || index}
                   className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50"

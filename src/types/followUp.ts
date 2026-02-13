@@ -27,6 +27,8 @@ export interface UpdateFollowUpData {
   scheduled_date?: string;
   notes?: string;
   completed?: boolean;
+  status?: string;
+  completed_notes?: string;
 }
 
 // =====================================================

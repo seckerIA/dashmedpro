@@ -165,7 +165,7 @@ export function CortanaProvider({ children }: { children: React.ReactNode }) {
       console.log('[Cortana] Iniciando sessão com agentId:', CORTANA_CONFIG.agentId);
 
       // Verificar limite de uso diário (5 chamadas)
-      const { data: usageData, error: usageError } = await supabase.rpc('check_and_increment_cortana_usage', {
+      const { data: usageData, error: usageError } = await (supabase.rpc as any)('check_and_increment_cortana_usage', {
         limit_count: 5
       });
 
@@ -184,7 +184,7 @@ export function CortanaProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      if (usageData && !usageData.allowed) {
+      if (usageData && !(usageData as any).allowed) {
         toast({
           title: 'Limite Diário Atingido',
           description: `Você atingiu o limite de 5 utilizações diárias da Cortana.`,
@@ -203,7 +203,7 @@ export function CortanaProvider({ children }: { children: React.ReactNode }) {
         agentId: CORTANA_CONFIG.agentId,
         clientTools,
         dynamicVariables,
-      });
+      } as any);
 
       console.log('[Cortana] Sessão iniciada com sucesso');
     } catch (error: any) {

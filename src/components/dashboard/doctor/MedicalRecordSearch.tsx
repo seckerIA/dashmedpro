@@ -124,7 +124,7 @@ export function MedicalRecordSearch() {
                             >
                                 <div className="flex items-center gap-3">
                                     <Avatar className="h-9 w-9 border border-border/50">
-                                        <AvatarImage src={patient.profile_picture_url || ""} />
+                                        <AvatarImage src={(patient as any).profile_picture_url || ""} />
                                         <AvatarFallback className="bg-primary/10 text-primary text-xs">
                                             {patient.full_name?.substring(0, 2).toUpperCase() || "PAC"}
                                         </AvatarFallback>
