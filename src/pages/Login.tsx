@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -589,6 +589,11 @@ const Login = () => {
               </Tabs>
             </CardContent>
           </Card>
+          <div className="mt-4 text-center text-xs text-muted-foreground">
+            <Link to="/privacy-policy" className="hover:underline hover:text-primary">Política de Privacidade</Link>
+            <span className="mx-2">|</span>
+            <Link to="/terms-of-service" className="hover:underline hover:text-primary">Termos de Serviço</Link>
+          </div>
         </div>
       </div>
       <div className="hidden bg-muted lg:flex items-center justify-center p-12 text-center">
