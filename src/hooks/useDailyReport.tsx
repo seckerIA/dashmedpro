@@ -66,7 +66,7 @@ export function useDailyReport() {
   }, [user?.id, queryClient]);
 
   // Buscar relatório do dia atual
-  const { data: todayReport, isLoading } = useQuery({
+  const { data: todayReport, isLoading } = useQuery<any>({
     queryKey: ['daily-report-today', user?.id],
     queryFn: async ({ signal }) => {
       if (!user?.id) return null;
@@ -75,8 +75,8 @@ export function useDailyReport() {
       today.setHours(0, 0, 0, 0);
       const todayISO = today.toISOString().split('T')[0];
 
-      const reportQuery = supabase
-        .from('prospecting_daily_reports')
+      const reportQuery = (supabase
+        .from('prospecting_daily_reports' as any) as any)
         .select('*')
         .eq('user_id', user.id)
         .eq('report_date', todayISO)
@@ -84,7 +84,7 @@ export function useDailyReport() {
       
       // Passar o query builder (não executado) para permitir abortSignal
       const reportResult = await supabaseQueryWithTimeout(reportQuery as any, 30000, signal);
-      const { data, error } = reportResult;
+      const { data, error } = reportResult as { data: any, error: any };
 
       if (error && error.code !== 'PGRST116') {
         console.error('useDailyReport - erro ao buscar:', error);
@@ -92,7 +92,7 @@ export function useDailyReport() {
       }
 
       // Verificar se o relatório é de um dia anterior e marcar como expirado
-      if (data && data.report_date !== todayISO) {
+      if (data && (data as any).report_date !== todayISO) {
         console.log('Relatório de dia anterior encontrado, não retornando dados');
         return null;
       }
@@ -124,7 +124,7 @@ export function useDailyReport() {
 
       const today = new Date().toISOString().split('T')[0];
 
-      const upsertData: DailyReportInsert = {
+      const upsertData: any = {
         user_id: user.id,
         report_date: today,
         calls_made: 0,
@@ -139,8 +139,8 @@ export function useDailyReport() {
       };
 
       // Usar upsert para permitir criar ou atualizar
-      const { data: report, error } = await supabase
-        .from('prospecting_daily_reports')
+      const { data: report, error } = await (supabase
+        .from('prospecting_daily_reports' as any) as any)
         .upsert(upsertData, {
           onConflict: 'user_id,report_date'
         })

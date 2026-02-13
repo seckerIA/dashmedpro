@@ -54,8 +54,8 @@ export function useHistoricalReports(filters: HistoricalReportsFilters = {}) {
       if (!user?.id) return [];
 
       // Query 1: Buscar relatórios
-      let reportsQuery = supabase
-        .from('prospecting_daily_reports')
+      let reportsQuery = (supabase
+        .from('prospecting_daily_reports' as any) as any)
         .select('*')
         .order('report_date', { ascending: false });
 
@@ -87,7 +87,7 @@ export function useHistoricalReports(filters: HistoricalReportsFilters = {}) {
       }
 
       // Query 2: Buscar perfis dos usuários únicos
-      const uniqueUserIds = [...new Set(reportsData.map(r => r.user_id))];
+      const uniqueUserIds = [...new Set((reportsData as any[]).map((r: any) => r.user_id))] as string[];
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('id, full_name, email')
@@ -104,7 +104,7 @@ export function useHistoricalReports(filters: HistoricalReportsFilters = {}) {
       );
 
       // Combinar dados
-      const combinedData: HistoricalReport[] = reportsData.map(report => ({
+      const combinedData: HistoricalReport[] = (reportsData as any[]).map((report: any) => ({
         ...report,
         user_profile: profilesMap.get(report.user_id) ? {
           full_name: profilesMap.get(report.user_id)!.full_name || '',

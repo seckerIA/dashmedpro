@@ -29,8 +29,8 @@ const fetchDashboardMetrics = async (
   doctorIds?: string[] // IDs dos médicos vinculados (para secretárias)
 ): Promise<DashboardMetrics> => {
   // Buscar deals com contatos
-  let dealsQuery = supabase
-    .from('crm_deals')
+  let dealsQuery = (supabase
+    .from('crm_deals' as any) as any)
     .select(`
       *,
       contact:crm_contacts(*)
@@ -53,11 +53,11 @@ const fetchDashboardMetrics = async (
 
   // Passar o query builder (não executado) para permitir abortSignal (timeout: 20s)
   const dealsResult = await supabaseQueryWithTimeout(dealsQuery as any, 20000, signal);
-  const { data: deals, error: dealsError } = dealsResult;
+  const { data: deals, error: dealsError } = dealsResult as { data: any[], error: any };
 
   if (dealsError) throw new Error(`Erro ao buscar deals: ${dealsError.message}`);
 
-  const dealsData = deals || [];
+  const dealsData = (deals || []) as any[];
 
   // Buscar contatos
   let contactsQuery = supabase
@@ -95,11 +95,11 @@ const fetchDashboardMetrics = async (
 
   // Passar o query builder (não executado) para permitir abortSignal (timeout: 20s)
   const contactsResult = await supabaseQueryWithTimeout(contactsQuery as any, 20000, signal);
-  const { data: contacts, error: contactsError } = contactsResult;
+  const { data: contacts, error: contactsError } = contactsResult as { data: any[], error: any };
 
   if (contactsError) throw new Error(`Erro ao buscar contatos: ${contactsError.message}`);
 
-  const contactsData = contacts || [];
+  const contactsData = (contacts || []) as any[];
 
   // Calcular métricas básicas
   const totalPipelineValue = dealsData.reduce((sum: number, deal: any) => {
@@ -204,16 +204,15 @@ const fetchDashboardMetrics = async (
   let procedureNames: Record<string, string> = {};
   if (procedureIds.size > 0) {
     const { data: procedures } = await supabaseQueryWithTimeout(
-      supabase
-        .from('commercial_procedures')
+      (supabase.from('commercial_procedures' as any) as any)
         .select('id, name')
-        .in('id', Array.from(procedureIds)) as any,
+        .in('id', Array.from(procedureIds)),
       15000,
       signal
-    );
+    ) as { data: any[] };
 
     if (procedures) {
-      procedures.forEach((proc: any) => {
+      (procedures as any[]).forEach((proc: any) => {
         procedureNames[proc.id] = proc.name;
       });
     }

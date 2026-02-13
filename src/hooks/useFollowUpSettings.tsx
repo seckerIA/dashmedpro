@@ -11,13 +11,12 @@ import type { FollowUpSettings, FollowUpSettingsUpdate, FollowUpAutomationLog } 
 const SETTINGS_KEY = 'followup-settings';
 const AUTOMATION_LOG_KEY = 'followup-automation-log';
 
+const fromTable = (table: string) => (supabase.from(table as any) as any);
+const rpcCall = (fn: string, params?: any) => (supabase.rpc(fn as any, params as any) as any);
+
 export function useFollowUpSettings() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-
-  // ==========================================
-  // FETCH SETTINGS
-  // ==========================================
 
   const {
     data: settings,
@@ -29,23 +28,18 @@ export function useFollowUpSettings() {
     queryFn: async () => {
       if (!user?.id) return null;
 
-      const { data, error } = await supabase
-        .from('followup_settings')
+      const { data, error } = await fromTable('followup_settings')
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
 
       if (error) throw error;
 
-      // Se não existir, criar configurações padrão
       if (!data) {
-        const { data: newSettings, error: createError } = await supabase
-          .rpc('create_default_followup_settings', { p_user_id: user.id });
+        const { data: newSettings, error: createError } = await rpcCall('create_default_followup_settings', { p_user_id: user.id });
 
         if (createError) {
-          // Se RPC falhar, tentar insert direto
-          const { data: inserted, error: insertError } = await supabase
-            .from('followup_settings')
+          const { data: inserted, error: insertError } = await fromTable('followup_settings')
             .insert({ user_id: user.id })
             .select()
             .single();
@@ -60,26 +54,20 @@ export function useFollowUpSettings() {
       return transformSettings(data);
     },
     enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000, // 5 minutos
+    staleTime: 5 * 60 * 1000,
   });
-
-  // ==========================================
-  // UPDATE SETTINGS
-  // ==========================================
 
   const updateSettingsMutation = useMutation({
     mutationFn: async (updates: FollowUpSettingsUpdate) => {
       if (!user?.id) throw new Error('User not authenticated');
 
-      // Transformar arrays de volta para JSONB se necessário
       const dbUpdates: Record<string, unknown> = { ...updates };
 
       if (updates.lead_vacuum_messages) {
         dbUpdates.lead_vacuum_messages = JSON.stringify(updates.lead_vacuum_messages);
       }
 
-      const { data, error } = await supabase
-        .from('followup_settings')
+      const { data, error } = await fromTable('followup_settings')
         .update(dbUpdates)
         .eq('user_id', user.id)
         .select()
@@ -105,16 +93,11 @@ export function useFollowUpSettings() {
     },
   });
 
-  // ==========================================
-  // TOGGLE ENABLED
-  // ==========================================
-
   const toggleEnabledMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
       if (!user?.id) throw new Error('User not authenticated');
 
-      const { data, error } = await supabase
-        .from('followup_settings')
+      const { data, error } = await fromTable('followup_settings')
         .update({ is_enabled: enabled })
         .eq('user_id', user.id)
         .select()
@@ -134,10 +117,6 @@ export function useFollowUpSettings() {
     },
   });
 
-  // ==========================================
-  // FETCH AUTOMATION LOGS
-  // ==========================================
-
   const {
     data: automationLogs,
     isLoading: isLoadingLogs,
@@ -146,8 +125,7 @@ export function useFollowUpSettings() {
     queryFn: async () => {
       if (!user?.id) return [];
 
-      const { data, error } = await supabase
-        .from('followup_automation_log')
+      const { data, error } = await fromTable('followup_automation_log')
         .select(`
           *,
           contact:crm_contacts(id, full_name, phone)
@@ -162,23 +140,15 @@ export function useFollowUpSettings() {
     enabled: !!user?.id,
   });
 
-  // ==========================================
-  // RESET TO DEFAULTS
-  // ==========================================
-
   const resetToDefaultsMutation = useMutation({
     mutationFn: async () => {
       if (!user?.id) throw new Error('User not authenticated');
 
-      // Deletar configurações atuais
-      await supabase
-        .from('followup_settings')
+      await fromTable('followup_settings')
         .delete()
         .eq('user_id', user.id);
 
-      // Criar novas com valores padrão
-      const { data, error } = await supabase
-        .from('followup_settings')
+      const { data, error } = await fromTable('followup_settings')
         .insert({ user_id: user.id })
         .select()
         .single();
@@ -195,15 +165,9 @@ export function useFollowUpSettings() {
     },
   });
 
-  // ==========================================
-  // HELPERS
-  // ==========================================
-
-  // Transformar dados do banco para o tipo TypeScript
   function transformSettings(data: Record<string, unknown>): FollowUpSettings {
     return {
       ...data,
-      // Garantir que arrays JSONB sejam parseados corretamente
       lead_vacuum_messages: typeof data.lead_vacuum_messages === 'string'
         ? JSON.parse(data.lead_vacuum_messages)
         : data.lead_vacuum_messages || [],
@@ -212,19 +176,12 @@ export function useFollowUpSettings() {
   }
 
   return {
-    // Data
     settings,
     automationLogs,
-
-    // Loading states
     isLoading,
     isLoadingLogs,
     isSaving: updateSettingsMutation.isPending,
-
-    // Error
     error,
-
-    // Actions
     updateSettings: updateSettingsMutation.mutateAsync,
     toggleEnabled: toggleEnabledMutation.mutateAsync,
     resetToDefaults: resetToDefaultsMutation.mutateAsync,
