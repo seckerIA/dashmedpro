@@ -15,12 +15,12 @@ export function useAdPlatformConnections() {
   return useQuery({
     queryKey: ['ad-platform-connections'],
     queryFn: async ({ signal }) => {
-      const query = supabase
-        .from('ad_platform_connections')
+      const query = (supabase
+        .from('ad_platform_connections' as any) as any)
         .select('*')
         .order('created_at', { ascending: false });
 
-      const { data, error } = await supabaseQueryWithTimeout(query, 30000, signal);
+      const { data, error } = await query;
 
       if (error) throw error;
       return data as AdPlatformConnection[];
@@ -38,16 +38,14 @@ export function useAdPlatformConnection(id: string) {
   return useQuery({
     queryKey: ['ad-platform-connection', id],
     queryFn: async ({ signal }) => {
-      const query = supabase
-        .from('ad_platform_connections')
+      const { data, error } = await (supabase
+        .from('ad_platform_connections' as any) as any)
         .select('*')
         .eq('id', id)
         .single();
 
-      const { data, error } = await supabaseQueryWithTimeout(query, 30000, signal);
-
       if (error) throw error;
-      return data as AdPlatformConnection;
+      return data as unknown as AdPlatformConnection;
     },
     enabled: !!id,
     staleTime: 2 * 60 * 1000,
@@ -64,14 +62,14 @@ export function useCreateAdPlatformConnection() {
 
   return useMutation({
     mutationFn: async (connection: AdPlatformConnectionInsert) => {
-      const { data, error } = await supabase
-        .from('ad_platform_connections')
+      const { data, error } = await (supabase
+        .from('ad_platform_connections' as any) as any)
         .insert(connection)
         .select()
         .single();
 
       if (error) throw error;
-      return data as AdPlatformConnection;
+      return data as unknown as AdPlatformConnection;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ad-platform-connections'] });
@@ -90,15 +88,15 @@ export function useUpdateAdPlatformConnection() {
       id: string;
       updates: AdPlatformConnectionUpdate
     }) => {
-      const { data, error } = await supabase
-        .from('ad_platform_connections')
+      const { data, error } = await (supabase
+        .from('ad_platform_connections' as any) as any)
         .update(updates)
         .eq('id', id)
         .select()
         .single();
 
       if (error) throw error;
-      return data as AdPlatformConnection;
+      return data as unknown as AdPlatformConnection;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['ad-platform-connections'] });
@@ -112,8 +110,8 @@ export function useDeleteAdPlatformConnection() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('ad_platform_connections')
+      const { error } = await (supabase
+        .from('ad_platform_connections' as any) as any)
         .delete()
         .eq('id', id);
 

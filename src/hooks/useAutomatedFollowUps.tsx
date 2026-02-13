@@ -23,6 +23,9 @@ const FOLLOWUP_SCHEDULED_KEY = 'followup-scheduled';
 const FOLLOWUP_RESPONSES_KEY = 'followup-responses';
 const FOLLOWUP_METRICS_KEY = 'followup-metrics';
 
+// Helper to get typed table reference
+const fromTable = (table: string) => (supabase.from(table as any) as any);
+
 export function useAutomatedFollowUps() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -37,8 +40,7 @@ export function useAutomatedFollowUps() {
   const templatesQuery = useQuery({
     queryKey: [FOLLOWUP_TEMPLATES_KEY, userIds],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('followup_templates')
+      const { data, error } = await fromTable('followup_templates')
         .select('*')
         .in('user_id', userIds)
         .order('trigger_type', { ascending: true });
@@ -51,8 +53,7 @@ export function useAutomatedFollowUps() {
 
   const createTemplateMutation = useMutation({
     mutationFn: async (template: FollowUpTemplateInsert) => {
-      const { data, error } = await supabase
-        .from('followup_templates')
+      const { data, error } = await fromTable('followup_templates')
         .insert({ ...template, user_id: user!.id })
         .select()
         .single();
@@ -71,8 +72,7 @@ export function useAutomatedFollowUps() {
 
   const updateTemplateMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: FollowUpTemplateUpdate }) => {
-      const { data, error } = await supabase
-        .from('followup_templates')
+      const { data, error } = await fromTable('followup_templates')
         .update(updates)
         .eq('id', id)
         .select()
@@ -92,7 +92,7 @@ export function useAutomatedFollowUps() {
 
   const deleteTemplateMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('followup_templates').delete().eq('id', id);
+      const { error } = await fromTable('followup_templates').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -111,8 +111,7 @@ export function useAutomatedFollowUps() {
   const scheduledQuery = useQuery({
     queryKey: [FOLLOWUP_SCHEDULED_KEY, userIds],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('followup_scheduled')
+      const { data, error } = await fromTable('followup_scheduled')
         .select(`
           *,
           template:followup_templates(*),
@@ -132,8 +131,7 @@ export function useAutomatedFollowUps() {
 
   const createScheduledMutation = useMutation({
     mutationFn: async (followup: FollowUpScheduledInsert) => {
-      const { data, error } = await supabase
-        .from('followup_scheduled')
+      const { data, error } = await fromTable('followup_scheduled')
         .insert({ ...followup, user_id: user!.id })
         .select()
         .single();
@@ -152,8 +150,7 @@ export function useAutomatedFollowUps() {
 
   const updateScheduledMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: FollowUpScheduledUpdate }) => {
-      const { data, error } = await supabase
-        .from('followup_scheduled')
+      const { data, error } = await fromTable('followup_scheduled')
         .update(updates)
         .eq('id', id)
         .select()
@@ -173,8 +170,7 @@ export function useAutomatedFollowUps() {
 
   const cancelScheduledMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { data, error } = await supabase
-        .from('followup_scheduled')
+      const { data, error } = await fromTable('followup_scheduled')
         .update({ status: 'cancelled' })
         .eq('id', id)
         .select()
@@ -199,8 +195,7 @@ export function useAutomatedFollowUps() {
   const responsesQuery = useQuery({
     queryKey: [FOLLOWUP_RESPONSES_KEY, userIds],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('followup_responses')
+      const { data, error } = await fromTable('followup_responses')
         .select(`
           *,
           followup:followup_scheduled!inner(
@@ -222,8 +217,7 @@ export function useAutomatedFollowUps() {
 
   const createResponseMutation = useMutation({
     mutationFn: async (response: FollowUpResponseInsert) => {
-      const { data, error } = await supabase
-        .from('followup_responses')
+      const { data, error } = await fromTable('followup_responses')
         .insert({ ...response, user_id: user!.id })
         .select()
         .single();
@@ -231,8 +225,7 @@ export function useAutomatedFollowUps() {
       if (error) throw error;
 
       // Atualizar follow-up para 'responded'
-      await supabase
-        .from('followup_scheduled')
+      await fromTable('followup_scheduled')
         .update({ status: 'responded' })
         .eq('id', response.followup_id);
 
@@ -257,10 +250,10 @@ export function useAutomatedFollowUps() {
     queryKey: [FOLLOWUP_METRICS_KEY, 'nps', user?.id],
     queryFn: async () => {
       const startDate = new Date();
-      startDate.setDate(1); // Primeiro dia do mês
+      startDate.setDate(1);
       const endDate = new Date();
 
-      const { data, error } = await supabase.rpc('calculate_nps', {
+      const { data, error } = await (supabase.rpc as any)('calculate_nps', {
         p_user_id: user!.id,
         p_start_date: startDate.toISOString(),
         p_end_date: endDate.toISOString(),
@@ -280,15 +273,14 @@ export function useAutomatedFollowUps() {
       const endDate = new Date();
 
       // NPS
-      const { data: npsData } = await supabase.rpc('calculate_nps', {
+      const { data: npsData } = await (supabase.rpc as any)('calculate_nps', {
         p_user_id: user!.id,
         p_start_date: startDate.toISOString(),
         p_end_date: endDate.toISOString(),
       });
 
       // CSAT Average
-      const { data: csatData } = await supabase
-        .from('followup_responses')
+      const { data: csatData } = await fromTable('followup_responses')
         .select('csat_score')
         .in('user_id', userIds)
         .gte('responded_at', startDate.toISOString())
@@ -296,31 +288,27 @@ export function useAutomatedFollowUps() {
         .not('csat_score', 'is', null);
 
       const csatAvg = csatData && csatData.length > 0
-        ? csatData.reduce((acc, r) => acc + (r.csat_score || 0), 0) / csatData.length
+        ? csatData.reduce((acc: number, r: any) => acc + (r.csat_score || 0), 0) / csatData.length
         : 0;
 
       // Counts
-      const { count: totalSent } = await supabase
-        .from('followup_scheduled')
+      const { count: totalSent } = await fromTable('followup_scheduled')
         .select('*', { count: 'exact', head: true })
         .in('user_id', userIds)
         .in('status', ['sent', 'responded']);
 
-      const { count: totalResponded } = await supabase
-        .from('followup_scheduled')
+      const { count: totalResponded } = await fromTable('followup_scheduled')
         .select('*', { count: 'exact', head: true })
         .in('user_id', userIds)
         .eq('status', 'responded');
 
-      const { count: pendingCount } = await supabase
-        .from('followup_scheduled')
+      const { count: pendingCount } = await fromTable('followup_scheduled')
         .select('*', { count: 'exact', head: true })
         .in('user_id', userIds)
         .eq('status', 'pending');
 
       // Recent responses
-      const { data: recentResponses } = await supabase
-        .from('followup_responses')
+      const { data: recentResponses } = await fromTable('followup_responses')
         .select(`
           *,
           contact:crm_contacts(id, full_name, phone)
@@ -352,7 +340,7 @@ export function useAutomatedFollowUps() {
 
   const createDefaultTemplatesMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc('create_default_followup_templates', {
+      const { error } = await (supabase.rpc as any)('create_default_followup_templates', {
         p_user_id: user!.id,
       });
 

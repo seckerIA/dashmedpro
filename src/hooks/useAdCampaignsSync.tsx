@@ -17,8 +17,8 @@ export function useAdCampaignsSync(filters?: {
   return useQuery({
     queryKey: ['ad-campaigns-sync', filters],
     queryFn: async ({ signal }) => {
-      let query = supabase
-        .from('ad_campaigns_sync')
+      let query = (supabase
+        .from('ad_campaigns_sync' as any) as any)
         .select(`
           *,
           connection:ad_platform_connections(*)
@@ -35,7 +35,7 @@ export function useAdCampaignsSync(filters?: {
         query = query.eq('status', filters.status);
       }
 
-      const { data, error } = await supabaseQueryWithTimeout(query, 30000, signal);
+      const { data, error } = await query;
 
       if (error) throw error;
       return data as AdCampaignWithConnection[];
@@ -53,16 +53,14 @@ export function useAdCampaignSync(id: string) {
   return useQuery({
     queryKey: ['ad-campaign-sync', id],
     queryFn: async ({ signal }) => {
-      const query = supabase
-        .from('ad_campaigns_sync')
+      const { data, error } = await (supabase
+        .from('ad_campaigns_sync' as any) as any)
         .select(`
           *,
           connection:ad_platform_connections(*)
         `)
         .eq('id', id)
         .single();
-
-      const { data, error } = await supabaseQueryWithTimeout(query, 30000, signal);
 
       if (error) throw error;
       return data as AdCampaignWithConnection;
@@ -155,8 +153,8 @@ export function useAdCampaignMetrics(filters?: {
   return useQuery({
     queryKey: ['ad-campaign-metrics', filters],
     queryFn: async ({ signal }) => {
-      let query = supabase
-        .from('ad_campaigns_sync')
+      let query = (supabase
+        .from('ad_campaigns_sync' as any) as any)
         .select('spend, impressions, clicks, ctr, conversions, conversion_value, cpa, roas');
 
       if (filters?.connection_id) {
@@ -172,7 +170,7 @@ export function useAdCampaignMetrics(filters?: {
         query = query.lte('synced_at', filters.end_date);
       }
 
-      const { data, error } = await supabaseQueryWithTimeout(query, 30000, signal);
+      const { data, error } = await query;
 
       if (error) throw error;
 

@@ -32,7 +32,7 @@ export function useAudioLevel(options: UseAudioLevelOptions = {}) {
     const calculateVolume = useCallback(() => {
         if (!analyserRef.current || !dataArrayRef.current) return;
 
-        analyserRef.current.getByteTimeDomainData(dataArrayRef.current);
+        analyserRef.current.getByteTimeDomainData(dataArrayRef.current as any);
 
         let sum = 0;
         const data = dataArrayRef.current;

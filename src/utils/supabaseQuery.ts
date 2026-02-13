@@ -22,8 +22,8 @@ type SupabaseQueryBuilder<T> = Promise<SupabaseQueryResult<T>> & {
  * 3. Extension interference (via fast timeout and clear error)
  */
 export async function supabaseQueryWithTimeout<T>(
-  queryBuilder: SupabaseQueryBuilder<T> | Promise<SupabaseQueryResult<T>>,
-  timeoutMs: number = 15000, // 15s - fail even faster (was 30s)
+  queryBuilder: any,
+  timeoutMs: number = 15000,
   signal?: AbortSignal
 ): Promise<SupabaseQueryResult<T>> {
   // NO INTERNAL RETRY - React Query handles that
@@ -35,7 +35,7 @@ export async function supabaseQueryWithTimeout<T>(
  * Internal execution logic with slot acquisition and race against clock
  */
 async function executeQueryWithTimeout<T>(
-  queryBuilder: SupabaseQueryBuilder<T> | Promise<SupabaseQueryResult<T>>,
+  queryBuilder: any,
   timeoutMs: number,
   signal?: AbortSignal
 ): Promise<SupabaseQueryResult<T>> {

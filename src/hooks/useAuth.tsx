@@ -29,15 +29,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!user) return;
 
     try {
-      const { data: memberData } = await supabase
-        .from('organization_members')
+      const { data: memberData } = await (supabase
+        .from('organization_members' as any) as any)
         .select('role, organization:organizations(*)')
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (memberData && memberData.organization) {
-        setOrganization(memberData.organization as any);
-        setOrgRole(memberData.role);
+      if (memberData && (memberData as any).organization) {
+        setOrganization((memberData as any).organization as any);
+        setOrgRole((memberData as any).role);
         console.log('[useAuth] Organization refreshed successfully');
       }
     } catch (err) {
@@ -54,13 +54,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (currentSession?.user) {
           // Check for Super Admin status first (needed for global redirect)
-          const { data: profile } = await supabase
-            .from('profiles')
+          const { data: profile } = await (supabase
+            .from('profiles') as any)
             .select('is_super_admin')
             .eq('id', currentSession.user.id)
             .single();
 
-          if (profile?.is_super_admin) {
+          if ((profile as any)?.is_super_admin) {
             setIsSuperAdmin(true);
             // Super Admin doesn't necessarily need a specific organization loaded here,
             // but we might want to load one if they choose to "impersonate".
@@ -69,15 +69,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
 
           // Fetch user's organization (only if NOT forcing null, or even if Super Admin is also a member)
-          const { data: memberData, error } = await supabase
-            .from('organization_members')
+          const { data: memberData, error } = await (supabase
+            .from('organization_members' as any) as any)
             .select('role, organization:organizations(*)')
             .eq('user_id', currentSession.user.id)
             .maybeSingle();
 
-          if (!error && memberData && memberData.organization) {
-            setOrganization(memberData.organization as any);
-            setOrgRole(memberData.role);
+          if (!error && memberData && (memberData as any).organization) {
+            setOrganization((memberData as any).organization as any);
+            setOrgRole((memberData as any).role);
           } else {
             console.log('Usuário sem organização vinculada ou erro ao buscar organization_members');
           }
@@ -104,25 +104,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setTimeout(async () => {
             try {
               // Check Super Admin on auth change
-              const { data: profile } = await supabase
-                .from('profiles')
+              const { data: profile } = await (supabase
+                .from('profiles') as any)
                 .select('is_super_admin')
                 .eq('id', currentSession.user.id)
                 .single();
 
-              if (profile?.is_super_admin) setIsSuperAdmin(true);
+              if ((profile as any)?.is_super_admin) setIsSuperAdmin(true);
               else setIsSuperAdmin(false);
 
               // Fetch organization on auth change (login)
-              const { data: memberData } = await supabase
-                .from('organization_members')
+              const { data: memberData } = await (supabase
+                .from('organization_members' as any) as any)
                 .select('role, organization:organizations(*)')
                 .eq('user_id', currentSession.user.id)
                 .maybeSingle();
 
-              if (memberData && memberData.organization) {
-                setOrganization(memberData.organization as any);
-                setOrgRole(memberData.role);
+              if (memberData && (memberData as any).organization) {
+                setOrganization((memberData as any).organization as any);
+                setOrgRole((memberData as any).role);
               } else {
                 setOrganization(null);
                 setOrgRole(null);

@@ -82,7 +82,7 @@ export function useCallHistory(options: UseCallHistoryOptions = {}) {
         throw error;
       }
 
-      return (data || []) as VOIPCallSessionWithRelations[];
+      return (data || []) as unknown as VOIPCallSessionWithRelations[];
     },
     enabled: enabled && !!user?.id && (!isSecretaria || !isLoadingDoctors),
     staleTime: 30 * 1000, // 30 seconds
@@ -136,7 +136,7 @@ export function useRecentCalls(limit = 10) {
         throw error;
       }
 
-      return (data || []) as VOIPCallSessionWithRelations[];
+      return (data || []) as unknown as VOIPCallSessionWithRelations[];
     },
     enabled: !!user?.id && (!isSecretaria || !isLoadingDoctors),
     staleTime: 30 * 1000,

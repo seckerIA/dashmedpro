@@ -198,7 +198,7 @@ function NoteItem({
   onDelete: () => void;
   isUpdating: boolean;
 }) {
-  const user = note.user;
+  const user = (note as any).user;
   const userName = user?.full_name || user?.email || 'Usuário';
   const userInitials = userName
     .split(' ')

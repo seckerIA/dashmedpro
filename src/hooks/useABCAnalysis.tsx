@@ -55,8 +55,8 @@ export function useABCAnalysis() {
                 return { totalValue: 0, classA: { items: 0, value: 0, percentage: 0 }, classB: { items: 0, value: 0, percentage: 0 }, classC: { items: 0, value: 0, percentage: 0 }, items: [] };
             }
             // Buscar todos os itens com seus lotes ativos
-            const { data: itemsData, error: itemsError } = await supabase
-                .from("inventory_items")
+            const { data: itemsData, error: itemsError } = await (supabase
+                .from("inventory_items" as any) as any)
                 .select(`
           id,
           name,

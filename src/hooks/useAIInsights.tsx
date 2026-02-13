@@ -21,8 +21,8 @@ export function useAIInsights() {
             if (!user) return [];
             if (signal?.aborted) return [];
 
-            const { data, error } = await supabase
-                .from('crm_ai_insights' as any)
+            const { data, error } = await (supabase
+                .from('crm_ai_insights' as any) as any)
                 .select('*')
                 .eq('user_id', user.id)
                 .gt('expires_at', new Date().toISOString())
@@ -49,8 +49,8 @@ export function useAIInsights() {
             if (!user) return null;
             if (signal?.aborted) return null;
 
-            const { data } = await supabase
-                .from('crm_ai_analysis_batches' as any)
+            const { data } = await (supabase
+                .from('crm_ai_analysis_batches' as any) as any)
                 .select('created_at')
                 .eq('user_id', user.id)
                 .eq('status', 'completed')
