@@ -12,6 +12,7 @@ import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { MetaIntegrationCard } from "@/components/marketing/MetaIntegrationCard";
 
 export function AdPlatformsIntegration() {
   const { data: connections, isLoading } = useAdPlatformConnections();
@@ -82,22 +83,27 @@ export function AdPlatformsIntegration() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold">Integrações de Anúncios</h2>
-          <p className="text-sm text-muted-foreground">
-            Conecte suas contas do Google Ads e Meta Ads para sincronizar campanhas
-          </p>
+    <div className="space-y-6">
+      {/* Meta Business Platform OAuth Centralizado */}
+      <MetaIntegrationCard />
+
+      {/* Conexões Manuais (Google Ads, etc) */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold">Outras Integrações</h2>
+            <p className="text-sm text-muted-foreground">
+              Adicione conexões manuais para Google Ads ou outras plataformas
+            </p>
+          </div>
+          <Button onClick={() => {
+            setEditingConnection(null);
+            setShowForm(true);
+          }}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Conexão
+          </Button>
         </div>
-        <Button onClick={() => {
-          setEditingConnection(null);
-          setShowForm(true);
-        }}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Conexão
-        </Button>
-      </div>
 
       {connections && connections.length === 0 ? (
         <Card>
@@ -197,14 +203,15 @@ export function AdPlatformsIntegration() {
         </div>
       )}
 
-      <AdConnectionForm
-        open={showForm}
-        onOpenChange={(open) => {
-          setShowForm(open);
-          if (!open) setEditingConnection(null);
-        }}
-        connection={editingConnection}
-      />
+        <AdConnectionForm
+          open={showForm}
+          onOpenChange={(open) => {
+            setShowForm(open);
+            if (!open) setEditingConnection(null);
+          }}
+          connection={editingConnection}
+        />
+      </div>
     </div>
   );
 }

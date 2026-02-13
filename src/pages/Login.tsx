@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,6 +28,7 @@ const Login = () => {
   const [sendingResetEmail, setSendingResetEmail] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // NOTE: Removed automatic cache clearing on mount - this was causing:
   // 1. Unnecessary page reloads when tab focus changed
@@ -166,6 +168,9 @@ const Login = () => {
         description: 'Redirecionando para o dashboard...',
       });
 
+      // Limpar cache do React Query para evitar dados stale
+      await queryClient.invalidateQueries();
+
       navigate('/');
     } catch (error) {
       console.error('❌ Erro inesperado no login:', error);
@@ -285,6 +290,9 @@ const Login = () => {
         title: 'Cadastro realizado com sucesso!',
         description: 'Você foi automaticamente logado.',
       });
+
+      // Limpar cache do React Query para evitar dados stale
+      await queryClient.invalidateQueries();
 
       navigate('/');
     } catch (error) {

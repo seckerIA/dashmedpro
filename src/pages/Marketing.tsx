@@ -10,6 +10,7 @@ import { UtmTemplates } from "@/components/commercial/UtmTemplates";
 import { MarketingLeadsConversions } from "@/components/marketing/MarketingLeadsConversions";
 import { MarketingReports } from "@/components/marketing/MarketingReports";
 import { MarketingOnboarding, MarketingHelpCard } from "@/components/marketing/MarketingOnboarding";
+import { MetaConnectionGate } from "@/components/marketing/MetaConnectionGate";
 
 export default function Marketing() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -32,27 +33,28 @@ export default function Marketing() {
   };
 
   return (
-    <div className="min-h-screen space-y-6 bg-background pb-20">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-primary/10">
-            <Megaphone className="h-8 w-8 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-card-foreground">Marketing</h1>
-            <p className="text-muted-foreground text-sm sm:text-lg">
-              Gestão de campanhas de anúncios e estratégias de marketing digital
-            </p>
+    <MetaConnectionGate>
+      <div className="min-h-screen space-y-6 bg-background pb-20">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-primary/10">
+              <Megaphone className="h-8 w-8 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-card-foreground">Marketing</h1>
+              <p className="text-muted-foreground text-sm sm:text-lg">
+                Gestão de campanhas de anúncios e estratégias de marketing digital
+              </p>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Onboarding */}
-      <MarketingOnboarding />
+        {/* Onboarding */}
+        <MarketingOnboarding />
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-2 lg:grid-cols-6 gap-2 h-auto p-1 bg-muted/50">
           <TabsTrigger
             value="dashboard"
@@ -144,8 +146,9 @@ export default function Marketing() {
         <TabsContent value="reports" className="mt-6">
           <MarketingReports />
         </TabsContent>
-      </Tabs>
-    </div>
+        </Tabs>
+      </div>
+    </MetaConnectionGate>
   );
 }
 

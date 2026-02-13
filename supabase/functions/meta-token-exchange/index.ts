@@ -1,0 +1,267 @@
+/**
+ * Edge Function: meta-token-exchange
+ * Troca código OAuth por access token e salva configurações
+ *
+ * Recebe:
+ * - code: Código do FB.login()
+ * - whatsapp_data: Dados do Embedded Signup (opcional)
+ */
+
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
+// Configurações
+const FB_APP_ID = Deno.env.get('FB_APP_ID') || '';
+const FB_APP_SECRET = Deno.env.get('FB_APP_SECRET') || '';
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
+const GRAPH_API_VERSION = 'v21.0';
+
+interface WhatsAppData {
+  phone_number_id?: string;
+  waba_id?: string;
+  businessId?: string;
+}
+
+interface AdAccount {
+  id: string;
+  account_id: string;
+  name: string;
+  currency: string;
+  timezone_name?: string;
+  account_status: number;
+}
+
+serve(async (req: Request) => {
+  // CORS
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  if (req.method !== 'POST') {
+    return new Response('Method not allowed', { status: 405, headers: corsHeaders });
+  }
+
+  try {
+    // Verificar autenticação
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('Não autorizado');
+    }
+
+    const supabase = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const supabaseAdmin = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Usuário não autenticado');
+
+    // Parsear body
+    const { code, whatsapp_data } = await req.json() as {
+      code: string;
+      whatsapp_data?: WhatsAppData;
+    };
+
+    if (!code) {
+      throw new Error('Código não fornecido');
+    }
+
+    console.log('[Token Exchange] Starting for user:', user.id);
+    console.log('[Token Exchange] WhatsApp data:', whatsapp_data);
+
+    // Verificar configuração
+    if (!FB_APP_ID || !FB_APP_SECRET) {
+      throw new Error('Configuração do Facebook incompleta');
+    }
+
+    // 1. Trocar código por access token
+    console.log('[Token Exchange] Exchanging code for token...');
+    const tokenResponse = await fetch(
+      `https://graph.facebook.com/${GRAPH_API_VERSION}/oauth/access_token?` +
+      `client_id=${FB_APP_ID}` +
+      `&client_secret=${FB_APP_SECRET}` +
+      `&code=${code}`
+    );
+
+    if (!tokenResponse.ok) {
+      const errorData = await tokenResponse.json();
+      console.error('[Token Exchange] Token exchange failed:', errorData);
+      throw new Error(errorData.error?.message || 'Falha ao trocar código por token');
+    }
+
+    const tokenData = await tokenResponse.json();
+    let accessToken = tokenData.access_token;
+    let tokenExpiresAt = tokenData.expires_in
+      ? new Date(Date.now() + tokenData.expires_in * 1000)
+      : null;
+
+    console.log('[Token Exchange] Got short-lived token, expires:', tokenExpiresAt?.toISOString());
+
+    // 2. Trocar por token de longa duração (60 dias ou nunca expira)
+    console.log('[Token Exchange] Getting long-lived token...');
+    const longLivedResponse = await fetch(
+      `https://graph.facebook.com/${GRAPH_API_VERSION}/oauth/access_token?` +
+      `grant_type=fb_exchange_token` +
+      `&client_id=${FB_APP_ID}` +
+      `&client_secret=${FB_APP_SECRET}` +
+      `&fb_exchange_token=${accessToken}`
+    );
+
+    if (longLivedResponse.ok) {
+      const longLivedData = await longLivedResponse.json();
+      accessToken = longLivedData.access_token;
+      // Token de longa duração: 60 dias, ou "Never" se configurado assim
+      tokenExpiresAt = longLivedData.expires_in
+        ? new Date(Date.now() + longLivedData.expires_in * 1000)
+        : null; // null = never expires
+      console.log('[Token Exchange] Got long-lived token, expires:', tokenExpiresAt?.toISOString() || 'never');
+    } else {
+      console.warn('[Token Exchange] Could not get long-lived token, using short-lived');
+    }
+
+    // Buscar organization_id do usuário
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('organization_id')
+      .eq('id', user.id)
+      .single();
+
+    const organizationId = profile?.organization_id;
+
+    // 3. Buscar contas de anúncios
+    console.log('[Token Exchange] Fetching ad accounts...');
+    let adAccounts: AdAccount[] = [];
+    try {
+      const adAccountsResponse = await fetch(
+        `https://graph.facebook.com/${GRAPH_API_VERSION}/me/adaccounts?` +
+        `fields=id,account_id,name,currency,timezone_name,account_status` +
+        `&access_token=${accessToken}`
+      );
+
+      if (adAccountsResponse.ok) {
+        const adAccountsData = await adAccountsResponse.json();
+        adAccounts = adAccountsData.data || [];
+        console.log(`[Token Exchange] Found ${adAccounts.length} ad accounts`);
+      }
+    } catch (e) {
+      console.warn('[Token Exchange] Could not fetch ad accounts:', e);
+    }
+
+    // 4. Salvar configuração do WhatsApp (se dados disponíveis)
+    if (whatsapp_data?.waba_id && whatsapp_data?.phone_number_id) {
+      console.log('[Token Exchange] Saving WhatsApp config...');
+
+      // Buscar informações do número
+      let displayPhoneNumber = '';
+      let verifiedName = '';
+      let qualityRating = '';
+
+      try {
+        const phoneResponse = await fetch(
+          `https://graph.facebook.com/${GRAPH_API_VERSION}/${whatsapp_data.phone_number_id}?` +
+          `fields=display_phone_number,verified_name,quality_rating` +
+          `&access_token=${accessToken}`
+        );
+
+        if (phoneResponse.ok) {
+          const phoneData = await phoneResponse.json();
+          displayPhoneNumber = phoneData.display_phone_number || '';
+          verifiedName = phoneData.verified_name || '';
+          qualityRating = phoneData.quality_rating || '';
+        }
+      } catch (e) {
+        console.warn('[Token Exchange] Could not fetch phone info:', e);
+      }
+
+      // Gerar webhook verify token
+      const webhookVerifyToken = crypto.randomUUID();
+
+      // Upsert whatsapp_config
+      const { error: whatsappError } = await supabaseAdmin
+        .from('whatsapp_config')
+        .upsert({
+          user_id: user.id,
+          organization_id: organizationId,
+          waba_id: whatsapp_data.waba_id,
+          phone_number_id: whatsapp_data.phone_number_id,
+          business_account_id: whatsapp_data.businessId,
+          access_token: accessToken,
+          display_phone_number: displayPhoneNumber,
+          verified_name: verifiedName,
+          quality_rating: qualityRating,
+          webhook_verify_token: webhookVerifyToken,
+          is_active: true,
+          oauth_connected: true,
+          oauth_expires_at: tokenExpiresAt?.toISOString() || null,
+          last_synced_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+
+      if (whatsappError) {
+        console.error('[Token Exchange] Error saving WhatsApp config:', whatsappError);
+      } else {
+        console.log('[Token Exchange] WhatsApp config saved successfully');
+      }
+    }
+
+    // 5. Salvar contas de anúncios
+    if (adAccounts.length > 0) {
+      console.log('[Token Exchange] Saving ad accounts...');
+
+      for (const account of adAccounts) {
+        const { error: adError } = await supabaseAdmin
+          .from('ad_platform_connections')
+          .upsert({
+            user_id: user.id,
+            organization_id: organizationId,
+            platform: 'meta_ads',
+            account_id: account.account_id || account.id.replace('act_', ''),
+            account_name: account.name,
+            api_key: accessToken,
+            is_active: true,
+            sync_status: 'pending',
+            metadata: {
+              currency: account.currency,
+              timezone: account.timezone_name,
+              account_status: account.account_status,
+              oauth_expires_at: tokenExpiresAt?.toISOString() || null,
+            },
+          }, {
+            onConflict: 'user_id,platform,account_id',
+          });
+
+        if (adError) {
+          console.error('[Token Exchange] Error saving ad account:', account.name, adError);
+        }
+      }
+
+      console.log('[Token Exchange] Ad accounts saved successfully');
+    }
+
+    // Retornar sucesso
+    return new Response(
+      JSON.stringify({
+        success: true,
+        whatsapp_connected: !!(whatsapp_data?.waba_id),
+        ads_connected: adAccounts.length > 0,
+        ad_accounts_count: adAccounts.length,
+        token_expires_at: tokenExpiresAt?.toISOString() || null,
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+    console.error('[Token Exchange] Error:', errorMessage);
+
+    return new Response(
+      JSON.stringify({ success: false, error: errorMessage }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});
