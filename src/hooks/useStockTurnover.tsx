@@ -46,8 +46,8 @@ export function useStockTurnover() {
         queryKey: ["stock-turnover", user?.id],
         queryFn: async (): Promise<TurnoverSummary> => {
             // 1. Buscar todos os itens com seus lotes
-            const { data: itemsData, error: itemsError } = await supabase
-                .from("inventory_items")
+            const { data: itemsData, error: itemsError } = await (supabase
+                .from("inventory_items" as any) as any)
                 .select(`
           id,
           name,
@@ -68,8 +68,8 @@ export function useStockTurnover() {
             const thirtyDaysAgo = subDays(today, 30);
 
             // 2. Buscar movimentações de saída (OUT, LOSS) dos últimos 30 dias por item
-            const { data: movementsData, error: movementsError } = await supabase
-                .from("inventory_movements")
+            const { data: movementsData, error: movementsError } = await (supabase
+                .from("inventory_movements" as any) as any)
                 .select(`
           id,
           batch_id,
@@ -88,8 +88,8 @@ export function useStockTurnover() {
             const movements = (movementsData || []) as any[];
 
             // 3. Buscar última movimentação de cada item
-            const { data: lastMovementsData, error: lastMovementsError } = await supabase
-                .from("inventory_movements")
+            const { data: lastMovementsData, error: lastMovementsError } = await (supabase
+                .from("inventory_movements" as any) as any)
                 .select(`
           id,
           created_at,

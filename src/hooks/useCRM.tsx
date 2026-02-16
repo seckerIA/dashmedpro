@@ -291,7 +291,7 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
       });
     }
 
-    const { data: existingDeals } = await (supabase.from('crm_deals').select('id').eq('contact_id', contact.id).not('stage', 'in', '("fechado_ganho","fechado_perdido")').limit(1) as any);
+    const { data: existingDeals } = await ((supabase.from('crm_deals' as any) as any).select('id').eq('contact_id', contact.id).not('stage', 'in', '("fechado_ganho","fechado_perdido")').limit(1));
 
     let deal: any;
     const targetStage = leadStatus === 'convertido' ? 'agendado' : 'lead_novo';

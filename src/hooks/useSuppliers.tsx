@@ -32,22 +32,22 @@ export function useSuppliers() {
     const suppliersQuery = useQuery({
         queryKey: ["inventory-suppliers"],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from("inventory_suppliers")
+            const { data, error } = await (supabase
+                .from("inventory_suppliers" as any) as any)
                 .select("*")
                 .eq("is_active", true)
                 .order("name");
 
             if (error) throw error;
-            return data as Supplier[];
+            return (data || []) as unknown as Supplier[];
         },
         enabled: !!user,
     });
 
     const createSupplier = useMutation({
         mutationFn: async (supplier: SupplierInsert) => {
-            const { data, error } = await supabase
-                .from("inventory_suppliers")
+            const { data, error } = await (supabase
+                .from("inventory_suppliers" as any) as any)
                 .insert([{
                     ...supplier,
                     organization_id: profile?.organization_id,
@@ -77,8 +77,8 @@ export function useSuppliers() {
 
     const updateSupplier = useMutation({
         mutationFn: async ({ id, ...supplier }: SupplierUpdate & { id: string }) => {
-            const { data, error } = await supabase
-                .from("inventory_suppliers")
+            const { data, error } = await (supabase
+                .from("inventory_suppliers" as any) as any)
                 .update(supplier)
                 .eq("id", id)
                 .select()
@@ -106,8 +106,8 @@ export function useSuppliers() {
     // Desativar fornecedor (em vez de excluir)
     const deactivateSupplier = useMutation({
         mutationFn: async (id: string) => {
-            const { data, error } = await supabase
-                .from("inventory_suppliers")
+            const { data, error } = await (supabase
+                .from("inventory_suppliers" as any) as any)
                 .update({ is_active: false })
                 .eq("id", id)
                 .select()

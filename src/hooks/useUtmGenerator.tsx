@@ -19,8 +19,8 @@ export function useGeneratedUtms(filters?: {
   return useQuery({
     queryKey: ['generated-utms', filters],
     queryFn: async () => {
-      let query = supabase
-        .from('generated_utms')
+      let query = (supabase
+        .from('generated_utms' as any) as any)
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -34,7 +34,7 @@ export function useGeneratedUtms(filters?: {
       const { data, error } = await query;
 
       if (error) throw error;
-      return data as GeneratedUtm[];
+      return (data || []) as unknown as GeneratedUtm[];
     },
   });
 }
@@ -43,14 +43,14 @@ export function useGeneratedUtm(id: string) {
   return useQuery({
     queryKey: ['generated-utm', id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('generated_utms')
+      const { data, error } = await (supabase
+        .from('generated_utms' as any) as any)
         .select('*')
         .eq('id', id)
         .single();
 
       if (error) throw error;
-      return data as GeneratedUtm;
+      return data as unknown as GeneratedUtm;
     },
     enabled: !!id,
   });
@@ -75,11 +75,9 @@ export function useGenerateUtm() {
       ad_campaign_sync_id?: string;
       user_id: string;
     }) => {
-      // Gerar URL com UTMs
       const full_url = buildUtmUrl(params);
 
-      // Salvar no banco
-      const utmData: GeneratedUtmInsert = {
+      const utmData: any = {
         user_id,
         template_id: template_id || null,
         ad_campaign_sync_id: ad_campaign_sync_id || null,
@@ -88,14 +86,14 @@ export function useGenerateUtm() {
         conversions: 0,
       };
 
-      const { data, error } = await supabase
-        .from('generated_utms')
+      const { data, error } = await (supabase
+        .from('generated_utms' as any) as any)
         .insert(utmData)
         .select()
         .single();
 
       if (error) throw error;
-      return data as GeneratedUtm;
+      return data as unknown as GeneratedUtm;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['generated-utms'] });
@@ -112,27 +110,25 @@ export function useTrackUtmClick() {
 
   return useMutation({
     mutationFn: async (utm_id: string) => {
-      // Buscar UTM atual
-      const { data: currentUtm, error: fetchError } = await supabase
-        .from('generated_utms')
+      const { data: currentUtm, error: fetchError } = await (supabase
+        .from('generated_utms' as any) as any)
         .select('clicks')
         .eq('id', utm_id)
         .single();
 
       if (fetchError) throw fetchError;
 
-      // Incrementar cliques
-      const { data, error } = await supabase
-        .from('generated_utms')
+      const { data, error } = await (supabase
+        .from('generated_utms' as any) as any)
         .update({ 
-          clicks: (currentUtm?.clicks || 0) + 1 
+          clicks: ((currentUtm as any)?.clicks || 0) + 1 
         })
         .eq('id', utm_id)
         .select()
         .single();
 
       if (error) throw error;
-      return data as GeneratedUtm;
+      return data as unknown as GeneratedUtm;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['generated-utms'] });
@@ -145,27 +141,25 @@ export function useTrackUtmConversion() {
 
   return useMutation({
     mutationFn: async (utm_id: string) => {
-      // Buscar UTM atual
-      const { data: currentUtm, error: fetchError } = await supabase
-        .from('generated_utms')
+      const { data: currentUtm, error: fetchError } = await (supabase
+        .from('generated_utms' as any) as any)
         .select('conversions')
         .eq('id', utm_id)
         .single();
 
       if (fetchError) throw fetchError;
 
-      // Incrementar conversões
-      const { data, error } = await supabase
-        .from('generated_utms')
+      const { data, error } = await (supabase
+        .from('generated_utms' as any) as any)
         .update({ 
-          conversions: (currentUtm?.conversions || 0) + 1 
+          conversions: ((currentUtm as any)?.conversions || 0) + 1 
         })
         .eq('id', utm_id)
         .select()
         .single();
 
       if (error) throw error;
-      return data as GeneratedUtm;
+      return data as unknown as GeneratedUtm;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['generated-utms'] });
@@ -188,17 +182,17 @@ export function useUpdateGeneratedUtm() {
       id: string; 
       updates: GeneratedUtmUpdate 
     }) => {
-      const { data, error } = await supabase
-        .from('generated_utms')
+      const { data, error } = await (supabase
+        .from('generated_utms' as any) as any)
         .update(updates)
         .eq('id', id)
         .select()
         .single();
 
       if (error) throw error;
-      return data as GeneratedUtm;
+      return data as unknown as GeneratedUtm;
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['generated-utms'] });
       queryClient.invalidateQueries({ queryKey: ['generated-utm', data.id] });
     },
@@ -210,8 +204,8 @@ export function useDeleteGeneratedUtm() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('generated_utms')
+      const { error } = await (supabase
+        .from('generated_utms' as any) as any)
         .delete()
         .eq('id', id);
 
@@ -222,5 +216,3 @@ export function useDeleteGeneratedUtm() {
     },
   });
 }
-
-
