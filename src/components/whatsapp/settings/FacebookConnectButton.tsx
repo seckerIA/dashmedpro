@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, MessageCircle, Zap, Shield, Clock } from 'lucide-react';
-import { useWhatsAppOAuth } from '@/hooks/useWhatsAppOAuth';
+import { useMetaOAuth } from '@/hooks/useMetaOAuth';
 
 // Ícone do Facebook
 const FacebookIcon = () => (
@@ -22,7 +22,7 @@ export function FacebookConnectButton() {
         startOAuthFlow,
         isConnecting,
         isOAuthConfigured
-    } = useWhatsAppOAuth();
+    } = useMetaOAuth();
 
     if (!isOAuthConfigured) {
         return (

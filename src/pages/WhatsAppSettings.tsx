@@ -14,16 +14,14 @@ import { Separator } from '@/components/ui/separator';
 import { SetupGuide } from '@/components/whatsapp/settings/SetupGuide';
 import { CredentialsForm } from '@/components/whatsapp/settings/CredentialsForm';
 import { FacebookConnectButton } from '@/components/whatsapp/settings/FacebookConnectButton';
-import { PhoneNumberSelector } from '@/components/whatsapp/settings/PhoneNumberSelector';
+// PhoneNumberSelector removido: fluxo OAuth agora usa FB.login() popup via useMetaOAuth
 import { useWhatsAppConfig, useTeamWhatsAppConfigs } from '@/hooks/useWhatsAppConfig';
-import { useWhatsAppOAuth } from '@/hooks/useWhatsAppOAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 
 export default function WhatsAppSettings() {
   const { config, isLoading, isConfigured, isActive } = useWhatsAppConfig();
   const { isAdmin } = useUserProfile();
   const { teamConfigs, isLoading: isLoadingTeam } = useTeamWhatsAppConfigs();
-  const { hasOAuthSession, isLoadingSession } = useWhatsAppOAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [webhookUrl, setWebhookUrl] = useState<string>('');
   const [webhookVerifyToken, setWebhookVerifyToken] = useState<string>('');
@@ -108,11 +106,6 @@ export default function WhatsAppSettings() {
             )}
           </div>
         </div>
-      )}
-
-      {/* Seletor de Número (após OAuth) */}
-      {hasOAuthSession && !isLoadingSession && (
-        <PhoneNumberSelector />
       )}
 
       {/* Tabs de configuração */}

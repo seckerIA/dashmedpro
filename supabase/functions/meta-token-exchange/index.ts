@@ -20,7 +20,7 @@ const corsHeaders = {
 const FB_APP_ID = Deno.env.get('FB_APP_ID') || '';
 const FB_APP_SECRET = Deno.env.get('FB_APP_SECRET') || '';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
-const GRAPH_API_VERSION = 'v21.0';
+const GRAPH_API_VERSION = 'v22.0';
 
 interface WhatsAppData {
   phone_number_id?: string;
@@ -62,46 +62,57 @@ serve(async (req: Request) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Usuário não autenticado');
 
-    // Parsear body
-    const { code, whatsapp_data } = await req.json() as {
-      code: string;
+    // Parsear body — aceita code (FB.login code exchange) ou access_token direto
+    const { code, access_token: directAccessToken, whatsapp_data } = await req.json() as {
+      code?: string;
+      access_token?: string;
       whatsapp_data?: WhatsAppData;
     };
 
-    if (!code) {
-      throw new Error('Código não fornecido');
+    if (!code && !directAccessToken) {
+      throw new Error('Código ou access token não fornecido');
     }
 
     console.log('[Token Exchange] Starting for user:', user.id);
+    console.log('[Token Exchange] Mode:', code ? 'code_exchange' : 'direct_token');
     console.log('[Token Exchange] WhatsApp data:', whatsapp_data);
 
-    // Verificar configuração
+    // Verificar configuração (app secret necessário para code exchange e long-lived token)
     if (!FB_APP_ID || !FB_APP_SECRET) {
       throw new Error('Configuração do Facebook incompleta');
     }
 
-    // 1. Trocar código por access token
-    console.log('[Token Exchange] Exchanging code for token...');
-    const tokenResponse = await fetch(
-      `https://graph.facebook.com/${GRAPH_API_VERSION}/oauth/access_token?` +
-      `client_id=${FB_APP_ID}` +
-      `&client_secret=${FB_APP_SECRET}` +
-      `&code=${code}`
-    );
+    let accessToken: string;
+    let tokenExpiresAt: Date | null = null;
 
-    if (!tokenResponse.ok) {
-      const errorData = await tokenResponse.json();
-      console.error('[Token Exchange] Token exchange failed:', errorData);
-      throw new Error(errorData.error?.message || 'Falha ao trocar código por token');
+    if (code) {
+      // 1a. Trocar código por access token
+      console.log('[Token Exchange] Exchanging code for token...');
+      const tokenResponse = await fetch(
+        `https://graph.facebook.com/${GRAPH_API_VERSION}/oauth/access_token?` +
+        `client_id=${FB_APP_ID}` +
+        `&client_secret=${FB_APP_SECRET}` +
+        `&code=${code}`
+      );
+
+      if (!tokenResponse.ok) {
+        const errorData = await tokenResponse.json();
+        console.error('[Token Exchange] Token exchange failed:', errorData);
+        throw new Error(errorData.error?.message || 'Falha ao trocar código por token');
+      }
+
+      const tokenData = await tokenResponse.json();
+      accessToken = tokenData.access_token;
+      tokenExpiresAt = tokenData.expires_in
+        ? new Date(Date.now() + tokenData.expires_in * 1000)
+        : null;
+
+      console.log('[Token Exchange] Got short-lived token, expires:', tokenExpiresAt?.toISOString());
+    } else {
+      // 1b. Usar access token direto (fallback do FB.login)
+      console.log('[Token Exchange] Using direct access token');
+      accessToken = directAccessToken!;
     }
-
-    const tokenData = await tokenResponse.json();
-    let accessToken = tokenData.access_token;
-    let tokenExpiresAt = tokenData.expires_in
-      ? new Date(Date.now() + tokenData.expires_in * 1000)
-      : null;
-
-    console.log('[Token Exchange] Got short-lived token, expires:', tokenExpiresAt?.toISOString());
 
     // 2. Trocar por token de longa duração (60 dias ou nunca expira)
     console.log('[Token Exchange] Getting long-lived token...');

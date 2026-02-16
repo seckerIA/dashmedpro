@@ -22,15 +22,17 @@ import {
 // Configurações
 const FB_APP_ID = import.meta.env.VITE_FB_APP_ID || '';
 
-// Permissões Meta Ads + Business
+// Permissões Meta Ads + Business (apenas aprovadas no App Review)
 const META_SCOPES = [
-  'ads_read',
   'ads_management',
   'business_management',
   'pages_show_list',
   'pages_read_engagement',
+  'pages_manage_metadata',
+  'pages_manage_ads',
   'leads_retrieval',
-  'catalog_management',
+  'email',
+  'public_profile',
 ].join(',');
 
 // Interfaces
@@ -134,12 +136,12 @@ export function useMetaOAuth() {
   });
 
   // =====================================================
-  // Mutation: Trocar código por token e salvar configuração
+  // Mutation: Trocar código/token por token long-lived e salvar configuração
   // =====================================================
   const exchangeTokenMutation = useMutation({
-    mutationFn: async ({ code }: { code: string }) => {
+    mutationFn: async ({ code, access_token }: { code?: string; access_token?: string }) => {
       const response = await supabase.functions.invoke('meta-token-exchange', {
-        body: { code },
+        body: { code, access_token },
       });
 
       if (response.error) throw response.error;
@@ -208,12 +210,10 @@ export function useMetaOAuth() {
           code: response.authResponse.code,
         });
       } else if (response.authResponse?.accessToken) {
-        // Fallback: recebemos accessToken direto
-        console.warn('[Meta OAuth] Received accessToken instead of code');
-        toast({
-          title: 'Conexão parcial',
-          description: 'Token recebido, mas configuração adicional pode ser necessária.',
-          variant: 'default',
+        // Fallback: recebemos accessToken direto (sem code exchange)
+        console.log('[Meta OAuth] Received accessToken directly, sending to backend');
+        await exchangeTokenMutation.mutateAsync({
+          access_token: response.authResponse.accessToken,
         });
       }
     } catch (error: unknown) {

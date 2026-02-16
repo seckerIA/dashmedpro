@@ -213,6 +213,38 @@ export function MetaIntegrationCard() {
             : undefined
         )}
 
+        {/* Token Refresh Banner */}
+        {isConnected && integrationStatus?.whatsapp?.expiresAt && (
+          integrationStatus.whatsapp.expiresAt.getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000
+        ) && (
+          <div className="p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-300 dark:border-yellow-800 rounded-lg">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                    Token expirando em breve
+                  </p>
+                  <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-0.5">
+                    Expira em {format(integrationStatus.whatsapp.expiresAt, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}.
+                    Renove a conexão para evitar interrupções.
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={startOAuthFlow}
+                disabled={isConnecting || !isSdkReady}
+                className="border-yellow-500 text-yellow-700 hover:bg-yellow-100 dark:border-yellow-600 dark:text-yellow-300 dark:hover:bg-yellow-900/30 flex-shrink-0"
+              >
+                <RefreshCw className={cn("h-3 w-3 mr-1", isConnecting && "animate-spin")} />
+                Renovar
+              </Button>
+            </div>
+          </div>
+        )}
+
         {!isOAuthConfigured && (
           <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
             <div className="flex items-start gap-2">

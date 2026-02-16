@@ -317,7 +317,11 @@ export function useDashboardMetrics() {
         throw error;
       }
     },
-    enabled: !!user?.id && !!profile && !authLoading && !isLoadingProfile && (!isSecretaria || !isLoadingDoctors),
+    enabled: (() => {
+      const enabled = !!user?.id && !!profile && !authLoading && !isLoadingProfile && (!isSecretaria || !isLoadingDoctors);
+      console.log(`📊 [DashMetrics] enabled=${enabled} | user=${!!user?.id} profile=${!!profile} authLoading=${authLoading} profileLoading=${isLoadingProfile} isSecretaria=${isSecretaria} doctorsLoading=${isLoadingDoctors}`);
+      return enabled;
+    })(),
     refetchInterval: () => {
       // Não fazer refetch se tab não está visível
       if (typeof document !== 'undefined' && document.hidden) return false;

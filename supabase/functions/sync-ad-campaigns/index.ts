@@ -12,7 +12,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const GRAPH_API_VERSION = "v21.0";
+const GRAPH_API_VERSION = "v22.0";
 
 interface SyncRequest {
   connection_id: string;
@@ -35,6 +35,7 @@ interface MetaInsights {
   spend?: string;
   reach?: string;
   actions?: Array<{ action_type: string; value: string }>;
+  action_values?: Array<{ action_type: string; value: string }>;
   cpc?: string;
   cpm?: string;
   ctr?: string;
@@ -289,6 +290,7 @@ async function fetchCampaignInsights(campaignId: string, accessToken: string): P
     'spend',
     'reach',
     'actions',
+    'action_values',
     'cpc',
     'cpm',
     'ctr',
@@ -346,9 +348,15 @@ async function saveCampaignToDatabase(
   // CPA (Cost Per Acquisition)
   const cpa = conversionCount > 0 ? spend / conversionCount : 0;
 
-  // ROAS (Return on Ad Spend) - precisa de valor de conversão que não temos
-  // Por enquanto, usar 0
-  const roas = 0;
+  // ROAS (Return on Ad Spend) — calculado via action_values (purchase)
+  let purchaseValue = 0;
+  if (insights?.action_values) {
+    const purchaseAction = insights.action_values.find(a => a.action_type === 'purchase');
+    if (purchaseAction) {
+      purchaseValue = parseFloat(purchaseAction.value || '0');
+    }
+  }
+  const roas = spend > 0 ? purchaseValue / spend : 0;
 
   // Mapear status
   const statusMap: Record<string, string> = {

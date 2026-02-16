@@ -25,7 +25,7 @@ import {
     Star,
     AlertCircle
 } from 'lucide-react';
-import { useWhatsAppOAuth, WhatsAppBusinessAccount } from '@/hooks/useWhatsAppOAuth';
+import { useWhatsAppOAuth, WhatsAppBusinessAccount } from '@/hooks/_deprecated_useWhatsAppOAuth';
 import { cn } from '@/lib/utils';
 
 interface PhoneNumberSelectorProps {

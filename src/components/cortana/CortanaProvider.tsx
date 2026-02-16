@@ -113,14 +113,21 @@ export function CortanaProvider({ children }: { children: React.ReactNode }) {
     },
     onError: (error) => {
       console.error('[Cortana] Erro:', error);
+      const errorStr = String(error || '').toLowerCase();
+      const isPromptTooLong = errorStr.includes('prompt is too long') || errorStr.includes('prompt_too_long');
+
+      const errorMessage = isPromptTooLong
+        ? 'O prompt do agente está muito longo. Reduza o system prompt no painel do ElevenLabs.'
+        : typeof error === 'string' ? error : 'Erro na conexão com a Cortana';
+
       setState(prev => ({
         ...prev,
         status: 'error',
-        error: typeof error === 'string' ? error : 'Erro na conexão com a Cortana',
+        error: errorMessage,
       }));
       toast({
         title: 'Erro na Cortana',
-        description: 'Não foi possível conectar ao assistente de voz.',
+        description: errorMessage,
         variant: 'destructive',
       });
     },
@@ -210,9 +217,12 @@ export function CortanaProvider({ children }: { children: React.ReactNode }) {
       console.error('[Cortana] Erro ao iniciar:', error);
 
       let errorMessage = 'Erro ao iniciar a Cortana.';
+      const errorStr = String(error?.message || error || '').toLowerCase();
 
       if (error.name === 'NotAllowedError') {
         errorMessage = 'Permissão de microfone negada. Permita o acesso ao microfone para usar a Cortana.';
+      } else if (errorStr.includes('prompt is too long') || errorStr.includes('prompt_too_long')) {
+        errorMessage = 'O prompt do agente está muito longo. Reduza o system prompt ou as ferramentas no painel do ElevenLabs.';
       }
 
       setState(prev => ({

@@ -7,6 +7,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+const GRAPH_API_VERSION = "v22.0";
+
 interface TestRequest {
   platform: 'google_ads' | 'meta_ads';
   api_key: string;
@@ -110,37 +112,77 @@ async function testGoogleAdsConnection(apiKey: string, accountId: string) {
   }
 }
 
-async function testMetaAdsConnection(apiKey: string, accountId: string) {
+async function testMetaAdsConnection(accessToken: string, accountId: string) {
   try {
-    // TODO: Implementar teste real de conexão com Meta Ads API
-    // Por enquanto, validação básica
-    if (!apiKey || apiKey.trim().length === 0) {
+    if (!accessToken || accessToken.trim().length === 0) {
+      return { success: false, error: 'Access Token inválido' };
+    }
+
+    const formattedAccountId = accountId.startsWith('act_') ? accountId : `act_${accountId}`;
+
+    // 1. Validar token via /me
+    console.log('[test-ad-connection] Validating token via /me...');
+    const meResponse = await fetch(
+      `https://graph.facebook.com/${GRAPH_API_VERSION}/me?fields=id,name&access_token=${accessToken}`
+    );
+
+    if (!meResponse.ok) {
+      const errorData = await meResponse.json();
+      const errorMsg = errorData.error?.message || 'Token inválido ou expirado';
+      console.error('[test-ad-connection] /me failed:', errorData);
+      if (errorData.error?.code === 190) {
+        return { success: false, error: 'Token expirado. Reconecte sua conta Meta.' };
+      }
+      return { success: false, error: errorMsg };
+    }
+
+    const meData = await meResponse.json();
+    console.log('[test-ad-connection] Token valid for user:', meData.name);
+
+    // 2. Verificar acesso à conta de anúncios
+    console.log(`[test-ad-connection] Checking access to ${formattedAccountId}...`);
+    const accountResponse = await fetch(
+      `https://graph.facebook.com/${GRAPH_API_VERSION}/${formattedAccountId}?fields=id,name,account_status,currency,balance&access_token=${accessToken}`
+    );
+
+    if (!accountResponse.ok) {
+      const errorData = await accountResponse.json();
+      console.error('[test-ad-connection] Account check failed:', errorData);
       return {
         success: false,
-        error: 'Access Token inválido'
+        error: `Sem acesso à conta ${formattedAccountId}: ${errorData.error?.message || 'Permissão negada'}`
       };
     }
 
-    if (!accountId || !/^act_\d+$/.test(accountId)) {
-      return {
-        success: false,
-        error: 'Account ID inválido. Deve começar com "act_" seguido de números.'
-      };
-    }
+    const accountData = await accountResponse.json();
 
-    // Mock: retorna sucesso se validações passarem
+    const statusMap: Record<number, string> = {
+      1: 'Ativa',
+      2: 'Desativada',
+      3: 'Não configurada',
+      7: 'Pendente de revisão',
+      8: 'Em revisão',
+      9: 'Em período de carência',
+      100: 'Suspensa',
+      101: 'Encerrada',
+    };
+
     return {
       success: true,
-      message: 'Conexão testada com sucesso (mock). Implemente integração real com Meta Ads API.'
+      message: 'Conexão validada com sucesso!',
+      details: {
+        user_name: meData.name,
+        account_name: accountData.name,
+        account_id: accountData.id,
+        account_status: statusMap[accountData.account_status] || `Status ${accountData.account_status}`,
+        currency: accountData.currency,
+        balance: accountData.balance,
+      }
     };
   } catch (error: any) {
-    return {
-      success: false,
-      error: error.message
-    };
+    console.error('[test-ad-connection] Error:', error);
+    return { success: false, error: error.message };
   }
 }
 
 serve(handler);
-
-

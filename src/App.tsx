@@ -117,7 +117,7 @@ import VOIPSettings from "@/pages/VOIPSettings";
 
 import { focusManager } from "@tanstack/react-query";
 import { checkToken, supabase, wasRecentlyAuthenticated } from "@/integrations/supabase/client";
-import { recoverStuckQueries } from "@/lib/queryUtils";
+import { recoverStuckQueries, resetFetchTracking } from "@/lib/queryUtils";
 
 // Configuração customizada de Foco da Janela (não-bloqueante mas segura)
 // Configuração customizada de Foco da Janela (não-bloqueante mas segura)
@@ -359,11 +359,9 @@ const RouteChangeHandler = ({ queryClient }: { queryClient: QueryClient }) => {
 
       console.log(`🔄 [RouteChange] ${prevLocation} → ${location.pathname}. Idle: ${idleMinutes}m ${idleSeconds % 60}s (Effective)`);
 
-      // ALWAYS reset fetch slots on navigation to prevent slot leaks from stuck queries
-      import("@/lib/queryUtils").then(({ resetFetchTracking }) => {
-        resetFetchTracking();
-        console.log('🔓 [RouteChange] Fetch slots resetados');
-      }).catch(() => { });
+      // ALWAYS reset fetch slots SYNC on navigation to prevent slot leaks from stuck queries
+      resetFetchTracking();
+      console.log('🔓 [RouteChange] Fetch slots resetados (sync)');
 
       // If idle for more than 30 seconds, recover stuck queries (not cancel all)
       if (effectiveIdleTime > 30000) {

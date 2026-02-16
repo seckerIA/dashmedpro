@@ -7,6 +7,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+const GRAPH_API_VERSION = "v22.0";
+
 interface ManageRequest {
   campaign_id: string;
   action: 'pause' | 'activate';
@@ -140,47 +142,66 @@ const handler = async (req: Request): Promise<Response> => {
 };
 
 async function manageGoogleAdsCampaign(
-  apiKey: string,
-  accountId: string,
-  campaignId: string,
+  _apiKey: string,
+  _accountId: string,
+  _campaignId: string,
   action: 'pause' | 'activate'
 ) {
-  try {
-    // TODO: Implementar chamada real à Google Ads API
-    // Por enquanto, retorna estrutura básica
-    return {
-      success: true,
-      message: `Google Ads campaign ${action} not yet implemented. Please implement Google Ads API integration.`
-    };
-  } catch (error: any) {
-    return {
-      success: false,
-      error: error.message
-    };
-  }
+  // TODO: Implementar com Google Ads API
+  return {
+    success: true,
+    message: `Google Ads campaign ${action}: integração real pendente.`
+  };
 }
 
 async function manageMetaAdsCampaign(
-  apiKey: string,
-  accountId: string,
+  accessToken: string,
+  _accountId: string,
   campaignId: string,
   action: 'pause' | 'activate'
 ) {
   try {
-    // TODO: Implementar chamada real à Meta Ads API
-    // Por enquanto, retorna estrutura básica
+    const metaStatus = action === 'pause' ? 'PAUSED' : 'ACTIVE';
+
+    console.log(`[manage-ad-campaign] Setting campaign ${campaignId} to ${metaStatus}...`);
+
+    const response = await fetch(
+      `https://graph.facebook.com/${GRAPH_API_VERSION}/${campaignId}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: metaStatus,
+          access_token: accessToken,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('[manage-ad-campaign] Meta API error:', errorData);
+
+      if (errorData.error?.code === 190) {
+        return { success: false, error: 'Token expirado. Reconecte sua conta Meta.' };
+      }
+
+      return {
+        success: false,
+        error: errorData.error?.message || `Falha ao ${action === 'pause' ? 'pausar' : 'ativar'} campanha`
+      };
+    }
+
+    const result = await response.json();
+    console.log('[manage-ad-campaign] Success:', result);
+
     return {
       success: true,
-      message: `Meta Ads campaign ${action} not yet implemented. Please implement Meta Ads API integration.`
+      message: `Campanha ${action === 'pause' ? 'pausada' : 'ativada'} com sucesso.`,
     };
   } catch (error: any) {
-    return {
-      success: false,
-      error: error.message
-    };
+    console.error('[manage-ad-campaign] Error:', error);
+    return { success: false, error: error.message };
   }
 }
 
 serve(handler);
-
-

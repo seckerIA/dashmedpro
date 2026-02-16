@@ -132,7 +132,7 @@ export const staticQueryOptions = {
  * Maximum concurrent fetching queries allowed
  * Prevents browser connection limits from being exceeded
  */
-export const MAX_CONCURRENT_QUERIES = 4;
+export const MAX_CONCURRENT_QUERIES = 6;
 
 /**
  * Tracks currently fetching queries for connection limiting

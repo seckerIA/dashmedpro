@@ -43,7 +43,7 @@ export function useUserProfile() {
 
         const { data: profileData, error: profileError } = await supabaseQueryWithTimeout(
           profileQuery as any,
-          45000, // 45 segundos - mais tempo após idle longo
+          15000, // 15s - profile é query simples (1 row by PK)
           signal
         );
 
@@ -62,7 +62,7 @@ export function useUserProfile() {
               .eq('id', user.id)
               .single();
 
-            const basicResult = await supabaseQueryWithTimeout(basicQuery as any, undefined);
+            const basicResult = await supabaseQueryWithTimeout(basicQuery as any, 10000);
             const { data: basicData, error: basicError } = basicResult;
 
             if (basicError && basicError.code !== 'PGRST116') {
@@ -73,7 +73,7 @@ export function useUserProfile() {
                 .eq('id', user.id)
                 .single();
 
-              const minimalResult = await supabaseQueryWithTimeout(minimalQuery as any, undefined);
+              const minimalResult = await supabaseQueryWithTimeout(minimalQuery as any, 10000);
               const { data: minimalData, error: minimalError } = minimalResult;
 
               if (minimalError && minimalError.code !== 'PGRST116') {

@@ -84,21 +84,14 @@ export function buildCortanaContext(
 export function getDynamicOverrides(context: CortanaContext): Record<string, string> {
   const now = new Date();
 
+  // NOTA: Manter variáveis dinâmicas CURTAS para não estourar o limite de prompt do ElevenLabs.
+  // Instruções fixas (como "não repita confirmações") devem estar no system prompt do agente
+  // no painel do ElevenLabs, NÃO aqui como dynamicVariable.
   return {
     userName: context.userName,
     userRole: translateRole(context.userRole),
-    currentDateTime: now.toLocaleString('pt-BR', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }),
     currentDate: now.toLocaleDateString('pt-BR'),
     currentTime: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-    // Instrução crítica para evitar repetições
-    systemInstruction: "IMPORTANTE: Você é a Cortana, uma assistente eficiente. NÃO repita confirmações múltiplas vezes. Confirme o comando APENAS UMA VEZ e execute. Seja direta.",
   };
 }
 

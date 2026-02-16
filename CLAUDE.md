@@ -1,5 +1,8 @@
 # DashMedPro - Context Guide
 
+> **IMPORTANTE**: Para o sistema completo de agentes AI (DevSquad Avengers), consulte `.claude/CLAUDE.md`.
+> Ele contem as regras de ativacao automatica, squads, e protocolos de seguranca.
+
 ## Overview
 Sistema CRM médico integrado com agenda, prontuários, pipeline de pacientes e gestão financeira via Supabase RLS.
 
@@ -274,6 +277,22 @@ supabase/functions/
 - **Badge Component Fix**:
   - Atualizado `AppointmentStatusBadge` para corrigir warning do React sobre props booleanas inválidas no DOM.
 
+### Contexto Atual (14/02/2026 - Cortana Prompt Too Long Fix + Quality Loop Protocol)
+- **Bug Fix (Cortana "Prompt is too long")**:
+  - **Erro**: ElevenLabs retornava "Prompt is too long" ao iniciar sessão da Cortana.
+  - **Causa**: `dynamicVariables` enviavam `systemInstruction` (texto longo) + `currentDateTime` (redundante com `currentDate`+`currentTime`), inflando o prompt no ElevenLabs.
+  - **Correção**:
+    - `contextBuilder.ts`: Removido `systemInstruction` e `currentDateTime` das `dynamicVariables`. Instruções fixas devem estar no system prompt do agente no painel do ElevenLabs.
+    - `CortanaProvider.tsx`: Adicionado tratamento de erro específico para "Prompt is too long" nos callbacks `onError` e `catch` de `startConversation`, exibindo mensagem amigável ao usuário.
+  - **Recomendação**: Se o erro persistir, encurtar o System Prompt diretamente no painel do ElevenLabs (configuração do Agent).
+  - Arquivos alterados: `src/services/cortana/contextBuilder.ts`, `src/components/cortana/CortanaProvider.tsx`
+- **Quality Loop Protocol (Novo)**:
+  - Criado protocolo de auto-verificação obrigatório para todos os agentes do DevSquad.
+  - **5 Fases**: Pre-Flight → Implementação → Verificação → Re-Avaliação → Documentação.
+  - Integrado em `.claude/CLAUDE.md` (seção dedicada) e `.claude/agents/SAFETY_PROTOCOL.md` (checklist J.A.R.V.I.S.).
+  - **Regra de Ouro**: "Não declare CONCLUÍDO até que o build passe e você tenha RELIDO suas próprias mudanças."
+  - Inclui atalho "Quality Loop Rápido" para tasks triviais (1-3 linhas).
+
 ### Contexto Atual (02/02/2026 - AI Auto-Reply & Lead Creation)
 - **Otimização de Auto-Resposta do WhatsApp**:
   - Implementada lógica hierárquica em `whatsapp-ai-analyze`: Configuração Local da conversa tem prioridade, mas usa Configuração Global como fallback para novas conversas.
@@ -284,3 +303,31 @@ supabase/functions/
 - **Correções Adicionais**:
   - `WhatsAppSettings.tsx`: Correção na navegação de abas via URL params.
   - `whatsapp-ai-analyze`: Prompt da IA reforçado para priorizar "Base de Conhecimento" e evitar alucinações.
+
+### Contexto Atual (14/02/2026 - Meta Business Platform Integration)
+- **Meta OAuth Scopes Fix**:
+  - `useMetaOAuth.tsx`: Atualizado `META_SCOPES` para incluir apenas permissões aprovadas no App Review.
+  - Removidos: `ads_read`, `catalog_management` (rejeitados pelo Meta). Adicionados: `pages_manage_metadata`, `pages_manage_ads`, `email`, `public_profile`.
+- **accessToken Fallback Fix**:
+  - `useMetaOAuth.tsx`: Quando FB.login retorna `accessToken` direto (sem code), agora chama `meta-token-exchange` corretamente.
+  - `meta-token-exchange`: Edge Function agora aceita tanto `{ code }` quanto `{ access_token }`.
+- **Edge Functions — Stubs Implementados**:
+  - `test-ad-connection`: Implementada chamada real à Meta Graph API (`/me` + `/{account_id}`) com validação de token e status da conta.
+  - `manage-ad-campaign`: Implementada chamada real `POST /{campaign_id}` para pause/activate campanhas Meta Ads.
+- **ROAS Fix**:
+  - `sync-ad-campaigns`: Adicionado `action_values` ao fetch de insights. ROAS agora calculado como `purchase_value / spend` (antes hardcoded 0).
+- **Graph API Upgrade**: Todas as Edge Functions de Ads atualizadas de `v21.0` para `v22.0`.
+- **useWhatsAppOAuth Deprecado**:
+  - Hook renomeado para `_deprecated_useWhatsAppOAuth.tsx` (referenciava tabela inexistente `whatsapp_oauth_sessions`).
+  - `FacebookConnectButton.tsx` e `WhatsAppSettings.tsx` migrados para usar `useMetaOAuth`.
+  - `PhoneNumberSelector` atualizado para importar do hook deprecado (componente não mais utilizado).
+- **Token Refresh Banner**:
+  - `MetaIntegrationCard.tsx`: Adicionado banner amarelo de alerta quando token expira em < 7 dias, com botão "Renovar" que refaz FB.login().
+- **Meta App Credentials**:
+  - App ID: `1557514182198067` (configurar em `VITE_FB_APP_ID`)
+  - App Secret: `2973953f9f307045913fe6e85dbcbba0` (configurar em Supabase Secrets como `FB_APP_SECRET`)
+  - **Nota**: Permissões rejeitadas (ads_read, catalog_management, whatsapp_business_management, etc.) funcionam normalmente em dev com conta do criador do app.
+- **Pendências**:
+  - Configurar `FB_APP_SECRET` no Supabase Secrets: `npx supabase secrets set FB_APP_SECRET=2973953f9f307045913fe6e85dbcbba0`
+  - Gravar screencasts para resubmeter permissões rejeitadas ao Meta App Review
+  - WhatsApp Edge Functions ainda usam Graph API v18.0 (funcional, upgrade opcional)
