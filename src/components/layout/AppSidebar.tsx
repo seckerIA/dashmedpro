@@ -267,6 +267,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
 
                   // Abas ocultas temporariamente (não exibir para nenhum cargo)
                   const hiddenUrls = [
+                    '/marketing', // Marketing
                     '/comercial/guia-prospeccao', // Guia de Prospecção
                     '/calculadora', // Calculadora
                     '/funil-vendas', // Funil de Vendas

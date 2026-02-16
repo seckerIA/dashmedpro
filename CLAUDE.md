@@ -304,6 +304,12 @@ supabase/functions/
   - `WhatsAppSettings.tsx`: Correção na navegação de abas via URL params.
   - `whatsapp-ai-analyze`: Prompt da IA reforçado para priorizar "Base de Conhecimento" e evitar alucinações.
 
+### Contexto Atual (13/02/2026 - Onboarding & UI Tweaks)
+- **UI Updates**:
+  - `AppSidebar.tsx`: Ocultada a rota `/marketing` da barra lateral (`hiddenUrls`) para simplificar a navegação.
+- **Onboarding Testing**:
+  - Criado usuário de teste (`testemedpro@gmail.com`) via bypass seguro no banco de dados para validar o fluxo completo de onboarding (Wizard -> Edge Function -> Dashboards).
+
 ### Contexto Atual (14/02/2026 - Meta Business Platform Integration)
 - **Meta OAuth Scopes Fix**:
   - `useMetaOAuth.tsx`: Atualizado `META_SCOPES` para incluir apenas permissões aprovadas no App Review.
