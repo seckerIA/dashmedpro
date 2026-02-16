@@ -32,7 +32,7 @@ export function useMarketingLeads(filters?: {
   platform?: 'google_ads' | 'meta_ads';
   status?: string;
 }) {
-  const { data: allLeads } = useCommercialLeads(filters);
+  const { leads: allLeads } = useCommercialLeads(filters);
   const { data: campaigns } = useAdCampaignsSync();
   const { data: utms } = useGeneratedUtms();
 

@@ -52,7 +52,7 @@ const fetchSalesCalls = async (
   const { data, error } = await supabaseQueryWithTimeout(query, undefined, signal);
 
   if (error) throw new Error(`Erro ao buscar calls: ${error.message}`);
-  return (data || []) as SalesCallWithRelations[];
+  return (data || []) as unknown as SalesCallWithRelations[];
 };
 
 // Fetch single call
@@ -68,7 +68,7 @@ const fetchSalesCall = async (callId: string): Promise<SalesCallWithRelations> =
     .single();
 
   if (error) throw new Error(`Erro ao buscar call: ${error.message}`);
-  return data as SalesCallWithRelations;
+  return data as unknown as SalesCallWithRelations;
 };
 
 // Hook principal
@@ -109,7 +109,7 @@ export function useSalesCalls(filters?: {
         .single();
 
       if (error) throw new Error(`Erro ao criar call: ${error.message}`);
-      return data as SalesCallWithRelations;
+      return data as unknown as SalesCallWithRelations;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['sales-calls'] });
@@ -145,7 +145,7 @@ export function useSalesCalls(filters?: {
         .single();
 
       if (error) throw new Error(`Erro ao atualizar call: ${error.message}`);
-      return data as SalesCallWithRelations;
+      return data as unknown as SalesCallWithRelations;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sales-calls'] });
@@ -185,7 +185,7 @@ export function useSalesCalls(filters?: {
         .single();
 
       if (error) throw new Error(`Erro ao marcar call como completada: ${error.message}`);
-      return data as SalesCallWithRelations;
+      return data as unknown as SalesCallWithRelations;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sales-calls'] });
@@ -207,7 +207,7 @@ export function useSalesCalls(filters?: {
         .single();
 
       if (error) throw new Error(`Erro ao cancelar call: ${error.message}`);
-      return data as SalesCallWithRelations;
+      return data as unknown as SalesCallWithRelations;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sales-calls'] });
@@ -229,7 +229,7 @@ export function useSalesCalls(filters?: {
         .single();
 
       if (error) throw new Error(`Erro ao marcar call como no_show: ${error.message}`);
-      return data as SalesCallWithRelations;
+      return data as unknown as SalesCallWithRelations;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sales-calls'] });

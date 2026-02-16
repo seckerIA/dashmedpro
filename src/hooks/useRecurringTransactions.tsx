@@ -25,7 +25,7 @@ export const useRecurringTransactions = () => {
       if (error) {
         throw new Error(error.message)
       }
-      return data
+      return (data || []) as any as FinancialRecurringTransactionWithTemplate[]
     },
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
@@ -64,8 +64,8 @@ export const useCreateRecurringTransaction = () => {
         is_active: data.is_active ?? true,
       }
 
-      const { data: result, error } = await supabase
-        .from('financial_recurring_transactions')
+      const { data: result, error } = await (supabase
+        .from('financial_recurring_transactions') as any)
         .insert([insertData])
         .select()
         .single()
@@ -178,7 +178,7 @@ export const useExecuteRecurringTransaction = () => {
       if (fetchError) throw new Error(fetchError.message)
 
       // Update next occurrence date (calculate next based on frequency)
-      const nextOccurrence = new Date(recurring.next_occurrence)
+      const nextOccurrence = new Date((recurring as any).next_occurrence || recurring.next_date)
       
       // Calcular próxima data baseado na frequência (valores em português)
       switch (recurring.frequency) {
@@ -212,8 +212,8 @@ export const useExecuteRecurringTransaction = () => {
           break
       }
       
-      const { error: updateError } = await supabase
-        .from('financial_recurring_transactions')
+      const { error: updateError } = await (supabase
+        .from('financial_recurring_transactions') as any)
         .update({
           next_occurrence: nextOccurrence.toISOString().split('T')[0]
         })

@@ -3,38 +3,30 @@ import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { LeadScoreFactor, LeadScoreHistory } from '@/types/leadScoring';
 import { CommercialLead } from '@/types/commercial';
+import { fromTable } from '@/lib/supabaseFrom';
 
-/**
- * Hook para gerenciar scoring de leads
- */
 export function useLeadScoring() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Buscar fatores de scoring configurados
   const { data: factors, isLoading: isLoadingFactors } = useQuery({
     queryKey: ['lead-scoring-factors', user?.id],
     queryFn: async () => {
       if (!user) throw new Error('User not authenticated');
-
-      const { data, error } = await supabase
-        .from('lead_scoring_factors')
+      const { data, error } = await fromTable('lead_scoring_factors')
         .select('*')
         .eq('user_id', user.id)
         .eq('enabled', true)
         .order('factor_name');
-
       if (error) throw error;
-      return data as LeadScoreFactor[];
+      return (data || []) as LeadScoreFactor[];
     },
     enabled: !!user,
   });
 
-  // Calcular score de um lead
   const calculateScore = useMutation({
     mutationFn: async (leadId: string) => {
       if (!user) throw new Error('User not authenticated');
-
       const session = await supabase.auth.getSession();
       const supabaseUrl = (await import('@/integrations/supabase/client')).SUPABASE_URL;
       const response = await fetch(`${supabaseUrl}/functions/v1/calculate-lead-score`, {
@@ -45,48 +37,23 @@ export function useLeadScoring() {
         },
         body: JSON.stringify({ lead_id: leadId, user_id: user.id }),
       });
-
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || 'Failed to calculate score');
       }
-
       return await response.json();
     },
     onSuccess: (data, leadId) => {
-      // Invalidar queries relacionadas
       queryClient.invalidateQueries({ queryKey: ['commercial-leads'] });
       queryClient.invalidateQueries({ queryKey: ['lead-score-history', leadId] });
     },
   });
 
-  // Buscar histórico de scores de um lead
-  const getScoreHistory = useQuery({
-    queryKey: ['lead-score-history'],
-    queryFn: async (leadId?: string) => {
-      if (!user || !leadId) return [];
-
-      const { data, error } = await supabase
-        .from('lead_score_history')
-        .select('*')
-        .eq('lead_id', leadId)
-        .order('calculated_at', { ascending: false })
-        .limit(50);
-
-      if (error) throw error;
-      return data as LeadScoreHistory[];
-    },
-    enabled: false, // Será habilitado quando necessário
-  });
-
-  // Atualizar pesos dos fatores
   const updateScoreWeights = useMutation({
     mutationFn: async (updates: Array<{ id: string; weight: number; enabled?: boolean }>) => {
       if (!user) throw new Error('User not authenticated');
-
       const promises = updates.map((update) =>
-        supabase
-          .from('lead_scoring_factors')
+        fromTable('lead_scoring_factors')
           .update({
             weight: update.weight,
             enabled: update.enabled !== undefined ? update.enabled : true,
@@ -95,14 +62,9 @@ export function useLeadScoring() {
           .eq('id', update.id)
           .eq('user_id', user.id)
       );
-
       const results = await Promise.all(promises);
-      const errors = results.filter((r) => r.error);
-      
-      if (errors.length > 0) {
-        throw new Error('Failed to update some factors');
-      }
-
+      const errors = results.filter((r: any) => r.error);
+      if (errors.length > 0) throw new Error('Failed to update some factors');
       return results;
     },
     onSuccess: () => {
@@ -110,13 +72,10 @@ export function useLeadScoring() {
     },
   });
 
-  // Criar/atualizar fator de scoring
   const upsertScoreFactor = useMutation({
     mutationFn: async (factor: Partial<LeadScoreFactor> & { factor_name: string; weight: number }) => {
       if (!user) throw new Error('User not authenticated');
-
-      const { data, error } = await supabase
-        .from('lead_scoring_factors')
+      const { data, error } = await fromTable('lead_scoring_factors')
         .upsert({
           user_id: user.id,
           factor_name: factor.factor_name,
@@ -124,12 +83,9 @@ export function useLeadScoring() {
           enabled: factor.enabled !== undefined ? factor.enabled : true,
           config: factor.config || {},
           updated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'user_id,factor_name',
-        })
+        }, { onConflict: 'user_id,factor_name' })
         .select()
         .single();
-
       if (error) throw error;
       return data as LeadScoreFactor;
     },
@@ -138,32 +94,24 @@ export function useLeadScoring() {
     },
   });
 
-  // Recalcular scores de todos os leads
   const recalculateAllScores = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error('User not authenticated');
-
-      // Buscar todos os leads do usuário
       const { data: leads, error } = await supabase
         .from('commercial_leads')
         .select('id')
         .eq('user_id', user.id)
         .in('status', ['new', 'contacted', 'qualified']);
-
       if (error) throw error;
       if (!leads || leads.length === 0) return { processed: 0 };
-
-      // Calcular score para cada lead (em lotes de 10)
       const batchSize = 10;
       let processed = 0;
-
       for (let i = 0; i < leads.length; i += batchSize) {
         const batch = leads.slice(i, i + batchSize);
         const promises = batch.map((lead) => calculateScore.mutateAsync(lead.id));
         await Promise.allSettled(promises);
         processed += batch.length;
       }
-
       return { processed };
     },
     onSuccess: () => {
@@ -184,31 +132,25 @@ export function useLeadScoring() {
       return queryClient.fetchQuery({
         queryKey: ['lead-score-history', leadId],
         queryFn: async () => {
-          const { data, error } = await supabase
-            .from('lead_score_history')
+          const { data, error } = await fromTable('lead_score_history')
             .select('*')
             .eq('lead_id', leadId)
             .order('calculated_at', { ascending: false })
             .limit(50);
-
           if (error) throw error;
-          return data as LeadScoreHistory[];
+          return (data || []) as LeadScoreHistory[];
         },
       });
     },
     updateScoreWeights: {
-      mutate: (updates: Array<{ id: string; weight: number; enabled?: boolean }>) =>
-        updateScoreWeights.mutate(updates),
-      mutateAsync: (updates: Array<{ id: string; weight: number; enabled?: boolean }>) =>
-        updateScoreWeights.mutateAsync(updates),
+      mutate: (updates: Array<{ id: string; weight: number; enabled?: boolean }>) => updateScoreWeights.mutate(updates),
+      mutateAsync: (updates: Array<{ id: string; weight: number; enabled?: boolean }>) => updateScoreWeights.mutateAsync(updates),
       isPending: updateScoreWeights.isPending,
       error: updateScoreWeights.error,
     },
     upsertScoreFactor: {
-      mutate: (factor: Partial<LeadScoreFactor> & { factor_name: string; weight: number }) =>
-        upsertScoreFactor.mutate(factor),
-      mutateAsync: (factor: Partial<LeadScoreFactor> & { factor_name: string; weight: number }) =>
-        upsertScoreFactor.mutateAsync(factor),
+      mutate: (factor: Partial<LeadScoreFactor> & { factor_name: string; weight: number }) => upsertScoreFactor.mutate(factor),
+      mutateAsync: (factor: Partial<LeadScoreFactor> & { factor_name: string; weight: number }) => upsertScoreFactor.mutateAsync(factor),
       isPending: upsertScoreFactor.isPending,
       error: upsertScoreFactor.error,
     },
@@ -220,4 +162,3 @@ export function useLeadScoring() {
     },
   };
 }
-

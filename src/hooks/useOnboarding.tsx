@@ -103,8 +103,7 @@ export function useOnboarding(): UseOnboardingReturn {
     queryFn: async () => {
       if (!user?.id) return null;
 
-      const { data, error } = await supabase
-        .from('onboarding_state')
+      const { data, error } = await (supabase.from('onboarding_state' as any) as any)
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
@@ -113,7 +112,7 @@ export function useOnboarding(): UseOnboardingReturn {
         throw error;
       }
 
-      return data as OnboardingStateDB | null;
+      return data as unknown as OnboardingStateDB | null;
     },
     enabled: !!user?.id,
     staleTime: 1000 * 60 * 5, // 5 minutes
@@ -130,15 +129,14 @@ export function useOnboarding(): UseOnboardingReturn {
     queryFn: async () => {
       if (!selectedSpecialty) return [];
 
-      const { data, error } = await supabase
-        .from('specialty_procedures')
+      const { data, error } = await (supabase.from('specialty_procedures' as any) as any)
         .select('*')
         .eq('specialty', selectedSpecialty)
         .order('category', { ascending: true })
         .order('name', { ascending: true });
 
       if (error) throw error;
-      return data as SpecialtyProcedure[];
+      return (data || []) as SpecialtyProcedure[];
     },
     enabled: !!selectedSpecialty,
   });
@@ -199,8 +197,7 @@ export function useOnboarding(): UseOnboardingReturn {
         updated_at: new Date().toISOString(),
       };
 
-      const { error } = await supabase
-        .from('onboarding_state')
+      const { error } = await (supabase.from('onboarding_state' as any) as any)
         .upsert(payload, { onConflict: 'user_id' });
 
       if (error) throw error;
@@ -478,8 +475,7 @@ export function useOnboarding(): UseOnboardingReturn {
 
     setCheckingSlug(true);
     try {
-      const { data, error } = await supabase
-        .from('organizations')
+      const { data, error } = await (supabase.from('organizations' as any) as any)
         .select('id')
         .eq('slug', slug.toLowerCase())
         .maybeSingle();

@@ -96,10 +96,11 @@ export function useProspectingSessions() {
   });
 
   // Estatísticas do dia
+  const sessions = (todaySessions || []) as any[];
   const todayStats = {
-    total: todaySessions.length,
-    atendimentosEncerrados: todaySessions.filter(s => s.result === 'atendimento_encerrado').length,
-    contatosDecisores: todaySessions.filter(s => s.result === 'contato_decisor').length,
+    total: sessions.length,
+    atendimentosEncerrados: sessions.filter((s: any) => s.result === 'atendimento_encerrado').length,
+    contatosDecisores: sessions.filter((s: any) => s.result === 'contato_decisor').length,
   };
 
   return {
