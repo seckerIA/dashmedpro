@@ -61,7 +61,7 @@ export function useMarketingDashboard() {
   });
   
   // Buscar leads do mês (vamos usar um hook que já existe ou criar um filtrado)
-  const { data: allLeads } = useCommercialLeads({});
+  const { leads: allLeads } = useCommercialLeads({});
   
   return useQuery({
     queryKey: ['marketing-dashboard', campaigns, connections, metrics, allLeads],

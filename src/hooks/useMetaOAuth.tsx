@@ -102,14 +102,12 @@ export function useMetaOAuth() {
       if (!user) throw new Error('Usuário não autenticado');
 
       const [whatsappRes, adsRes] = await Promise.all([
-        supabase
-          .from('whatsapp_config')
+        (supabase.from('whatsapp_config' as any) as any)
           .select('*')
           .eq('user_id', user.id)
           .eq('is_active', true)
           .maybeSingle(),
-        supabase
-          .from('ad_platform_connections')
+        (supabase.from('ad_platform_connections' as any) as any)
           .select('*')
           .eq('user_id', user.id)
           .eq('platform', 'meta_ads')
@@ -246,15 +244,11 @@ export function useMetaOAuth() {
     mutationFn: async () => {
       if (!user) throw new Error('Usuário não autenticado');
 
-      // Desativar whatsapp_config
-      await supabase
-        .from('whatsapp_config')
+      await (supabase.from('whatsapp_config' as any) as any)
         .update({ is_active: false, oauth_connected: false })
         .eq('user_id', user.id);
 
-      // Desativar ad_platform_connections
-      await supabase
-        .from('ad_platform_connections')
+      await (supabase.from('ad_platform_connections' as any) as any)
         .update({ is_active: false })
         .eq('user_id', user.id)
         .eq('platform', 'meta_ads');

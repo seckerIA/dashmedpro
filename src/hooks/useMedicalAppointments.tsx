@@ -122,7 +122,7 @@ const createFinancialTransactionForAppointment = async (
 
     const orgId = appointment.organization_id || profileOrgId;
 
-    const transactionData: FinancialTransactionInsert = {
+    const transactionData: any = {
       user_id: appointment.user_id,
       organization_id: orgId,
       account_id: accountId,
@@ -198,8 +198,7 @@ const deductStockForAppointment = async (
 ): Promise<{ success: boolean; deductedItems: number }> => {
   try {
     // 1. Buscar itens de estoque vinculados que ainda não foram deduzidos
-    const { data: stockUsage, error: fetchError } = await supabase
-      .from('appointment_stock_usage')
+    const { data: stockUsage, error: fetchError } = await (supabase.from('appointment_stock_usage' as any) as any)
       .select(`
         id,
         inventory_item_id,
@@ -228,8 +227,7 @@ const deductStockForAppointment = async (
       let remainingQuantity = usage.quantity;
 
       // Buscar batches ativos ordenados por data de validade (FEFO)
-      const { data: batches, error: batchError } = await supabase
-        .from('inventory_batches')
+      const { data: batches, error: batchError } = await (supabase.from('inventory_batches' as any) as any)
         .select('id, quantity, expiration_date')
         .eq('item_id', usage.inventory_item_id)
         .eq('is_active', true)
@@ -253,8 +251,7 @@ const deductStockForAppointment = async (
         const deductQuantity = Math.min(remainingQuantity, batch.quantity);
 
         // Criar movimento de saída (OUT) - o trigger do banco atualiza o saldo
-        const { error: movementError } = await supabase
-          .from('inventory_movements')
+        const { error: movementError } = await (supabase.from('inventory_movements' as any) as any)
           .insert({
             batch_id: batch.id,
             type: 'OUT',
@@ -275,8 +272,7 @@ const deductStockForAppointment = async (
 
       // Marcar como deduzido se conseguiu deduzir tudo
       if (remainingQuantity <= 0) {
-        const { error: updateError } = await supabase
-          .from('appointment_stock_usage')
+        const { error: updateError } = await (supabase.from('appointment_stock_usage' as any) as any)
           .update({ deducted: true })
           .eq('id', usage.id);
 
@@ -389,8 +385,7 @@ const updateDealPipeline = async (
     let existingDeal = null;
 
     // Buscar deal no stage "agendado" primeiro (mais específico)
-    const { data: dealInAgendado } = await supabase
-      .from('crm_deals')
+    const { data: dealInAgendado } = await (supabase.from('crm_deals') as any)
       .select('id, stage, user_id')
       .eq('contact_id', contactId)
       .eq('stage', 'agendado')
@@ -402,8 +397,7 @@ const updateDealPipeline = async (
     } else {
       // Se não encontrou no stage "agendado", buscar qualquer deal ativo para o contato
       // Não usar user_id como filtro para evitar criar duplicados quando o médico é diferente
-      const { data: anyActiveDeal } = await supabase
-        .from('crm_deals')
+      const { data: anyActiveDeal } = await (supabase.from('crm_deals') as any)
         .select('id, stage, user_id')
         .eq('contact_id', contactId)
         .not('stage', 'in', '("fechado_ganho","fechado_perdido")')
@@ -509,8 +503,7 @@ export const checkAndMoveToAguardandoRetorno = async (contactId: string): Promis
     }
 
     // 5. Buscar deal do contato e verificar is_in_treatment
-    const { data: deal, error: dealError } = await supabase
-      .from('crm_deals')
+    const { data: deal, error: dealError } = await (supabase.from('crm_deals') as any)
       .select('id, is_in_treatment, stage')
       .eq('contact_id', contactId)
       .not('stage', 'in', '("fechado_ganho","fechado_perdido")')
@@ -564,8 +557,7 @@ export const checkAndMoveToAguardandoRetorno = async (contactId: string): Promis
 export const updateDealToTreatment = async (contactId: string, doctorId: string): Promise<void> => {
   try {
     // Buscar deal ativo do contato
-    const { data: deal, error: dealError } = await supabase
-      .from('crm_deals')
+    const { data: deal, error: dealError } = await (supabase.from('crm_deals') as any)
       .select('id')
       .eq('contact_id', contactId)
       .not('stage', 'in', '("fechado_ganho","fechado_perdido")')
@@ -632,8 +624,7 @@ const fetchAppointments = async (
   // Global auth handling will catch 401 errors and refresh token
 
   // INÍCIO DA QUERY
-  let query = supabase
-    .from('medical_appointments')
+  let query = (supabase.from('medical_appointments') as any)
     .select(`
       *,
       contact:crm_contacts!medical_appointments_contact_id_fkey(*),
@@ -840,8 +831,7 @@ const updateAppointment = async ({
   };
 
   // Buscar dados atuais para verificar mudanças sensíveis
-  const { data: oldAppointment } = await supabase
-    .from('medical_appointments')
+  const { data: oldAppointment } = await (supabase.from('medical_appointments') as any)
     .select('sinal_paid, sinal_amount, payment_status, estimated_value, financial_transaction_id')
     .eq('id', id)
     .single();
@@ -1221,7 +1211,7 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
 
         // Se não existir categoria de entrada, criar uma automaticamente
         if (!categories || categories.length === 0) {
-          const orgId = appointment.organization_id || profile?.organization_id;
+          const orgId = (appointment as any).organization_id || (profile as any)?.organization_id;
           if (!orgId) {
             console.error('[Financial] Não foi possível criar categoria: organization_id não encontrado');
             throw new Error('Organization ID não encontrado para criar categoria');

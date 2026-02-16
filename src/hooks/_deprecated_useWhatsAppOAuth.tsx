@@ -63,8 +63,7 @@ export function useWhatsAppOAuth() {
         queryFn: async () => {
             if (!sessionIdFromUrl || !user) return null;
 
-            const { data, error } = await supabase
-                .from('whatsapp_oauth_sessions')
+            const { data, error } = await (supabase.from('whatsapp_oauth_sessions' as any) as any)
                 .select('*')
                 .eq('id', sessionIdFromUrl)
                 .eq('user_id', user.id)
@@ -75,7 +74,7 @@ export function useWhatsAppOAuth() {
                 return null;
             }
 
-            return data as OAuthSession;
+            return data as unknown as OAuthSession;
         },
         enabled: !!sessionIdFromUrl && !!user,
         staleTime: 0, // Sempre buscar fresh
@@ -199,8 +198,7 @@ export function useWhatsAppOAuth() {
     const cancelOAuthSession = useCallback(async () => {
         if (!sessionIdFromUrl) return;
 
-        await supabase
-            .from('whatsapp_oauth_sessions')
+        await (supabase.from('whatsapp_oauth_sessions' as any) as any)
             .delete()
             .eq('id', sessionIdFromUrl);
 

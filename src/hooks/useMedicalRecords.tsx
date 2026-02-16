@@ -35,8 +35,7 @@ export function useMedicalRecords(contactId?: string) {
       if (!contactId || !user?.id) return [];
 
       // 1. Buscar prontuários
-      const query = supabase
-        .from('medical_records')
+      const query = (supabase.from('medical_records' as any) as any)
         .select(`
           *,
           contact:crm_contacts(id, full_name, phone, email)
@@ -132,8 +131,7 @@ export function useMedicalRecords(contactId?: string) {
         record_status: 'completed',
       };
 
-      const { data, error } = await supabase
-        .from('medical_records')
+      const { data, error } = await (supabase.from('medical_records' as any) as any)
         .insert(recordData)
         .select()
         .single();
@@ -193,8 +191,7 @@ export function useMedicalRecords(contactId?: string) {
       if (updates.exams_requested !== undefined) updateData.exams_requested = updates.exams_requested;
       if (updates.record_type !== undefined) updateData.record_type = updates.record_type;
 
-      const { data, error } = await supabase
-        .from('medical_records')
+      const { data, error } = await (supabase.from('medical_records' as any) as any)
         .update(updateData)
         .eq('id', recordId)
         .select()
@@ -225,8 +222,7 @@ export function useMedicalRecords(contactId?: string) {
   // Deletar prontuário
   const deleteRecordMutation = useMutation({
     mutationFn: async (recordId: string) => {
-      const { error } = await supabase
-        .from('medical_records')
+      const { error } = await (supabase.from('medical_records' as any) as any)
         .delete()
         .eq('id', recordId);
 
@@ -253,8 +249,7 @@ export function useMedicalRecords(contactId?: string) {
   // Buscar prontuário por ID
   const getRecordById = async (recordId: string): Promise<MedicalRecord | null> => {
     // Buscar prontuário sem JOIN com profiles (não há FK direta)
-    const { data, error } = await supabase
-      .from('medical_records')
+    const { data, error } = await (supabase.from('medical_records' as any) as any)
       .select(`
         *,
         contact:crm_contacts(id, full_name, phone, email, cpf)
@@ -273,8 +268,7 @@ export function useMedicalRecords(contactId?: string) {
   // Marcar como completo
   const markAsCompletedMutation = useMutation({
     mutationFn: async (recordId: string) => {
-      const { data, error } = await supabase
-        .from('medical_records')
+      const { data, error } = await (supabase.from('medical_records' as any) as any)
         .update({
           record_status: 'completed',
         })
@@ -342,8 +336,7 @@ export function usePrescriptions(contactId?: string) {
       if (!contactId || !user?.id) return [];
 
       // Buscar receitas sem JOIN com profiles (não há FK direta)
-      const query = supabase
-        .from('prescriptions')
+      const query = (supabase.from('prescriptions' as any) as any)
         .select(`
           *,
           contact:crm_contacts(id, full_name)
@@ -387,8 +380,7 @@ export function usePrescriptions(contactId?: string) {
         prescription_date: new Date().toISOString().split('T')[0],
       };
 
-      const { data, error } = await supabase
-        .from('prescriptions')
+      const { data, error } = await (supabase.from('prescriptions' as any) as any)
         .insert(prescriptionData)
         .select()
         .single();
@@ -418,8 +410,7 @@ export function usePrescriptions(contactId?: string) {
   // Marcar receita como impressa
   const markAsPrintedMutation = useMutation({
     mutationFn: async (prescriptionId: string) => {
-      const { data, error } = await supabase
-        .from('prescriptions')
+      const { data, error } = await (supabase.from('prescriptions' as any) as any)
         .update({
           is_printed: true,
           printed_at: new Date().toISOString(),
@@ -464,8 +455,7 @@ export function usePatientMedicalHistory(contactId: string | null) {
       if (!contactId || !user?.id) return null;
 
       // Buscar prontuários
-      const recordsQuery = supabase
-        .from('medical_records')
+      const recordsQuery = (supabase.from('medical_records' as any) as any)
         .select('*')
         .eq('contact_id', contactId)
         .order('created_at', { ascending: false });
@@ -478,8 +468,7 @@ export function usePatientMedicalHistory(contactId: string | null) {
         .order('start_time', { ascending: false });
 
       // Buscar receitas
-      const prescriptionsQuery = supabase
-        .from('prescriptions')
+      const prescriptionsQuery = (supabase.from('prescriptions' as any) as any)
         .select('*')
         .eq('contact_id', contactId)
         .order('created_at', { ascending: false });
@@ -521,8 +510,7 @@ export function usePatientRecordHistory(contactId: string | null) {
     queryFn: async ({ signal }) => {
       if (!contactId || !user?.id) return [];
 
-      const query = supabase
-        .from('medical_records')
+      const query = (supabase.from('medical_records' as any) as any)
         .select(`
           id,
           created_at,
@@ -574,8 +562,7 @@ export function useMedicalRecord(recordId: string | null) {
       if (!recordId || !user?.id) return null;
 
       // Buscar prontuário sem JOIN com profiles (não há FK direta)
-      const query = supabase
-        .from('medical_records')
+      const query = (supabase.from('medical_records' as any) as any)
         .select(`
           *,
           contact:crm_contacts(id, full_name, phone, email)

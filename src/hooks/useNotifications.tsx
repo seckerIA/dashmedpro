@@ -38,7 +38,7 @@ export function useNotifications() {
         return;
       }
 
-      const notificationsData = (data as Notification[]) || [];
+      const notificationsData = (data as unknown as Notification[]) || [];
       setNotifications(notificationsData);
       setUnreadCount(notificationsData.filter(n => !n.read).length || 0);
     } catch (error) {

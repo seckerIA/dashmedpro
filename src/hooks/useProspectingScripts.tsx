@@ -53,10 +53,11 @@ export function useProspectingScripts() {
       if (publicError) throw publicError;
 
       // Para os scripts públicos, buscar info dos criadores
-      const scriptResults: ProspectingScriptWithCreator[] = [...(myScripts || [])];
+      const scriptResults: ProspectingScriptWithCreator[] = [...((myScripts as any[]) || [])];
       
-      if (publicScripts && publicScripts.length > 0) {
-        const creatorIds = [...new Set(publicScripts.map(s => s.user_id))];
+      if (publicScripts && (publicScripts as any[]).length > 0) {
+        const pScripts = publicScripts as any[];
+        const creatorIds = [...new Set(pScripts.map((s: any) => s.user_id))] as string[];
         
         const creatorsQuery = supabase
           .from('profiles')
@@ -67,17 +68,16 @@ export function useProspectingScripts() {
         const { data: creators, error: creatorsError } = creatorsResult;
         
         if (!creatorsError && creators) {
-          const creatorsMap = new Map(creators.map(c => [c.id, c]));
+          const creatorsMap = new Map((creators as any[]).map((c: any) => [c.id, c]));
           
-          publicScripts.forEach(script => {
+          pScripts.forEach((script: any) => {
             scriptResults.push({
               ...script,
               creator: creatorsMap.get(script.user_id)
             });
           });
         } else {
-          // Se falhar buscar criadores, adiciona scripts sem info de criador
-          scriptResults.push(...publicScripts);
+          scriptResults.push(...pScripts);
         }
       }
 
