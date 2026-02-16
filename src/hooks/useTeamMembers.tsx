@@ -46,12 +46,12 @@ const fetchTeamMembers = async (userId: string | undefined, signal?: AbortSignal
   } else if (role === 'medico') {
     // Médico vê apenas secretárias vinculadas (não inclui a si mesmo)
     // Se não atribuir a ninguém, a tarefa vai para ele mesmo por padrão
-    const { data: links } = await supabase
-      .from('secretary_doctor_links')
+    const { data: links } = await (supabase
+      .from('secretary_doctor_links' as any) as any)
       .select('secretary_id')
       .eq('doctor_id', userId);
 
-    const secretaryIds = links?.map(l => l.secretary_id) || [];
+    const secretaryIds = (links as any[])?.map((l: any) => l.secretary_id) || [];
 
     // Se não há secretárias vinculadas, retorna lista vazia
     if (secretaryIds.length === 0) {
@@ -66,12 +66,12 @@ const fetchTeamMembers = async (userId: string | undefined, signal?: AbortSignal
       .order('full_name', { ascending: true });
   } else if (role === 'secretaria') {
     // Secretária vê apenas médicos vinculados e a si mesma
-    const { data: links } = await supabase
-      .from('secretary_doctor_links')
+    const { data: links } = await (supabase
+      .from('secretary_doctor_links' as any) as any)
       .select('doctor_id')
       .eq('secretary_id', userId);
 
-    const allowedIds = [userId, ...(links?.map(l => l.doctor_id) || [])];
+    const allowedIds = [userId, ...((links as any[])?.map((l: any) => l.doctor_id) || [])];
 
     queryPromise = supabase
       .from('profiles')
@@ -88,10 +88,10 @@ const fetchTeamMembers = async (userId: string | undefined, signal?: AbortSignal
       .eq('is_active', true);
   }
 
-  const { data, error } = await supabaseQueryWithTimeout(queryPromise, undefined, signal);
+  const { data, error } = await supabaseQueryWithTimeout(queryPromise as any, undefined, signal);
 
   if (error) throw new Error(`Erro ao buscar membros da equipe: ${error.message}`);
-  return data || [];
+  return (data || []) as TeamMember[];
 };
 
 export function useTeamMembers() {

@@ -107,8 +107,8 @@ export function useHistoricalReports(filters: HistoricalReportsFilters = {}) {
       const combinedData: HistoricalReport[] = (reportsData as any[]).map((report: any) => ({
         ...report,
         user_profile: profilesMap.get(report.user_id) ? {
-          full_name: profilesMap.get(report.user_id)!.full_name || '',
-          email: profilesMap.get(report.user_id)!.email,
+          full_name: (profilesMap.get(report.user_id) as any)!.full_name || '',
+          email: (profilesMap.get(report.user_id) as any)!.email,
         } : undefined,
       }));
 

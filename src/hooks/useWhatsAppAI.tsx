@@ -36,8 +36,8 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
     queryKey: ['conversation-owner', conversationId],
     queryFn: async () => {
       if (!conversationId) return null;
-      const { data } = await supabase
-        .from('whatsapp_conversations')
+      const { data } = await (supabase
+        .from('whatsapp_conversations' as any) as any)
         .select('user_id')
         .eq('id', conversationId)
         .single();
@@ -47,7 +47,7 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
   });
 
   // Determinar quem é o dono da config
-  const configOwnerId = targetUserId || conversationData?.user_id || user?.id;
+  const configOwnerId = targetUserId || (conversationData as any)?.user_id || user?.id;
 
   // =====================================================
   // Realtime Subscriptions
@@ -114,7 +114,7 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
         return null;
       }
 
-      return data as ConversationAnalysis | null;
+      return data as unknown as ConversationAnalysis | null;
     },
     enabled: !!conversationId,
     staleTime: 30000, // 30 segundos
@@ -141,7 +141,7 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
         return [];
       }
 
-      return data as AISuggestion[];
+      return (data || []) as unknown as AISuggestion[];
     },
     enabled: !!conversationId,
     staleTime: 30000,
@@ -151,7 +151,7 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
   // Mutation: Analisar conversa (chama Edge Function)
   // =====================================================
   const analyzeMutation = useMutation({
-    mutationFn: async (forceReanalyze = false) => {
+    mutationFn: async (forceReanalyze: boolean = false): Promise<AnalyzeConversationResponse> => {
       if (!conversationId) throw new Error('No conversation selected');
 
       const { data: sessionData } = await supabase.auth.getSession();
@@ -210,8 +210,8 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
       if (!conversationId || !user) throw new Error('Missing required data');
 
       // Verificar se análise existe
-      const { data: existingAnalysis } = await supabase
-        .from('whatsapp_conversation_analysis')
+      const { data: existingAnalysis } = await (supabase
+        .from('whatsapp_conversation_analysis' as any) as any)
         .select('id')
         .eq('conversation_id', conversationId)
         .maybeSingle();
@@ -433,7 +433,7 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
   // =====================================================
   // Helpers
   // =====================================================
-  const analyzeConversation = async (forceReanalyze = false) => {
+  const analyzeConversation = async (forceReanalyze: boolean = false) => {
     return analyzeMutation.mutateAsync(forceReanalyze);
   };
 

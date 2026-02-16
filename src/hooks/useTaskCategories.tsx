@@ -78,7 +78,7 @@ export function useTaskCategories() {
             // Deduplicar categorias pelo nome
             const uniqueCategoriesMap = new Map();
             if (data) {
-                data.forEach((cat: TaskCategory) => {
+                (data as any[]).forEach((cat: TaskCategory) => {
                     const normalizedName = cat.name.trim();
                     if (!uniqueCategoriesMap.has(normalizedName)) {
                         uniqueCategoriesMap.set(normalizedName, cat);

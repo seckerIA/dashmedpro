@@ -55,14 +55,14 @@ export const useCostsBreakdown = (startDate?: string, endDate?: string) => {
           .lte('transaction_date', endDate)
 
         const filteredResult = await supabaseQueryWithTimeout(filteredTransactionsQuery as any, undefined, signal);
-        const transactionIds = filteredResult.data?.map(t => t.id) || []
+        const transactionIds = ((filteredResult.data || []) as any[]).map((t: any) => t.id)
 
         if (transactionIds.length > 0) {
           query = query.in('transaction_id', transactionIds)
         }
       }
 
-      const queryResult = await supabaseQueryWithTimeout(query as any, undefined, signal);
+      const queryResult = await supabaseQueryWithTimeout(query as any, undefined, signal) as any;
       const { data, error } = queryResult;
 
       if (error) throw error
@@ -74,7 +74,7 @@ export const useCostsBreakdown = (startDate?: string, endDate?: string) => {
         terceirizacao: 0,
       }
 
-      data?.forEach((cost: any) => {
+      (data as any[])?.forEach((cost: any) => {
         if (cost.cost_type in breakdown) {
           breakdown[cost.cost_type] += Number(cost.amount)
         }

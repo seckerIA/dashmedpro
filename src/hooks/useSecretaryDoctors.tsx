@@ -34,8 +34,8 @@ export function useSecretaryDoctors() {
       // console.log('🔍 [useSecretaryDoctors] Buscando médicos vinculados para:', user.id);
 
       // 1. Buscar IDs dos vínculos com timeout
-      const linksQuery = supabase
-        .from('secretary_doctor_links')
+      const linksQuery = (supabase
+        .from('secretary_doctor_links' as any) as any)
         .select('doctor_id')
         .eq('secretary_id', user.id);
 
@@ -114,8 +114,8 @@ export function useSecretaryDoctorLinks() {
     queryKey: ['all-secretary-doctor-links'],
     queryFn: async ({ signal }) => {
       // ... (manter query existente)
-      const query = supabase
-        .from('secretary_doctor_links')
+      const query = (supabase
+        .from('secretary_doctor_links' as any) as any)
         .select(`
           id,
           secretary_id,
@@ -143,7 +143,7 @@ export function useSecretaryDoctorLinks() {
 
   const createLink = async (secretaryId: string, doctorId: string) => {
     const { data, error } = await (supabase
-      .from('secretary_doctor_links') as any)
+      .from('secretary_doctor_links' as any) as any)
       .insert({
         secretary_id: secretaryId,
         doctor_id: doctorId,
@@ -158,8 +158,8 @@ export function useSecretaryDoctorLinks() {
   };
 
   const removeLink = async (linkId: string) => {
-    const { error } = await supabase
-      .from('secretary_doctor_links')
+    const { error } = await (supabase
+      .from('secretary_doctor_links' as any) as any)
       .delete()
       .eq('id', linkId);
 
@@ -169,8 +169,8 @@ export function useSecretaryDoctorLinks() {
 
   const updateSecretaryLinks = async (secretaryId: string, doctorIds: string[]) => {
     // Primeiro remove APENAS os da organização atual (implícito pelo RLS)
-    await supabase
-      .from('secretary_doctor_links')
+    await (supabase
+      .from('secretary_doctor_links' as any) as any)
       .delete()
       .eq('secretary_id', secretaryId);
     // Nota: RLS garante que só apaga da nossa org.
@@ -183,7 +183,7 @@ export function useSecretaryDoctorLinks() {
       }));
 
       const { error } = await (supabase
-        .from('secretary_doctor_links') as any)
+        .from('secretary_doctor_links' as any) as any)
         .insert(links as any);
 
       if (error) throw error;

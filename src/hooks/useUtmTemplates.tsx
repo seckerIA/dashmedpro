@@ -14,8 +14,8 @@ export function useUtmTemplates(activeOnly?: boolean) {
   return useQuery({
     queryKey: ['utm-templates', activeOnly],
     queryFn: async () => {
-      let query = supabase
-        .from('utm_templates')
+      let query = (supabase
+        .from('utm_templates' as any) as any)
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -26,7 +26,7 @@ export function useUtmTemplates(activeOnly?: boolean) {
       const { data, error } = await query;
 
       if (error) throw error;
-      return data as UtmTemplate[];
+      return (data || []) as unknown as UtmTemplate[];
     },
   });
 }
@@ -35,14 +35,14 @@ export function useUtmTemplate(id: string) {
   return useQuery({
     queryKey: ['utm-template', id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('utm_templates')
+      const { data, error } = await (supabase
+        .from('utm_templates' as any) as any)
         .select('*')
         .eq('id', id)
         .single();
 
       if (error) throw error;
-      return data as UtmTemplate;
+      return data as unknown as UtmTemplate;
     },
     enabled: !!id,
   });
@@ -57,14 +57,14 @@ export function useCreateUtmTemplate() {
 
   return useMutation({
     mutationFn: async (template: UtmTemplateInsert) => {
-      const { data, error } = await supabase
-        .from('utm_templates')
+      const { data, error } = await (supabase
+        .from('utm_templates' as any) as any)
         .insert(template)
         .select()
         .single();
 
       if (error) throw error;
-      return data as UtmTemplate;
+      return data as unknown as UtmTemplate;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['utm-templates'] });
@@ -83,17 +83,17 @@ export function useUpdateUtmTemplate() {
       id: string; 
       updates: UtmTemplateUpdate 
     }) => {
-      const { data, error } = await supabase
-        .from('utm_templates')
+      const { data, error } = await (supabase
+        .from('utm_templates' as any) as any)
         .update(updates)
         .eq('id', id)
         .select()
         .single();
 
       if (error) throw error;
-      return data as UtmTemplate;
+      return data as unknown as UtmTemplate;
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['utm-templates'] });
       queryClient.invalidateQueries({ queryKey: ['utm-template', data.id] });
     },
@@ -105,8 +105,8 @@ export function useDeleteUtmTemplate() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('utm_templates')
+      const { error } = await (supabase
+        .from('utm_templates' as any) as any)
         .delete()
         .eq('id', id);
 
@@ -118,5 +118,3 @@ export function useDeleteUtmTemplate() {
     },
   });
 }
-
-

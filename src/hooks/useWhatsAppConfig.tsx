@@ -325,8 +325,8 @@ export function useTeamWhatsAppConfigs() {
         const profile = profileMap.get(config.user_id);
         return {
           ...config,
-          user_name: profile?.full_name || 'Usuário desconhecido',
-          user_email: profile?.email || '',
+          user_name: (profile as any)?.full_name || 'Usuário desconhecido',
+          user_email: (profile as any)?.email || '',
         } as TeamWhatsAppConfig;
       });
     },

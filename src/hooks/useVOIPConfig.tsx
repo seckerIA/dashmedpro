@@ -62,7 +62,7 @@ export function useVOIPConfig() {
         return null; // Return null instead of throwing to prevent console spam
       }
 
-      return data as VOIPConfig | null;
+      return data as unknown as VOIPConfig | null;
     },
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
@@ -119,7 +119,7 @@ export function useVOIPConfig() {
         .single();
 
       if (error) throw error;
-      return data as VOIPConfig;
+      return data as unknown as VOIPConfig;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [VOIP_CONFIG_QUERY_KEY] });
@@ -150,7 +150,7 @@ export function useVOIPConfig() {
         .single();
 
       if (error) throw error;
-      return data as VOIPConfig;
+      return data as unknown as VOIPConfig;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [VOIP_CONFIG_QUERY_KEY] });
@@ -181,7 +181,7 @@ export function useVOIPConfig() {
         .single();
 
       if (error) throw error;
-      return data as VOIPConfig;
+      return data as unknown as VOIPConfig;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [VOIP_CONFIG_QUERY_KEY] });

@@ -109,7 +109,7 @@ const fetchSecretaryMetrics = async (
     .from('profiles')
     .select('id, email, full_name')
     .eq('id', userId)
-    .single();
+    .single() as any;
 
   // Contar agendamentos criados pela secretaria hoje
   const appointmentsTodayQuery = supabase
@@ -147,7 +147,7 @@ const fetchSecretaryMetrics = async (
   const confirmationsTodayQuery = supabase
     .from('medical_appointments')
     .select('id', { count: 'exact', head: true })
-    .eq('status', 'confirmado')
+    .eq('status', 'confirmed' as any)
     .gte('updated_at', todayStart)
     .lte('updated_at', todayEnd);
 
@@ -155,7 +155,7 @@ const fetchSecretaryMetrics = async (
   const pendingConfirmationsQuery = supabase
     .from('medical_appointments')
     .select('id', { count: 'exact', head: true })
-    .eq('status', 'agendado')
+    .eq('status', 'scheduled' as any)
     .gte('start_time', todayStart);
 
   const [
@@ -177,14 +177,14 @@ const fetchSecretaryMetrics = async (
   ]);
 
   return {
-    appointmentsScheduledToday: appointmentsTodayResult.count || 0,
-    appointmentsScheduledThisMonth: appointmentsMonthResult.count || 0,
-    patientsRegisteredToday: contactsTodayResult.count || 0,
-    patientsRegisteredThisMonth: contactsMonthResult.count || 0,
-    confirmationsToday: confirmationsTodayResult.count || 0,
-    pendingConfirmations: pendingConfirmationsResult.count || 0,
-    userName: profileResult.data?.full_name || profileResult.data?.email || 'Secretaria',
-    userEmail: profileResult.data?.email || '',
+    appointmentsScheduledToday: (appointmentsTodayResult as any).count || 0,
+    appointmentsScheduledThisMonth: (appointmentsMonthResult as any).count || 0,
+    patientsRegisteredToday: (contactsTodayResult as any).count || 0,
+    patientsRegisteredThisMonth: (contactsMonthResult as any).count || 0,
+    confirmationsToday: (confirmationsTodayResult as any).count || 0,
+    pendingConfirmations: (pendingConfirmationsResult as any).count || 0,
+    userName: (profileResult.data as any)?.full_name || (profileResult.data as any)?.email || 'Secretaria',
+    userEmail: (profileResult.data as any)?.email || '',
   };
 };
 
@@ -202,12 +202,12 @@ const fetchTeamMetrics = async (
   // Se for médico (não admin), buscar métricas próprias + secretárias vinculadas
   if (isMedico && !isAdminOrDono) {
     // Buscar IDs de secretárias vinculadas ao médico
-    const { data: links } = await supabase
-      .from('secretary_doctor_links')
+    const { data: links } = await (supabase
+      .from('secretary_doctor_links' as any) as any)
       .select('secretary_id')
       .eq('doctor_id', userId);
 
-    const linkedSecretaryIds = links?.map(l => l.secretary_id) || [];
+    const linkedSecretaryIds = (links as any[])?.map((l: any) => l.secretary_id) || [];
     const allUserIds = [userId, ...linkedSecretaryIds];
 
     // Buscar dados para o médico e suas secretárias
@@ -250,20 +250,20 @@ const fetchTeamMetrics = async (
     if (dealsResult.error) throw new Error(`Erro ao buscar deals: ${dealsResult.error.message}`);
     if (contactsResult.error) throw new Error(`Erro ao buscar contatos: ${contactsResult.error.message}`);
 
-    const deals = dealsResult.data || [];
-    const contacts = contactsResult.data || [];
-    const leads = leadsResult.data || [];
-    const profiles = profilesResult.data || [];
-    const appointments = appointmentsResult.data || [];
+    const deals = (dealsResult.data || []) as any[];
+    const contacts = (contactsResult.data || []) as any[];
+    const leads = (leadsResult.data || []) as any[];
+    const profiles = (profilesResult.data || []) as any[];
+    const appointments = (appointmentsResult.data || []) as any[];
 
-    const profilesMap = new Map(profiles.map(p => [p.id, p]));
+    const profilesMap = new Map(profiles.map((p: any) => [p.id, p]));
 
     // Calcular métricas por usuário (médico + secretárias)
     const teamMetrics: TeamMetrics[] = allUserIds.map(targetUserId => {
-      const userDeals = deals.filter(d => d.user_id === targetUserId || d.assigned_to === targetUserId);
-      const userContacts = contacts.filter(c => c.user_id === targetUserId);
-      const userLeads = leads.filter(l => l.user_id === targetUserId);
-      const userAppointments = appointments.filter(a => a.user_id === targetUserId);
+      const userDeals = (deals as any[]).filter((d: any) => d.user_id === targetUserId || d.assigned_to === targetUserId);
+      const userContacts = (contacts as any[]).filter((c: any) => c.user_id === targetUserId);
+      const userLeads = (leads as any[]).filter((l: any) => l.user_id === targetUserId);
+      const userAppointments = (appointments as any[]).filter((a: any) => a.user_id === targetUserId);
       const profile = profilesMap.get(targetUserId);
 
       return calculateUserMetricsFromData(targetUserId, userDeals, userContacts, userLeads, profile, userAppointments, monthStart);
@@ -332,14 +332,14 @@ const fetchTeamMetrics = async (
     if (dealsResult.error) throw new Error(`Erro ao buscar deals: ${dealsResult.error.message}`);
     if (contactsResult.error) throw new Error(`Erro ao buscar contatos: ${contactsResult.error.message}`);
 
-    const deals = dealsResult.data || [];
-    const contacts = contactsResult.data || [];
-    const leads = leadsResult.data || [];
-    const profiles = profilesResult.data || [];
-    const appointments = appointmentsResult.data || [];
+    const deals = (dealsResult.data || []) as any[];
+    const contacts = (contactsResult.data || []) as any[];
+    const leads = (leadsResult.data || []) as any[];
+    const profiles = (profilesResult.data || []) as any[];
+    const appointments = (appointmentsResult.data || []) as any[];
 
     const profile = profiles[0];
-    const userMetrics = calculateUserMetrics(userId, deals, contacts, leads, profile, appointments, monthStart);
+    const userMetrics = calculateUserMetrics(userId, deals, contacts, leads, profile, appointments as any[], monthStart);
 
     return {
       ...userMetrics,
@@ -361,9 +361,9 @@ const fetchTeamMetrics = async (
       .eq('is_active', true)
       .limit(50); // Reduzido de 100 para 50 para melhor performance
 
-    const { data: profiles, error } = await supabaseQueryWithTimeout(profilesQuery, 25000, signal);
-    if (!error && profiles && profiles.length > 0) {
-      targetUserIds = profiles.map(p => p.id);
+    const { data: profiles, error } = await supabaseQueryWithTimeout(profilesQuery as any, 25000, signal);
+    if (!error && profiles && (profiles as any[]).length > 0) {
+      targetUserIds = (profiles as any[]).map((p: any) => p.id);
     }
   }
 
@@ -412,20 +412,20 @@ const fetchTeamMetrics = async (
   if (dealsResult.error) throw new Error(`Erro ao buscar deals: ${dealsResult.error.message}`);
   if (contactsResult.error) throw new Error(`Erro ao buscar contatos: ${contactsResult.error.message}`);
 
-  const deals = dealsResult.data || [];
-  const contacts = contactsResult.data || [];
-  const leads = leadsResult.data || [];
-  const profiles = profilesResult.data || [];
-  const appointments = appointmentsResult.data || [];
+  const deals = (dealsResult.data || []) as any[];
+  const contacts = (contactsResult.data || []) as any[];
+  const leads = (leadsResult.data || []) as any[];
+  const profiles = (profilesResult.data || []) as any[];
+  const appointments = (appointmentsResult.data || []) as any[];
 
-  const profilesMap = new Map(profiles.map(p => [p.id, p]));
+  const profilesMap = new Map(profiles.map((p: any) => [p.id, p]));
 
   // Calcular métricas por usuário
   const teamMetrics: TeamMetrics[] = targetUserIds.map(targetUserId => {
-    const userDeals = deals.filter(d => d.user_id === targetUserId || d.assigned_to === targetUserId);
-    const userContacts = contacts.filter(c => c.user_id === targetUserId);
-    const userLeads = leads.filter(l => l.user_id === targetUserId);
-    const userAppointments = appointments.filter(a => a.user_id === targetUserId);
+    const userDeals = (deals as any[]).filter((d: any) => d.user_id === targetUserId || d.assigned_to === targetUserId);
+    const userContacts = (contacts as any[]).filter((c: any) => c.user_id === targetUserId);
+    const userLeads = (leads as any[]).filter((l: any) => l.user_id === targetUserId);
+    const userAppointments = (appointments as any[]).filter((a: any) => a.user_id === targetUserId);
     const profile = profilesMap.get(targetUserId);
 
     return calculateUserMetricsFromData(targetUserId, userDeals, userContacts, userLeads, profile, userAppointments, monthStart);

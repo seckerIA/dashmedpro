@@ -24,7 +24,7 @@ const fetchTasks = async (userId: string, signal?: AbortSignal): Promise<TaskWit
     throw new Error(`Erro ao buscar tarefas: ${error.message}`);
   }
 
-  return (data || []).map(task => ({
+  return ((data || []) as any[]).map((task: any) => ({
     ...task,
     completed_at: task.completed_at || null,
     assignments: [],
@@ -48,8 +48,8 @@ const fetchTaskById = async (taskId: string): Promise<TaskWithCRM | null> => {
   if (!data) return null;
 
   return {
-    ...data,
-    completed_at: data.completed_at || null,
+    ...(data as any),
+    completed_at: (data as any).completed_at || null,
     assignments: [],
     my_assignment: null,
   } as TaskWithCRM;
