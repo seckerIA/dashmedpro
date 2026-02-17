@@ -20,7 +20,7 @@ import {
 } from '@/lib/facebookSDK';
 
 // Configurações
-const FB_APP_ID = import.meta.env.VITE_FB_APP_ID || '';
+const FB_APP_ID = '1557514182198067';
 
 // Permissões Meta Ads + Business (apenas aprovadas no App Review)
 const META_SCOPES = [
