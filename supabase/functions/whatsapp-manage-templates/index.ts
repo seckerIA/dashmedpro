@@ -59,13 +59,19 @@ serve(async (req: Request) => {
       .maybeSingle();
 
     if (!config || !config.access_token) {
-      throw new Error('WhatsApp não configurado. Configure primeiro na aba Conexão.');
+      return new Response(
+        JSON.stringify({ success: false, error: 'WhatsApp não configurado. Configure primeiro na aba Conexão.' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // WABA ID pode estar em waba_id ou business_account_id
     const wabaId = config.waba_id || config.business_account_id;
     if (!wabaId) {
-      throw new Error('WABA ID não encontrado. Reconecte via Facebook OAuth.');
+      return new Response(
+        JSON.stringify({ success: false, error: 'WABA ID não encontrado. Reconecte via Facebook OAuth.' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const token = config.access_token;
@@ -84,7 +90,10 @@ serve(async (req: Request) => {
       if (!response.ok) {
         const errorData = await response.json();
         console.error('[manage-templates] Meta API error:', errorData.error);
-        throw new Error(errorData.error?.message || 'Failed to fetch templates from Meta');
+        return new Response(
+          JSON.stringify({ success: false, error: errorData.error?.message || 'Erro ao buscar templates da Meta' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
       const data = await response.json();
@@ -178,7 +187,10 @@ serve(async (req: Request) => {
       const { name, language, category, components } = body;
 
       if (!name || !category || !components) {
-        throw new Error('name, category e components são obrigatórios');
+        return new Response(
+          JSON.stringify({ success: false, error: 'name, category e components são obrigatórios' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
       console.log(`[manage-templates] Creating template "${name}" on WABA ${wabaId}`);
@@ -213,8 +225,11 @@ serve(async (req: Request) => {
       const data = await response.json();
 
       if (!response.ok || data.error) {
-        console.error('[manage-templates] Create error:', data.error);
-        throw new Error(data.error?.message || 'Failed to create template on Meta');
+        console.error('[manage-templates] Create error:', JSON.stringify(data.error));
+        return new Response(
+          JSON.stringify({ success: false, error: data.error?.message || 'Erro ao criar template na Meta' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
       console.log(`[manage-templates] Template created on Meta:`, JSON.stringify(data));
@@ -272,7 +287,10 @@ serve(async (req: Request) => {
       const { template_name, template_id } = body;
 
       if (!template_name) {
-        throw new Error('template_name é obrigatório');
+        return new Response(
+          JSON.stringify({ success: false, error: 'template_name é obrigatório' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
       console.log(`[manage-templates] Deleting template "${template_name}" from WABA ${wabaId}`);
@@ -313,13 +331,16 @@ serve(async (req: Request) => {
       );
     }
 
-    throw new Error(`Unknown action: ${action}. Use: sync, create, delete`);
+    return new Response(
+      JSON.stringify({ success: false, error: `Ação desconhecida: ${action}. Use: sync, create, delete` }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
   } catch (error: any) {
-    console.error('[manage-templates] Error:', error.message);
+    console.error('[manage-templates] Unexpected error:', error.message);
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: false, error: error.message }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
