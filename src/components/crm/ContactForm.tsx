@@ -131,7 +131,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
       company: contact?.company || "",
       position: contact?.position || "",
       notes: initialData?.notes || ((contact as any)?.custom_fields as any)?.notes || "",
-      service: contact?.service || ((contact as any)?.custom_fields as any)?.procedure_id || "none",
+      service: (contact as any)?.service || ((contact as any)?.custom_fields as any)?.procedure_id || "none",
       service_value: (contact?.service_value?.toString() || "") as any,
       tags: contact?.tags || [],
       create_deal: !contact ? true : !!initialStage, // Sempre true para novos contatos

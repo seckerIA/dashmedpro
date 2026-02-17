@@ -1,17 +1,35 @@
 import { Database } from '@/integrations/supabase/types';
 
-// Tipos baseados nas tabelas do Supabase
-export type ProspectingScript = Database['public']['Tables']['prospecting_scripts']['Row'];
-export type ProspectingScriptInsert = Database['public']['Tables']['prospecting_scripts']['Insert'];
-export type ProspectingScriptUpdate = Database['public']['Tables']['prospecting_scripts']['Update'];
+// Base type from generated schema
+type ProspectingScriptRow = Database['public']['Tables']['prospecting_scripts']['Row'];
+
+// Extended type with DB columns missing from generated types
+export type ProspectingScript = ProspectingScriptRow & {
+  cards?: any;
+  is_public?: boolean;
+  is_copy?: boolean;
+  original_script_id?: string | null;
+};
+export type ProspectingScriptInsert = Database['public']['Tables']['prospecting_scripts']['Insert'] & Record<string, any>;
+export type ProspectingScriptUpdate = Database['public']['Tables']['prospecting_scripts']['Update'] & Record<string, any>;
 
 export type ProspectingSession = Database['public']['Tables']['prospecting_sessions']['Row'];
 export type ProspectingSessionInsert = Database['public']['Tables']['prospecting_sessions']['Insert'];
 export type ProspectingSessionUpdate = Database['public']['Tables']['prospecting_sessions']['Update'];
 
-export type DailyReport = Database['public']['Tables']['prospecting_daily_reports']['Row'];
-export type DailyReportInsert = Database['public']['Tables']['prospecting_daily_reports']['Insert'];
-export type DailyReportUpdate = Database['public']['Tables']['prospecting_daily_reports']['Update'];
+// Extended DailyReport type with DB columns missing from generated types
+type DailyReportRow = Database['public']['Tables']['prospecting_daily_reports']['Row'];
+export type DailyReport = DailyReportRow & {
+  goal_calls?: number;
+  goal_contacts?: number;
+  final_calls?: number;
+  final_contacts?: number;
+  started_at?: string;
+  finished_at?: string | null;
+  status?: string;
+};
+export type DailyReportInsert = Database['public']['Tables']['prospecting_daily_reports']['Insert'] & Record<string, any>;
+export type DailyReportUpdate = Database['public']['Tables']['prospecting_daily_reports']['Update'] & Record<string, any>;
 
 // Tipos para os cards
 export type CardType = 'script' | 'objection';

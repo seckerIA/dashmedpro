@@ -2,7 +2,8 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = "https://adzaqkduxnpckbcuqpmg.supabase.co";
+export const SUPABASE_URL = "https://adzaqkduxnpckbcuqpmg.supabase.co";
+export const CURRENT_PROJECT_REF = "adzaqkduxnpckbcuqpmg";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkemFxa2R1eG5wY2tiY3VxcG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5ODgyMDksImV4cCI6MjA4MTU2NDIwOX0.WO9-vzv_Vuh86TQWgNWuQ45cXa-L4GoGQfpSbvQiVMc";
 
 // Import the supabase client like this:
@@ -15,3 +16,53 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     autoRefreshToken: true,
   }
 });
+
+/**
+ * Check if the current token is valid, attempt refresh if needed.
+ * Returns true if the session is valid after check.
+ */
+export async function checkToken(): Promise<boolean> {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error || !session) {
+      // Try refreshing
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError || !refreshData.session) {
+        return false;
+      }
+      return true;
+    }
+    // Check if token is about to expire (within 60 seconds)
+    const expiresAt = session.expires_at;
+    if (expiresAt && expiresAt * 1000 - Date.now() < 60000) {
+      const { error: refreshError } = await supabase.auth.refreshSession();
+      return !refreshError;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check if there was a recent successful authentication (within last 5 seconds).
+ * Used to avoid unnecessary re-auth checks right after login.
+ */
+let lastAuthTimestamp = 0;
+export function wasRecentlyAuthenticated(): boolean {
+  return Date.now() - lastAuthTimestamp < 5000;
+}
+
+// Update timestamp on auth state changes
+supabase.auth.onAuthStateChange((event) => {
+  if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+    lastAuthTimestamp = Date.now();
+  }
+});
+
+/**
+ * Cleanup all realtime channels
+ */
+export function cleanupAllChannels(): void {
+  supabase.removeAllChannels();
+}

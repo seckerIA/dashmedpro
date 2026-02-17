@@ -160,8 +160,8 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
         email: selectedContact.email || '',
         phone: selectedContact.phone || '',
         company: selectedContact.company || '',
-        service: selectedContact.service || '',
-        service_value: selectedContact.service_value?.toString() || ''
+        service: (selectedContact as any).service || '',
+        service_value: (selectedContact as any).service_value?.toString() || ''
       });
     }
   }, [selectedContact]);

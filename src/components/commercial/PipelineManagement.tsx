@@ -437,7 +437,7 @@ export function PipelineManagement() {
 
       {/* Modal de Edição de Deal */}
       <DealForm
-        deal={editingDeal || undefined}
+        deal={(editingDeal as any) || undefined}
         trigger={<div style={{ display: 'none' }} />}
         onSuccess={() => setEditingDeal(null)}
         onClose={() => setEditingDeal(null)}

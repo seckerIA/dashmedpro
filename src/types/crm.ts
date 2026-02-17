@@ -41,7 +41,7 @@ export type HealthInsuranceType = 'convenio' | 'particular';
 export type PatientGender = 'masculino' | 'feminino' | 'outro' | 'prefiro_nao_dizer';
 
 // Tipos auxiliares para o frontend
-export interface CRMDealWithContact extends CRMDeal {
+export interface CRMDealWithContact extends Omit<CRMDeal, 'contact_id' | 'is_in_treatment' | 'is_defaulting' | 'position'> {
   contact?: (CRMContact & { last_contact_at?: string | null }) | null;
   contact_id?: string | null;
   position?: number | null;

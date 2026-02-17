@@ -443,7 +443,7 @@ const TransactionForm = () => {
 
       if (isEditMode && id) {
         console.log('Chamando updateTransaction.mutateAsync...')
-        await updateTransaction.mutateAsync({ id, ...transactionData })
+        await updateTransaction.mutateAsync({ id, ...transactionData } as any)
         console.log('Transação atualizada com sucesso!')
 
         // Atualizar custos no modo de edição
@@ -478,7 +478,7 @@ const TransactionForm = () => {
         navigate('/financeiro/transacoes')
       } else {
         console.log('Chamando createTransaction.mutateAsync...')
-        const createdTransaction = await createTransaction.mutateAsync(transactionData)
+        const createdTransaction = await createTransaction.mutateAsync(transactionData as any)
         console.log('Transação criada com sucesso!', createdTransaction)
 
         // Se tem custos, criar os custos associados
