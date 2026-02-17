@@ -375,8 +375,13 @@ export function TemplateManager() {
     category: WhatsAppTemplateCategory;
     components: WhatsAppTemplateComponent[];
   }) => {
-    await createTemplate(data);
-    setShowCreateForm(false);
+    try {
+      await createTemplate(data);
+      setShowCreateForm(false);
+    } catch {
+      // Error handled by mutation's onError callback (toast)
+      // Keep form open so user can retry
+    }
   };
 
   const handleDelete = async (templateId: string, templateName: string) => {

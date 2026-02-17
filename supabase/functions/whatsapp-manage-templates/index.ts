@@ -195,32 +195,38 @@ serve(async (req: Request) => {
         throw new Error(data.error?.message || 'Failed to create template on Meta');
       }
 
-      console.log(`[manage-templates] Template created on Meta:`, data);
+      console.log(`[manage-templates] Template created on Meta:`, JSON.stringify(data));
 
-      // Salvar no banco local
+      // Salvar no banco local (upsert para evitar conflito se template já existe)
       const sanitizedName = name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+      const templateId = String(data.id); // Garantir que é string
+
       const { data: savedTemplate, error: dbError } = await supabaseAdmin
         .from('whatsapp_templates')
-        .insert({
-          user_id: user.id,
-          template_id: data.id,
-          name: sanitizedName,
-          language: language || 'pt_BR',
-          category: category.toUpperCase(),
-          status: 'pending', // Sempre começa como pending até Meta aprovar
-          components,
-        })
+        .upsert(
+          {
+            user_id: user.id,
+            template_id: templateId,
+            name: sanitizedName,
+            language: language || 'pt_BR',
+            category: category.toUpperCase(),
+            status: 'pending', // Sempre começa como pending até Meta aprovar
+            components,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,template_id' }
+        )
         .select()
         .single();
 
       if (dbError) {
-        console.error('[manage-templates] DB save error:', dbError);
+        console.error('[manage-templates] DB save error:', JSON.stringify(dbError));
         // Template foi criado na Meta mas falhou no DB — retorna sucesso parcial
         return new Response(
           JSON.stringify({
             success: true,
-            warning: 'Template criado na Meta mas erro ao salvar localmente. Faça sync.',
-            meta_template_id: data.id,
+            warning: `Template criado na Meta (ID: ${templateId}) mas erro ao salvar localmente: ${dbError.message}. Clique em Sincronizar.`,
+            meta_template_id: templateId,
           }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -230,10 +236,10 @@ serve(async (req: Request) => {
         JSON.stringify({
           success: true,
           template: savedTemplate,
-          meta_template_id: data.id,
+          meta_template_id: templateId,
           message: 'Template criado e enviado para aprovação da Meta.',
         }),
-        { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 

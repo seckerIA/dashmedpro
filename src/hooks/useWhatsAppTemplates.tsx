@@ -107,10 +107,18 @@ export function useWhatsAppTemplates() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [WHATSAPP_TEMPLATES_KEY] });
-      toast({
-        title: 'Template criado',
-        description: data.message || 'Enviado para aprovação da Meta.',
-      });
+      if (data.warning) {
+        toast({
+          title: 'Template criado com aviso',
+          description: data.warning,
+          variant: 'default',
+        });
+      } else {
+        toast({
+          title: 'Template criado',
+          description: data.message || 'Enviado para aprovação da Meta.',
+        });
+      }
     },
     onError: (error: Error) => {
       toast({
