@@ -19,7 +19,7 @@ const FacebookIcon = () => (
 
 export function FacebookConnectButton() {
     const {
-        startOAuthFlow,
+        startWhatsAppOAuthFlow,
         isConnecting,
         isOAuthConfigured
     } = useMetaOAuth();
@@ -76,7 +76,7 @@ export function FacebookConnectButton() {
 
                 {/* Botão de Conexão */}
                 <Button
-                    onClick={startOAuthFlow}
+                    onClick={startWhatsAppOAuthFlow}
                     disabled={isConnecting}
                     className="w-full h-12 bg-[#1877F2] hover:bg-[#166FE5] text-white font-medium text-base"
                     size="lg"
