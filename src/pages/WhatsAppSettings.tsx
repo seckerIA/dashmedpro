@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { SUPABASE_URL } from '@/integrations/supabase/client';
-import { MessageCircle, Settings, ArrowLeft, Loader2, Users, Phone, CheckCircle, XCircle, Sparkles } from 'lucide-react';
+import { MessageCircle, Settings, ArrowLeft, Loader2, Users, Phone, CheckCircle, XCircle, Sparkles, FileText } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -15,7 +15,7 @@ import { Separator } from '@/components/ui/separator';
 import { SetupGuide } from '@/components/whatsapp/settings/SetupGuide';
 import { CredentialsForm } from '@/components/whatsapp/settings/CredentialsForm';
 import { FacebookConnectButton } from '@/components/whatsapp/settings/FacebookConnectButton';
-// PhoneNumberSelector removido: fluxo OAuth agora usa FB.login() popup via useMetaOAuth
+import { TemplateManager } from '@/components/whatsapp/settings/TemplateManager';
 import { useWhatsAppConfig, useTeamWhatsAppConfigs } from '@/hooks/useWhatsAppConfig';
 import { useUserProfile } from '@/hooks/useUserProfile';
 
@@ -132,6 +132,12 @@ export default function WhatsAppSettings() {
           <TabsTrigger value="credentials">
             Credenciais
           </TabsTrigger>
+          {isConfigured && (
+            <TabsTrigger value="templates">
+              <FileText className="h-4 w-4 mr-2" />
+              Templates
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* Tab: Team WhatsApps (Admin only) */}
@@ -298,6 +304,13 @@ export default function WhatsAppSettings() {
             )}
           </div>
         </TabsContent>
+
+        {/* Tab: Templates */}
+        {isConfigured && (
+          <TabsContent value="templates" className="space-y-6">
+            <TemplateManager />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

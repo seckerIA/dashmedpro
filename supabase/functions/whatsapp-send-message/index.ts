@@ -30,7 +30,7 @@ const handler = async (req: Request): Promise<Response> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
-    const { message_id, phone_number, content, reply_to_wa_id } = await req.json();
+    const { message_id, phone_number, content, reply_to_wa_id, template_name, template_language, template_variables } = await req.json();
 
     if (!message_id) throw new Error('message_id is required');
 
@@ -124,15 +124,43 @@ const handler = async (req: Request): Promise<Response> => {
 
     const token = config.access_token;
 
-    const payload: any = {
-      messaging_product: 'whatsapp',
-      to: phone_number,
-      type: 'text',
-      text: { body: content },
-    };
+    let payload: any;
 
-    if (reply_to_wa_id) {
-      payload.context = { message_id: reply_to_wa_id };
+    if (template_name) {
+      // Template message
+      payload = {
+        messaging_product: 'whatsapp',
+        to: phone_number,
+        type: 'template',
+        template: {
+          name: template_name,
+          language: { code: template_language || 'pt_BR' },
+        },
+      };
+
+      // Add template variables if provided
+      if (template_variables && Object.keys(template_variables).length > 0) {
+        const sortedKeys = Object.keys(template_variables).sort();
+        payload.template.components = [{
+          type: 'body',
+          parameters: sortedKeys.map((key) => ({
+            type: 'text',
+            text: template_variables[key],
+          })),
+        }];
+      }
+    } else {
+      // Text message
+      payload = {
+        messaging_product: 'whatsapp',
+        to: phone_number,
+        type: 'text',
+        text: { body: content },
+      };
+
+      if (reply_to_wa_id) {
+        payload.context = { message_id: reply_to_wa_id };
+      }
     }
 
     console.log(`[send-message] Sending to ${phone_number} using id ${config.phone_number_id}`);

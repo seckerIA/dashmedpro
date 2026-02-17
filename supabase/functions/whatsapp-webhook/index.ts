@@ -326,7 +326,9 @@ async function processIncomingMessage(
   }
 
   // Atualizar conversa com última mensagem
-  await supabase
+  // NOTA: unread_count é incrementado separadamente (fetch+increment)
+  // pois supabase.rpc() não pode ser usado como valor em .update()
+  const { error: convUpdateError } = await supabase
     .from('whatsapp_conversations')
     .update({
       last_message_at: new Date().toISOString(),
@@ -334,9 +336,28 @@ async function processIncomingMessage(
       last_message_direction: 'inbound',
       contact_name: contactName || undefined,
       updated_at: new Date().toISOString(),
-      unread_count: supabase.rpc('increment_unread', { conv_id: conversationId }),
     })
     .eq('id', conversationId);
+
+  if (convUpdateError) {
+    console.error('[Webhook] Error updating conversation metadata:', convUpdateError);
+  }
+
+  // Incrementar unread_count atomicamente (fetch + increment)
+  const { data: convData } = await supabase
+    .from('whatsapp_conversations')
+    .select('unread_count')
+    .eq('id', conversationId)
+    .single();
+
+  const { error: unreadError } = await supabase
+    .from('whatsapp_conversations')
+    .update({ unread_count: (convData?.unread_count || 0) + 1 })
+    .eq('id', conversationId);
+
+  if (unreadError) {
+    console.error('[Webhook] Error incrementing unread count:', unreadError);
+  }
 
   console.log('[Webhook] Message saved:', savedMessage.id);
 

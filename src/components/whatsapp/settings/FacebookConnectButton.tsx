@@ -1,14 +1,26 @@
 /**
  * Componente: FacebookConnectButton
  * Botão para iniciar conexão OAuth com Facebook/WhatsApp
+ * Mostra estado conectado com opção de desconectar
  */
 
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, MessageCircle, Zap, Shield, Clock } from 'lucide-react';
+import { Loader2, MessageCircle, Zap, Shield, Clock, CheckCircle, Unlink, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { useMetaOAuth } from '@/hooks/useMetaOAuth';
+import { useWhatsAppConfig } from '@/hooks/useWhatsAppConfig';
 
 // Ícone do Facebook
 const FacebookIcon = () => (
@@ -24,6 +36,17 @@ export function FacebookConnectButton() {
         isOAuthConfigured
     } = useMetaOAuth();
 
+    const {
+        config,
+        isConfigured,
+        isActive,
+        deleteConfig,
+        deactivate,
+        isDeleting,
+        isDeactivating,
+    } = useWhatsAppConfig();
+
+    // Estado: Não configurado (FB_APP_ID ausente)
     if (!isOAuthConfigured) {
         return (
             <Card className="border-dashed border-2 border-muted">
@@ -41,6 +64,104 @@ export function FacebookConnectButton() {
         );
     }
 
+    // Estado: Já conectado
+    if (isConfigured && config) {
+        return (
+            <Card className={`border ${isActive
+                ? 'bg-green-500/5 border-green-500/20'
+                : 'bg-yellow-500/5 border-yellow-500/20'
+            }`}>
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle className="flex items-center gap-2">
+                                <CheckCircle className={`h-5 w-5 ${isActive ? 'text-green-500' : 'text-yellow-500'}`} />
+                                WhatsApp Conectado
+                                <Badge variant={isActive ? 'default' : 'secondary'} className={`text-xs ${isActive ? 'bg-green-600' : ''}`}>
+                                    {isActive ? 'Ativo' : 'Inativo'}
+                                </Badge>
+                            </CardTitle>
+                            <CardDescription className="mt-1">
+                                {config.verified_name || 'Nome não verificado'}
+                                {config.display_phone_number && ` • ${config.display_phone_number}`}
+                            </CardDescription>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="p-3 rounded-lg bg-muted/50">
+                            <p className="text-muted-foreground text-xs">Phone Number ID</p>
+                            <p className="font-mono text-xs mt-1 truncate">{config.phone_number_id || '—'}</p>
+                        </div>
+                        <div className="p-3 rounded-lg bg-muted/50">
+                            <p className="text-muted-foreground text-xs">Business Account</p>
+                            <p className="font-mono text-xs mt-1 truncate">{config.business_account_id || '—'}</p>
+                        </div>
+                    </div>
+                    {config.oauth_connected && (
+                        <Badge variant="outline" className="text-xs">
+                            <Zap className="h-3 w-3 mr-1" />
+                            Conectado via Facebook OAuth
+                        </Badge>
+                    )}
+                </CardContent>
+                <CardFooter className="flex gap-2">
+                    {/* Desativar/Reativar */}
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => deactivate()}
+                        disabled={isDeactivating || !isActive}
+                        className={!isActive ? 'opacity-50' : ''}
+                    >
+                        {isDeactivating ? (
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        ) : (
+                            <Unlink className="h-4 w-4 mr-1" />
+                        )}
+                        Desativar
+                    </Button>
+
+                    {/* Remover integração */}
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button
+                                variant="destructive"
+                                size="sm"
+                                disabled={isDeleting}
+                            >
+                                {isDeleting ? (
+                                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                ) : (
+                                    <Trash2 className="h-4 w-4 mr-1" />
+                                )}
+                                Remover Integração
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Remover integração do WhatsApp?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Todas as configurações serão removidas (Phone ID, Token, Webhook).
+                                    As conversas existentes serão mantidas.
+                                    Você poderá reconectar a qualquer momento.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deleteConfig()}>
+                                    Sim, remover tudo
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </CardFooter>
+            </Card>
+        );
+    }
+
+    // Estado: Não conectado — mostrar botão de conectar
     return (
         <Card className="bg-gradient-to-br from-blue-500/5 to-blue-600/10 border-blue-500/20">
             <CardHeader>

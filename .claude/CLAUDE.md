@@ -16,6 +16,7 @@
 | **Thor** | BACKEND | `.claude/agents/BACKEND.md` | Supabase, PostgreSQL, RLS, Edge Functions, migrations |
 | **Captain America** | SECURITY | `.claude/agents/SECURITY.md` | Auth, RLS policies, seguranca, code review |
 | **Vision** | SYSTEM | `.claude/agents/SYSTEM.md` | DevOps, deploy, performance, testes, docs |
+| **Thanos** | META_SPECIALIST | `.claude/agents/META_SPECIALIST.md` | Meta Graph API, App Review, OAuth, WhatsApp Cloud API, Meta Ads |
 
 ### Squad DEBUGGERS (Debugadores)
 
@@ -90,6 +91,13 @@ TAREFA LONGA COM MONITORAMENTO:
   -> Ativar Heimdall (WATCHER)
   -> Usar Task tool com run_in_background: true
   -> Exemplos: "roda build em background", "monitora deploy"
+
+META / FACEBOOK / WHATSAPP API / APP REVIEW / OAUTH / ADS API:
+  -> Ativar Thanos (META_SPECIALIST)
+  -> Consultar: .claude/agents/META_SPECIALIST.md
+  -> Exemplos: "permissao rejeitada", "erro na Graph API", "configurar OAuth Meta",
+     "screencast para App Review", "token expirado", "ads nao sincronizam",
+     "whatsapp webhook", "resubmeter permissao"
 
 TAREFA COMPLEXA MULTI-DOMINIO:
   -> Ativar Nick Fury (ARCHITECT) para orquestrar
