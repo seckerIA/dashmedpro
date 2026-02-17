@@ -99,7 +99,7 @@ export function FacebookConnectButton() {
                             <p className="font-mono text-xs mt-1 truncate">{config.business_account_id || '—'}</p>
                         </div>
                     </div>
-                    {config.oauth_connected && (
+                    {(config as any).oauth_connected && (
                         <Badge variant="outline" className="text-xs">
                             <Zap className="h-3 w-3 mr-1" />
                             Conectado via Facebook OAuth

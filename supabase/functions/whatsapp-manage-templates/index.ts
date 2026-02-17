@@ -131,6 +131,27 @@ serve(async (req: Request) => {
         }
       }
 
+      // Remover templates locais que não existem mais na Meta
+      const metaTemplateIds = new Set(metaTemplates.map((mt: any) => String(mt.id)));
+      const { data: localTemplates } = await supabaseAdmin
+        .from('whatsapp_templates')
+        .select('id, template_id')
+        .eq('user_id', user.id);
+
+      let removed = 0;
+      if (localTemplates) {
+        for (const lt of localTemplates) {
+          if (!metaTemplateIds.has(lt.template_id)) {
+            await supabaseAdmin
+              .from('whatsapp_templates')
+              .delete()
+              .eq('id', lt.id);
+            removed++;
+            console.log(`[manage-templates] Removed orphan template ${lt.template_id}`);
+          }
+        }
+      }
+
       // Atualizar last_synced_at na config
       await supabaseAdmin
         .from('whatsapp_config')
@@ -141,9 +162,10 @@ serve(async (req: Request) => {
         JSON.stringify({
           success: true,
           synced,
+          removed,
           errors,
           total: metaTemplates.length,
-          message: `${synced} templates sincronizados com sucesso.`,
+          message: `${synced} templates sincronizados, ${removed} removidos.`,
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
