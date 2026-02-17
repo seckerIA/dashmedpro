@@ -21,6 +21,7 @@ import {
 
 // Configurações
 const FB_APP_ID = '1557514182198067';
+const FB_CONFIG_ID = '791657633947469';
 
 // Permissões Meta Ads + Business (apenas aprovadas no App Review)
 const META_SCOPES = [
@@ -171,66 +172,77 @@ export function useMetaOAuth() {
   // =====================================================
   const startOAuthFlow = useCallback(async () => {
     if (!user) {
-      toast({
-        title: 'Erro',
-        description: 'Você precisa estar logado para continuar',
-        variant: 'destructive',
-      });
+      toast({ title: 'Erro', description: 'Você precisa estar logado para continuar', variant: 'destructive' });
       return;
     }
-
     if (!isSdkReady) {
-      toast({
-        title: 'Aguarde',
-        description: 'Carregando SDK do Facebook...',
-        variant: 'default',
-      });
+      toast({ title: 'Aguarde', description: 'Carregando SDK do Facebook...', variant: 'default' });
       return;
     }
-
     setIsConnecting(true);
-
     try {
       console.log('[Meta OAuth] Starting FB.login with scope:', META_SCOPES);
-
-      // Chamar FB.login com scope padrão (sem Embedded Signup que requer BSP/TP)
       const response: FacebookLoginResponse = await fbLogin({
         scope: META_SCOPES,
         response_type: 'code',
         override_default_response_type: true,
       });
-
       console.log('[Meta OAuth] FB.login response:', response);
-
       if (response.authResponse?.code) {
-        // Trocar código por token no backend
-        await exchangeTokenMutation.mutateAsync({
-          code: response.authResponse.code,
-        });
+        await exchangeTokenMutation.mutateAsync({ code: response.authResponse.code });
       } else if (response.authResponse?.accessToken) {
-        // Fallback: recebemos accessToken direto (sem code exchange)
-        console.log('[Meta OAuth] Received accessToken directly, sending to backend');
-        await exchangeTokenMutation.mutateAsync({
-          access_token: response.authResponse.accessToken,
-        });
+        await exchangeTokenMutation.mutateAsync({ access_token: response.authResponse.accessToken });
       }
     } catch (error: unknown) {
       console.error('[Meta OAuth] Login error:', error);
-
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-
       if (errorMessage.includes('cancelled') || errorMessage.includes('Login was cancelled')) {
-        toast({
-          title: 'Conexão cancelada',
-          description: 'Você cancelou o processo de login.',
-          variant: 'default',
-        });
+        toast({ title: 'Conexão cancelada', description: 'Você cancelou o processo de login.', variant: 'default' });
       } else {
-        toast({
-          title: 'Erro na conexão',
-          description: errorMessage,
-          variant: 'destructive',
-        });
+        toast({ title: 'Erro na conexão', description: errorMessage, variant: 'destructive' });
+      }
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [user, isSdkReady, toast, exchangeTokenMutation]);
+
+  // =====================================================
+  // Action: Iniciar fluxo WhatsApp Embedded Signup
+  // =====================================================
+  const startWhatsAppOAuthFlow = useCallback(async () => {
+    if (!user) {
+      toast({ title: 'Erro', description: 'Você precisa estar logado para continuar', variant: 'destructive' });
+      return;
+    }
+    if (!isSdkReady) {
+      toast({ title: 'Aguarde', description: 'Carregando SDK do Facebook...', variant: 'default' });
+      return;
+    }
+    setIsConnecting(true);
+    try {
+      console.log('[Meta OAuth] Starting WhatsApp Embedded Signup with config_id:', FB_CONFIG_ID);
+      const response: FacebookLoginResponse = await fbLogin({
+        config_id: FB_CONFIG_ID,
+        response_type: 'code',
+        override_default_response_type: true,
+        extras: {
+          feature: 'whatsapp_embedded_signup',
+          version: 2,
+        },
+      });
+      console.log('[Meta OAuth] WhatsApp Embedded Signup response:', response);
+      if (response.authResponse?.code) {
+        await exchangeTokenMutation.mutateAsync({ code: response.authResponse.code });
+      } else if (response.authResponse?.accessToken) {
+        await exchangeTokenMutation.mutateAsync({ access_token: response.authResponse.accessToken });
+      }
+    } catch (error: unknown) {
+      console.error('[Meta OAuth] WhatsApp login error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      if (errorMessage.includes('cancelled') || errorMessage.includes('Login was cancelled')) {
+        toast({ title: 'Conexão cancelada', description: 'Você cancelou o processo de login.', variant: 'default' });
+      } else {
+        toast({ title: 'Erro na conexão', description: errorMessage, variant: 'destructive' });
       }
     } finally {
       setIsConnecting(false);
@@ -292,6 +304,7 @@ export function useMetaOAuth() {
 
     // Ações
     startOAuthFlow,
+    startWhatsAppOAuthFlow,
     disconnect: disconnectMutation.mutate,
     isDisconnecting: disconnectMutation.isPending,
 
