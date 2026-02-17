@@ -548,7 +548,7 @@ const Financial = () => {
                                 {account.type === 'poupanca' && <PieChart className="w-5 h-5" style={{ color: accountColor }} />}
                                 {account.type === 'caixa' && <Wallet className="w-5 h-5" style={{ color: accountColor }} />}
                                 {account.type === 'investimento' && <TrendingUp className="w-5 h-5" style={{ color: accountColor }} />}
-                                {(!account.type || account.type === 'outros') && <CreditCard className="w-5 h-5" style={{ color: accountColor }} />}
+                                {(!account.type || (account.type as string) === 'outros') && <CreditCard className="w-5 h-5" style={{ color: accountColor }} />}
                               </div>
                               <div>
                                 <p className="text-sm font-semibold text-foreground">{account.name}</p>

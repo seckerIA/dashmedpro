@@ -120,7 +120,7 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
 
       // DEDUP: Se a secretária e o médico tiverem a mesma conversa, mantém apenas a mais recente
       const uniqueMap = new Map<string, WhatsAppConversationWithRelations>();
-      (data || []).forEach((conv: any) => {
+      ((data || []) as any[]).forEach((conv: any) => {
         const existing = uniqueMap.get(conv.phone_number);
         if (!existing || new Date(conv.last_message_at || 0) > new Date(existing.last_message_at || 0)) {
           uniqueMap.set(conv.phone_number, conv as WhatsAppConversationWithRelations);

@@ -319,7 +319,8 @@ const InventoryProductsTab = () => {
             await createSupplier.mutateAsync({
                 user_id: user.id,
                 name: quickSupplierName.trim(),
-            });
+                cnpj: '', email: '', phone: '', contact_person: '', address: '',
+            } as any);
             setQuickSupplierName("");
             setIsQuickSupplierModalOpen(false);
         } catch (error) {
@@ -374,7 +375,8 @@ const InventoryProductsTab = () => {
                 cost_price: data.cost_price,
                 description: data.description,
                 supplier_id: data.supplier_id || null,
-            });
+                user_id: user?.id,
+            } as any);
 
             // 2. Se tiver quantidade inicial, criar lote inicial
             if (data.initial_quantity && data.initial_quantity > 0 && newItem?.id) {
@@ -383,7 +385,8 @@ const InventoryProductsTab = () => {
                     quantity: data.initial_quantity,
                     batch_number: data.batch_number || `LOTE-${Date.now()}`,
                     expiration_date: data.expiration_date || undefined,
-                });
+                    is_active: true,
+                } as any);
             }
 
             setIsCreateModalOpen(false);

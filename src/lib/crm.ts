@@ -11,7 +11,7 @@ export function getContactService(contact: CRMContact | null | undefined): strin
   if (!contact) return null;
   
   // Primeiro tenta obter de custom_fields.procedure_id
-  const customFields = contact.custom_fields as any;
+  const customFields = (contact as any).custom_fields as any;
   if (customFields?.procedure_id) {
     return customFields.procedure_id;
   }
