@@ -282,12 +282,12 @@ export function MedicalRecordForm({
           // 2. Lançamento Financeiro (Se houver preço)
           if (item.price && item.price > 0) {
             createTransaction({
-              type: 'income',
+              type: 'entrada' as const,
               amount: item.price * item.quantity,
               description: `Venda Material: ${item.itemId} (Qtd: ${item.quantity})`,
               date: new Date().toISOString(),
               transaction_date: new Date().toISOString(),
-              status: 'pending',
+              status: 'pendente' as const,
               category_id: null,
               account_id: null,
               user_id: user.id

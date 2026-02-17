@@ -55,7 +55,7 @@ export function ConversationItem({
     lead_status_color,
   } = conversation;
 
-  const displayName = contact_name || contact?.name || phone_number;
+  const displayName = contact_name || (contact as any)?.name || (contact as any)?.full_name || phone_number;
   const initials = displayName
     .split(' ')
     .map(n => n[0])
