@@ -267,6 +267,8 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
 
                   // Abas ocultas temporariamente (não exibir para nenhum cargo)
                   const hiddenUrls = [
+                    // Marketing oculto apenas para rafaelcarvalhomed@gmail.com
+                    ...(user?.email === 'rafaelcarvalhomed@gmail.com' ? ['/marketing'] : []),
                     '/comercial/guia-prospeccao', // Guia de Prospecção
                     '/calculadora', // Calculadora
                     '/funil-vendas', // Funil de Vendas
