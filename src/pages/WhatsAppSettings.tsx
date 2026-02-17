@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { SUPABASE_URL } from '@/integrations/supabase/client';
 import { MessageCircle, Settings, ArrowLeft, Loader2, Users, Phone, CheckCircle, XCircle, Sparkles } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -258,7 +259,7 @@ export default function WhatsAppSettings() {
         <TabsContent value="guide" className="space-y-6">
           <div className="grid lg:grid-cols-2 gap-6">
             <SetupGuide
-              webhookUrl={webhookUrl || (config ? `https://rpcixpbmtpyrnzlsuuus.supabase.co/functions/v1/whatsapp-webhook` : undefined)}
+              webhookUrl={webhookUrl || (config ? `${SUPABASE_URL}/functions/v1/whatsapp-webhook` : undefined)}
               webhookVerifyToken={webhookVerifyToken || config?.webhook_verify_token || undefined}
             />
             <CredentialsForm
@@ -283,7 +284,7 @@ export default function WhatsAppSettings() {
                   <div>
                     <p className="text-muted-foreground">Callback URL:</p>
                     <code className="text-xs bg-background px-2 py-1 rounded">
-                      {webhookUrl || `https://rpcixpbmtpyrnzlsuuus.supabase.co/functions/v1/whatsapp-webhook`}
+                      {webhookUrl || `${SUPABASE_URL}/functions/v1/whatsapp-webhook`}
                     </code>
                   </div>
                   <div>
