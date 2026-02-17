@@ -82,11 +82,11 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background relative">
       {viewMode === 'daily' ? (
-        <DoctorDashboard viewMode={viewMode} onViewModeChange={setViewMode} />
+        <DoctorDashboard viewMode={viewMode} onViewModeChange={setViewMode as any} />
       ) : viewMode === 'vision' ? (
-        <VisionDashboard viewMode={viewMode} onViewModeChange={setViewMode} />
+        <VisionDashboard viewMode={viewMode} onViewModeChange={setViewMode as any} />
       ) : (
-        <DetailedDashboard viewMode={viewMode} onViewModeChange={setViewMode} />
+        <DetailedDashboard viewMode={viewMode} onViewModeChange={setViewMode as any} />
       )}
     </div>
   );

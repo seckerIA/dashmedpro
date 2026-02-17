@@ -72,7 +72,7 @@ export const useCostsBreakdown = (startDate?: string, endDate?: string) => {
         ferramentas: 0,
         operacional: 0,
         terceirizacao: 0,
-      }
+      };
 
       (data as any[])?.forEach((cost: any) => {
         if (cost.cost_type in breakdown) {

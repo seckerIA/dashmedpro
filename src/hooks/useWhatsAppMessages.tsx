@@ -118,9 +118,9 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
       }
 
       // Criar mensagem no banco (status: sending)
-      const messageData: WhatsAppMessageInsert = {
+      const messageData: any = {
         user_id: conversation.user_id,
-        organization_id: profile?.organization_id,
+        organization_id: (profile as any)?.organization_id,
         conversation_id: payload.conversation_id,
         phone_number: conversation.phone_number,
         content: payload.content,

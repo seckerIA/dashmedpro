@@ -314,7 +314,7 @@ export default function FollowUpPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { linkedDoctorIds } = useSecretaryDoctors();
+  const { doctorIds: linkedDoctorIds } = useSecretaryDoctors();
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');

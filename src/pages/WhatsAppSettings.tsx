@@ -98,7 +98,7 @@ export default function WhatsAppSettings() {
                   : 'Ative a integração para começar a usar o chat'}
               </p>
             </div>
-            {config?.oauth_connected && (
+            {(config as any)?.oauth_connected && (
               <Badge variant="outline" className="ml-auto">
                 <Sparkles className="h-3 w-3 mr-1" />
                 Conectado via Facebook

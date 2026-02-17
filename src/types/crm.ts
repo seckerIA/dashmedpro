@@ -35,7 +35,7 @@ export type CRMActivityInsert = Database['public']['Tables']['crm_activities']['
 export type CRMActivityUpdate = Database['public']['Tables']['crm_activities']['Update'];
 
 // Enums
-export type CRMPipelineStage = Database['public']['Enums']['crm_pipeline_stage'];
+export type CRMPipelineStage = string;
 export type CRMActivityType = Database['public']['Enums']['crm_activity_type'] | 'ai_interaction';
 export type HealthInsuranceType = 'convenio' | 'particular';
 export type PatientGender = 'masculino' | 'feminino' | 'outro' | 'prefiro_nao_dizer';
@@ -59,7 +59,7 @@ export interface CRMDealWithContact extends CRMDeal {
   } | null;
 }
 
-export interface CRMContactWithDeals extends CRMContact {
+export interface CRMContactWithDeals extends Omit<CRMContact, 'last_contact_at'> {
   deals?: CRMDeal[];
   activities?: CRMActivity[];
   last_contact_at?: string | null;

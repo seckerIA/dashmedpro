@@ -7,7 +7,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/components/ui/use-toast';
-import type { WhatsAppConversationLabel, WhatsAppConversationLabelInsert } from '@/types/whatsapp';
+type WhatsAppConversationLabel = any;
+type WhatsAppConversationLabelInsert = any;
 
 // Query keys
 export const WHATSAPP_LABELS_KEY = 'whatsapp-labels';

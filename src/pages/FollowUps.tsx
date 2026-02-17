@@ -38,6 +38,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 
 export default function FollowUps() {
+  const navigate = (path: string) => window.location.href = path;
   const { followUps, isLoading, deleteFollowUp, updateFollowUp, isDeleting } = useFollowUps();
   const { deals } = useCRM();
   const { toast } = useToast();
