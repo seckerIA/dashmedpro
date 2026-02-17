@@ -1,63 +1,30 @@
 
-# Plano: Criar Paginas de Politica de Privacidade e Termos de Servico
+# Fix: Facebook Connect Button Not Showing in Lovable Preview
 
-## Resumo
+## Problem
+The "Conexao Rapida" button with Facebook OAuth doesn't appear in the Lovable preview because:
+1. The `.env` file doesn't contain `VITE_FB_APP_ID`
+2. The `.env` file still points to the wrong Supabase project (`rpcixpbmtpyrnzlsuuus` instead of `adzaqkduxnpckbcuqpmg`)
 
-Criar duas novas paginas (`/privacy-policy` e `/terms-of-service`) com o conteudo fornecido, adaptadas ao design system do DashMed Pro (Tailwind + componentes existentes). Adicionar links discretos no rodape da pagina de Login com botao de retorno.
+The `useMetaOAuth` hook checks `import.meta.env.VITE_FB_APP_ID` -- if empty, `isOAuthConfigured` is `false`, and the `FacebookConnectButton` renders the disabled/unavailable card.
 
-## Arquivos a Criar
+## Solution
 
-| Arquivo | Descricao |
-|---------|-----------|
-| `src/pages/PrivacyPolicy.tsx` | Pagina completa de Politica de Privacidade |
-| `src/pages/TermsOfService.tsx` | Pagina completa de Termos de Servico |
+Update the `.env` file with the correct values:
 
-## Arquivos a Modificar
-
-| Arquivo | Mudanca |
-|---------|---------|
-| `src/App.tsx` | Adicionar rotas `/privacy-policy` e `/terms-of-service` (publicas, sem autenticacao) |
-| `src/pages/Login.tsx` | Adicionar links discretos no rodape da pagina de login |
-
-## Detalhes Tecnicos
-
-### 1. Paginas de Politica e Termos
-
-Cada pagina tera:
-- Layout responsivo com `max-w-4xl` centralizado
-- Botao "Voltar ao Login" no topo (usando `useNavigate` do react-router)
-- Logo do DashMed Pro no cabecalho
-- Conteudo completo fornecido, estilizado com classes Tailwind
-- Rodape com copyright e links cruzados entre as duas paginas
-- Suporte a dark mode via variaveis CSS existentes
-
-### 2. Links na Pagina de Login
-
-Adicionar abaixo do card de login (apos a linha 591):
-
-```tsx
-<div className="mt-4 text-center text-xs text-muted-foreground">
-  <Link to="/privacy-policy" className="hover:underline">
-    Politica de Privacidade
-  </Link>
-  <span className="mx-2">|</span>
-  <Link to="/terms-of-service" className="hover:underline">
-    Termos de Servico
-  </Link>
-</div>
+```
+VITE_SUPABASE_PROJECT_ID="adzaqkduxnpckbcuqpmg"
+VITE_SUPABASE_PUBLISHABLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkemFxa2R1eG5wY2tiY3VxcG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5ODgyMDksImV4cCI6MjA4MTU2NDIwOX0.WO9-vzv_Vuh86TQWgNWuQ45cXa-L4GoGQfpSbvQiVMc"
+VITE_SUPABASE_URL="https://adzaqkduxnpckbcuqpmg.supabase.co"
+VITE_FB_APP_ID="1557514182198067"
+VITE_FB_META_OAUTH_REDIRECT_URI="https://adzaqkduxnpckbcuqpmg.supabase.co/functions/v1/meta-oauth-callback"
+VITE_FB_CONFIG_ID="791657633947469"
 ```
 
-### 3. Rotas no App.tsx
+Note: `FB_APP_SECRET` and `SUPABASE_SERVICE_ROLE_KEY` remain as project secrets only (not in `.env`) since they should never be exposed to the client.
 
-As rotas serao adicionadas no bloco de rotas publicas (junto com `/login`, `/reset-password`, `/auth/callback`), pois nao requerem autenticacao.
+## Technical Details
 
-### 4. Estrutura das paginas
-
-Ambas as paginas seguirao a mesma estrutura:
-- Header com logo + titulo + botao voltar
-- Box de "ultima atualizacao"
-- Secoes numeradas com h2/h3
-- Boxes de destaque (info, warning, highlight) usando classes Tailwind
-- Tabelas estilizadas
-- Box de contato
-- Footer
+- **File changed:** `.env`
+- **Root cause:** `VITE_` prefixed environment variables must be in the `.env` file to be available in the Vite build via `import.meta.env`
+- **Impact:** The Facebook connect button, Supabase client connection, and OAuth redirect will all use the correct project
