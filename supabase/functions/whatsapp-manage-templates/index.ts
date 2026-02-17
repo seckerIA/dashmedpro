@@ -266,11 +266,11 @@ serve(async (req: Request) => {
       const data = await response.json();
 
       if (!response.ok || data.error) {
-        console.error('[manage-templates] Delete error:', data.error);
-        throw new Error(data.error?.message || 'Failed to delete template on Meta');
+        // Se o template já não existe na Meta, não é erro — só limpar local
+        console.warn('[manage-templates] Meta delete warning (proceeding with local cleanup):', JSON.stringify(data.error));
       }
 
-      // Remover do banco local
+      // Remover do banco local (sempre, mesmo se Meta retornou erro)
       if (template_id) {
         await supabaseAdmin
           .from('whatsapp_templates')
