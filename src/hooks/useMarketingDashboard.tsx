@@ -157,8 +157,8 @@ export function useMarketingDashboard() {
         }
       });
       
-      // Status de integrações
-      const activeConnections = connectionsData.filter(c => c.is_active).length;
+      // Status de integrações (exclude meta_oauth record — not a real ad account)
+      const activeConnections = connectionsData.filter(c => c.is_active && c.account_id !== 'meta_oauth').length;
       const lastSync = connectionsData
         .filter(c => c.last_sync_at)
         .sort((a, b) => {

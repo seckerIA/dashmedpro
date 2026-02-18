@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { MetaIntegrationCard } from "@/components/marketing/MetaIntegrationCard";
+import { AdAccountSyncSelector } from "@/components/marketing/AdAccountSyncSelector";
 
 export function AdPlatformsIntegration() {
   const { data: connections, isLoading } = useAdPlatformConnections();
@@ -87,6 +88,9 @@ export function AdPlatformsIntegration() {
       {/* Meta Business Platform OAuth Centralizado */}
       <MetaIntegrationCard />
 
+      {/* Seletor de Contas de Anúncios Meta para Sync */}
+      <AdAccountSyncSelector />
+
       {/* Conexões Manuais (Google Ads, etc) */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -105,11 +109,14 @@ export function AdPlatformsIntegration() {
           </Button>
         </div>
 
-      {connections && connections.length === 0 ? (
+      {/* Filter out meta_ads connections — managed by AdAccountSyncSelector above */}
+      {(() => {
+        const otherConnections = connections?.filter(c => c.platform !== 'meta_ads') || [];
+        return otherConnections.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center">
             <p className="text-muted-foreground mb-4">
-              Nenhuma conexão configurada. Adicione uma conexão para começar.
+              Nenhuma conexão manual configurada. Adicione uma conexão para Google Ads ou outras plataformas.
             </p>
             <Button onClick={() => setShowForm(true)}>
               <Plus className="h-4 w-4 mr-2" />
@@ -119,7 +126,7 @@ export function AdPlatformsIntegration() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {connections?.map((connection) => (
+          {otherConnections.map((connection) => (
             <Card key={connection.id}>
               <CardHeader>
                 <div className="flex items-start justify-between">
@@ -201,7 +208,8 @@ export function AdPlatformsIntegration() {
             </Card>
           ))}
         </div>
-      )}
+      );
+      })()}
 
         <AdConnectionForm
           open={showForm}

@@ -46,7 +46,8 @@ export function MarketingDashboard() {
     }
 
     try {
-      const activeConnections = connections.filter(c => c.is_active);
+      // Filter: only active accounts, exclude meta_oauth record (not a real ad account)
+      const activeConnections = connections.filter(c => c.is_active && c.account_id !== 'meta_oauth');
       for (const connection of activeConnections) {
         await syncCampaigns.mutateAsync(connection.id);
       }

@@ -200,18 +200,26 @@ async function syncMetaAds(connection: any, supabase: any, userId: string) {
     const campaigns = await fetchMetaCampaigns(formattedAccountId, accessToken);
     console.log(`[Meta Ads] Found ${campaigns.length} campaigns`);
 
-    // 2. Buscar insights para cada campanha (últimos 30 dias)
-    const campaignsWithInsights = await Promise.all(
-      campaigns.map(async (campaign) => {
-        try {
-          const insights = await fetchCampaignInsights(campaign.id, accessToken);
-          return { ...campaign, insights };
-        } catch (e) {
-          console.warn(`[Meta Ads] Could not fetch insights for campaign ${campaign.id}:`, e);
-          return campaign;
-        }
-      })
-    );
+    // 2. Buscar insights em batches de 5 (evita rate limit da Meta API)
+    const BATCH_SIZE = 5;
+    const campaignsWithInsights: CampaignWithInsights[] = [];
+
+    for (let i = 0; i < campaigns.length; i += BATCH_SIZE) {
+      const batch = campaigns.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.all(
+        batch.map(async (campaign) => {
+          try {
+            const insights = await fetchCampaignInsights(campaign.id, accessToken);
+            return { ...campaign, insights };
+          } catch (e) {
+            console.warn(`[Meta Ads] Could not fetch insights for campaign ${campaign.id}:`, e);
+            return campaign as CampaignWithInsights;
+          }
+        })
+      );
+      campaignsWithInsights.push(...batchResults);
+      console.log(`[Meta Ads] Fetched insights batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(campaigns.length / BATCH_SIZE)}`);
+    }
 
     // 3. Salvar campanhas no banco
     let syncedCount = 0;
