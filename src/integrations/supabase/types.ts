@@ -96,6 +96,7 @@ export type Database = {
       }
       ad_platform_connections: {
         Row: {
+          account_category: string
           account_id: string
           account_name: string
           api_key: string
@@ -111,6 +112,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_category?: string
           account_id: string
           account_name: string
           api_key: string
@@ -126,6 +128,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_category?: string
           account_id?: string
           account_name?: string
           api_key?: string
