@@ -12,13 +12,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   RefreshCw,
   CheckCircle2,
   XCircle,
@@ -120,22 +113,6 @@ export function AdAccountSyncSelector() {
         variant: 'destructive',
         title: 'Erro',
         description: error.message || 'Erro ao atualizar conta.',
-      });
-    }
-  };
-
-  const handleCategoryChange = async (connectionId: string, newCategory: AdAccountCategory) => {
-    try {
-      await updateConnection.mutateAsync({
-        id: connectionId,
-        updates: { account_category: newCategory } as any,
-      });
-      toast({ title: 'Categoria atualizada' });
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Erro',
-        description: error.message || 'Erro ao atualizar categoria.',
       });
     }
   };
@@ -254,7 +231,7 @@ export function AdAccountSyncSelector() {
     if (accounts.length === 0) {
       return (
         <div className="p-4 text-center text-sm text-muted-foreground">
-          Nenhuma conta nesta categoria. Use o seletor de categoria em cada conta para movê-la.
+          Nenhuma conta nesta categoria.
         </div>
       );
     }
@@ -297,25 +274,6 @@ export function AdAccountSyncSelector() {
                 <p className="text-xs text-red-500 mt-0.5 truncate">{account.error_message}</p>
               )}
             </div>
-            <Select
-              value={(account.account_category as AdAccountCategory) || 'other'}
-              onValueChange={(val) => {
-                // Prevent label click from toggling checkbox
-                handleCategoryChange(account.id, val as AdAccountCategory);
-              }}
-            >
-              <SelectTrigger
-                className="w-[110px] h-7 text-xs"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="bm">BM</SelectItem>
-                <SelectItem value="waba">WABA</SelectItem>
-                <SelectItem value="other">Outra</SelectItem>
-              </SelectContent>
-            </Select>
             <Badge
               variant={account.sync_status === 'success' ? 'default' : 'secondary'}
               className="text-xs flex-shrink-0"
