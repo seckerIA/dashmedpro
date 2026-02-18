@@ -373,6 +373,97 @@ npm run lint          # ESLint check
 - **Conta financeira ausente**: Toast warning se nao houver `financial_accounts` ativa
 - **WhatsApp Token Expiration**: Tokens Meta expiram periodicamente
 - **Meta OAuth HTTPS**: Facebook requer HTTPS (usar ngrok para dev local)
+- **406 em update+select+single**: RLS bloqueia read-back apos PATCH — usar `.update().eq()` sem `.select().single()` (ver Licoes Aprendidas)
+- **meta_oauth record nao e conta real**: O record `account_id = 'meta_oauth'` armazena o token OAuth, NAO e uma conta de anuncios — SEMPRE filtrar de sync e listagens
+
+---
+
+## Licoes Aprendidas (Patterns & Anti-Patterns)
+
+### Anti-Pattern: `.select().single()` apos UPDATE com RLS
+- **Problema**: `supabase.from('table').update(data).eq('id', id).select().single()` retorna 406 (PGRST116) quando a RLS policy permite UPDATE mas nao permite SELECT do row atualizado
+- **Causa**: PostgREST tenta ler o row de volta apos o update, mas a RLS bloqueia o read
+- **Fix**: Remover `.select().single()` e retornar apenas `{ id }` quando nao precisa do dado retornado
+- **Regra**: So use `.select().single()` em mutations se REALMENTE precisa do dado retornado E tem certeza que a RLS permite read
+
+### Anti-Pattern: `Promise.all` em chamadas de API externa com muitos itens
+- **Problema**: `Promise.all(campaigns.map(...))` dispara N requests simultaneas, causando rate limit na Meta API
+- **Fix**: Processar em batches de 5 (`BATCH_SIZE = 5`) com loop sequencial entre batches
+- **Pattern**:
+```typescript
+for (let i = 0; i < items.length; i += BATCH_SIZE) {
+  const batch = items.slice(i, i + BATCH_SIZE);
+  const results = await Promise.all(batch.map(fn));
+  allResults.push(...results);
+}
+```
+
+### Anti-Pattern: Colunas fantasmas em Edge Functions
+- **Problema**: Edge Functions fazendo upsert com colunas que nao existem no banco (ex: `campaign_name`, `raw_data`, `organization_id`, `metadata`, `quality_rating`) — PostgreSQL rejeita silenciosamente via `supabase.functions.invoke` (que engole o erro)
+- **Fix**: SEMPRE verificar schema real em `src/integrations/supabase/types.ts` ou migration files antes de fazer upsert
+- **Regra**: Quando `supabase.functions.invoke` retorna sucesso mas nada muda no banco, verificar se as colunas do upsert existem
+
+### Pattern: Record especial `meta_oauth`
+- O `meta-token-exchange` cria um record em `ad_platform_connections` com `account_id = 'meta_oauth'` para armazenar o token OAuth
+- Este record NAO e uma conta de anuncios real — NAO deve ser sincronizado, listado ou contado
+- SEMPRE filtrar: `.filter(c => c.account_id !== 'meta_oauth')`
+
+### Pattern: Deploy Edge Functions via CLI
+- Token de acesso armazenado em `.env` como `SUPABASE_ACCES_TOKEN` (nota: typo no nome, falta um S)
+- Comando: `SUPABASE_ACCESS_TOKEN=<token> npx supabase functions deploy <nome> --project-ref adzaqkduxnpckbcuqpmg`
+- Tokens expiram — se 401, gerar novo em https://supabase.com/dashboard/account/tokens
+
+---
+
+## Historico de Sessoes
+
+### Sessao 18/02/2026 — Meta Ads Schema Fix + WhatsApp BM Connect + Ad Account Selector
+
+#### 1. Fix Schema Mismatches em Edge Functions (commit e8ec2d0)
+- **Problema**: `sync-ad-campaigns` e `meta-oauth-callback` faziam upsert com colunas inexistentes, causando falhas silenciosas
+- **Correcoes em `sync-ad-campaigns`**:
+  - `campaign_name` → `platform_campaign_name`
+  - Adicionado `platform: 'meta_ads'`
+  - Removido `raw_data` (coluna inexistente)
+  - Adicionados `budget`, `conversion_value`, `start_date`, `end_date`
+- **Correcoes em `meta-oauth-callback`**:
+  - Graph API v21.0 → v22.0
+  - Removidos `organization_id`, `metadata` do upsert ads
+  - Removidos `organization_id`, `quality_rating`, `oauth_connected`, `oauth_expires_at` do upsert whatsapp
+  - Catch block status 400 → 200 (compatibilidade com `supabase.functions.invoke`)
+- **Correcoes em `meta-token-exchange`**:
+  - Removidos `organization_id`, `quality_rating` do path whatsapp_config
+- **Arquivos**: `supabase/functions/sync-ad-campaigns/index.ts`, `supabase/functions/meta-oauth-callback/index.ts`, `supabase/functions/meta-token-exchange/index.ts`
+
+#### 2. WhatsApp Business Connect via BM (commit c5f6969)
+- **Feature**: Conectar conta WhatsApp Business diretamente das contas do Business Manager usando token OAuth ja armazenado
+- **Nova Edge Function `whatsapp-list-accounts`**:
+  - Action `list`: Busca WABAs e phone numbers via Graph API v22.0 (`/me/businesses` → `/{id}/owned_whatsapp_business_accounts` → `/{id}/phone_numbers`)
+  - Action `connect`: Salva WABA/phone escolhido em `whatsapp_config` com `oauth_connected: true`
+- **Novo Componente `WhatsAppAccountPicker`**: Dialog com RadioGroup para selecionar conta, quality badges, tratamento de token expirado
+- **Atualizacoes em `useMetaOAuth`**: Adicionados `fetchWhatsAppAccounts`, `connectWhatsAppAccount` (query + mutation)
+- **Atualizacoes em `MetaIntegrationCard`**: Botao "Configurar" para WhatsApp quando Meta conectado mas WhatsApp nao
+- **Arquivos**: `supabase/functions/whatsapp-list-accounts/index.ts`, `src/components/marketing/WhatsAppAccountPicker.tsx`, `src/hooks/useMetaOAuth.tsx`, `src/components/marketing/MetaIntegrationCard.tsx`
+
+#### 3. Ad Account Selector para Sync Seletivo (commit 16fb761)
+- **Problema**: Marketing dashboard mostrando valores zerados. 26+ contas de anuncios sincronizando simultaneamente (incluindo `meta_oauth` que nao e conta real), causando rate limits e timeouts
+- **Novo Componente `AdAccountSyncSelector`**:
+  - Lista contas Meta Ads com checkboxes (exclui `meta_oauth`)
+  - Toggle `is_active` para ativar/desativar sync por conta
+  - Botao "Sincronizar (N)" com barra de progresso e resultado por conta
+  - Colapsavel, com "Selecionar todas" / "Desmarcar todas"
+- **Atualizacoes**:
+  - `AdPlatformsIntegration`: Integrado seletor, contas `meta_ads` filtradas de "Outras Integracoes"
+  - `MarketingDashboard.handleSyncAll`: Exclui `meta_oauth` da sincronizacao
+  - `useMarketingDashboard`: Contagem de conexoes ativas exclui `meta_oauth`
+  - `sync-ad-campaigns`: Insights buscados em batches de 5 (evita rate limit)
+- **Arquivos**: `src/components/marketing/AdAccountSyncSelector.tsx`, `src/components/commercial/AdPlatformsIntegration.tsx`, `src/components/marketing/MarketingDashboard.tsx`, `src/hooks/useMarketingDashboard.tsx`, `supabase/functions/sync-ad-campaigns/index.ts`
+
+#### 4. Fix 406 RLS Error no Toggle (commit 9948df3)
+- **Problema**: Clicar em checkbox ou "Desmarcar todas" gerava erro 406 (PGRST116) em loop — a RLS bloqueava o `.select().single()` apos o PATCH
+- **Causa**: `useUpdateAdPlatformConnection` usava `.update().eq().select().single()` — PostgREST tentava ler o row atualizado mas a RLS bloqueava o read-back
+- **Fix**: Removido `.select().single()`, retorna apenas `{ id }` — o toggle nao precisa do dado retornado
+- **Arquivo**: `src/hooks/useAdPlatformConnections.tsx`
 
 ---
 
@@ -391,4 +482,4 @@ Regras criticas:
 
 ---
 
-**Version:** 0.5.0 | 2026-02-14 | DevSquad Avengers Edition
+**Version:** 0.6.0 | 2026-02-18 | DevSquad Avengers Edition

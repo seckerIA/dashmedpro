@@ -337,3 +337,25 @@ supabase/functions/
   - Configurar `FB_APP_SECRET` no Supabase Secrets: `npx supabase secrets set FB_APP_SECRET=2973953f9f307045913fe6e85dbcbba0`
   - Gravar screencasts para resubmeter permissões rejeitadas ao Meta App Review
   - WhatsApp Edge Functions ainda usam Graph API v18.0 (funcional, upgrade opcional)
+
+### Contexto Atual (18/02/2026 - Meta Ads Schema Fix + WhatsApp BM Connect + Ad Account Selector)
+- **Fix Schema Mismatches em Edge Functions** (commit `e8ec2d0`):
+  - `sync-ad-campaigns`: Corrigido `campaign_name` → `platform_campaign_name`, removido `raw_data`, adicionados `budget`, `conversion_value`, `start_date`, `end_date`
+  - `meta-oauth-callback`: Removidas colunas inexistentes (`organization_id`, `metadata`, `quality_rating`, `oauth_connected`, `oauth_expires_at`), Graph API v21→v22
+  - `meta-token-exchange`: Removidos `organization_id`, `quality_rating` do path whatsapp_config
+- **WhatsApp Business Connect via BM** (commit `c5f6969`):
+  - Nova Edge Function `whatsapp-list-accounts` (list + connect WABAs from BM)
+  - Novo componente `WhatsAppAccountPicker` com seleção de WABA/phone
+  - Botão "Configurar" no `MetaIntegrationCard` para WhatsApp
+- **Ad Account Selector para Sync Seletivo** (commit `16fb761`):
+  - Novo componente `AdAccountSyncSelector` com checkboxes por conta, progresso de sync, e resultado por conta
+  - Exclui record `meta_oauth` (não é conta real) de sync e contagens
+  - Batch processing em `sync-ad-campaigns` (5 por vez, evita rate limit)
+- **Fix 406 RLS Error** (commit `9948df3`):
+  - `useUpdateAdPlatformConnection`: Removido `.select().single()` que causava 406 (RLS bloqueia read-back após PATCH)
+- **Lições Aprendidas**:
+  - `.select().single()` após UPDATE com RLS restritiva causa 406 — remover quando não precisa do dado retornado
+  - `Promise.all` com muitos items causa rate limit — usar batch processing
+  - Colunas inexistentes em upsert são rejeitadas silenciosamente via `supabase.functions.invoke`
+  - Record `meta_oauth` na `ad_platform_connections` NÃO é conta de anúncios — sempre filtrar
+  - Token de deploy do Supabase CLI está em `.env` como `SUPABASE_ACCES_TOKEN` (com typo)
