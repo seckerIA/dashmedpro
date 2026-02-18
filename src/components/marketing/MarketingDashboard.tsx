@@ -49,8 +49,8 @@ export function MarketingDashboard() {
     }
 
     try {
-      // Filter: only active accounts, exclude meta_oauth record (not a real ad account)
-      const activeConnections = connections.filter(c => c.is_active && c.account_id !== 'meta_oauth');
+      // Filter: only active ad accounts (category 'other') — BMs, WABAs, Pages can't be synced
+      const activeConnections = connections.filter(c => c.is_active && c.account_category === 'other');
       for (const connection of activeConnections) {
         await syncCampaigns.mutateAsync(connection.id);
       }

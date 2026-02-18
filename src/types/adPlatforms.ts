@@ -17,6 +17,7 @@ export interface AdPlatformConnection {
   account_id: string;
   account_name: string;
   account_category: AdAccountCategory;
+  parent_account_id?: string | null;
   api_key: string;
   refresh_token?: string | null;
   is_active: boolean;

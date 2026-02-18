@@ -191,6 +191,23 @@ async function syncMetaAds(connection: any, supabase: any, userId: string) {
       throw new Error('Access token não encontrado. Reconecte sua conta Meta.');
     }
 
+    // Guard: only ad accounts (category 'other') can be synced
+    const category = connection.account_category;
+    if (category && category !== 'other') {
+      return {
+        success: false,
+        error: `Tipo "${category}" não suporta sync de campanhas. Apenas contas de anúncio podem ser sincronizadas.`
+      };
+    }
+
+    // Guard: reject known non-ad-account prefixes
+    if (accountId.startsWith('bm_') || accountId.startsWith('waba_') || accountId.startsWith('page_') || accountId === 'meta_oauth') {
+      return {
+        success: false,
+        error: 'Este registro não é uma conta de anúncios.'
+      };
+    }
+
     // Formatar account_id (adicionar prefixo act_ se necessário)
     const formattedAccountId = accountId.startsWith('act_') ? accountId : `act_${accountId}`;
 
