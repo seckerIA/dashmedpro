@@ -71,9 +71,9 @@ export function useMarketingDashboard() {
     queryFn: async (): Promise<MarketingDashboardData> => {
       const connectionsData = connections || [];
 
-      // Contas ativas (excluindo meta_oauth que é apenas storage do token)
+      // Contas ativas (excluindo meta_oauth e pages que não são contas de anúncios)
       const activeConns = connectionsData.filter(
-        c => c.is_active && c.account_id !== 'meta_oauth'
+        c => c.is_active && c.account_id !== 'meta_oauth' && c.account_category !== 'page'
       );
       const activeConnIds = new Set(activeConns.map(c => c.id));
 

@@ -65,6 +65,10 @@ interface MetaIntegrationStatus {
     connected: boolean;
     connections: AdPlatformConnection[];
   };
+  leadForms: {
+    pagesConnected: number;
+    totalLeads: number;
+  };
 }
 
 // Tipos para WABAs do Business Manager
@@ -117,7 +121,7 @@ export function useMetaOAuth() {
     queryFn: async (): Promise<MetaIntegrationStatus> => {
       if (!user) throw new Error('Usuário não autenticado');
 
-      const [whatsappRes, adsRes] = await Promise.all([
+      const [whatsappRes, adsRes, leadFormsCountRes] = await Promise.all([
         (supabase.from('whatsapp_config' as any) as any)
           .select('*')
           .eq('user_id', user.id)
@@ -128,7 +132,14 @@ export function useMetaOAuth() {
           .eq('user_id', user.id)
           .eq('platform', 'meta_ads')
           .eq('is_active', true),
+        (supabase.from('lead_form_submissions' as any) as any)
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id),
       ]);
+
+      // Contar pages conectadas (account_category = 'page')
+      const allConnections = (adsRes.data || []) as any[];
+      const pagesConnected = allConnections.filter((c: any) => c.account_category === 'page').length;
 
       return {
         whatsapp: {
@@ -141,6 +152,10 @@ export function useMetaOAuth() {
         ads: {
           connected: (adsRes.data?.length || 0) > 0,
           connections: (adsRes.data || []) as AdPlatformConnection[],
+        },
+        leadForms: {
+          pagesConnected,
+          totalLeads: leadFormsCountRes.count || 0,
         },
       };
     },

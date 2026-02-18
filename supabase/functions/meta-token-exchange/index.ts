@@ -344,6 +344,68 @@ serve(async (req: Request) => {
       console.warn('[Token Exchange] Could not fetch businesses:', e);
     }
 
+    // 5e. Buscar e salvar Facebook Pages (para Lead Forms webhook)
+    let pagesCount = 0;
+    try {
+      console.log('[Token Exchange] Fetching pages...');
+      const pagesResponse = await fetch(
+        `https://graph.facebook.com/${GRAPH_API_VERSION}/me/accounts?fields=id,name,access_token&access_token=${accessToken}`
+      );
+      if (pagesResponse.ok) {
+        const pagesData = await pagesResponse.json();
+        const pages = pagesData.data || [];
+        pagesCount = pages.length;
+        console.log(`[Token Exchange] Found ${pages.length} pages`);
+
+        for (const page of pages) {
+          // Salvar page como conexão (platform=meta_ads, account_id=page_{id}, category=page)
+          const { error: pageError } = await supabaseAdmin
+            .from('ad_platform_connections')
+            .upsert({
+              user_id: user.id,
+              platform: 'meta_ads',
+              account_id: `page_${page.id}`,
+              account_name: page.name,
+              api_key: page.access_token,
+              is_active: true,
+              sync_status: 'success',
+              account_category: 'page',
+            }, {
+              onConflict: 'user_id,platform,account_id',
+            });
+
+          if (pageError) {
+            console.error('[Token Exchange] Error saving page:', page.name, pageError);
+          }
+
+          // Subscrever page ao webhook de leadgen
+          try {
+            const subscribeResponse = await fetch(
+              `https://graph.facebook.com/${GRAPH_API_VERSION}/${page.id}/subscribed_apps`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  subscribed_fields: ['leadgen'],
+                  access_token: page.access_token,
+                }),
+              }
+            );
+            if (subscribeResponse.ok) {
+              console.log(`[Token Exchange] Page "${page.name}" subscribed to leadgen webhook`);
+            } else {
+              const subError = await subscribeResponse.json();
+              console.warn(`[Token Exchange] Could not subscribe page "${page.name}":`, subError);
+            }
+          } catch (e) {
+            console.warn(`[Token Exchange] Error subscribing page "${page.name}":`, e);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Token Exchange] Could not fetch pages:', e);
+    }
+
     // Retornar sucesso
     return new Response(
       JSON.stringify({
@@ -351,6 +413,7 @@ serve(async (req: Request) => {
         whatsapp_connected: !!(whatsapp_data?.waba_id),
         ads_connected: adAccounts.length > 0,
         ad_accounts_count: adAccounts.length,
+        pages_count: pagesCount,
         token_expires_at: tokenExpiresAt?.toISOString() || null,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

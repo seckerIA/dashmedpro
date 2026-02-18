@@ -63,7 +63,7 @@ export function AdAccountSyncSelector() {
   const metaAdAccounts = useMemo(() => {
     if (!allConnections) return [];
     return allConnections.filter(
-      (c) => c.platform === 'meta_ads' && c.account_id !== 'meta_oauth'
+      (c) => c.platform === 'meta_ads' && c.account_id !== 'meta_oauth' && c.account_category !== 'page'
     );
   }, [allConnections]);
 

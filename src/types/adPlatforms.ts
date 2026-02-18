@@ -4,7 +4,7 @@
 export type AdPlatform = 'google_ads' | 'meta_ads';
 export type SyncStatus = 'success' | 'error' | 'pending';
 export type AdCampaignStatus = 'active' | 'paused' | 'ended' | 'removed';
-export type AdAccountCategory = 'bm' | 'waba' | 'other';
+export type AdAccountCategory = 'bm' | 'waba' | 'other' | 'page';
 
 // =====================================================
 // AD PLATFORM CONNECTIONS
@@ -227,4 +227,5 @@ export const AD_ACCOUNT_CATEGORY_LABELS: Record<AdAccountCategory, string> = {
   other: 'Contas de Anúncio',
   waba: 'WhatsApp Business',
   bm: 'Business Manager',
+  page: 'Facebook Pages',
 };

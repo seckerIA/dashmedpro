@@ -21,6 +21,7 @@ import {
   RefreshCw,
   LogOut,
   Settings,
+  FileText,
 } from 'lucide-react';
 import { useMetaOAuth } from '@/hooks/useMetaOAuth';
 import { cn } from '@/lib/utils';
@@ -263,6 +264,18 @@ export function MetaIntegrationCard() {
           undefined,
           integrationStatus?.ads?.connections?.length
             ? `${integrationStatus.ads.connections.length} conta(s) de anúncios conectada(s)`
+            : undefined
+        )}
+
+        {/* Lead Forms */}
+        {renderIntegrationItem(
+          <FileText className="h-5 w-5" />,
+          'Lead Forms',
+          'Receba leads dos formulários nativos do Facebook',
+          (integrationStatus?.leadForms?.pagesConnected || 0) > 0,
+          undefined,
+          integrationStatus?.leadForms?.pagesConnected
+            ? `${integrationStatus.leadForms.pagesConnected} página(s) conectada(s)${integrationStatus.leadForms.totalLeads > 0 ? ` · ${integrationStatus.leadForms.totalLeads} lead(s) recebido(s)` : ''}`
             : undefined
         )}
 
