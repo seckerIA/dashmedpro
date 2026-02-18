@@ -573,10 +573,11 @@ const handler = async (req: Request): Promise<Response> => {
             platform: 'meta_ads',
             account_id: selectedAccount.account_id || selectedAccount.id.replace('act_', ''),
             account_name: selectedAccount.name,
-            api_key: session.access_token, // Token de acesso
+            api_key: session.access_token,
             is_active: true,
             sync_status: 'pending',
             last_sync_at: null,
+            account_category: 'other',
           }, {
             onConflict: 'user_id,platform,account_id',
             ignoreDuplicates: false

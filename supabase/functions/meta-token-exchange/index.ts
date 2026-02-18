@@ -37,6 +37,16 @@ interface AdAccount {
   account_status: number;
 }
 
+interface Business {
+  id: string;
+  name: string;
+}
+
+interface WABAAccount {
+  id: string;
+  name: string;
+}
+
 serve(async (req: Request) => {
   // CORS
   if (req.method === 'OPTIONS') {
@@ -229,7 +239,7 @@ serve(async (req: Request) => {
       console.log('[Token Exchange] OAuth record saved successfully');
     }
 
-    // 5b. Salvar contas de anúncios individuais
+    // 5b. Salvar contas de anúncios individuais (category: 'other' = Contas de Anúncio)
     if (adAccounts.length > 0) {
       console.log('[Token Exchange] Saving ad accounts...');
 
@@ -244,6 +254,7 @@ serve(async (req: Request) => {
             api_key: accessToken,
             is_active: true,
             sync_status: 'pending',
+            account_category: 'other',
           }, {
             onConflict: 'user_id,platform,account_id',
           });
@@ -254,6 +265,77 @@ serve(async (req: Request) => {
       }
 
       console.log('[Token Exchange] Ad accounts saved successfully');
+    }
+
+    // 5c. Buscar e salvar Business Managers (category: 'bm')
+    try {
+      console.log('[Token Exchange] Fetching businesses...');
+      const bizResponse = await fetch(
+        `https://graph.facebook.com/${GRAPH_API_VERSION}/me/businesses?fields=id,name&access_token=${accessToken}`
+      );
+      if (bizResponse.ok) {
+        const bizData = await bizResponse.json();
+        const businesses: Business[] = bizData.data || [];
+        console.log(`[Token Exchange] Found ${businesses.length} businesses`);
+
+        for (const biz of businesses) {
+          const { error: bizError } = await supabaseAdmin
+            .from('ad_platform_connections')
+            .upsert({
+              user_id: user.id,
+              platform: 'meta_ads',
+              account_id: `bm_${biz.id}`,
+              account_name: biz.name,
+              api_key: accessToken,
+              is_active: true,
+              sync_status: 'success',
+              account_category: 'bm',
+            }, {
+              onConflict: 'user_id,platform,account_id',
+            });
+
+          if (bizError) {
+            console.error('[Token Exchange] Error saving business:', biz.name, bizError);
+          }
+
+          // 5d. Buscar WABAs de cada Business (category: 'waba')
+          try {
+            const wabaResponse = await fetch(
+              `https://graph.facebook.com/${GRAPH_API_VERSION}/${biz.id}/owned_whatsapp_business_accounts?fields=id,name&access_token=${accessToken}`
+            );
+            if (wabaResponse.ok) {
+              const wabaData = await wabaResponse.json();
+              const wabas: WABAAccount[] = wabaData.data || [];
+              console.log(`[Token Exchange] Found ${wabas.length} WABAs in ${biz.name}`);
+
+              for (const waba of wabas) {
+                const { error: wabaError } = await supabaseAdmin
+                  .from('ad_platform_connections')
+                  .upsert({
+                    user_id: user.id,
+                    platform: 'meta_ads',
+                    account_id: `waba_${waba.id}`,
+                    account_name: waba.name,
+                    api_key: accessToken,
+                    is_active: true,
+                    sync_status: 'success',
+                    account_category: 'waba',
+                  }, {
+                    onConflict: 'user_id,platform,account_id',
+                  });
+
+                if (wabaError) {
+                  console.error('[Token Exchange] Error saving WABA:', waba.name, wabaError);
+                }
+              }
+            }
+          } catch (e) {
+            console.warn(`[Token Exchange] Could not fetch WABAs for ${biz.name}:`, e);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Token Exchange] Could not fetch businesses:', e);
     }
 
     // Retornar sucesso
