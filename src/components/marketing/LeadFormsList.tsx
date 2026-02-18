@@ -4,6 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 import {
   RefreshCw,
   FileText,
@@ -15,7 +18,14 @@ import {
   Clock,
   ExternalLink,
   Loader2,
+  User,
+  Mail,
+  Phone,
+  Calendar,
+  MessageSquare,
+  Megaphone,
 } from 'lucide-react';
+import { type LeadFormSubmission } from '@/hooks/useMetaLeadForms';
 import { useMetaLeadForms, useLeadFormSubmissions, type MetaLeadForm } from '@/hooks/useMetaLeadForms';
 import { useAdPlatformConnections } from '@/hooks/useAdPlatformConnections';
 import { format } from 'date-fns';
@@ -45,10 +55,132 @@ function FormQuestions({ questions }: { questions: MetaLeadForm['questions'] }) 
 }
 
 // ========================================
+// Sub-component: Detalhe de um lead (modal)
+// ========================================
+function LeadDetailDialog({
+  submission,
+  open,
+  onOpenChange,
+}: {
+  submission: LeadFormSubmission | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  if (!submission) return null;
+
+  const fieldData = submission.field_data || [];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg max-h-[85vh]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <User className="h-5 w-5" />
+            {submission.full_name || 'Lead sem nome'}
+          </DialogTitle>
+        </DialogHeader>
+
+        <ScrollArea className="max-h-[60vh] pr-4">
+          <div className="space-y-4">
+            {/* Info básica */}
+            <div className="grid grid-cols-1 gap-3">
+              {submission.full_name && (
+                <div className="flex items-center gap-3 text-sm">
+                  <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground w-16">Nome</span>
+                  <span className="font-medium">{submission.full_name}</span>
+                </div>
+              )}
+              {submission.email && (
+                <div className="flex items-center gap-3 text-sm">
+                  <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground w-16">Email</span>
+                  <span className="font-medium">{submission.email}</span>
+                </div>
+              )}
+              {submission.phone_number && (
+                <div className="flex items-center gap-3 text-sm">
+                  <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground w-16">Telefone</span>
+                  <span className="font-medium font-mono">{submission.phone_number}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-3 text-sm">
+                <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-muted-foreground w-16">Data</span>
+                <span>{format(new Date(submission.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
+              </div>
+              {submission.campaign_name && (
+                <div className="flex items-center gap-3 text-sm">
+                  <Megaphone className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground w-16">Campanha</span>
+                  <span>{submission.campaign_name}</span>
+                </div>
+              )}
+              {submission.ad_name && (
+                <div className="flex items-center gap-3 text-sm">
+                  <MessageSquare className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground w-16">Anúncio</span>
+                  <span>{submission.ad_name}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Status CRM */}
+            <div className="flex items-center gap-2">
+              {submission.is_processed ? (
+                <Badge variant="default" className="gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Vinculado ao CRM
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="gap-1">
+                  <Clock className="h-3 w-3" />
+                  Pendente de processamento
+                </Badge>
+              )}
+            </div>
+
+            <Separator />
+
+            {/* Respostas do formulário */}
+            <div>
+              <h4 className="text-sm font-semibold mb-3">Respostas do Formulário</h4>
+              {fieldData.length > 0 ? (
+                <div className="space-y-3">
+                  {fieldData.map((field: any, idx: number) => {
+                    const value = Array.isArray(field.values)
+                      ? field.values.join(', ')
+                      : field.values || '—';
+                    return (
+                      <div key={field.name || idx} className="rounded-lg bg-muted/50 p-3">
+                        <p className="text-xs text-muted-foreground mb-1">
+                          {field.name?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) || `Campo ${idx + 1}`}
+                        </p>
+                        <p className="text-sm font-medium">{value}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground italic">
+                  Dados do formulário não disponíveis
+                </p>
+              )}
+            </div>
+          </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ========================================
 // Sub-component: Leads de um formulário
 // ========================================
 function FormLeads({ formId }: { formId: string }) {
   const { data: submissions, isLoading } = useLeadFormSubmissions(formId);
+  const [selectedLead, setSelectedLead] = useState<LeadFormSubmission | null>(null);
 
   if (isLoading) {
     return (
@@ -67,44 +199,58 @@ function FormLeads({ formId }: { formId: string }) {
   }
 
   return (
-    <div className="border rounded-lg overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Nome</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Telefone</TableHead>
-            <TableHead>Data</TableHead>
-            <TableHead>CRM</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {submissions.map((sub) => (
-            <TableRow key={sub.id}>
-              <TableCell className="font-medium">{sub.full_name || '—'}</TableCell>
-              <TableCell className="text-sm">{sub.email || '—'}</TableCell>
-              <TableCell className="text-sm font-mono">{sub.phone_number || '—'}</TableCell>
-              <TableCell className="text-sm text-muted-foreground">
-                {format(new Date(sub.created_at), 'dd/MM/yy HH:mm', { locale: ptBR })}
-              </TableCell>
-              <TableCell>
-                {sub.is_processed ? (
-                  <Badge variant="default" className="gap-1">
-                    <CheckCircle2 className="h-3 w-3" />
-                    Vinculado
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary" className="gap-1">
-                    <Clock className="h-3 w-3" />
-                    Pendente
-                  </Badge>
-                )}
-              </TableCell>
+    <>
+      <div className="border rounded-lg overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nome</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Telefone</TableHead>
+              <TableHead>Data</TableHead>
+              <TableHead>CRM</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+          </TableHeader>
+          <TableBody>
+            {submissions.map((sub) => (
+              <TableRow
+                key={sub.id}
+                className="cursor-pointer hover:bg-muted/50"
+                onClick={() => setSelectedLead(sub)}
+              >
+                <TableCell className="font-medium text-primary hover:underline">
+                  {sub.full_name || '—'}
+                </TableCell>
+                <TableCell className="text-sm">{sub.email || '—'}</TableCell>
+                <TableCell className="text-sm font-mono">{sub.phone_number || '—'}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {format(new Date(sub.created_at), 'dd/MM/yy HH:mm', { locale: ptBR })}
+                </TableCell>
+                <TableCell>
+                  {sub.is_processed ? (
+                    <Badge variant="default" className="gap-1">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Vinculado
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="gap-1">
+                      <Clock className="h-3 w-3" />
+                      Pendente
+                    </Badge>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      <LeadDetailDialog
+        submission={selectedLead}
+        open={!!selectedLead}
+        onOpenChange={(open) => !open && setSelectedLead(null)}
+      />
+    </>
   );
 }
 
