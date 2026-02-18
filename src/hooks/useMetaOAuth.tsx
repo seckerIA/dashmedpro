@@ -184,13 +184,9 @@ export function useMetaOAuth() {
       console.log('[Meta OAuth] Starting FB.login with scope:', META_SCOPES);
       const response: FacebookLoginResponse = await fbLogin({
         scope: META_SCOPES,
-        response_type: 'code',
-        override_default_response_type: true,
       });
       console.log('[Meta OAuth] FB.login response:', response);
-      if (response.authResponse?.code) {
-        await exchangeTokenMutation.mutateAsync({ code: response.authResponse.code });
-      } else if (response.authResponse?.accessToken) {
+      if (response.authResponse?.accessToken) {
         await exchangeTokenMutation.mutateAsync({ access_token: response.authResponse.accessToken });
       }
     } catch (error: unknown) {
@@ -223,17 +219,13 @@ export function useMetaOAuth() {
       console.log('[Meta OAuth] Starting WhatsApp Embedded Signup with config_id:', FB_CONFIG_ID);
       const response: FacebookLoginResponse = await fbLogin({
         config_id: FB_CONFIG_ID,
-        response_type: 'code',
-        override_default_response_type: true,
         extras: {
           feature: 'whatsapp_embedded_signup',
           version: 2,
         },
       });
       console.log('[Meta OAuth] WhatsApp Embedded Signup response:', response);
-      if (response.authResponse?.code) {
-        await exchangeTokenMutation.mutateAsync({ code: response.authResponse.code });
-      } else if (response.authResponse?.accessToken) {
+      if (response.authResponse?.accessToken) {
         await exchangeTokenMutation.mutateAsync({ access_token: response.authResponse.accessToken });
       }
     } catch (error: unknown) {
