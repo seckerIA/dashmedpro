@@ -224,7 +224,7 @@ export const AD_CAMPAIGN_STATUS_LABELS: Record<AdCampaignStatus, string> = {
 };
 
 export const AD_ACCOUNT_CATEGORY_LABELS: Record<AdAccountCategory, string> = {
-  bm: 'Business Manager',
+  other: 'Contas de Anúncio',
   waba: 'WhatsApp Business',
-  other: 'Outras',
+  bm: 'Business Manager',
 };
