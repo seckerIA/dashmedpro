@@ -6,6 +6,7 @@
  * Usa FB.login() com config_id para autenticação unificada
  */
 
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,11 +20,13 @@ import {
   AlertTriangle,
   RefreshCw,
   LogOut,
+  Settings,
 } from 'lucide-react';
 import { useMetaOAuth } from '@/hooks/useMetaOAuth';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { WhatsAppAccountPicker } from './WhatsAppAccountPicker';
 
 export function MetaIntegrationCard() {
   const {
@@ -40,6 +43,8 @@ export function MetaIntegrationCard() {
     isDisconnecting,
     refetchStatus,
   } = useMetaOAuth();
+
+  const [showWhatsAppPicker, setShowWhatsAppPicker] = useState(false);
 
   // Renderizar badge de status
   const renderStatusBadge = (connected: boolean, expiresAt?: Date) => {
@@ -191,15 +196,63 @@ export function MetaIntegrationCard() {
       </CardHeader>
 
       <CardContent className="space-y-3">
-        {/* WhatsApp */}
-        {renderIntegrationItem(
-          <Phone className="h-5 w-5" />,
-          'WhatsApp Business',
-          'Envie e receba mensagens pelo WhatsApp',
-          integrationStatus?.whatsapp?.connected || false,
-          integrationStatus?.whatsapp?.expiresAt,
-          integrationStatus?.whatsapp?.config?.display_phone_number
-        )}
+        {/* WhatsApp — with "Configurar" button */}
+        <div className="flex items-start justify-between p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
+          <div className="flex items-start gap-3">
+            <div
+              className={cn(
+                'p-2 rounded-lg',
+                integrationStatus?.whatsapp?.connected
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                  : 'bg-muted'
+              )}
+            >
+              <Phone className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="font-medium">WhatsApp Business</h4>
+                {renderStatusBadge(
+                  integrationStatus?.whatsapp?.connected || false,
+                  integrationStatus?.whatsapp?.expiresAt
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground mt-0.5">Envie e receba mensagens pelo WhatsApp</p>
+              {integrationStatus?.whatsapp?.connected && integrationStatus?.whatsapp?.config?.display_phone_number && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {integrationStatus.whatsapp.config.display_phone_number}
+                </p>
+              )}
+              {integrationStatus?.whatsapp?.connected && integrationStatus?.whatsapp?.expiresAt && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Expira em: {format(integrationStatus.whatsapp.expiresAt, "dd/MM/yyyy", { locale: ptBR })}
+                </p>
+              )}
+            </div>
+          </div>
+          {/* Botão Configurar — só aparece quando Meta está conectado mas WhatsApp não */}
+          {isConnected && !integrationStatus?.whatsapp?.connected && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowWhatsAppPicker(true)}
+              className="flex-shrink-0"
+            >
+              <Settings className="h-3 w-3 mr-1" />
+              Configurar
+            </Button>
+          )}
+        </div>
+
+        {/* WhatsApp Account Picker Dialog */}
+        <WhatsAppAccountPicker
+          open={showWhatsAppPicker}
+          onOpenChange={setShowWhatsAppPicker}
+          onSuccess={() => {
+            refetchStatus();
+            setShowWhatsAppPicker(false);
+          }}
+        />
 
         {/* Meta Ads */}
         {renderIntegrationItem(

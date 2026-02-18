@@ -136,15 +136,6 @@ serve(async (req: Request) => {
       console.warn('[Token Exchange] Could not get long-lived token, using short-lived');
     }
 
-    // Buscar organization_id do usuário
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('organization_id')
-      .eq('id', user.id)
-      .single();
-
-    const organizationId = profile?.organization_id;
-
     // 3. Buscar contas de anúncios
     console.log('[Token Exchange] Fetching ad accounts...');
     let adAccounts: AdAccount[] = [];
@@ -171,12 +162,11 @@ serve(async (req: Request) => {
       // Buscar informações do número
       let displayPhoneNumber = '';
       let verifiedName = '';
-      let qualityRating = '';
 
       try {
         const phoneResponse = await fetch(
           `https://graph.facebook.com/${GRAPH_API_VERSION}/${whatsapp_data.phone_number_id}?` +
-          `fields=display_phone_number,verified_name,quality_rating` +
+          `fields=display_phone_number,verified_name` +
           `&access_token=${accessToken}`
         );
 
@@ -184,7 +174,6 @@ serve(async (req: Request) => {
           const phoneData = await phoneResponse.json();
           displayPhoneNumber = phoneData.display_phone_number || '';
           verifiedName = phoneData.verified_name || '';
-          qualityRating = phoneData.quality_rating || '';
         }
       } catch (e) {
         console.warn('[Token Exchange] Could not fetch phone info:', e);
@@ -198,14 +187,12 @@ serve(async (req: Request) => {
         .from('whatsapp_config')
         .upsert({
           user_id: user.id,
-          organization_id: organizationId,
           waba_id: whatsapp_data.waba_id,
           phone_number_id: whatsapp_data.phone_number_id,
-          business_account_id: whatsapp_data.businessId,
+          business_account_id: whatsapp_data.businessId || whatsapp_data.waba_id,
           access_token: accessToken,
           display_phone_number: displayPhoneNumber,
           verified_name: verifiedName,
-          quality_rating: qualityRating,
           webhook_verify_token: webhookVerifyToken,
           is_active: true,
           oauth_connected: true,

@@ -67,6 +67,21 @@ interface MetaIntegrationStatus {
   };
 }
 
+// Tipos para WABAs do Business Manager
+export interface WhatsAppPhoneNumberBM {
+  id: string;
+  display_phone_number: string;
+  verified_name: string;
+  quality_rating: string;
+}
+
+export interface WhatsAppBusinessAccountBM {
+  id: string;
+  name: string;
+  timezone_id?: string;
+  phone_numbers: WhatsAppPhoneNumberBM[];
+}
+
 export function useMetaOAuth() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -274,6 +289,60 @@ export function useMetaOAuth() {
   });
 
   // =====================================================
+  // Query: Buscar WABAs do Business Manager (manual trigger)
+  // =====================================================
+  const whatsAppAccountsQuery = useQuery({
+    queryKey: ['whatsapp-bm-accounts', user?.id],
+    queryFn: async (): Promise<WhatsAppBusinessAccountBM[]> => {
+      const response = await supabase.functions.invoke('whatsapp-list-accounts', {
+        body: { action: 'list' },
+      });
+
+      if (response.error) throw response.error;
+      if (!response.data?.success) {
+        const err = new Error(response.data?.error || 'Falha ao buscar contas WhatsApp');
+        (err as any).code = response.data?.code;
+        throw err;
+      }
+
+      return response.data.whatsapp_accounts || [];
+    },
+    enabled: false, // Manual trigger only
+  });
+
+  // =====================================================
+  // Mutation: Conectar WABA/phone selecionado
+  // =====================================================
+  const connectWhatsAppMutation = useMutation({
+    mutationFn: async ({ wabaId, phoneNumberId }: { wabaId: string; phoneNumberId: string }) => {
+      const response = await supabase.functions.invoke('whatsapp-list-accounts', {
+        body: { action: 'connect', waba_id: wabaId, phone_number_id: phoneNumberId },
+      });
+
+      if (response.error) throw response.error;
+      if (!response.data?.success) throw new Error(response.data?.error || 'Falha ao conectar WhatsApp');
+
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['meta-integration-status'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-config'] });
+
+      toast({
+        title: 'WhatsApp conectado!',
+        description: 'Configuração salva com sucesso.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Erro ao conectar WhatsApp',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // =====================================================
   // Estado computado
   // =====================================================
   const isConnected = useMemo(() => {
@@ -299,6 +368,14 @@ export function useMetaOAuth() {
     startWhatsAppOAuthFlow,
     disconnect: disconnectMutation.mutate,
     isDisconnecting: disconnectMutation.isPending,
+
+    // WhatsApp BM accounts
+    fetchWhatsAppAccounts: whatsAppAccountsQuery.refetch,
+    isFetchingWhatsAppAccounts: whatsAppAccountsQuery.isFetching,
+    whatsAppAccounts: whatsAppAccountsQuery.data,
+    whatsAppAccountsError: whatsAppAccountsQuery.error,
+    connectWhatsAppAccount: connectWhatsAppMutation.mutateAsync,
+    isConnectingWhatsApp: connectWhatsAppMutation.isPending,
 
     // Invalidar queries
     refetchStatus: () => queryClient.invalidateQueries({ queryKey: ['meta-integration-status'] }),
