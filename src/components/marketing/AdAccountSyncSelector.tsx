@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import { useAdPlatformConnections, useUpdateAdPlatformConnection } from '@/hooks/useAdPlatformConnections';
 import { useSyncAdCampaigns } from '@/hooks/useAdCampaignsSync';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -99,17 +101,18 @@ export function AdAccountSyncSelector() {
     }
   };
 
+  const queryClient = useQueryClient();
+
   const handleDeselectAll = async () => {
-    const accountsToDeselect = [...activeAccounts];
+    const ids = metaAdAccounts.filter((c) => c.is_active).map((c) => c.id);
+    if (ids.length === 0) return;
     try {
-      await Promise.all(
-        accountsToDeselect.map((account) =>
-          updateConnection.mutateAsync({
-            id: account.id,
-            updates: { is_active: false } as any,
-          })
-        )
-      );
+      const { error } = await (supabase
+        .from('ad_platform_connections' as any) as any)
+        .update({ is_active: false })
+        .in('id', ids);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['ad-platform-connections'] });
     } catch (error: any) {
       toast({
         variant: 'destructive',
