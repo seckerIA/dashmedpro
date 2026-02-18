@@ -226,23 +226,20 @@ serve(async (req: Request) => {
       .from('ad_platform_connections')
       .upsert({
         user_id: user.id,
-        organization_id: organizationId,
         platform: 'meta_ads',
         account_id: 'meta_oauth',
         account_name: 'Meta Business Connection',
         api_key: accessToken,
         is_active: true,
-        sync_status: 'connected',
-        metadata: {
-          oauth_expires_at: tokenExpiresAt?.toISOString() || null,
-          ad_accounts_count: adAccounts.length,
-        },
+        sync_status: 'success',
       }, {
         onConflict: 'user_id,platform,account_id',
       });
 
     if (oauthRecordError) {
       console.error('[Token Exchange] Error saving OAuth record:', oauthRecordError);
+    } else {
+      console.log('[Token Exchange] OAuth record saved successfully');
     }
 
     // 5b. Salvar contas de anúncios individuais
@@ -254,19 +251,12 @@ serve(async (req: Request) => {
           .from('ad_platform_connections')
           .upsert({
             user_id: user.id,
-            organization_id: organizationId,
             platform: 'meta_ads',
             account_id: account.account_id || account.id.replace('act_', ''),
             account_name: account.name,
             api_key: accessToken,
             is_active: true,
             sync_status: 'pending',
-            metadata: {
-              currency: account.currency,
-              timezone: account.timezone_name,
-              account_status: account.account_status,
-              oauth_expires_at: tokenExpiresAt?.toISOString() || null,
-            },
           }, {
             onConflict: 'user_id,platform,account_id',
           });
