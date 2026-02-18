@@ -4,6 +4,7 @@
 export type AdPlatform = 'google_ads' | 'meta_ads';
 export type SyncStatus = 'success' | 'error' | 'pending';
 export type AdCampaignStatus = 'active' | 'paused' | 'ended' | 'removed';
+export type AdAccountCategory = 'bm' | 'waba' | 'other';
 
 // =====================================================
 // AD PLATFORM CONNECTIONS
@@ -15,7 +16,8 @@ export interface AdPlatformConnection {
   platform: AdPlatform;
   account_id: string;
   account_name: string;
-  api_key: string; // Criptografado no banco
+  account_category: AdAccountCategory;
+  api_key: string;
   refresh_token?: string | null;
   is_active: boolean;
   last_sync_at?: string | null;
@@ -37,6 +39,7 @@ export interface AdPlatformConnectionInsert {
 
 export interface AdPlatformConnectionUpdate {
   account_name?: string;
+  account_category?: AdAccountCategory;
   api_key?: string;
   refresh_token?: string | null;
   is_active?: boolean;
@@ -46,7 +49,7 @@ export interface AdPlatformConnectionUpdate {
 }
 
 // =====================================================
-// AD CAMPAIGNS SYNC
+// AD CAMPAIGNS
 // =====================================================
 
 export interface AdCampaignSync {
@@ -61,7 +64,7 @@ export interface AdCampaignSync {
   spend: number;
   impressions: number;
   clicks: number;
-  ctr: number; // Porcentagem
+  ctr: number;
   conversions: number;
   conversion_value: number;
   cpa?: number | null;
@@ -110,10 +113,6 @@ export interface AdCampaignSyncUpdate {
   synced_at?: string;
 }
 
-// =====================================================
-// UTM TEMPLATES
-// =====================================================
-
 export interface UtmTemplate {
   id: string;
   user_id: string;
@@ -152,10 +151,6 @@ export interface UtmTemplateUpdate {
   is_active?: boolean;
 }
 
-// =====================================================
-// GENERATED UTMS
-// =====================================================
-
 export interface GeneratedUtm {
   id: string;
   user_id: string;
@@ -181,10 +176,6 @@ export interface GeneratedUtmUpdate {
   clicks?: number;
   conversions?: number;
 }
-
-// =====================================================
-// UTILITY TYPES
-// =====================================================
 
 export interface AdCampaignWithConnection extends AdCampaignSync {
   connection?: AdPlatformConnection;
@@ -232,4 +223,8 @@ export const AD_CAMPAIGN_STATUS_LABELS: Record<AdCampaignStatus, string> = {
   removed: 'Removida',
 };
 
-
+export const AD_ACCOUNT_CATEGORY_LABELS: Record<AdAccountCategory, string> = {
+  bm: 'Business Manager',
+  waba: 'WhatsApp Business',
+  other: 'Outras',
+};

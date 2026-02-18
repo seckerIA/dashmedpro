@@ -1,7 +1,7 @@
 /**
  * AdAccountSyncSelector
- * Lista contas de anúncios Meta conectadas com toggle para ativar/desativar sync
- * e botão para sincronizar apenas as selecionadas.
+ * Lista contas de anúncios Meta conectadas com toggle para ativar/desativar sync,
+ * separadas por categoria (BM, WABA, Outras) em abas.
  */
 
 import { useState, useMemo } from 'react';
@@ -10,6 +10,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   RefreshCw,
   CheckCircle2,
@@ -19,6 +27,9 @@ import {
   TrendingUp,
   ChevronDown,
   ChevronUp,
+  Building2,
+  MessageSquare,
+  MoreHorizontal,
 } from 'lucide-react';
 import { useAdPlatformConnections, useUpdateAdPlatformConnection } from '@/hooks/useAdPlatformConnections';
 import { useSyncAdCampaigns } from '@/hooks/useAdCampaignsSync';
@@ -28,6 +39,8 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import type { AdAccountCategory } from '@/types/adPlatforms';
+import { AD_ACCOUNT_CATEGORY_LABELS } from '@/types/adPlatforms';
 
 interface SyncProgress {
   current: number;
@@ -36,23 +49,43 @@ interface SyncProgress {
   results: Array<{ id: string; name: string; success: boolean; message?: string }>;
 }
 
+const CATEGORY_ICONS: Record<AdAccountCategory, React.ReactNode> = {
+  bm: <Building2 className="h-4 w-4" />,
+  waba: <MessageSquare className="h-4 w-4" />,
+  other: <MoreHorizontal className="h-4 w-4" />,
+};
+
 export function AdAccountSyncSelector() {
   const { data: allConnections, isLoading } = useAdPlatformConnections();
   const updateConnection = useUpdateAdPlatformConnection();
   const syncCampaigns = useSyncAdCampaigns();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState<AdAccountCategory>('bm');
 
-  // Filter only real Meta Ads accounts (exclude meta_oauth record)
   const metaAdAccounts = useMemo(() => {
     if (!allConnections) return [];
     return allConnections.filter(
       (c) => c.platform === 'meta_ads' && c.account_id !== 'meta_oauth'
     );
   }, [allConnections]);
+
+  const accountsByCategory = useMemo(() => {
+    const grouped: Record<AdAccountCategory, typeof metaAdAccounts> = {
+      bm: [],
+      waba: [],
+      other: [],
+    };
+    for (const account of metaAdAccounts) {
+      const cat = (account.account_category as AdAccountCategory) || 'other';
+      grouped[cat]?.push(account) ?? grouped.other.push(account);
+    }
+    return grouped;
+  }, [metaAdAccounts]);
 
   const activeAccounts = useMemo(
     () => metaAdAccounts.filter((c) => c.is_active),
@@ -73,7 +106,7 @@ export function AdAccountSyncSelector() {
   }
 
   if (metaAdAccounts.length === 0) {
-    return null; // Don't render if no Meta Ads accounts
+    return null;
   }
 
   const handleToggle = async (connectionId: string, currentActive: boolean) => {
@@ -91,6 +124,22 @@ export function AdAccountSyncSelector() {
     }
   };
 
+  const handleCategoryChange = async (connectionId: string, newCategory: AdAccountCategory) => {
+    try {
+      await updateConnection.mutateAsync({
+        id: connectionId,
+        updates: { account_category: newCategory } as any,
+      });
+      toast({ title: 'Categoria atualizada' });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: error.message || 'Erro ao atualizar categoria.',
+      });
+    }
+  };
+
   const handleSelectAll = async () => {
     const inactiveAccounts = metaAdAccounts.filter((c) => !c.is_active);
     for (const account of inactiveAccounts) {
@@ -100,8 +149,6 @@ export function AdAccountSyncSelector() {
       });
     }
   };
-
-  const queryClient = useQueryClient();
 
   const handleDeselectAll = async () => {
     const ids = metaAdAccounts.filter((c) => c.is_active).map((c) => c.id);
@@ -184,7 +231,6 @@ export function AdAccountSyncSelector() {
     });
 
     setIsSyncing(false);
-    // Keep progress visible for review
   };
 
   const getStatusIcon = (status: string) => {
@@ -203,6 +249,88 @@ export function AdAccountSyncSelector() {
   const progressPercent = syncProgress
     ? Math.round((syncProgress.current / syncProgress.total) * 100)
     : 0;
+
+  const renderAccountList = (accounts: typeof metaAdAccounts) => {
+    if (accounts.length === 0) {
+      return (
+        <div className="p-4 text-center text-sm text-muted-foreground">
+          Nenhuma conta nesta categoria. Use o seletor de categoria em cada conta para movê-la.
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-1 max-h-[400px] overflow-y-auto">
+        {accounts.map((account) => (
+          <label
+            key={account.id}
+            className={cn(
+              'flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors',
+              'hover:bg-accent/50',
+              account.is_active
+                ? 'border-primary/30 bg-primary/5'
+                : 'border-transparent bg-muted/30'
+            )}
+          >
+            <Checkbox
+              checked={account.is_active}
+              onCheckedChange={() => handleToggle(account.id, account.is_active)}
+              disabled={isSyncing}
+            />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium truncate">{account.account_name}</span>
+                {getStatusIcon(account.sync_status)}
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="font-mono">{account.account_id}</span>
+                {account.last_sync_at && (
+                  <>
+                    <span>-</span>
+                    <span>
+                      Sync: {format(new Date(account.last_sync_at), "dd/MM HH:mm", { locale: ptBR })}
+                    </span>
+                  </>
+                )}
+              </div>
+              {account.error_message && (
+                <p className="text-xs text-red-500 mt-0.5 truncate">{account.error_message}</p>
+              )}
+            </div>
+            <Select
+              value={(account.account_category as AdAccountCategory) || 'other'}
+              onValueChange={(val) => {
+                // Prevent label click from toggling checkbox
+                handleCategoryChange(account.id, val as AdAccountCategory);
+              }}
+            >
+              <SelectTrigger
+                className="w-[110px] h-7 text-xs"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="bm">BM</SelectItem>
+                <SelectItem value="waba">WABA</SelectItem>
+                <SelectItem value="other">Outra</SelectItem>
+              </SelectContent>
+            </Select>
+            <Badge
+              variant={account.sync_status === 'success' ? 'default' : 'secondary'}
+              className="text-xs flex-shrink-0"
+            >
+              {account.sync_status === 'success'
+                ? 'OK'
+                : account.sync_status === 'error'
+                ? 'Erro'
+                : 'Pendente'}
+            </Badge>
+          </label>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <Card>
@@ -306,82 +434,50 @@ export function AdAccountSyncSelector() {
           </div>
         )}
 
-        {/* Select All / Deselect All */}
+        {/* Expanded: Tabs by category */}
         {expanded && (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSelectAll}
-              disabled={selectedCount === totalCount || isSyncing}
-              className="text-xs"
-            >
-              Selecionar todas
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDeselectAll}
-              disabled={selectedCount === 0 || isSyncing}
-              className="text-xs"
-            >
-              Desmarcar todas
-            </Button>
-          </div>
-        )}
-
-        {/* Account List */}
-        {expanded && (
-          <div className="space-y-1 max-h-[400px] overflow-y-auto">
-            {metaAdAccounts.map((account) => (
-              <label
-                key={account.id}
-                className={cn(
-                  'flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors',
-                  'hover:bg-accent/50',
-                  account.is_active
-                    ? 'border-primary/30 bg-primary/5'
-                    : 'border-transparent bg-muted/30'
-                )}
+          <>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSelectAll}
+                disabled={selectedCount === totalCount || isSyncing}
+                className="text-xs"
               >
-                <Checkbox
-                  checked={account.is_active}
-                  onCheckedChange={() => handleToggle(account.id, account.is_active)}
-                  disabled={isSyncing}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium truncate">{account.account_name}</span>
-                    {getStatusIcon(account.sync_status)}
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span className="font-mono">{account.account_id}</span>
-                    {account.last_sync_at && (
-                      <>
-                        <span>-</span>
-                        <span>
-                          Sync: {format(new Date(account.last_sync_at), "dd/MM HH:mm", { locale: ptBR })}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                  {account.error_message && (
-                    <p className="text-xs text-red-500 mt-0.5 truncate">{account.error_message}</p>
-                  )}
-                </div>
-                <Badge
-                  variant={account.sync_status === 'success' ? 'default' : 'secondary'}
-                  className="text-xs flex-shrink-0"
-                >
-                  {account.sync_status === 'success'
-                    ? 'OK'
-                    : account.sync_status === 'error'
-                    ? 'Erro'
-                    : 'Pendente'}
-                </Badge>
-              </label>
-            ))}
-          </div>
+                Selecionar todas
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDeselectAll}
+                disabled={selectedCount === 0 || isSyncing}
+                className="text-xs"
+              >
+                Desmarcar todas
+              </Button>
+            </div>
+
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as AdAccountCategory)}>
+              <TabsList className="w-full">
+                {(['bm', 'waba', 'other'] as AdAccountCategory[]).map((cat) => (
+                  <TabsTrigger key={cat} value={cat} className="flex-1 gap-1.5 text-xs">
+                    {CATEGORY_ICONS[cat]}
+                    {AD_ACCOUNT_CATEGORY_LABELS[cat]}
+                    <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
+                      {accountsByCategory[cat].length}
+                    </Badge>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+
+              {(['bm', 'waba', 'other'] as AdAccountCategory[]).map((cat) => (
+                <TabsContent key={cat} value={cat} className="mt-2">
+                  {renderAccountList(accountsByCategory[cat])}
+                </TabsContent>
+              ))}
+            </Tabs>
+          </>
         )}
 
         {/* Collapsed Summary */}
