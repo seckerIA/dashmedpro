@@ -270,9 +270,11 @@ serve(async (req: Request) => {
     const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
     console.error('[Token Exchange] Error:', errorMessage);
 
+    // Retorna 200 com success:false para que supabase.functions.invoke
+    // repasse a mensagem de erro real ao frontend (non-2xx perde a mensagem)
     return new Response(
       JSON.stringify({ success: false, error: errorMessage }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
