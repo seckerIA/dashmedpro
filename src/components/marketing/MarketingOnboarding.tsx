@@ -5,12 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { 
-  Settings, 
-  Megaphone, 
-  Link2, 
-  BarChart3, 
-  Users, 
+import {
+  Settings,
+  Megaphone,
+  FileText,
+  BarChart3,
+  Users,
   TrendingUp,
   X,
   ArrowRight,
@@ -55,14 +55,14 @@ export function MarketingOnboarding() {
       tab: "campaigns",
     },
     {
-      icon: Link2,
-      title: "UTMs",
-      description: "Gere links rastreáveis com parâmetros UTM para suas campanhas",
-      tab: "utms",
+      icon: FileText,
+      title: "Formulários",
+      description: "Gerencie formulários de captação do Meta e veja os leads recebidos",
+      tab: "forms",
     },
     {
       icon: Users,
-      title: "Leads & Conversões",
+      title: "Leads",
       description: "Acompanhe leads originados de anúncios e calcule ROI por campanha",
       tab: "leads",
     },
@@ -180,7 +180,7 @@ export function MarketingHelpCard() {
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-green-500" />
-                  <span>3. Gere links com UTMs para rastreamento</span>
+                  <span>3. Sincronize formulários de captação</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-green-500" />

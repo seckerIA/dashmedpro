@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Pause, Play, Eye, RefreshCw, Search, Filter } from "lucide-react";
 import { useAdCampaignsSync, usePauseAdCampaign, useActivateAdCampaign } from "@/hooks/useAdCampaignsSync";
+import { useAdPlatformConnections } from "@/hooks/useAdPlatformConnections";
 import { AdCampaignDetails } from "./AdCampaignDetails";
 import { AD_PLATFORM_LABELS, AD_CAMPAIGN_STATUS_LABELS } from "@/types/adPlatforms";
 import { Loader2 } from "lucide-react";
@@ -20,26 +21,45 @@ export function AdCampaignsList() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
-  
+
   const filters: any = {};
   if (platformFilter !== 'all') filters.platform = platformFilter;
   if (statusFilter !== 'all') filters.status = statusFilter;
 
   const { data: campaigns, isLoading } = useAdCampaignsSync(filters);
+  const { data: connections } = useAdPlatformConnections();
   const pauseCampaign = usePauseAdCampaign();
   const activateCampaign = useActivateAdCampaign();
   const { toast } = useToast();
 
-  const filteredCampaigns = campaigns?.filter(campaign => {
+  // Filtrar campanhas apenas de ad accounts ativas (category 'other')
+  const activeAdAccountIds = useMemo(() => {
+    return new Set(
+      (connections || [])
+        .filter(c => c.is_active && c.account_category === 'other')
+        .map(c => c.id)
+    );
+  }, [connections]);
+
+  const filteredCampaigns = useMemo(() => {
+    let result = campaigns || [];
+
+    // Filtrar por ad accounts ativas
+    if (activeAdAccountIds.size > 0) {
+      result = result.filter(c => activeAdAccountIds.has(c.connection_id));
+    }
+
+    // Filtrar por busca
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      return (
+      result = result.filter(campaign =>
         campaign.platform_campaign_name.toLowerCase().includes(query) ||
         campaign.platform_campaign_id.toLowerCase().includes(query)
       );
     }
-    return true;
-  }) || [];
+
+    return result;
+  }, [campaigns, activeAdAccountIds, searchQuery]);
 
   const handlePause = async (campaignId: string) => {
     try {

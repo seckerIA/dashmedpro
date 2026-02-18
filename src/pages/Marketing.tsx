@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Link2, Megaphone, Settings, BarChart3, LayoutDashboard, Users } from "lucide-react";
+import { Megaphone, Settings, BarChart3, LayoutDashboard, Users, FileText } from "lucide-react";
 import { MarketingDashboard } from "@/components/marketing/MarketingDashboard";
 import { AdPlatformsIntegration } from "@/components/commercial/AdPlatformsIntegration";
 import { AdCampaignsList } from "@/components/commercial/AdCampaignsList";
-import { UtmGenerator } from "@/components/commercial/UtmGenerator";
-import { UtmTemplates } from "@/components/commercial/UtmTemplates";
+import { LeadFormsList } from "@/components/marketing/LeadFormsList";
 import { MarketingLeadsConversions } from "@/components/marketing/MarketingLeadsConversions";
 import { MarketingReports } from "@/components/marketing/MarketingReports";
 import { MarketingOnboarding, MarketingHelpCard } from "@/components/marketing/MarketingOnboarding";
@@ -64,13 +63,6 @@ export default function Marketing() {
             Dashboard
           </TabsTrigger>
           <TabsTrigger
-            value="integrations"
-            className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-border/50 transition-all duration-200 font-medium py-3"
-          >
-            <Settings className="w-4 h-4 mr-2" />
-            Integrações
-          </TabsTrigger>
-          <TabsTrigger
             value="campaigns"
             className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-border/50 transition-all duration-200 font-medium py-3"
           >
@@ -78,18 +70,18 @@ export default function Marketing() {
             Campanhas
           </TabsTrigger>
           <TabsTrigger
-            value="utms"
+            value="forms"
             className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-border/50 transition-all duration-200 font-medium py-3"
           >
-            <Link2 className="w-4 h-4 mr-2" />
-            UTMs
+            <FileText className="w-4 h-4 mr-2" />
+            Formulários
           </TabsTrigger>
           <TabsTrigger
             value="leads"
             className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-border/50 transition-all duration-200 font-medium py-3"
           >
             <Users className="w-4 h-4 mr-2" />
-            Leads & Conversões
+            Leads
           </TabsTrigger>
           <TabsTrigger
             value="reports"
@@ -98,14 +90,17 @@ export default function Marketing() {
             <BarChart3 className="w-4 h-4 mr-2" />
             Relatórios
           </TabsTrigger>
+          <TabsTrigger
+            value="integrations"
+            className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-border/50 transition-all duration-200 font-medium py-3"
+          >
+            <Settings className="w-4 h-4 mr-2" />
+            Integrações
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="mt-6">
           <MarketingDashboard />
-        </TabsContent>
-
-        <TabsContent value="integrations" className="mt-6">
-          <AdPlatformsIntegration />
         </TabsContent>
 
         <TabsContent value="campaigns" className="mt-6">
@@ -113,30 +108,15 @@ export default function Marketing() {
             <div>
               <h2 className="text-xl font-semibold mb-2">Campanhas de Anúncios</h2>
               <p className="text-sm text-muted-foreground">
-                Visualize e gerencie suas campanhas sincronizadas do Google Ads e Meta Ads
+                Campanhas sincronizadas das suas contas de anúncio ativas
               </p>
             </div>
             <AdCampaignsList />
           </div>
         </TabsContent>
 
-        <TabsContent value="utms" className="mt-6">
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-xl font-semibold mb-2">Gerador de UTMs</h2>
-              <p className="text-sm text-muted-foreground">
-                Gere links rastreáveis com parâmetros UTM para suas campanhas
-              </p>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div>
-                <UtmGenerator />
-              </div>
-              <div>
-                <UtmTemplates />
-              </div>
-            </div>
-          </div>
+        <TabsContent value="forms" className="mt-6">
+          <LeadFormsList />
         </TabsContent>
 
         <TabsContent value="leads" className="mt-6">
@@ -145,6 +125,10 @@ export default function Marketing() {
 
         <TabsContent value="reports" className="mt-6">
           <MarketingReports />
+        </TabsContent>
+
+        <TabsContent value="integrations" className="mt-6">
+          <AdPlatformsIntegration />
         </TabsContent>
         </Tabs>
       </div>
