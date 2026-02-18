@@ -100,10 +100,21 @@ export function AdAccountSyncSelector() {
   };
 
   const handleDeselectAll = async () => {
-    for (const account of activeAccounts) {
-      await updateConnection.mutateAsync({
-        id: account.id,
-        updates: { is_active: false } as any,
+    const accountsToDeselect = [...activeAccounts];
+    try {
+      await Promise.all(
+        accountsToDeselect.map((account) =>
+          updateConnection.mutateAsync({
+            id: account.id,
+            updates: { is_active: false } as any,
+          })
+        )
+      );
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: error.message || 'Erro ao desmarcar contas.',
       });
     }
   };
