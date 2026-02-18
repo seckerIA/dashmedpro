@@ -366,32 +366,30 @@ async function saveCampaignToDatabase(
     'ARCHIVED': 'archived',
   };
 
+  // Calcular budget (preferir daily_budget, fallback para lifetime_budget)
+  const budget = parseFloat(campaign.daily_budget || campaign.lifetime_budget || '0');
+
   const { error } = await supabase
     .from('ad_campaigns_sync')
     .upsert({
       user_id: userId,
       connection_id: connectionId,
       platform_campaign_id: campaign.id,
-      campaign_name: campaign.name,
+      platform_campaign_name: campaign.name,
+      platform: 'meta_ads',
       status: statusMap[campaign.status] || 'paused',
+      budget,
       impressions,
       clicks,
       conversions: conversionCount,
+      conversion_value: purchaseValue,
       spend,
       ctr,
       cpa,
       roas,
+      start_date: insights?.date_start || null,
+      end_date: insights?.date_stop || null,
       synced_at: new Date().toISOString(),
-      raw_data: {
-        objective: campaign.objective,
-        daily_budget: campaign.daily_budget,
-        lifetime_budget: campaign.lifetime_budget,
-        created_time: campaign.created_time,
-        updated_time: campaign.updated_time,
-        reach,
-        date_start: insights?.date_start,
-        date_stop: insights?.date_stop,
-      }
     }, {
       onConflict: 'connection_id,platform_campaign_id',
       ignoreDuplicates: false

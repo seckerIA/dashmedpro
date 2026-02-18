@@ -24,7 +24,7 @@ const FB_OAUTH_REDIRECT_URI = Deno.env.get('FB_META_OAUTH_REDIRECT_URI') ||
 const FRONTEND_URL = Deno.env.get('FRONTEND_URL') || 'http://localhost:8080';
 
 // Graph API version
-const GRAPH_API_VERSION = 'v21.0';
+const GRAPH_API_VERSION = 'v22.0';
 
 // =====================================================
 // Helper: Gerar HTML para resposta do popup
@@ -487,15 +487,6 @@ const handler = async (req: Request): Promise<Response> => {
         throw new Error('Sessão OAuth inválida ou expirada');
       }
 
-      // Buscar organization_id do usuário
-      const { data: profile } = await supabaseAdmin
-        .from('profiles')
-        .select('organization_id')
-        .eq('id', user.id)
-        .single();
-
-      const organizationId = profile?.organization_id;
-
       let result: any;
 
       // =========================================
@@ -520,18 +511,15 @@ const handler = async (req: Request): Promise<Response> => {
           .from('whatsapp_config')
           .upsert({
             user_id: user.id,
-            organization_id: organizationId,
             phone_number_id: phone_number_id,
             waba_id: waba_id,
+            business_account_id: waba_id,
             access_token: session.access_token,
             display_phone_number: selectedPhone.display_phone_number,
             verified_name: selectedPhone.verified_name,
-            quality_rating: selectedPhone.quality_rating,
             webhook_verify_token: webhookVerifyToken,
             is_active: true,
             last_synced_at: new Date().toISOString(),
-            oauth_connected: true,
-            oauth_expires_at: session.token_expires_at
           }, { onConflict: 'user_id' })
           .select()
           .single();
@@ -582,7 +570,6 @@ const handler = async (req: Request): Promise<Response> => {
           .from('ad_platform_connections')
           .upsert({
             user_id: user.id,
-            organization_id: organizationId,
             platform: 'meta_ads',
             account_id: selectedAccount.account_id || selectedAccount.id.replace('act_', ''),
             account_name: selectedAccount.name,
@@ -590,12 +577,6 @@ const handler = async (req: Request): Promise<Response> => {
             is_active: true,
             sync_status: 'pending',
             last_sync_at: null,
-            metadata: {
-              currency: selectedAccount.currency,
-              timezone: selectedAccount.timezone_name,
-              account_status: selectedAccount.account_status,
-              oauth_expires_at: session.token_expires_at
-            }
           }, {
             onConflict: 'user_id,platform,account_id',
             ignoreDuplicates: false
@@ -658,7 +639,7 @@ const handler = async (req: Request): Promise<Response> => {
       console.error('[Meta OAuth] POST error:', error.message);
       return new Response(
         JSON.stringify({ success: false, error: error.message }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
   }
