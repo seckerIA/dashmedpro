@@ -220,7 +220,32 @@ serve(async (req: Request) => {
       }
     }
 
-    // 5. Salvar contas de anúncios
+    // 5. Salvar registro base de conexão OAuth (garante que o gate sabe que está conectado)
+    console.log('[Token Exchange] Saving OAuth connection record...');
+    const { error: oauthRecordError } = await supabaseAdmin
+      .from('ad_platform_connections')
+      .upsert({
+        user_id: user.id,
+        organization_id: organizationId,
+        platform: 'meta_ads',
+        account_id: 'meta_oauth',
+        account_name: 'Meta Business Connection',
+        api_key: accessToken,
+        is_active: true,
+        sync_status: 'connected',
+        metadata: {
+          oauth_expires_at: tokenExpiresAt?.toISOString() || null,
+          ad_accounts_count: adAccounts.length,
+        },
+      }, {
+        onConflict: 'user_id,platform,account_id',
+      });
+
+    if (oauthRecordError) {
+      console.error('[Token Exchange] Error saving OAuth record:', oauthRecordError);
+    }
+
+    // 5b. Salvar contas de anúncios individuais
     if (adAccounts.length > 0) {
       console.log('[Token Exchange] Saving ad accounts...');
 
