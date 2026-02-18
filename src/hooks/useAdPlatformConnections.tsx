@@ -88,15 +88,13 @@ export function useUpdateAdPlatformConnection() {
       id: string;
       updates: AdPlatformConnectionUpdate
     }) => {
-      const { data, error } = await (supabase
+      const { error } = await (supabase
         .from('ad_platform_connections' as any) as any)
         .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+        .eq('id', id);
 
       if (error) throw error;
-      return data as unknown as AdPlatformConnection;
+      return { id };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['ad-platform-connections'] });
