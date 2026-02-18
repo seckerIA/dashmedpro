@@ -239,11 +239,17 @@ serve(async (req: Request) => {
       console.log('[Token Exchange] OAuth record saved successfully');
     }
 
-    // 5b. Salvar contas de anúncios individuais (category: 'other' = Contas de Anúncio)
+    // 5b. Salvar contas de anúncios individuais
+    // Ad accounts with "(Read-Only)" are auto-created by WhatsApp → category 'waba'
+    // Regular ad accounts → category 'other'
     if (adAccounts.length > 0) {
       console.log('[Token Exchange] Saving ad accounts...');
 
       for (const account of adAccounts) {
+        // Detect WABA-associated ad accounts by "(Read-Only)" pattern
+        const isWabaAdAccount = account.name?.includes('(Read-Only)');
+        const category = isWabaAdAccount ? 'waba' : 'other';
+
         const { error: adError } = await supabaseAdmin
           .from('ad_platform_connections')
           .upsert({
@@ -254,7 +260,7 @@ serve(async (req: Request) => {
             api_key: accessToken,
             is_active: true,
             sync_status: 'pending',
-            account_category: 'other',
+            account_category: category,
           }, {
             onConflict: 'user_id,platform,account_id',
           });
