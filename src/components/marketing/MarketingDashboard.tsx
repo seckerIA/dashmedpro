@@ -2,20 +2,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { 
-  DollarSign, 
-  TrendingUp, 
-  Target, 
-  Users, 
-  RefreshCw, 
-  Link2, 
-  BarChart3, 
+import {
+  DollarSign,
+  TrendingUp,
+  Target,
+  Users,
+  RefreshCw,
+  Link2,
+  BarChart3,
   Settings,
   AlertTriangle,
   ArrowUpRight,
   ArrowDownRight,
   CheckCircle2,
-  ExternalLink
+  ExternalLink,
+  Building2,
+  MessageSquare,
+  MoreHorizontal,
 } from "lucide-react";
 import { useMarketingDashboard } from "@/hooks/useMarketingDashboard";
 import { useSyncAdCampaigns } from "@/hooks/useAdCampaignsSync";
@@ -204,33 +207,53 @@ export function MarketingDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Status de Integrações</CardTitle>
+            <CardTitle className="text-sm font-medium">Fonte dos Dados</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Conexões Ativas</span>
-              <Badge variant={dashboardData.activeConnections > 0 ? 'default' : 'secondary'}>
-                {dashboardData.activeConnections}
-              </Badge>
-            </div>
-            {dashboardData.lastSyncTime && (
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Última Sincronização</span>
-                <span className="text-sm">
-                  {format(new Date(dashboardData.lastSyncTime), "dd/MM HH:mm", { locale: ptBR })}
-                </span>
+          <CardContent className="space-y-3">
+            {dashboardData.activeAccountsList.length > 0 ? (
+              <>
+                <div className="space-y-1.5">
+                  {dashboardData.activeAccountsList.map((account) => {
+                    const icon = account.category === 'bm'
+                      ? <Building2 className="h-3.5 w-3.5 text-blue-500" />
+                      : account.category === 'waba'
+                      ? <MessageSquare className="h-3.5 w-3.5 text-green-500" />
+                      : <MoreHorizontal className="h-3.5 w-3.5 text-gray-500" />;
+                    return (
+                      <div key={account.id} className="flex items-center gap-2 text-sm">
+                        {icon}
+                        <span className="truncate flex-1">{account.name}</span>
+                        {account.lastSync && (
+                          <span className="text-[10px] text-muted-foreground flex-shrink-0">
+                            {format(new Date(account.lastSync), "dd/MM HH:mm", { locale: ptBR })}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {dashboardData.lastSyncTime && (
+                  <div className="flex items-center justify-between pt-2 border-t text-xs text-muted-foreground">
+                    <span>Última sync</span>
+                    <span>{format(new Date(dashboardData.lastSyncTime), "dd/MM HH:mm", { locale: ptBR })}</span>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-center space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma conta ativa para análise
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => navigate('/marketing?tab=integrations')}
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Selecionar Contas
+                </Button>
               </div>
-            )}
-            {!dashboardData.hasConnections && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full mt-2"
-                onClick={() => navigate('/marketing?tab=integrations')}
-              >
-                <Settings className="h-4 w-4 mr-2" />
-                Configurar Integrações
-              </Button>
             )}
           </CardContent>
         </Card>
