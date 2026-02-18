@@ -65,7 +65,7 @@ export function AdAccountSyncSelector() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
   const [expanded, setExpanded] = useState(false);
-  const [activeTab, setActiveTab] = useState<AdAccountCategory>('bm');
+  const [activeTab, setActiveTab] = useState<AdAccountCategory>('other');
 
   const metaAdAccounts = useMemo(() => {
     if (!allConnections) return [];
@@ -460,7 +460,7 @@ export function AdAccountSyncSelector() {
 
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as AdAccountCategory)}>
               <TabsList className="w-full">
-                {(['bm', 'waba', 'other'] as AdAccountCategory[]).map((cat) => (
+                {(['other', 'waba', 'bm'] as AdAccountCategory[]).map((cat) => (
                   <TabsTrigger key={cat} value={cat} className="flex-1 gap-1.5 text-xs">
                     {CATEGORY_ICONS[cat]}
                     {AD_ACCOUNT_CATEGORY_LABELS[cat]}
@@ -471,7 +471,7 @@ export function AdAccountSyncSelector() {
                 ))}
               </TabsList>
 
-              {(['bm', 'waba', 'other'] as AdAccountCategory[]).map((cat) => (
+              {(['other', 'waba', 'bm'] as AdAccountCategory[]).map((cat) => (
                 <TabsContent key={cat} value={cat} className="mt-2">
                   {renderAccountList(accountsByCategory[cat])}
                 </TabsContent>
