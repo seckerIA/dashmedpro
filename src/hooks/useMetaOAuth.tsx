@@ -278,17 +278,27 @@ export function useMetaOAuth() {
     mutationFn: async () => {
       if (!user) throw new Error('Usuário não autenticado');
 
-      await (supabase.from('whatsapp_config' as any) as any)
+      const whatsappResult = await (supabase.from('whatsapp_config' as any) as any)
         .update({ is_active: false, oauth_connected: false })
         .eq('user_id', user.id);
 
-      await (supabase.from('ad_platform_connections' as any) as any)
-        .update({ is_active: false })
+      if (whatsappResult.error) {
+        console.warn('Erro ao desconectar WhatsApp config:', whatsappResult.error);
+      }
+
+      const adsResult = await (supabase.from('ad_platform_connections' as any) as any)
+        .delete()
         .eq('user_id', user.id)
         .eq('platform', 'meta_ads');
+
+      if (adsResult.error) {
+        throw new Error(`Falha ao remover conexões: ${adsResult.error.message}`);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['meta-integration-status'] });
+      queryClient.invalidateQueries({ queryKey: ['ad-platform-connections'] });
+      queryClient.invalidateQueries({ queryKey: ['marketing-dashboard'] });
       toast({
         title: 'Desconectado',
         description: 'Suas contas Meta foram desconectadas.',
