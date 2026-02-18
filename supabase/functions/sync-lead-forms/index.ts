@@ -1,12 +1,16 @@
 /**
  * Edge Function: sync-lead-forms
- * Descobre formulários de Lead Ads (Instant Forms) de páginas Facebook conectadas.
+ * Descobre formulários de Lead Ads (Instant Forms) de páginas Facebook conectadas
+ * E sincroniza os leads históricos de cada formulário.
  *
- * Recebe: { page_ids?: string[] }
+ * Recebe: { page_ids?: string[], sync_leads?: boolean }
  *   - Se page_ids fornecido: sincroniza apenas essas páginas
  *   - Se vazio: sincroniza todas as páginas ativas do usuário
+ *   - sync_leads: default true — também busca leads de cada formulário
  *
- * Graph API: GET /{page_id}/leadgen_forms?fields=id,name,status,leads_count,questions
+ * Graph API:
+ *   GET /{page_id}/leadgen_forms?fields=id,name,status,leads_count,questions
+ *   GET /{form_id}/leads?fields=id,created_time,field_data,ad_id,ad_name,campaign_id,campaign_name
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -55,6 +59,7 @@ serve(async (req: Request) => {
 
     const body = await req.json().catch(() => ({}));
     const requestedPageIds: string[] | undefined = body.page_ids;
+    const syncLeads: boolean = body.sync_leads !== false; // default true
 
     // 1. Buscar páginas conectadas do usuário
     const { data: pageConnections, error: connError } = await supabaseAdmin
@@ -142,6 +147,7 @@ serve(async (req: Request) => {
             questions: form.questions || [],
             pageId,
             pageName: page.account_name,
+            accessToken, // needed for fetching leads
           });
         }
       } catch (fetchError: any) {
@@ -175,13 +181,39 @@ serve(async (req: Request) => {
       }
     }
 
-    console.log(`[sync-lead-forms] Done: ${upsertedCount} forms synced, ${errors.length} errors`);
+    // 4. Sincronizar leads de cada formulário
+    let totalLeadsSynced = 0;
+    if (syncLeads && allForms.length > 0) {
+      console.log(`[sync-lead-forms] Syncing leads for ${allForms.length} forms...`);
+
+      for (const form of allForms) {
+        try {
+          const leadsSynced = await syncFormLeads(
+            supabaseAdmin,
+            user.id,
+            form.meta_form_id,
+            form.form_name,
+            form.pageId,
+            form.accessToken
+          );
+          totalLeadsSynced += leadsSynced;
+        } catch (e: any) {
+          console.error(`[sync-lead-forms] Error syncing leads for form ${form.meta_form_id}:`, e);
+          errors.push(`Leads de ${form.form_name}: ${e.message}`);
+        }
+      }
+
+      console.log(`[sync-lead-forms] Total leads synced: ${totalLeadsSynced}`);
+    }
+
+    console.log(`[sync-lead-forms] Done: ${upsertedCount} forms synced, ${totalLeadsSynced} leads synced, ${errors.length} errors`);
 
     return new Response(
       JSON.stringify({
         success: true,
         forms_found: allForms.length,
         forms_synced: upsertedCount,
+        leads_synced: totalLeadsSynced,
         errors: errors.length > 0 ? errors : undefined,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -252,4 +284,83 @@ async function retryWithUserToken(
     console.error(`[sync-lead-forms] Retry error for page ${pageId}:`, e);
     return null;
   }
+}
+
+/**
+ * Sincroniza leads de um formulário específico via Graph API
+ * GET /{form_id}/leads?fields=id,created_time,field_data,ad_id,ad_name,campaign_id,campaign_name
+ * Paginação automática (até 500 leads por formulário)
+ */
+async function syncFormLeads(
+  supabase: any,
+  userId: string,
+  formId: string,
+  formName: string,
+  pageId: string,
+  accessToken: string
+): Promise<number> {
+  const MAX_LEADS = 500;
+  const PER_PAGE = 100;
+  let totalSynced = 0;
+  let nextUrl: string | null = `https://graph.facebook.com/${GRAPH_API_VERSION}/${formId}/leads?fields=id,created_time,field_data,ad_id,ad_name,campaign_id,campaign_name&limit=${PER_PAGE}&access_token=${accessToken}`;
+
+  while (nextUrl && totalSynced < MAX_LEADS) {
+    const response = await fetch(nextUrl);
+    const data = await response.json();
+
+    if (data.error) {
+      console.error(`[sync-lead-forms] Error fetching leads for form ${formId}:`, data.error);
+      break;
+    }
+
+    const leads = data.data || [];
+    if (leads.length === 0) break;
+
+    console.log(`[sync-lead-forms] Fetched ${leads.length} leads for form ${formId} (${formName})`);
+
+    // Processar leads em batch
+    for (const lead of leads) {
+      const fieldData = lead.field_data || [];
+      const extractedFields: Record<string, string> = {};
+      for (const field of fieldData) {
+        extractedFields[field.name] = Array.isArray(field.values) ? field.values[0] : field.values;
+      }
+
+      const email = extractedFields.email || null;
+      const fullName = extractedFields.full_name || extractedFields.nome_completo || extractedFields.name || null;
+      const phoneNumber = extractedFields.phone_number || extractedFields.telefone || extractedFields.phone || null;
+
+      const { error: upsertError } = await supabase
+        .from('lead_form_submissions')
+        .upsert({
+          user_id: userId,
+          leadgen_id: lead.id,
+          form_id: formId,
+          form_name: formName,
+          page_id: pageId,
+          ad_id: lead.ad_id || null,
+          ad_name: lead.ad_name || null,
+          campaign_id: lead.campaign_id || null,
+          campaign_name: lead.campaign_name || null,
+          field_data: fieldData,
+          email,
+          full_name: fullName,
+          phone_number: phoneNumber,
+          is_processed: false,
+          created_at: lead.created_time || new Date().toISOString(),
+        }, { onConflict: 'leadgen_id' });
+
+      if (upsertError) {
+        console.error(`[sync-lead-forms] Upsert lead error (${lead.id}):`, upsertError);
+      } else {
+        totalSynced++;
+      }
+    }
+
+    // Próxima página
+    nextUrl = data.paging?.next || null;
+  }
+
+  console.log(`[sync-lead-forms] Synced ${totalSynced} leads for form ${formId}`);
+  return totalSynced;
 }

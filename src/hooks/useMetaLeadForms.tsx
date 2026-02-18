@@ -73,9 +73,13 @@ export function useMetaLeadForms() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['meta-lead-forms'] });
+      queryClient.invalidateQueries({ queryKey: ['lead-form-submissions'] });
+      const parts = [`${data.forms_synced} formulário(s)`];
+      if (data.leads_synced > 0) parts.push(`${data.leads_synced} lead(s) sincronizado(s)`);
+      if (data.errors?.length) parts.push(`${data.errors.length} erro(s)`);
       toast({
-        title: 'Formulários sincronizados',
-        description: `${data.forms_synced} formulário(s) encontrado(s)${data.errors?.length ? ` (${data.errors.length} erro(s))` : ''}`,
+        title: 'Sincronização concluída',
+        description: parts.join(' · '),
       });
     },
     onError: (error: Error) => {
