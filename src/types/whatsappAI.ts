@@ -103,6 +103,12 @@ export interface AIConfig {
   auto_reply_enabled: boolean;
   auto_scheduling_enabled: boolean;
 
+  // Identidade do Agente (novo agente humanizado)
+  agent_name?: string;
+  agent_greeting?: string;
+  clinic_name?: string;
+  specialist_name?: string;
+
   created_at: string;
   updated_at: string;
 }

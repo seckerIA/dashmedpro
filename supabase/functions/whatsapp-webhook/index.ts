@@ -361,11 +361,19 @@ async function processIncomingMessage(
 
   console.log('[Webhook] Message saved:', savedMessage.id);
 
-  // --- DISPARO DA IA (FOLLOW-UP AUTOMÁTICO) ---
-  const aiUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/whatsapp-ai-analyze`;
+  // --- DISPARO DA IA (AGENTE HUMANIZADO) ---
+  const aiUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/whatsapp-ai-agent`;
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
-  console.log('[Webhook] Triggering AI Analysis in background...');
+  console.log('[Webhook] Triggering AI Agent in background...');
+
+  const agentBody = JSON.stringify({
+    conversation_id: conversationId,
+    message_content: content,
+    phone_number: phoneNumber,
+    phone_number_id: phoneNumberId,
+    user_id: userId,
+  });
 
   // Usar EdgeRuntime.waitUntil para garantir que o fetch complete mesmo após retornar response ao Meta
   // @ts-ignore
@@ -378,25 +386,23 @@ async function processIncomingMessage(
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${serviceKey}`
         },
-        body: JSON.stringify({ conversation_id: conversationId })
+        body: agentBody
       }).then(res => {
-        console.log(`[Webhook] AI Invocation Status: ${res.status}`);
-        return res.text(); // Consume body to ensuring completion
+        console.log(`[Webhook] AI Agent Status: ${res.status}`);
+        return res.text();
       }).catch(err => {
-        console.error('[Webhook] AI Invocation Error:', err);
+        console.error('[Webhook] AI Agent Error:', err);
       })
     );
   } else {
-    // Fallback: tentar sem await (pode falhar) ou usar invoke background se fosse cliente
-    // Mas como estamos aqui, vamos tentar sem await mas logando
     fetch(aiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${serviceKey}`
       },
-      body: JSON.stringify({ conversation_id: conversationId })
-    }).catch(err => console.error('[Webhook] AI Fire-and-forget error:', err));
+      body: agentBody
+    }).catch(err => console.error('[Webhook] AI Agent fire-and-forget error:', err));
   }
 
   console.log(`[Webhook] Finished process for message: ${savedMessage.id}`);

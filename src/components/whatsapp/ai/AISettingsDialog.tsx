@@ -8,10 +8,11 @@ import {
     DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Sparkles, Save, Info, Bot, ShieldCheck } from 'lucide-react';
+import { Sparkles, Save, Info, Bot, ShieldCheck, User, Building2 } from 'lucide-react';
 import { useWhatsAppAI } from '@/hooks/useWhatsAppAI';
 import { cn } from '@/lib/utils';
 import {
@@ -31,6 +32,10 @@ export function AISettingsDialog({ open, onOpenChange, targetUserId }: AISetting
     const { aiConfig, updateAIConfig, isUpdatingConfig, isLoadingConfig } = useWhatsAppAI({ targetUserId });
 
     const [formData, setFormData] = useState({
+        agent_name: '',
+        clinic_name: '',
+        specialist_name: '',
+        agent_greeting: '',
         knowledge_base: '',
         already_known_info: '',
         custom_prompt_instructions: '',
@@ -41,6 +46,10 @@ export function AISettingsDialog({ open, onOpenChange, targetUserId }: AISetting
     useEffect(() => {
         if (aiConfig) {
             setFormData({
+                agent_name: aiConfig.agent_name || '',
+                clinic_name: aiConfig.clinic_name || '',
+                specialist_name: aiConfig.specialist_name || '',
+                agent_greeting: aiConfig.agent_greeting || '',
                 knowledge_base: aiConfig.knowledge_base || '',
                 already_known_info: aiConfig.already_known_info || '',
                 custom_prompt_instructions: aiConfig.custom_prompt_instructions || '',
@@ -63,14 +72,64 @@ export function AISettingsDialog({ open, onOpenChange, targetUserId }: AISetting
                         <div className="p-2 bg-primary/10 rounded-lg">
                             <Bot className="h-5 w-5 text-primary" />
                         </div>
-                        <DialogTitle>Configurações da Inteligência de Vendas</DialogTitle>
+                        <DialogTitle>Configuracoes do Agente de IA</DialogTitle>
                     </div>
                     <DialogDescription>
-                        Personalize como a IA analisa suas conversas e sugere respostas.
+                        Configure a identidade e comportamento do seu agente de IA humanizado para WhatsApp.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-6 py-4">
+                    {/* Identidade do Agente */}
+                    <div className="space-y-4 p-4 rounded-xl border border-primary/20 bg-primary/5">
+                        <div className="flex items-center gap-2">
+                            <User className="h-4 w-4 text-primary" />
+                            <Label className="text-sm font-bold">Identidade do Agente</Label>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="agent_name" className="text-xs text-muted-foreground">Nome da IA</Label>
+                                <Input
+                                    id="agent_name"
+                                    placeholder="Sofia"
+                                    value={formData.agent_name}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, agent_name: e.target.value }))}
+                                    className="h-9 text-sm bg-background"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="clinic_name" className="text-xs text-muted-foreground">Nome da Clinica</Label>
+                                <Input
+                                    id="clinic_name"
+                                    placeholder="Clinica Odonto Premium"
+                                    value={formData.clinic_name}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, clinic_name: e.target.value }))}
+                                    className="h-9 text-sm bg-background"
+                                />
+                            </div>
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="specialist_name" className="text-xs text-muted-foreground">Nome do especialista (para handoff)</Label>
+                            <Input
+                                id="specialist_name"
+                                placeholder="Dr. Carlos"
+                                value={formData.specialist_name}
+                                onChange={(e) => setFormData(prev => ({ ...prev, specialist_name: e.target.value }))}
+                                className="h-9 text-sm bg-background"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="agent_greeting" className="text-xs text-muted-foreground">Saudacao personalizada (opcional)</Label>
+                            <Textarea
+                                id="agent_greeting"
+                                placeholder="Ola! Sou a Sofia, assistente virtual da Clinica Premium. Como posso te ajudar?"
+                                className="h-16 text-sm resize-none bg-background"
+                                value={formData.agent_greeting}
+                                onChange={(e) => setFormData(prev => ({ ...prev, agent_greeting: e.target.value }))}
+                            />
+                        </div>
+                    </div>
+
                     {/* Base de Conhecimento */}
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
@@ -157,7 +216,7 @@ export function AISettingsDialog({ open, onOpenChange, targetUserId }: AISetting
                         <div className="flex items-center justify-between gap-4">
                             <div className="space-y-1">
                                 <Label className="text-sm font-bold flex items-center gap-2">
-                                    Análise Autônoma & Auto-Resposta
+                                    Agente Autonomo
                                     {formData.auto_reply_enabled && (
                                         <span className="text-[10px] bg-emerald-500 text-white px-2 py-0.5 rounded-full font-bold">
                                             ATIVO
@@ -165,8 +224,8 @@ export function AISettingsDialog({ open, onOpenChange, targetUserId }: AISetting
                                     )}
                                 </Label>
                                 <p className="text-xs text-muted-foreground leading-relaxed">
-                                    A IA responderá automaticamente quando tiver alta confiança (≥85%).
-                                    As mensagens automáticas terão um badge visual identificando que foram enviadas pela IA.
+                                    O agente conversara diretamente com pacientes de forma humanizada,
+                                    qualificando leads e direcionando para agendamento.
                                 </p>
                             </div>
                             <Switch

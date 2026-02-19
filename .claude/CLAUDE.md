@@ -320,8 +320,11 @@ import { z } from 'zod';
 - `financial_transactions`: lancamentos (account_id, amount, type, transaction_date)
 - `secretary_doctor_links`: many-to-many secretaria<->medicos
 - `whatsapp_config`: configuracao WhatsApp por usuario
-- `whatsapp_conversations`: conversas com contatos
+- `whatsapp_conversations`: conversas com contatos (+ `ai_lock_until` para lock atomico)
 - `whatsapp_messages`: mensagens enviadas/recebidas
+- `whatsapp_ai_config`: config IA por usuario (identity, KB, auto-reply, auto-scheduling)
+- `sofia_knowledge_base`: RAG knowledge base com pgvector embeddings (1536 dims)
+- `whatsapp_lead_qualifications`: dados estruturados do lead (nome, procedimento, convenio, urgencia, status)
 
 ### Pipeline Stages
 `lead_novo` -> `agendado` -> `em_tratamento` -> `inadimplente` | `aguardando_retorno`
@@ -334,15 +337,20 @@ import { z } from 'zod';
 ### Edge Functions
 ```
 supabase/functions/
-├── whatsapp-webhook/         # Recebe mensagens do Meta (v18.0)
-├── whatsapp-send-message/    # Envia mensagens via Graph API (v18.0)
-├── whatsapp-ai-analyze/      # Analise de conversas com GPT-4o-mini
-├── whatsapp-config-validate/ # Valida tokens e configura webhook
-├── meta-token-exchange/      # OAuth token exchange do Meta Business (v22.0)
-├── meta-oauth-callback/      # OAuth callback + asset discovery (v22.0)
-├── sync-ad-campaigns/        # Sincroniza campanhas Meta Ads (v22.0)
-├── manage-ad-campaign/       # Pause/Activate campanhas Meta Ads (v22.0)
-├── test-ad-connection/       # Testa conexao Meta Ads via Graph API (v22.0)
+├── whatsapp-webhook/            # Recebe mensagens do Meta (v18.0) — trigger para AI agent
+├── whatsapp-send-message/       # Envia mensagens via Graph API (v18.0)
+├── whatsapp-ai-agent/           # Agente conversacional humanizado GPT-4o (NOVO)
+│   ├── index.ts                 # Handler principal (lock, debounce, RAG, send)
+│   ├── router.ts                # Deteccao de fase heuristica (5 fases medicas)
+│   └── prompt.ts                # Prompts por fase + identidade configuravel
+├── whatsapp-ai-analyze/         # Analise de conversas com GPT-4o-mini (backup/legacy)
+├── sofia-generate-embedding/    # Gera embeddings para RAG knowledge base (NOVO)
+├── whatsapp-config-validate/    # Valida tokens e configura webhook
+├── meta-token-exchange/         # OAuth token exchange do Meta Business (v22.0)
+├── meta-oauth-callback/         # OAuth callback + asset discovery (v22.0)
+├── sync-ad-campaigns/           # Sincroniza campanhas Meta Ads (v22.0)
+├── manage-ad-campaign/          # Pause/Activate campanhas Meta Ads (v22.0)
+├── test-ad-connection/          # Testa conexao Meta Ads via Graph API (v22.0)
 ```
 
 ### Scripts
@@ -361,7 +369,9 @@ npm run lint          # ESLint check
 - **Transacoes financeiras**: Auto-criadas ao marcar consulta como `completed` SE payment_status=paid
 - **WhatsApp Token Storage**: `access_token` em `whatsapp_config` (nao Vault)
 - **Webhook JWT**: Desabilitado para Meta webhooks (`verify_jwt = false`)
-- **IA no WhatsApp**: Analise via GPT-4o-mini, qualificacao de leads
+- **IA no WhatsApp (Agente Humanizado)**: GPT-4o conversacional com 5 fases medicas (abertura, triagem, agendamento, pos_agendamento, handoff), lock atomico PostgreSQL, RAG pgvector, typing simulation, message splitting ([SPLIT])
+- **IA no WhatsApp (Legacy)**: `whatsapp-ai-analyze` mantido como backup — analise via GPT-4o-mini, qualificacao de leads
+- **AI Agent Identity**: Nome, clinica, especialista e saudacao configuraveis por usuario em `whatsapp_ai_config`
 - **Meta Ads**: FB.login() + code exchange, long-lived token (60 dias), Graph API v22.0
 - **Meta OAuth**: `useMetaOAuth` hook centralizado (useWhatsAppOAuth deprecado)
 - **ROAS**: Calculado via `action_values.purchase` / `spend` na sync de campanhas
@@ -409,7 +419,7 @@ for (let i = 0; i < items.length; i += BATCH_SIZE) {
 - SEMPRE filtrar: `.filter(c => c.account_id !== 'meta_oauth')`
 
 ### Pattern: Deploy Edge Functions via CLI
-- Token de acesso armazenado em `.env` como `SUPABASE_ACCES_TOKEN` (nota: typo no nome, falta um S)
+- Token de acesso armazenado em `.env` como `SUPABASE_ACCESS_TOKEN`
 - Comando: `SUPABASE_ACCESS_TOKEN=<token> npx supabase functions deploy <nome> --project-ref adzaqkduxnpckbcuqpmg`
 - Tokens expiram — se 401, gerar novo em https://supabase.com/dashboard/account/tokens
 
@@ -465,6 +475,74 @@ for (let i = 0; i < items.length; i += BATCH_SIZE) {
 - **Fix**: Removido `.select().single()`, retorna apenas `{ id }` — o toggle nao precisa do dado retornado
 - **Arquivo**: `src/hooks/useAdPlatformConnections.tsx`
 
+### Sessao 19/02/2026 — Agente de IA Humanizado para WhatsApp (Sophia-style)
+
+#### Contexto
+Substituicao do motor de analise `whatsapp-ai-analyze` (GPT-4o-mini, robótico) por um agente conversacional humanizado `whatsapp-ai-agent` (GPT-4o), inspirado no modelo Sophia adaptado para nicho medico.
+
+#### Decisoes do Usuario
+- **Nome da IA**: Configuravel por clinica (campo `agent_name` em `whatsapp_ai_config`)
+- **Foco**: Agendamento (triagem -> agendar consultas)
+- **Voz**: Nao (so texto, sem ElevenLabs TTS)
+
+#### Arquitetura do Novo Agente
+```
+Meta Webhook -> whatsapp-webhook -> fire-and-forget -> whatsapp-ai-agent
+  1. Acquire atomic lock (try_acquire_ai_lock RPC, 35s)
+  2. Wait 5s (debounce multi-mensagem)
+  3. Mark as read (blue check via Graph API)
+  4. Load history (ultimas 20 msgs)
+  5. Detect phase (heuristica, sem LLM)
+  6. Load lead data (whatsapp_lead_qualifications)
+  7. [Se agendamento] Load slots disponiveis (5 dias)
+  8. [Se preciso] RAG knowledge base (pgvector similarity)
+  9. Build prompt por fase + identidade clinica
+ 10. GPT-4o generation (temp 0.75, max 500 tokens)
+ 11. Post-process: emoji limit (max 1) + [SPLIT] + auto-split >120 chars
+ 12. Send messages com typing simulation (800ms-2500ms)
+ 13. Extract lead data em background (GPT-4o-mini)
+ 14. Release lock
+```
+
+#### 5 Fases Medicas (router.ts)
+| # | Fase | Trigger | Objetivo |
+|---|------|---------|----------|
+| 1 | abertura | 1-3 msgs | Saudacao, identificar paciente |
+| 2 | triagem | 4+ msgs sem procedimento | Descobrir procedimento, convenio, urgencia |
+| 3 | agendamento | Procedimento + convenio | Oferecer horarios, confirmar consulta |
+| 4 | pos_agendamento | Lead agendado | Confirmar detalhes, orientacoes pre-consulta |
+| 5 | handoff | Keywords emergencia/reclamacao | Transferir para humano |
+
+#### Migration SQL (executada)
+- `sofia_knowledge_base`: RAG com pgvector embeddings (1536 dims)
+- `whatsapp_lead_qualifications`: dados estruturados do lead
+- `whatsapp_conversations.ai_lock_until`: lock atomico
+- `whatsapp_ai_config`: +9 colunas (agent_name, clinic_name, specialist_name, agent_greeting, knowledge_base, already_known_info, custom_prompt_instructions, auto_reply_enabled, auto_scheduling_enabled)
+- 3 RPCs: `try_acquire_ai_lock`, `release_ai_lock`, `match_knowledge`
+
+#### Arquivos Criados
+- `supabase/migrations/20260219000001_ai_agent_tables.sql`
+- `supabase/functions/whatsapp-ai-agent/index.ts` (~500 linhas)
+- `supabase/functions/whatsapp-ai-agent/router.ts`
+- `supabase/functions/whatsapp-ai-agent/prompt.ts`
+- `supabase/functions/sofia-generate-embedding/index.ts`
+
+#### Arquivos Modificados
+- `supabase/functions/whatsapp-webhook/index.ts` — trigger `whatsapp-ai-analyze` -> `whatsapp-ai-agent`
+- `supabase/config.toml` — adicionadas entradas verify_jwt=false
+- `src/components/whatsapp/ai/AISettingsDialog.tsx` — secao identidade do agente
+- `src/types/whatsappAI.ts` — 4 campos novos em AIConfig
+
+#### Deploy
+- Edge Functions deployadas via CLI: `whatsapp-ai-agent`, `sofia-generate-embedding`, `whatsapp-webhook`
+- Migration executada no Supabase SQL Editor
+- `whatsapp-ai-analyze` mantido intacto como fallback
+
+#### Pendencias
+- Auto-scheduling logic (criar `medical_appointments` automaticamente) — NAO portado do `whatsapp-ai-analyze` ainda
+- UI de CRUD para `sofia_knowledge_base` (fase 2 — por agora usa textarea simples)
+- Teste end-to-end via mensagem WhatsApp real
+
 ---
 
 ## Safety Protocol (J.A.R.V.I.S.)
@@ -482,4 +560,4 @@ Regras criticas:
 
 ---
 
-**Version:** 0.6.0 | 2026-02-18 | DevSquad Avengers Edition
+**Version:** 0.7.0 | 2026-02-19 | DevSquad Avengers Edition

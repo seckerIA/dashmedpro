@@ -3,5 +3,11 @@ project_id = "adzaqkduxnpckbcuqpmg"
 [functions.whatsapp-webhook]
 verify_jwt = false
 
+[functions.whatsapp-ai-agent]
+verify_jwt = false
+
+[functions.sofia-generate-embedding]
+verify_jwt = false
+
 [functions.facebook-leadgen-webhook]
 verify_jwt = false
