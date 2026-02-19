@@ -499,7 +499,7 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
               />
             )}
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="stage"
@@ -658,7 +658,7 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
 
                 {editingContact ? (
                   <div className="space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-2">
                         <label className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Nome Completo</label>
                         <Input

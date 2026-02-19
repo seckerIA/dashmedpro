@@ -44,8 +44,8 @@ export const useInventory = () => {
             if (!user?.id) throw new Error("Usuário não autenticado");
 
             const { data, error } = await fromTable("inventory_items")
-                .insert([{ 
-                    ...newItem, 
+                .insert([{
+                    ...newItem,
                     user_id: user.id,
                     organization_id: (profile as any)?.organization_id
                 }])
@@ -146,14 +146,28 @@ export const useInventory = () => {
 
             if (batches && (batches as any[]).length > 0) {
                 const batchIds = (batches as any[]).map((b: any) => b.id);
-                const { error: movementsError } = await fromTable("inventory_movements")
+
+                // 1. Delete transactions items related to these batches
+                await fromTable("inventory_transaction_items")
                     .delete()
                     .in("batch_id", batchIds);
 
-                if (movementsError) {
-                    console.error("Erro ao deletar movimentações:", movementsError);
-                }
+                // 2. Delete movements related to these batches
+                await fromTable("inventory_movements")
+                    .delete()
+                    .in("batch_id", batchIds);
 
+                // 3. Delete stock usage related to this item
+                await fromTable("appointment_stock_usage")
+                    .delete()
+                    .eq("inventory_item_id", id);
+
+                // 4. Delete item-level transactions (if any directly point to item)
+                await fromTable("inventory_transaction_items")
+                    .delete()
+                    .eq("item_id", id);
+
+                // 5. Finally delete batches
                 const { error: batchesError } = await fromTable("inventory_batches")
                     .delete()
                     .eq("item_id", id);
@@ -161,6 +175,15 @@ export const useInventory = () => {
                 if (batchesError) {
                     throw new Error("Erro ao excluir lotes do produto: " + batchesError.message);
                 }
+            } else {
+                // If it has no batches, it might still have direct item references
+                await fromTable("appointment_stock_usage")
+                    .delete()
+                    .eq("inventory_item_id", id);
+
+                await fromTable("inventory_transaction_items")
+                    .delete()
+                    .eq("item_id", id);
             }
 
             const { data, error } = await fromTable("inventory_items")

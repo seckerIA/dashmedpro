@@ -134,7 +134,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Buscar mensagens
     const { data: messages, error: msgError } = await supabaseAdmin
       .from('whatsapp_messages')
-      .select('direction, content, message_type, sent_at')
+      .select('id, message_id, direction, content, message_type, sent_at')
       .eq('conversation_id', conversation_id)
       .order('sent_at', { ascending: false })
       .limit(20);
@@ -579,36 +579,9 @@ Analise a conversa, extraia dados e gere respostas.`;
         });
       }
 
-      // 2. Atualizar ou Criar Paciente (tabela patients) se tivermos dados ricos (CPF principalmente)
-      // A tabela patients costuma ter coluna cpf nativa
-      if (info.cpf || info.full_name_correction) {
-        const patientUpdates: any = {};
-        if (info.full_name_correction) patientUpdates.name = info.full_name_correction; // Tabela patients usa 'name' ou 'full_name'? O código antigo usava 'name' (linha 499 original)
-        // Verificando Step 583 (vazio) e Step 598 (crm_contacts). O código na linha 499 insere { name: ... }
-        // Portanto vamos usar 'name'.
+      // 2. Tabela 'patients' removida/unificada com crm_contacts.
+      // O bloco anterior já atualizou crm_contacts.
 
-        // Se tiver CPF, tentamos inserir. Se a coluna nao existir, vai dar erro, entao melhor verificar
-        // Assumindo que patients foi criada para ter dados medicos, provavelmente tem cpf.
-        // Mas para garantir, vamos usar logica defensiva ou try/catch
-
-        // Vamos tentar buscar o paciente pelo telefone primeiro
-        let patientId = null;
-        const { data: existingPatient } = await supabaseAdmin.from('patients').select('id').eq('phone', conversation.phone_number).maybeSingle();
-
-        if (existingPatient) {
-          // Atualizar
-          if (info.cpf) patientUpdates.cpf = info.cpf;
-          // Nota: Se 'cpf' não existir na tabela patients, esse update vai falhar.
-          // Supabase ignora campos extras em insert? Não, dá erro.
-          // Como não vi o schema da tabela patients (Step 583 vazio), 
-          // vou arriscar que existe 'cpf' pois é tabela de paciente.
-          // Se der erro, o catch global pega.
-
-          if (Object.keys(patientUpdates).length > 0) {
-            await supabaseAdmin.from('patients').update(patientUpdates).eq('id', existingPatient.id);
-          }
-        }
-      }
     }
 
     // Auto-Reply Logic Updated (Hierarchy):
@@ -664,7 +637,6 @@ Analise a conversa, extraia dados e gere respostas.`;
               .select('*', { count: 'exact', head: true })
               .eq('doctor_id', aiResponse.schedule_confirmation.doctor_id || conversation.user_id)
               .neq('status', 'cancelled')
-              .or(`start_time.lte.${endDate.toISOString()},end_time.gte.${bookDate.toISOString()}`)
               .lt('start_time', endDate.toISOString())
               .gt('end_time', bookDate.toISOString());
 
@@ -681,37 +653,41 @@ Analise a conversa, extraia dados e gere respostas.`;
                 .update({ ai_autonomous_mode: false, priority: 'high', status: 'open' })
                 .eq('id', conversation_id);
             } else {
-              // 2. Resolver o Paciente
-              let patientId = conversation.contact_id;
+              // 2. Resolver o Paciente/Contato
+              let contactId = conversation.contact_id;
 
-              if (!patientId) {
-                const { data: existingPatient } = await supabaseAdmin
-                  .from('patients')
+              if (!contactId) {
+                const { data: existingContact } = await supabaseAdmin
+                  .from('crm_contacts')
                   .select('id')
-                  .eq('phone', conversation.phone_number)
+                  .or(`phone.eq.${conversation.phone_number},phone.eq.+${conversation.phone_number}`)
                   .maybeSingle();
 
-                if (existingPatient) patientId = existingPatient.id;
+                if (existingContact) contactId = existingContact.id;
                 else {
-                  const { data: newPatient } = await supabaseAdmin.from('patients').insert({
-                    name: conversation.contact_name || 'Paciente WhatsApp',
+                  const { data: newContact } = await supabaseAdmin.from('crm_contacts').insert({
+                    full_name: conversation.contact_name || 'Paciente WhatsApp',
                     phone: conversation.phone_number,
-                    user_id: conversation.user_id
+                    user_id: conversation.user_id,
+                    tags: ['whatsapp_auto']
                   }).select('id').single();
-                  if (newPatient) patientId = newPatient.id;
+                  if (newContact) contactId = newContact.id;
                 }
               }
 
-              if (patientId) {
+              if (contactId) {
                 // 3. Criar o Agendamento
                 const { error: appError } = await supabaseAdmin
                   .from('medical_appointments')
                   .insert({
                     doctor_id: aiResponse.schedule_confirmation.doctor_id || conversation.user_id,
-                    patient_id: patientId,
+                    contact_id: contactId, // Usando contact_id correto (crm_contacts)
                     start_time: bookDate.toISOString(),
                     end_time: endDate.toISOString(),
                     status: 'scheduled',
+                    title: `Consulta - ${aiResponse.schedule_confirmation.procedure_name || 'Geral'}`, // Adicionado título obrigatório
+                    appointment_type: 'first_visit', // Tipo padrão seguro
+                    duration_minutes: 30, // Duração obrigatória
                     notes: `Agendado via IA. Procedimento: ${aiResponse.schedule_confirmation.procedure_name || 'Geral'}.`,
                     user_id: conversation.user_id
                   });
@@ -725,6 +701,28 @@ Analise a conversa, extraia dados e gere respostas.`;
                     .update({ lead_status: 'convertido' })
                     .eq('conversation_id', conversation_id);
                   // No need to change bestSuggestion, original confirmation is fine
+
+                  // Atualizar contato também com association se possível (opcional)
+                  if (!conversation.contact_id) {
+                    await supabaseAdmin.from('whatsapp_conversations').update({ contact_id: contactId }).eq('id', conversation_id);
+                  }
+
+                  // 5. Atualizar Pipeline do CRM (Mudar para estágio 'agendado')
+                  const { error: dealError } = await supabaseAdmin
+                    .from('crm_deals')
+                    .update({
+                      stage: 'agendado',
+                      updated_at: new Date().toISOString()
+                    })
+                    .eq('contact_id', contactId)
+                    .not('stage', 'in', '("fechado_ganho","fechado_perdido")');
+
+                  if (dealError) {
+                    console.warn('[AutoSchedule] Could not update CRM deal stage:', dealError.message);
+                  } else {
+                    console.log('[AutoSchedule] CRM Pipeline stage updated to "agendado"');
+                  }
+
                 } else {
                   throw appError; // Propagate error to catch block
                 }
@@ -795,7 +793,7 @@ Analise a conversa, extraia dados e gere respostas.`;
               message_type: 'text',
               status: 'pending',
               sent_at: new Date().toISOString(),
-              reply_to_message_id: messages[0]?.message_id || null, // Adiciona contexto de resposta
+              reply_to_message_id: messages[0]?.id || null, // Adiciona contexto de resposta usando UUID
               metadata: { auto_reply: true, confidence: bestSuggestion.confidence, ai_generated: true }
             })
             .select('id')
@@ -934,6 +932,24 @@ Analise a conversa, extraia dados e gere respostas.`;
 
   } catch (error: any) {
     console.error('[whatsapp-ai-analyze] Error:', error.message);
+
+    // Log error to database for easier debugging
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') || 'https://adzaqkduxnpckbcuqpmg.supabase.co';
+      const supabaseAdmin = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+      await supabaseAdmin.from('debug_logs').insert({
+        function_name: 'whatsapp-ai-analyze',
+        message: 'Global Error Catch',
+        data: {
+          error: error.message,
+          stack: error.stack,
+          name: error.name
+        }
+      });
+    } catch (logError) {
+      console.error('Failed to log error to database:', logError);
+    }
+
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

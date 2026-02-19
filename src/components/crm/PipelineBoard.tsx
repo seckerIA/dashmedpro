@@ -35,6 +35,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // Componente SortableDealCard
 interface SortableDealCardProps {
@@ -332,17 +333,21 @@ export function PipelineBoard({
         stage: stage.value,
       }
     });
+
+    const isMobile = useIsMobile();
+    const widthStyle = isMobile ? '85vw' : '320px';
+
     return (
       <Card
         ref={setNodeRef}
-        className={`flex-shrink-0 w-80 bg-gradient-to-br from-card to-card/50 border-2 shadow-card transition-all duration-100 ease-out ${isOver
+        className={`flex-shrink-0 w-[85vw] md:w-80 bg-gradient-to-br from-card to-card/50 border-2 shadow-card transition-all duration-100 ease-out snap-center ${isOver
           ? 'border-primary shadow-glow ring-2 ring-primary/20 scale-[1.01]'
           : 'border-border hover:shadow-lg'
           }`}
         style={{
-          width: '320px',
-          maxWidth: '320px',
-          minWidth: '320px',
+          width: widthStyle,
+          maxWidth: widthStyle,
+          minWidth: widthStyle,
           boxSizing: 'border-box',
           overflow: 'hidden',
           transform: 'translateZ(0)', // GPU acceleration
@@ -363,7 +368,7 @@ export function PipelineBoard({
       onDragEnd={handleDragEnd}
       measuring={measuringConfig}
     >
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory px-4 md:px-0 scrollbar-hide">
         {PIPELINE_STAGES.map((stage) => {
           const stageDeals = getDealsByStage(stage.value);
 
@@ -372,16 +377,16 @@ export function PipelineBoard({
               <CardHeader className="pb-3 bg-gradient-to-r from-transparent to-primary/5 rounded-t-lg">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`flex items-center justify-center w-12 h-12 rounded-xl ${stage.bgColor} border border-border/50 shadow-sm`}>
+                    <div className={`flex items-center justify-center w-12 h-12 rounded-xl ${stage.bgColor} border border-border/50 shadow-sm shrink-0`}>
                       <stage.icon className={`w-6 h-6 ${stage.textColor}`} />
                     </div>
-                    <div>
-                      <CardTitle className="text-base font-semibold text-foreground h-12 flex items-center leading-tight">
+                    <div className="min-w-0">
+                      <CardTitle className="text-base font-semibold text-foreground h-12 flex items-center leading-tight truncate">
                         {stage.label}
                       </CardTitle>
                       {/* Valor total do estágio - oculto para secretária */}
                       {!isSecretaria && (
-                        <p className="text-sm text-muted-foreground mt-0.5 font-medium">
+                        <p className="text-sm text-muted-foreground mt-0.5 font-medium truncate">
                           {getTotalValueByStage(stage.value)}
                         </p>
                       )}
@@ -395,14 +400,14 @@ export function PipelineBoard({
                   </div>
                   <Badge
                     variant="secondary"
-                    className={`text-sm ${stage.bgColor} ${stage.textColor} border-0 font-semibold px-3 py-1.5 rounded-lg`}
+                    className={`text-sm ${stage.bgColor} ${stage.textColor} border-0 font-semibold px-3 py-1.5 rounded-lg shrink-0`}
                   >
                     {stageDeals.length}
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent className="p-2 pt-0" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'visible' }}>
-                <ScrollArea className="h-[calc(100vh-300px)] w-full" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+                <ScrollArea className="h-[calc(100dvh-280px)] md:h-[calc(100vh-300px)] w-full" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
                   <SortableContext items={stageDeals.map(deal => deal.id)} strategy={verticalListSortingStrategy}>
                     <div className="space-y-3 w-full px-1" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'visible' }}>
                       {stageDeals.map((deal) => (

@@ -230,7 +230,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
     <TooltipProvider delayDuration={0}>
       <div className={`flex h-full flex-col bg-sidebar text-sidebar-foreground font-sans ${isCollapsed ? 'w-full' : ''}`}>
         <ScrollArea className="flex-1">
-          <div className={`${isCollapsed ? 'p-1 space-y-3' : 'p-4 space-y-4'}`}>
+          <div className={`${isCollapsed ? 'p-1.5 space-y-3' : 'p-3 space-y-3'}`}>
             {/* Logo Section - DashMed Pro */}
             <div
               className={`
@@ -243,11 +243,11 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
               <img
                 src={dashmedLogo}
                 alt="DashMed Pro"
-                className={`${isCollapsed ? 'h-10 w-auto' : 'h-12 w-auto'} transition-smooth`}
+                className={`${isCollapsed ? 'h-9 w-auto' : 'h-10 w-auto'} transition-smooth`}
               />
               {!isCollapsed && (
                 <div className="flex flex-col">
-                  <span className="text-foreground font-semibold text-lg tracking-wide whitespace-nowrap overflow-hidden">
+                  <span className="text-foreground font-semibold text-base tracking-wide whitespace-nowrap overflow-hidden">
                     {organization?.name || "DASHMED PRO"}
                   </span>
                   <span className="text-muted-foreground text-xs whitespace-nowrap overflow-hidden">
@@ -467,7 +467,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                               }}
                               className={`
                                 group relative w-full flex items-center justify-between
-                                px-4 py-2.5 rounded-2xl text-base font-medium
+                                px-3 py-2 rounded-2xl text-sm font-medium
                                 transition-all duration-200
                                 ${active
                                   ? 'bg-primary/15 text-primary border border-primary/20 shadow-[0_0_15px_rgba(37,99,235,0.15)]'
@@ -475,7 +475,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                                 }
                               `}
                             >
-                              <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-3">
                                 {item.iconImage ? (
                                   <img
                                     src={item.iconImage}
@@ -495,7 +495,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                                 )}
                                 <span
                                   className={`
-                                    text-base font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden
+                                    text-sm font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden
                                     ${active ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}
                                   `}
                                 >
@@ -599,7 +599,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                             <Badge
                               variant={item.variant === 'new' ? 'default' : 'secondary'}
                               className={`
-                                text-[10px] px-2 h-5 rounded-full border
+                                text-[9px] px-1.5 h-4 rounded-full border
                                 ${item.variant === 'new'
                                   ? 'bg-primary/15 text-primary border-primary/30'
                                   : 'bg-accent/50 text-foreground border-border'
@@ -639,7 +639,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                               }}
                               className={`
                                 group relative w-full block
-                                ${isCollapsed ? 'p-2' : 'px-4 py-2.5'}
+                                ${isCollapsed ? 'p-2' : 'px-3 py-2'}
                                 rounded-2xl text-base font-medium
                                 transition-all duration-200
                                 ${active
@@ -744,7 +744,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                 variant="ghost"
                 size="sm"
                 onClick={handleSignOut}
-                className="w-full justify-start px-2.5 py-2 h-9 rounded-2xl text-base text-muted-foreground hover:text-foreground hover:bg-accent"
+                className="w-full justify-start px-2.5 py-1.5 h-8 rounded-2xl text-sm text-muted-foreground hover:text-foreground hover:bg-accent"
               >
                 <LogOut className="mr-2 h-5 w-5" />
                 Sair

@@ -206,9 +206,8 @@ const MedicalRecords = () => {
                           setSelectedPatientName(patient.full_name);
                           setActiveTab("ficha");
                         }}
-                        className={`w-full p-4 text-left hover:bg-muted/50 transition-colors ${
-                          isSelected ? "bg-primary/10 border-l-2 border-primary" : ""
-                        }`}
+                        className={`w-full p-4 text-left hover:bg-muted/50 transition-colors ${isSelected ? "bg-primary/10 border-l-2 border-primary" : ""
+                          }`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="space-y-1 flex-1 min-w-0">
@@ -340,7 +339,7 @@ const MedicalRecords = () => {
                   <TabsContent value="ficha" className="mt-6">
                     <PatientInfoTab
                       patient={selectedPatient}
-                      onUpdate={() => {}}
+                      onUpdate={() => { }}
                       onNewRecord={() => setIsNewRecordModalOpen(true)}
                     />
                   </TabsContent>
@@ -348,6 +347,7 @@ const MedicalRecords = () => {
                   <TabsContent value="historico" className="mt-6">
                     <MedicalHistoryTab
                       contactId={selectedPatientId}
+                      patient={selectedPatient}
                     />
                   </TabsContent>
 

@@ -62,7 +62,7 @@ export default function VisionDashboard({ viewMode, onViewModeChange }: ViewMode
                     </p>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 md:gap-3 flex-wrap">
                     <div className="relative hidden md:block">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -72,12 +72,12 @@ export default function VisionDashboard({ viewMode, onViewModeChange }: ViewMode
                     </div>
                     {/* View Toggle */}
                     {onViewModeChange && (
-                        <div className="flex items-center gap-1 bg-muted/20 p-1 rounded-xl border border-border/50">
+                        <div className="flex items-center gap-1 bg-muted/20 p-1 rounded-xl border border-border/50 overflow-x-auto max-w-[200px] md:max-w-none scrollbar-hide">
                             <Button
                                 variant={viewMode === 'daily' ? 'default' : 'ghost'}
                                 size="sm"
                                 onClick={() => onViewModeChange('daily')}
-                                className={`text-xs h-8 px-3 rounded-lg ${viewMode === 'daily' ? 'shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                                className={`text-xs h-8 px-3 rounded-lg whitespace-nowrap ${viewMode === 'daily' ? 'shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                             >
                                 Dia a Dia
                             </Button>
@@ -85,7 +85,7 @@ export default function VisionDashboard({ viewMode, onViewModeChange }: ViewMode
                                 variant={viewMode === 'vision' || viewMode === 'general' ? 'default' : 'ghost'}
                                 size="sm"
                                 onClick={() => onViewModeChange('vision')}
-                                className={`text-xs h-8 px-3 rounded-lg ${viewMode === 'vision' || viewMode === 'general' ? 'shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                                className={`text-xs h-8 px-3 rounded-lg whitespace-nowrap ${viewMode === 'vision' || viewMode === 'general' ? 'shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                             >
                                 Visão Geral
                             </Button>
@@ -93,18 +93,19 @@ export default function VisionDashboard({ viewMode, onViewModeChange }: ViewMode
                                 variant={viewMode === 'detailed' ? 'default' : 'ghost'}
                                 size="sm"
                                 onClick={() => onViewModeChange('detailed')}
-                                className={`text-xs h-8 px-3 rounded-lg ${viewMode === 'detailed' ? 'shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                                className={`text-xs h-8 px-3 rounded-lg whitespace-nowrap ${viewMode === 'detailed' ? 'shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                             >
                                 Detalhada
                             </Button>
                         </div>
                     )}
-                    <Button variant="outline" size="icon" className="bg-card border-border text-foreground hover:bg-muted/50 rounded-xl">
+                    <Button variant="outline" size="icon" className="bg-card border-border text-foreground hover:bg-muted/50 rounded-xl shrink-0">
                         <Filter className="h-4 w-4" />
                     </Button>
-                    <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 border-0 rounded-xl">
+                    <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 border-0 rounded-xl shrink-0">
                         <CalendarIcon className="h-4 w-4 mr-2" />
-                        Agendar
+                        <span className="hidden sm:inline">Agendar</span>
+                        <span className="sm:hidden">Novo</span>
                     </Button>
                 </div>
             </div>

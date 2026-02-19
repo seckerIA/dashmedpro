@@ -32,52 +32,52 @@ export function useSecretaryActivities() {
       try {
         const { data: crmActivities, error: crmError } = await supabase
           .from("crm_activities")
-          .select(`id, type, title, description, created_at`)
+          .select(`id, activity_type, title, description, created_at`)
           .gte("created_at", last24h.toISOString())
           .order("created_at", { ascending: false })
           .limit(10);
 
         if (!crmError && crmActivities) {
-        for (const activity of crmActivities) {
-          const contactName = 'Paciente'; // FK não existe
-          const userName = 'Equipe'; // FK não existe
+          for (const activity of crmActivities) {
+            const contactName = 'Paciente'; // FK não existe
+            const userName = 'Equipe'; // FK não existe
 
-          let activityType: ActivityType = 'note';
-          let description = activity.description || activity.title || '';
+            let activityType: ActivityType = 'note';
+            let description = activity.description || activity.title || '';
 
-          switch (activity.type) {
-            case 'call':
-              activityType = 'call';
-              description = description || 'registrou uma ligação';
-              break;
-            case 'whatsapp':
-              activityType = 'whatsapp';
-              description = description || 'enviou mensagem WhatsApp';
-              break;
-            case 'email':
-              activityType = 'email';
-              description = description || 'enviou email';
-              break;
-            case 'meeting':
-              activityType = 'scheduling';
-              description = description || 'registrou reunião';
-              break;
-            case 'note':
-            case 'task':
-              activityType = 'note';
-              description = description || 'adicionou anotação';
-              break;
+            switch (activity.activity_type) {
+              case 'call':
+                activityType = 'call';
+                description = description || 'registrou uma ligação';
+                break;
+              case 'whatsapp':
+                activityType = 'whatsapp';
+                description = description || 'enviou mensagem WhatsApp';
+                break;
+              case 'email':
+                activityType = 'email';
+                description = description || 'enviou email';
+                break;
+              case 'meeting':
+                activityType = 'scheduling';
+                description = description || 'registrou reunião';
+                break;
+              case 'note':
+              case 'task':
+                activityType = 'note';
+                description = description || 'adicionou anotação';
+                break;
+            }
+
+            activities.push({
+              id: `crm-${activity.id}`,
+              type: activityType,
+              secretary: userName,
+              patient: contactName,
+              time: new Date(activity.created_at),
+              description: description,
+            });
           }
-
-          activities.push({
-            id: `crm-${activity.id}`,
-            type: activityType,
-            secretary: userName,
-            patient: contactName,
-            time: new Date(activity.created_at),
-            description: description,
-          });
-        }
         }
       } catch (e) {
         // crm_activities pode não existir ou RLS pode bloquear - ignorar silenciosamente
@@ -169,7 +169,7 @@ export function useSecretaryActivities() {
         const { data: completedTasks, error: tasksError } = await supabase
           .from("tasks")
           .select(`id, title, completed_at`)
-          .eq("status", "completed")
+          .eq("status", "concluida")
           .not("completed_at", "is", null)
           .gte("completed_at", last24h.toISOString())
           .order("completed_at", { ascending: false })

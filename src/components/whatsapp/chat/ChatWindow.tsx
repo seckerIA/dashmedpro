@@ -331,7 +331,7 @@ export function ChatWindow({
               <Button
                 variant="ghost"
                 size="icon"
-                className="flex-shrink-0 -ml-2 md:hidden"
+                className="flex-shrink-0 -ml-2 xl:hidden"
                 onClick={onBack}
               >
                 <ArrowLeft className="h-5 w-5" />

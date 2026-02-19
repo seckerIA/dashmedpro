@@ -31,13 +31,14 @@ export function WhatsAppLayout({
   const showInboxOnMobile = !selectedConversationId || isMobileView === 'inbox';
 
   return (
-    <div className="h-[calc(100vh-120px)] flex overflow-hidden rounded-lg border bg-background relative">
+    <div className="h-[calc(100vh-64px)] flex overflow-hidden bg-background relative">
       {/* Coluna 1: Inbox/Lista de conversas */}
       <div
         className={cn(
           'w-full md:w-80 lg:w-96 border-r flex-shrink-0 flex flex-col',
-          // Mobile: esconder quando chat selecionado
-          selectedConversationId && 'hidden md:flex'
+          // Hide inbox on screens smaller than XL when a chat is selected
+          // to give more room for Chat + AI Sidebar
+          selectedConversationId && 'hidden xl:flex'
         )}
       >
         {inbox}
@@ -46,7 +47,7 @@ export function WhatsAppLayout({
       {/* Coluna 2: Chat */}
       <div
         className={cn(
-          'flex-1 flex flex-col min-w-0',
+          'flex-1 flex flex-col min-w-0 md:min-w-[400px]',
           // Mobile: esconder quando nenhum chat selecionado
           !selectedConversationId && 'hidden md:flex'
         )}

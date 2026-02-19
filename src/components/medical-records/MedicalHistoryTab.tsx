@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Sheet,
   SheetContent,
@@ -9,7 +10,7 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet';
 import { useMedicalRecords } from '@/hooks/useMedicalRecords';
-import { MedicalRecord, RECORD_TYPES } from '@/types/medicalRecords';
+import { MedicalRecord, RECORD_TYPES, Patient } from '@/types/medicalRecords';
 import {
   FileText,
   Calendar,
@@ -17,7 +18,8 @@ import {
   Pill,
   TestTube,
   Clock,
-  ArrowRight
+  ArrowRight,
+  Printer
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -25,9 +27,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface MedicalHistoryTabProps {
   contactId: string;
+  patient?: Patient | null;
 }
 
-export function MedicalHistoryTab({ contactId }: MedicalHistoryTabProps) {
+export function MedicalHistoryTab({ contactId, patient }: MedicalHistoryTabProps) {
   const { records, isLoading, error } = useMedicalRecords(contactId);
   const [selectedRecord, setSelectedRecord] = useState<MedicalRecord | null>(null);
 
@@ -51,6 +54,179 @@ export function MedicalHistoryTab({ contactId }: MedicalHistoryTabProps) {
       default:
         return 'bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
     }
+  };
+
+  const handlePrint = () => {
+    if (!selectedRecord) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const content = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Prontuário - ${patient?.full_name || 'Paciente'}</title>
+          <style>
+            @page { margin: 20mm; }
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
+            .header { text-align: center; margin-bottom: 40px; border-bottom: 2px solid #2563eb; padding-bottom: 20px; }
+            .logo { font-size: 28px; font-weight: bold; color: #2563eb; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
+            .subtitle { font-size: 14px; color: #666; margin-top: 5px; }
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px; background: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; }
+            .info-item { margin-bottom: 8px; }
+            .label { font-size: 12px; text-transform: uppercase; color: #64748b; font-weight: 600; display: block; margin-bottom: 2px; }
+            .value { font-size: 15px; font-weight: 500; color: #0f172a; }
+            .section { margin-bottom: 30px; page-break-inside: avoid; }
+            .section-title { font-size: 16px; font-weight: 700; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 15px; display: flex; align-items: center; }
+            .section-title::before { content: ''; display: inline-block; width: 4px; height: 16px; background: #2563eb; margin-right: 8px; border-radius: 2px; }
+            .content { font-size: 14px; white-space: pre-wrap; color: #334155; line-height: 1.7; background: #fff; }
+            .tag { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; margin-right: 5px; margin-bottom: 5px; background: #e2e8f0; color: #475569; }
+            .signatures { margin-top: 80px; display: flex; justify-content: space-between; page-break-inside: avoid; }
+            .signature-box { width: 40%; text-align: center; }
+            .signature-line { border-top: 1px solid #94a3b8; margin-bottom: 10px; }
+            .signature-name { font-weight: 600; font-size: 14px; color: #0f172a; }
+            .signature-role { font-size: 12px; color: #64748b; }
+            .footer { margin-top: 50px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+            @media print {
+              body { padding: 0; }
+              .no-print { display: none; }
+              .header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="logo">DashMed Pro</div>
+            <div class="subtitle">Relatório de Atendimento Médico</div>
+          </div>
+
+          <div class="info-grid">
+            <div>
+              <div class="info-item">
+                <span class="label">Paciente</span>
+                <span class="value">${patient?.full_name || 'N/A'}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Data de Nascimento</span>
+                <span class="value">${patient?.birth_date ? new Date(patient.birth_date).toLocaleDateString('pt-BR') : 'N/A'}</span>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div class="info-item">
+                <span class="label">Data do Atendimento</span>
+                <span class="value">${new Date(selectedRecord.created_at).toLocaleDateString('pt-BR')} às ${new Date(selectedRecord.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Tipo</span>
+                <span class="value">${getRecordTypeInfo(selectedRecord.record_type).label}</span>
+              </div>
+            </div>
+          </div>
+
+          ${selectedRecord.doctor ? `
+            <div class="section">
+              <div class="section-title">Profissional Responsável</div>
+              <div class="content">Dr(a). ${selectedRecord.doctor.full_name}</div>
+            </div>
+          ` : ''}
+
+          ${selectedRecord.chief_complaint ? `
+            <div class="section">
+              <div class="section-title">Queixa Principal</div>
+              <div class="content">${selectedRecord.chief_complaint}</div>
+            </div>
+          ` : ''}
+
+          ${selectedRecord.history_current_illness ? `
+            <div class="section">
+              <div class="section-title">História da Doença Atual (HDA)</div>
+              <div class="content">${selectedRecord.history_current_illness}</div>
+            </div>
+          ` : ''}
+
+          ${selectedRecord.vital_signs && Object.keys(selectedRecord.vital_signs).length > 0 ? `
+            <div class="section">
+              <div class="section-title">Sinais Vitais</div>
+              <div class="content">
+                <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                  ${selectedRecord.vital_signs.bp_systolic ? `<div><span class="label">PA</span> <span class="value">${selectedRecord.vital_signs.bp_systolic}/${selectedRecord.vital_signs.bp_diastolic} mmHg</span></div>` : ''}
+                  ${selectedRecord.vital_signs.heart_rate ? `<div><span class="label">FC</span> <span class="value">${selectedRecord.vital_signs.heart_rate} bpm</span></div>` : ''}
+                  ${selectedRecord.vital_signs.temperature ? `<div><span class="label">Temp</span> <span class="value">${selectedRecord.vital_signs.temperature}°C</span></div>` : ''}
+                  ${selectedRecord.vital_signs.spo2 ? `<div><span class="label">SpO2</span> <span class="value">${selectedRecord.vital_signs.spo2}%</span></div>` : ''}
+                  ${selectedRecord.vital_signs.weight ? `<div><span class="label">Peso</span> <span class="value">${selectedRecord.vital_signs.weight} kg</span></div>` : ''}
+                </div>
+              </div>
+            </div>
+          ` : ''}
+
+          ${selectedRecord.physical_exam_notes ? `
+            <div class="section">
+              <div class="section-title">Exame Físico</div>
+              <div class="content">${selectedRecord.physical_exam_notes}</div>
+            </div>
+          ` : ''}
+
+          ${selectedRecord.diagnostic_hypothesis ? `
+            <div class="section">
+              <div class="section-title">Hipótese Diagnóstica</div>
+              <div class="content">${selectedRecord.diagnostic_hypothesis}</div>
+              ${selectedRecord.cid_codes && selectedRecord.cid_codes.length > 0 ? `
+                <div style="margin-top: 10px;">
+                  ${selectedRecord.cid_codes.map((cid: string) => `<span class="tag">CID: ${cid}</span>`).join('')}
+                </div>
+              ` : ''}
+            </div>
+          ` : ''}
+
+          ${selectedRecord.treatment_plan ? `
+            <div class="section">
+              <div class="section-title">Conduta / Plano Terapêutico</div>
+              <div class="content">${selectedRecord.treatment_plan}</div>
+            </div>
+          ` : ''}
+
+          ${selectedRecord.prescriptions && selectedRecord.prescriptions.length > 0 ? `
+            <div class="section">
+              <div class="section-title">Prescrições</div>
+              <div class="content">
+                ${selectedRecord.prescriptions.map((p: any) => `
+                  <div style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dashed #e2e8f0;">
+                    <div style="font-weight: 600; font-size: 15px;">${p.medication} ${p.dosage}</div>
+                    <div style="color: #475569; margin-top: 2px;">${p.frequency} por ${p.duration} ${p.quantity ? `(${p.quantity})` : ''}</div>
+                    ${p.instructions ? `<div style="font-style: italic; color: #64748b; font-size: 13px; margin-top: 2px;">Obs: ${p.instructions}</div>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          <div class="signatures">
+            <div class="signature-box">
+              <div class="signature-line"></div>
+              <div class="signature-name">Dr(a). ${selectedRecord.doctor?.full_name || '__________________________'}</div>
+              <div class="signature-role">Médico Responsável</div>
+            </div>
+            <div class="signature-box">
+              <div class="signature-line"></div>
+              <div class="signature-name">${patient?.full_name || '__________________________'}</div>
+              <div class="signature-role">Paciente / Responsável</div>
+            </div>
+          </div>
+
+          <div class="footer">
+            Documento gerado eletronicamente pelo sistema DashMed Pro em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}.
+          </div>
+
+          <script>
+            window.onload = function() { window.print(); }
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(content);
+    printWindow.document.close();
   };
 
   if (isLoading) {
@@ -112,22 +288,28 @@ export function MedicalHistoryTab({ contactId }: MedicalHistoryTabProps) {
         <SheetContent className="sm:max-w-2xl w-full flex flex-col h-full p-0">
           {selectedRecord && (
             <>
-              <SheetHeader className="px-6 py-4 border-b">
-                <div className="flex items-center gap-2 mb-2">
-                  <Badge className={getRecordTypeColor(selectedRecord.record_type)}>
-                    {getRecordTypeInfo(selectedRecord.record_type).label}
-                  </Badge>
-                  <span className="text-sm text-muted-foreground flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    {format(parseISO(selectedRecord.created_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                  </span>
+              <SheetHeader className="px-6 py-4 border-b flex flex-row items-center justify-between space-y-0">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge className={getRecordTypeColor(selectedRecord.record_type)}>
+                      {getRecordTypeInfo(selectedRecord.record_type).label}
+                    </Badge>
+                    <span className="text-sm text-muted-foreground flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      {format(parseISO(selectedRecord.created_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                    </span>
+                  </div>
+                  <SheetTitle>Detalhes do Atendimento</SheetTitle>
+                  <SheetDescription>
+                    {selectedRecord.doctor ? `Realizado por Dr(a). ${selectedRecord.doctor.full_name}` : 'Médico não identificado'}
+                    {' • '}
+                    {format(parseISO(selectedRecord.created_at), "HH:mm", { locale: ptBR })}
+                  </SheetDescription>
                 </div>
-                <SheetTitle>Detalhes do Atendimento</SheetTitle>
-                <SheetDescription>
-                  {selectedRecord.doctor ? `Realizado por Dr(a). ${selectedRecord.doctor.full_name}` : 'Médico não identificado'}
-                  {' • '}
-                  {format(parseISO(selectedRecord.created_at), "HH:mm", { locale: ptBR })}
-                </SheetDescription>
+                <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2">
+                  <Printer className="h-4 w-4" />
+                  Imprimir / PDF
+                </Button>
               </SheetHeader>
 
               <ScrollArea className="flex-1 px-6">
