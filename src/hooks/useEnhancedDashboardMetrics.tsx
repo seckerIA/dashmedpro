@@ -4,6 +4,7 @@ import { useAuth } from './useAuth';
 import { useUserProfile } from './useUserProfile';
 import { useSecretaryDoctors } from './useSecretaryDoctors';
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
+import { parseLocalDate } from '@/utils/dateUtils';
 
 interface TreatmentEvolutionData {
   month: string;
@@ -69,10 +70,9 @@ const fetchEnhancedMetrics = async (
   // Calcular tempo médio no pipeline
   const closedDeals = dealsData.filter((d: any) => d.stage === 'fechado_ganho' || d.stage === 'fechado_perdido');
   const pipelineTimes = closedDeals
-    .filter((d: any) => d.created_at && d.updated_at)
     .map((d: any) => {
-      const created = new Date(d.created_at);
-      const updated = new Date(d.updated_at);
+      const created = parseLocalDate(d.created_at);
+      const updated = parseLocalDate(d.updated_at);
       return Math.floor((updated.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
     });
   const averagePipelineTime = pipelineTimes.length > 0
@@ -163,7 +163,7 @@ const fetchEnhancedMetrics = async (
     const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
 
     const monthDeals = dealsData.filter((deal: any) => {
-      const dealDate = new Date(deal.updated_at);
+      const dealDate = parseLocalDate(deal.updated_at);
       return dealDate >= monthStart && dealDate <= monthEnd;
     });
 
@@ -194,7 +194,7 @@ const fetchEnhancedMetrics = async (
       const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
 
       const monthTransactions = transactionsData.filter((t: any) => {
-        const tDate = new Date(t.transaction_date || t.created_at);
+        const tDate = parseLocalDate(t.transaction_date || t.created_at);
         return tDate >= monthStart && tDate <= monthEnd;
       });
 

@@ -5,12 +5,18 @@ import { FollowUp, CreateFollowUpData, UpdateFollowUpData } from '@/types/follow
 import { useAuth } from './useAuth';
 
 // Buscar follow-ups do usuário
-const fetchFollowUps = async (userId: string, signal?: AbortSignal): Promise<FollowUp[]> => {
-  const queryPromise = supabase
+const fetchFollowUps = async (userId: string, viewAsUserIds?: string[], signal?: AbortSignal): Promise<FollowUp[]> => {
+  let queryPromise = supabase
     .from('crm_follow_ups')
-    .select('*')
-    .eq('user_id', userId)
-    .order('scheduled_date', { ascending: true });
+    .select('*');
+
+  if (viewAsUserIds && viewAsUserIds.length > 0) {
+    queryPromise = (queryPromise as any).in('user_id', viewAsUserIds);
+  } else {
+    queryPromise = (queryPromise as any).eq('user_id', userId);
+  }
+
+  queryPromise = (queryPromise as any).order('scheduled_date', { ascending: true });
 
   const { data, error } = await supabaseQueryWithTimeout(queryPromise, 30000, signal);
 
@@ -71,19 +77,19 @@ const deleteFollowUp = async (id: string): Promise<void> => {
   if (error) throw error;
 };
 
-export function useFollowUps() {
+export function useFollowUps(viewAsUserIds?: string[]) {
   const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
 
   // Query para buscar follow-ups
   const { data: followUps = [], isLoading, error } = useQuery({
-    queryKey: ['followUps', user?.id],
+    queryKey: ['followUps', user?.id, viewAsUserIds?.join(',')],
     queryFn: async ({ signal }) => {
       if (!user?.id) {
         return [];
       }
       try {
-        return await fetchFollowUps(user.id, signal);
+        return await fetchFollowUps(user.id, viewAsUserIds, signal);
       } catch (error) {
         console.error('❌ useFollowUps - Erro ao buscar follow-ups:', error);
         return [];

@@ -18,6 +18,7 @@ import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 import { DatePicker } from "@/components/ui/date-picker"
+import { getLocalTodayString, prepareForDatePicker } from '@/utils/dateUtils'
 import { useFinancialCategories } from '@/hooks/useFinancialCategories'
 import { useFinancialAccounts } from '@/hooks/useFinancialAccounts'
 import { useCreateFinancialTransaction, useUpdateFinancialTransaction } from '@/hooks/useFinancialTransactionMutations'
@@ -85,7 +86,7 @@ const TransactionForm = () => {
     type: 'entrada',
     description: '',
     amount: '',
-    transaction_date: format(new Date(), 'yyyy-MM-dd'),
+    transaction_date: getLocalTodayString(),
     category_id: '',
     account_id: '',
     payment_method: 'pix',
@@ -588,7 +589,7 @@ const TransactionForm = () => {
               <div className="space-y-2">
                 <Label htmlFor="transaction_date" className="text-sm font-medium text-foreground">Data da Transação *</Label>
                 <DatePicker
-                  date={formData.transaction_date ? new Date(formData.transaction_date + 'T12:00:00') : undefined}
+                  date={prepareForDatePicker(formData.transaction_date)}
                   setDate={(date) => date && handleInputChange('transaction_date', format(date, 'yyyy-MM-dd'))}
                   label="Selecione uma data"
                   className="w-full justify-start text-left font-normal pl-3"

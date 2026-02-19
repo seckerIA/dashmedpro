@@ -22,8 +22,7 @@ import {
 import { useFinancialTransactions } from "@/hooks/useFinancialTransactions"
 import { useDeleteFinancialTransaction } from "@/hooks/useFinancialTransactionMutations"
 import { useUserProfile } from "@/hooks/useUserProfile"
-import { format } from "date-fns"
-import { ptBR } from "date-fns/locale"
+import { formatDisplayDate, parseLocalDate } from "@/utils/dateUtils"
 import { FinancialTransactionWithDetails } from "@/types/financial"
 import { formatCurrency } from "@/lib/currency"
 
@@ -61,8 +60,8 @@ const FinancialTransactions = ({ embedded = false }: FinancialTransactionsProps)
 
     // Aplicar ordenação
     return [...result].sort((a, b) => {
-      const dateA = new Date(a.transaction_date).getTime()
-      const dateB = new Date(b.transaction_date).getTime()
+      const dateA = parseLocalDate(a.transaction_date).getTime()
+      const dateB = parseLocalDate(b.transaction_date).getTime()
 
       if (dateA !== dateB) {
         return sortOrder === "desc" ? dateB - dateA : dateA - dateB
@@ -236,7 +235,7 @@ const FinancialTransactions = ({ embedded = false }: FinancialTransactionsProps)
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Calendar className="w-4 h-4 text-muted-foreground" />
-                            {format(new Date(transaction.transaction_date), 'dd/MM/yyyy', { locale: ptBR })}
+                            {formatDisplayDate(transaction.transaction_date)}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -356,7 +355,7 @@ const FinancialTransactions = ({ embedded = false }: FinancialTransactionsProps)
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Data</label>
                     <p className="text-sm">
-                      {format(new Date(selectedTransaction.transaction_date), 'dd/MM/yyyy', { locale: ptBR })}
+                      {formatDisplayDate(selectedTransaction.transaction_date)}
                     </p>
                   </div>
                   <div>

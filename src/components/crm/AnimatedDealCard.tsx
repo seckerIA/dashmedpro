@@ -35,6 +35,7 @@ interface AnimatedDealCardProps {
   isHighlighted?: boolean;
   onToggleFollowUp?: (dealId: string, needsFollowUp: boolean) => void;
   showOwnerBadge?: boolean;
+  followUp?: any;
 }
 
 export function AnimatedDealCard({
@@ -46,7 +47,8 @@ export function AnimatedDealCard({
   isDeleting,
   isHighlighted,
   onToggleFollowUp,
-  showOwnerBadge
+  showOwnerBadge,
+  followUp
 }: AnimatedDealCardProps) {
   const { isSecretaria } = useUserProfile();
   const [isHovered, setIsHovered] = useState(false);
@@ -203,7 +205,20 @@ export function AnimatedDealCard({
               Inadimplente
             </Badge>
           )}
-          {/* Badge de Follow-up removido (campo legacy) */}
+          {/* Badge de Follow-up */}
+          {followUp && (
+            <Badge
+              variant="secondary"
+              className={`text-xs px-2 py-0.5 border-blue-400/20 ${new Date(followUp.scheduled_date) < new Date()
+                ? 'bg-red-500/10 text-red-600'
+                : 'bg-blue-500/10 text-blue-600'
+                }`}
+              title={`Agendado para: ${new Date(followUp.scheduled_date).toLocaleString()}`}
+            >
+              <Clock className="w-3 h-3 mr-1" />
+              Follow-up {new Date(followUp.scheduled_date) < new Date() ? 'Atrasado' : 'Agendado'}
+            </Badge>
+          )}
           {showOwnerBadge && deal.owner_profile && (
             <Badge
               variant="outline"
@@ -321,7 +336,13 @@ export function AnimatedDealCard({
           </div>
         )}
 
-        {/* Follow-up Action - Removed legacy needs_follow_up logic */}
+        {/* Follow-up Action */}
+        <div className="pt-2" onClick={(e) => e.stopPropagation()}>
+          <FollowUpAction
+            dealId={deal.id}
+            dealTitle={deal.title}
+          />
+        </div>
 
         {/* Footer: Expected Close Date */}
         {deal.expected_close_date && (

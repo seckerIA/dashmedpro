@@ -70,7 +70,7 @@ export function PipelineManagement() {
     followUps,
     updateFollowUp,
     isLoading: isLoadingFollowUps
-  } = useFollowUps();
+  } = useFollowUps(viewAllMode && selectedUserIds.length > 0 ? selectedUserIds : undefined);
   const { createAppointment } = useMedicalAppointments();
   const { toast } = useToast();
   const navigate = useNavigate();

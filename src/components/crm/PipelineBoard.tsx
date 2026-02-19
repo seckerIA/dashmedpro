@@ -48,6 +48,7 @@ interface SortableDealCardProps {
   isHighlighted?: boolean;
   onToggleFollowUp?: (dealId: string, needsFollowUp: boolean) => void;
   showOwnerBadge?: boolean;
+  followUp?: any; // Informações do follow-up agendado
 }
 
 function SortableDealCard({
@@ -59,7 +60,8 @@ function SortableDealCard({
   isDeleting,
   isHighlighted,
   onToggleFollowUp,
-  showOwnerBadge
+  showOwnerBadge,
+  followUp
 }: SortableDealCardProps) {
   const {
     attributes,
@@ -104,6 +106,7 @@ function SortableDealCard({
     >
       <AnimatedDealCard
         deal={deal}
+        followUp={followUp} // Passar follow-up prop
         onClick={onClick}
         onEdit={onEdit}
         onDelete={onDelete}
@@ -185,8 +188,11 @@ export function PipelineBoard({
   };
 
   // Memoizar deals por stage para evitar recálculos
-  const dealsByStage = useMemo(() => {
+  // Memoizar deals e follow-ups por stage para evitar recalculos
+  const { dealsByStage, followUpMap } = useMemo(() => {
     const grouped: Record<string, CRMDealWithContact[]> = {};
+    const fuMap = new Map<string, FollowUp>();
+
     PIPELINE_STAGES.forEach(stage => {
       grouped[stage.value] = [];
     });
@@ -197,13 +203,18 @@ export function PipelineBoard({
       }
     });
 
+    // Mapear follow-ups por deal_id (apenas pendentes)
+    followUps.filter(fu => !fu.completed).forEach(fu => {
+      fuMap.set(fu.deal_id, fu);
+    });
+
     // Ordenar cada grupo por position
     Object.keys(grouped).forEach(stage => {
       grouped[stage].sort((a, b) => (a.position || 0) - (b.position || 0));
     });
 
-    return grouped;
-  }, [deals]);
+    return { dealsByStage: grouped, followUpMap: fuMap };
+  }, [deals, followUps]);
 
   // Memoizar totais por stage
   const totalsByStage = useMemo(() => {
@@ -295,7 +306,7 @@ export function PipelineBoard({
 
       if (oldIndex !== newIndex && oldIndex >= 0 && newIndex >= 0) {
         // Reordenar usando arrayMove
-        const reordered = arrayMove(stageDeals, oldIndex, newIndex);
+        const reordered = arrayMove(stageDeals, oldIndex, newIndex) as CRMDealWithContact[];
 
         // Atualizar todas as posições
         if (onReorderDealsInStage) {
@@ -414,6 +425,7 @@ export function PipelineBoard({
                         <SortableDealCard
                           key={`${deal.id}-${deal.contact?.service_value || 0}-${deal.contact?.updated_at || ''}`}
                           deal={deal}
+                          followUp={followUpMap.get(deal.id)}
                           onClick={() => onDealClick?.(deal)}
                           onEdit={onEditDeal}
                           onDelete={onDeleteDeal}

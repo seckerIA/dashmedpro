@@ -27,6 +27,7 @@ import { GlobalSearch } from "@/components/crm/GlobalSearch"
 import { useAppointmentAlerts } from "@/hooks/useAppointmentAlerts"
 import { AppointmentAlertModal } from "@/components/alerts/AppointmentAlertModal"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { getProfileDisplayData } from "@/utils/nameUtils"
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Menu } from "lucide-react"
 
@@ -86,7 +87,11 @@ export function AppLayout({ children, hideSidebar = false, title: explicitTitle,
   const isDesktop = windowWidth >= 1024
   const isLargeDesktop = windowWidth >= 1280
 
-  const displayName = profile?.full_name || profile?.email || 'Usuário'
+  const { name: firstName, prefix: namePrefix } = getProfileDisplayData(profile?.full_name)
+  const isDoc = profile?.role === 'medico'
+  const displayName = isDoc
+    ? `${namePrefix} ${profile?.full_name ? profile.full_name.replace(/^(dr|dra|doutor|doutora)\.?\s+/i, '') : 'Doutor'}`
+    : (profile?.full_name || profile?.email || 'Usuário')
   const displayRole = profile?.role || 'vendedor'
 
   const initials = (profile?.full_name || profile?.email || 'U')

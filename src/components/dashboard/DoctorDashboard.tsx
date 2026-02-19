@@ -9,6 +9,7 @@ import { SecretaryActivitiesV2 } from './doctor/SecretaryActivitiesV2';
 import { NegotiationsWidget } from './doctor/NegotiationsWidget';
 import { MedicalRecordSearch } from './doctor/MedicalRecordSearch';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { formatDisplayName, getProfileDisplayData } from '@/utils/nameUtils';
 import { Card } from '@/components/ui/card';
 import { startOfDay, endOfDay } from 'date-fns';
 
@@ -33,7 +34,7 @@ export function DoctorDashboard({ viewMode, onViewModeChange }: DoctorDashboardP
     });
 
     const appointmentsCount = appointments?.length || 0;
-    const firstName = profile?.full_name?.split(' ')[0] || 'Doutor';
+    const { name: firstName, prefix: namePrefix } = getProfileDisplayData(profile?.full_name);
 
     // Contextual greeting based on time and schedule
     const hour = new Date().getHours();
@@ -55,7 +56,7 @@ export function DoctorDashboard({ viewMode, onViewModeChange }: DoctorDashboardP
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex flex-col space-y-1">
                     <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                        {timeGreeting}, Dr. <span className="text-primary">{firstName}</span>
+                        {timeGreeting}, {namePrefix} <span className="text-primary">{firstName}</span>
                     </h1>
                     <p className="text-muted-foreground mt-1 font-light tracking-wide">
                         {getContextualSubtitle()}

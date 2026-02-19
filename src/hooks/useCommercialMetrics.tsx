@@ -24,6 +24,7 @@ import {
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CommercialMetrics, PeriodFilter, PeriodRange } from "@/types/metrics";
+import { parseLocalDate } from "@/utils/dateUtils";
 
 // Função para calcular o período baseado no filtro
 function getPeriodRange(filter: PeriodFilter, customRange?: PeriodRange): PeriodRange {
@@ -476,7 +477,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       // Receita por hora do dia
       const revenueByHour = Array.from({ length: 24 }, (_, hourIndex) => {
         const hourAppointments = completedAppointments.filter(apt => {
-          const appointmentHour = new Date(apt.start_time).getHours();
+          const appointmentHour = parseLocalDate(apt.start_time).getHours();
           return appointmentHour === hourIndex;
         });
         const hourRevenue = hourAppointments.reduce((sum, apt) => {
@@ -758,7 +759,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         leadsTrend.push({
           name: format(monthStart, 'MMM', { locale: ptBR }),
           value: (leads as any[])?.filter(l => {
-            const leadDate = parseISO(l.created_at);
+            const leadDate = parseLocalDate(l.created_at);
             return leadDate >= monthStart && leadDate <= monthEnd;
           }).length || 0,
         });

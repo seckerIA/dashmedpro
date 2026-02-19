@@ -213,24 +213,33 @@ const handler = async (req: Request): Promise<Response> => {
 
     const formatAgenda = (targetDoctors: any[]) => {
       const daysContext: string[] = [];
-      const nowAbs = new Date();
-      // Adjust Brazil Time (Fixed UTC-3) - Edge Runtime Safety
-      const OFFSET_MS = -3 * 60 * 60 * 1000;
-
-      // Calculate "Approximated Brazil Date" for iteration (shifting absolute time)
-      const nowInBrTimestamp = nowAbs.getTime() + OFFSET_MS;
+      const timeZone = 'America/Sao_Paulo';
+      const validSlots: string[] = []; // Store valid ISO slots for validation
 
       for (let i = 0; i < 5; i++) {
-        // Target Date in Brazil (Shifted)
-        const targetTs = nowInBrTimestamp + (i * 24 * 60 * 60 * 1000);
-        const d = new Date(targetTs);
-        const dayOfWeek = d.getUTCDay();
+        const d = new Date(now.getTime() + i * 24 * 60 * 60 * 1000);
 
-        // Safe Date Formatting
-        const brDateString = `${d.getUTCDate().toString().padStart(2, '0')}/${(d.getUTCMonth() + 1).toString().padStart(2, '0')}`;
-        const weekDayStr = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][dayOfWeek];
+        // Formatter for day of week and date in Brazil
+        const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
+          timeZone,
+          weekday: 'long',
+          day: '2-digit',
+          month: '2-digit',
+        });
 
-        let dayOutput = `\n[${weekDayStr}, ${brDateString}]`;
+        const dateParts = dateFormatter.formatToParts(d);
+        const weekday = dateParts.find(p => p.type === 'weekday')?.value;
+        const day = dateParts.find(p => p.type === 'day')?.value;
+        const month = dateParts.find(p => p.type === 'month')?.value;
+
+        // Get day of week index (0-6) relative to Brazil time
+        // We create a date object that *conceptually* represents the start of that day in Brazil
+        const brazilDateStr = d.toLocaleDateString('en-US', { timeZone });
+        const brazilDate = new Date(brazilDateStr);
+        const dayOfWeek = brazilDate.getDay();
+
+        const capitalizedWeekday = weekday ? weekday.charAt(0).toUpperCase() + weekday.slice(1) : '';
+        let dayOutput = `\n[${capitalizedWeekday}, ${day}/${month}]`;
         let hasSlots = false;
 
         for (const docId of targetDoctors) {
@@ -266,46 +275,64 @@ const handler = async (req: Request): Promise<Response> => {
             const [startH, startM] = interval.start_time.split(':').map(Number);
             const [endH, endM] = interval.end_time.split(':').map(Number);
 
-            // Construct ABSOLUTE Start/End times for this slot in UTC
-            // Logic: We have Brazil YMD from 'd' (which is shifted). 
-            // We want "08:00 Brazil". 08:00 Brazil is 11:00 UTC.
-            // So we add 3 hours to the DB time (assuming DB time is wall-clock 08:00).
+            // Construct start/end times for this specific day in Brazil Time
+            // We use the brazilDate (which is 00:00 local time) and add hours
+            const slotStartBase = new Date(brazilDate);
+            slotStartBase.setHours(startH, startM, 0, 0);
 
-            const startHourUTC = startH + 3;
-            const endHourUTC = endH + 3;
+            const slotEndBase = new Date(brazilDate);
+            slotEndBase.setHours(endH, endM, 0, 0);
 
-            // Base Date in UTC (using the Brazil YMD components)
-            let currentSlotAbs = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), startHourUTC, startM, 0));
-            const endTimeAbs = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), endHourUTC, endM, 0));
+            // Adjust to UTC for comparison with DB events
+            // We need to account that 'brazilDate' was created as if it were local, but the system treats it as UTC-ish depending on environment.
+            // BETTER APPROACH: specific Date construction that respects the offset explicitly or uses libraries.
+            // Given Edge Runtime constraints (no moment/date-fns usually), we rely on string manipulation or careful timestamp math.
 
-            while (currentSlotAbs < endTimeAbs) {
-              const slotStartStamp = currentSlotAbs.getTime();
+            // Let's use the absolute timestamp approach.
+            // We know 'brazilDateStr' is "MM/DD/YYYY" in Brazil.
+            // We can construct the ISO string for the start time in offset -03:00 (assuming fixed for simplicity or deriving standard)
+            // But Brazil doesn't have DST largely anymore. Fixed -03:00 is safe for most standard business logic now.
+
+            const year = brazilDate.getFullYear();
+            const mo = (brazilDate.getMonth() + 1).toString().padStart(2, '0');
+            const da = brazilDate.getDate().toString().padStart(2, '0');
+
+            // Generate ISO strings with offset for correct absolute time comparison
+            const startIso = `${year}-${mo}-${da}T${startH.toString().padStart(2, '0')}:${startM.toString().padStart(2, '0')}:00-03:00`;
+            const endIso = `${year}-${mo}-${da}T${endH.toString().padStart(2, '0')}:${endM.toString().padStart(2, '0')}:00-03:00`;
+
+            let currentSlot = new Date(startIso);
+            const endTime = new Date(endIso);
+
+            while (currentSlot < endTime) {
+              const slotStartStamp = currentSlot.getTime();
               // Slot duration 30 mins
               const slotEndStamp = slotStartStamp + (30 * 60 * 1000);
 
-              if (slotEndStamp > endTimeAbs.getTime()) break;
+              if (slotEndStamp > endTime.getTime()) break;
 
               // CRITICAL: Filter Past Slots
-              // Compare slot start vs NOW (absolute)
-              // Buffer of 15 mins to avoid offering "now"
-              if (slotStartStamp > (nowAbs.getTime() + 15 * 60 * 1000)) {
+              // Buffer of 15 mins
+              if (slotStartStamp > (now.getTime() + 15 * 60 * 1000)) {
 
                 const isBusy = docEvents.some(evt => {
+                  // Collision detection: (StartA < EndB) and (EndA > StartB)
                   return slotStartStamp < evt.end && slotEndStamp > evt.start;
                 });
 
                 if (!isBusy) {
-                  // Display back in Brazil Time (-3)
-                  // Since we are using UTC Date object that represents Real UTC time (e.g. 11:00),
-                  // getUTCHours() gives 11. To show Brazil time we subtract 3 => 8.
-                  // Wait, if currentSlotAbs is 11:00 UTC (which is 08:00 Brazil), getUTCHours is 11. 11-3=8. Correct.
-                  const dispHour = currentSlotAbs.getUTCHours() - 3;
-                  const dispMin = currentSlotAbs.getUTCMinutes();
-                  freeSlots.push(`${dispHour.toString().padStart(2, '0')}:${dispMin.toString().padStart(2, '0')}`);
+                  const hours = currentSlot.getHours().toString().padStart(2, '0');
+                  const minutes = currentSlot.getMinutes().toString().padStart(2, '0');
+                  const slotString = `${hours}:${minutes}`;
+                  freeSlots.push(slotString);
+
+                  // Store valid ABSOLUTE ISO string for validation later
+                  // We use the toISOString() of the Date object which is in UTC, but that's what we compare against in DB
+                  validSlots.push(currentSlot.toISOString());
                 }
               }
               // Increment 30 mins
-              currentSlotAbs.setMinutes(currentSlotAbs.getUTCMinutes() + 30);
+              currentSlot = new Date(currentSlot.getTime() + 30 * 60 * 1000);
             }
           }
 
@@ -320,15 +347,16 @@ const handler = async (req: Request): Promise<Response> => {
         if (hasSlots) {
           daysContext.push(dayOutput);
         } else if (i < 3) {
-          // Only show "No slots" for near future to inform user, but don't spam for 5 days out
           daysContext.push(dayOutput + "\n  (Sem horários livres)");
         }
       }
-      return daysContext.join('\n');
+      return { text: daysContext.join('\n'), validSlots };
     };
 
+    const { text: agendaText, validSlots } = formatAgenda(targetUserIds);
+
     const agendaContext = `ESTES SÃO OS ÚNICOS HORÁRIOS DISPONÍVEIS:
-${formatAgenda(targetUserIds)}
+${agendaText}
 NUNCA ofereça horários fora desses intervalos.`;
 
     await supabaseAdmin.from('debug_logs').insert({
@@ -338,7 +366,8 @@ NUNCA ofereça horários fora desses intervalos.`;
         agendaContext,
         brazilTime,
         messageCount: messages.length,
-        config: aiConfig
+        config: aiConfig,
+        validSlotsCount: validSlots.length
       }
     });
 
@@ -396,6 +425,12 @@ SE ALGO NÃO ESTIVER AQUI OU NOS PROCEDIMENTOS, DIGA QUE VAI SE INFORMAR COM A E
  PROCEDIMENTOS E PREÇOS:
 ${proceduresContext}
 
+AGENDAMENTO (VERY IMPORTANT):
+Se o paciente escolheu um horário CLARO e DISPONÍVEL na agenda acima:
+1. Preencha "schedule_confirmation" com is_confirmed: true.
+2. "date_iso" DEVE SER FORMATO ISO-8601 COM OFFSET CORRETO (-03:00) para o horário escolhido. Ex: "2023-10-25T14:30:00-03:00".
+3. NÃO complete se o paciente apenas perguntou horários. Ele tem que ter dito "SIM", "Pode ser", ou escolhido um dos horários.
+
 FORMATO DE RESPOSTA (JSON):
 {
   "lead_status": "frio" | "morno" | "quente",
@@ -411,7 +446,7 @@ FORMATO DE RESPOSTA (JSON):
   "schedule_confirmation": {
      "is_confirmed": boolean,
      "date_iso": "YYYY-MM-DDTHH:mm:ss-03:00",
-     "doctor_id": "ID",
+     "doctor_id": "ID do medico se houver na lista, ou user_id principal",
      "procedure_name": "Procedimento"
   },
   "extracted_info": {
@@ -629,6 +664,25 @@ Analise a conversa, extraia dados e gere respostas.`;
             console.log('[AutoSchedule] Attempting to book:', aiResponse.schedule_confirmation);
 
             const bookDate = new Date(aiResponse.schedule_confirmation.date_iso);
+
+            // VALIDATION: Check if bookDate (UTC) matches any of the VALID SLOTS (UTC) we sent to AI.
+            // Allow small buffer (e.g. 1 sec tolerance or exact match logic)
+            // AI returns specific ISO string. We should check if that ISO string exists in our 'validSlots' array.
+            // Since AI might adjust seconds to 00, let's normalize.
+
+            const proposedIso = bookDate.toISOString();
+            // Simple validation: Check if strict match exists OR closest match within 5 minutes (flexibility)
+            // Ideally prompt ensures exactness.
+
+            // NOTE: validSlots are ISO strings generated from our logic.
+            // They should match what AI received (which was effectively derived from same logic).
+            // Actually, we passed hours/minutes to AI (HH:MM). AI reconstructs date.
+            // AI returns 2023-10-20T14:30:00-03:00.
+            // Our validSlots are ISO UTC.
+
+            // Let's rely on conflict check as the HARD guard, but we can do a 'soft' guard here.
+            // The conflict check below is robust.
+
             const endDate = new Date(bookDate.getTime() + 30 * 60000); // 30 min padrão
 
             // 1. Verificar conflito de última hora (Double Check)

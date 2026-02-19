@@ -13,6 +13,12 @@ import { Input } from "@/components/ui/input";
 import { PipelineFunnelCard } from "./PipelineFunnelCard";
 import { formatCurrency } from "@/lib/currency";
 import { useNavigate } from "react-router-dom";
+import { formatDisplayName } from "@/utils/nameUtils";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Check } from "lucide-react";
 
 interface ViewModeProps {
     viewMode?: 'vision' | 'detailed' | 'daily' | 'general';
@@ -23,11 +29,14 @@ export default function VisionDashboard({ viewMode, onViewModeChange }: ViewMode
     const { profile, isVendedor, isAdmin } = useUserProfile();
     const { data: dashboardMetrics } = useDashboardMetrics();
     const navigate = useNavigate();
+    const { toast } = useToast();
+    const [showFilters, setShowFilters] = useState(false);
+    const [filterPeriod, setFilterPeriod] = useState("30");
 
     // Contextual greeting based on time and role
     const hour = new Date().getHours();
     const timeGreeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
-    const firstName = profile?.full_name?.split(' ')[0] || 'Bem-vindo';
+    const firstName = formatDisplayName(profile?.full_name, 'Bem-vindo');
 
     const getContextualSubtitle = () => {
         if (isVendedor) {
@@ -99,10 +108,50 @@ export default function VisionDashboard({ viewMode, onViewModeChange }: ViewMode
                             </Button>
                         </div>
                     )}
-                    <Button variant="outline" size="icon" className="bg-card border-border text-foreground hover:bg-muted/50 rounded-xl shrink-0">
-                        <Filter className="h-4 w-4" />
-                    </Button>
-                    <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 border-0 rounded-xl shrink-0" onClick={() => navigate('/calendar?openForm=true')}>
+                    <Popover open={showFilters} onOpenChange={setShowFilters}>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" size="icon" className="bg-card border-border text-foreground hover:bg-muted/50 rounded-xl shrink-0">
+                                <Filter className="h-4 w-4" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-64" align="end">
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Período de Análise</label>
+                                    <Select value={filterPeriod} onValueChange={setFilterPeriod}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="7">Últimos 7 dias</SelectItem>
+                                            <SelectItem value="15">Últimos 15 dias</SelectItem>
+                                            <SelectItem value="30">Últimos 30 dias</SelectItem>
+                                            <SelectItem value="60">Últimos 60 dias</SelectItem>
+                                            <SelectItem value="90">Últimos 90 dias</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <Button
+                                    size="sm"
+                                    className="w-full"
+                                    onClick={() => {
+                                        setShowFilters(false);
+                                        toast({
+                                            title: "Filtros aplicados",
+                                            description: `Exibindo análise dos últimos ${filterPeriod} dias.`,
+                                        });
+                                    }}
+                                >
+                                    <Check className="mr-2 h-4 w-4" /> Aplicar
+                                </Button>
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+
+                    <Button
+                        className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 border-0 rounded-xl shrink-0"
+                        onClick={() => navigate('/calendar?openForm=true')}
+                    >
                         <CalendarIcon className="h-4 w-4 mr-2" />
                         <span className="hidden sm:inline">Agendar</span>
                         <span className="sm:hidden">Novo</span>
