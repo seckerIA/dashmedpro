@@ -23,6 +23,9 @@ import {
 } from '@/components/ui/dialog';
 import { useMedicalAppointments } from '@/hooks/useMedicalAppointments';
 import { useSinalReceipts } from '@/hooks/useSinalReceipts';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/currency';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -41,6 +44,7 @@ import {
   Loader2,
   FileImage,
   Download,
+  Trash2,
 } from 'lucide-react';
 
 type SinalFilter = 'all' | 'pending' | 'paid';
@@ -48,6 +52,8 @@ type SinalFilter = 'all' | 'pending' | 'paid';
 export function SinalTab() {
   const { appointments, updateAppointment, isLoading } = useMedicalAppointments();
   const { uploadReceipt, isUploading, getSignedUrl } = useSinalReceipts();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const [filter, setFilter] = useState<SinalFilter>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -187,6 +193,48 @@ export function SinalTab() {
     setSelectedAppointmentId(appointmentId);
     setReceiptFile(null);
     setMarkPaidOpen(true);
+  };
+
+  // Deletar sinal (zera o valor e remove transação financeira associada)
+  const handleDeleteSinal = async (appointmentId: string) => {
+    if (!confirm('Tem certeza que deseja excluir este sinal? A transação financeira associada também será removida.')) return;
+
+    try {
+      // 1. Deletar transação financeira de sinal associada
+      await supabase
+        .from('financial_transactions')
+        .delete()
+        .eq('metadata->>appointment_id', appointmentId)
+        .eq('metadata->>is_sinal', 'true');
+
+      // 2. Resetar campos de sinal na consulta
+      await updateAppointment.mutateAsync({
+        id: appointmentId,
+        updates: {
+          sinal_amount: 0,
+          sinal_paid: false,
+          sinal_paid_at: null as any,
+          sinal_receipt_url: null as any,
+        },
+      });
+
+      // 3. Invalidar queries
+      queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-accounts'] });
+
+      toast({
+        title: 'Sinal excluído',
+        description: 'O sinal e a transação financeira associada foram removidos.',
+      });
+    } catch (error) {
+      console.error('[SinalTab] Erro ao excluir sinal:', error);
+      toast({
+        title: 'Erro ao excluir sinal',
+        description: 'Não foi possível excluir o sinal. Tente novamente.',
+        variant: 'destructive',
+      });
+    }
   };
 
   if (isLoading) {
@@ -403,24 +451,34 @@ export function SinalTab() {
                         )}
                       </TableCell>
                       <TableCell className="text-center">
-                        {!appointment.sinal_paid && (
+                        <div className="flex items-center justify-center gap-1">
+                          {!appointment.sinal_paid && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openMarkPaidModal(appointment.id)}
+                              className="h-8"
+                            >
+                              <CheckCircle2 className="h-4 w-4 mr-1" />
+                              Marcar Pago
+                            </Button>
+                          )}
+                          {appointment.sinal_paid && appointment.sinal_paid_at && (
+                            <span className="text-xs text-muted-foreground">
+                              {format(parseISO(appointment.sinal_paid_at), "dd/MM/yyyy", {
+                                locale: ptBR,
+                              })}
+                            </span>
+                          )}
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
-                            onClick={() => openMarkPaidModal(appointment.id)}
-                            className="h-8"
+                            onClick={() => handleDeleteSinal(appointment.id)}
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
                           >
-                            <CheckCircle2 className="h-4 w-4 mr-1" />
-                            Marcar Pago
+                            <Trash2 className="h-4 w-4" />
                           </Button>
-                        )}
-                        {appointment.sinal_paid && appointment.sinal_paid_at && (
-                          <span className="text-xs text-muted-foreground">
-                            {format(parseISO(appointment.sinal_paid_at), "dd/MM/yyyy", {
-                              locale: ptBR,
-                            })}
-                          </span>
-                        )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

@@ -5,7 +5,7 @@ import { useUserProfile } from './useUserProfile';
 import { useSecretaryDoctors } from './useSecretaryDoctors';
 import { useToast } from '@/hooks/use-toast';
 import { useMemo, useEffect } from 'react';
-import { addDays, isAfter, isBefore } from 'date-fns';
+import { addDays, isAfter, isBefore, format } from 'date-fns';
 import {
   MedicalAppointment,
   MedicalAppointmentWithRelations,
@@ -130,8 +130,8 @@ const createFinancialTransactionForAppointment = async (
       type: 'entrada',
       amount: finalAmount,
       description: finalDescription,
-      date: new Date().toISOString().split('T')[0], // Usar data de hoje para o registro financeiro
-      transaction_date: new Date().toISOString().split('T')[0],
+      date: format(new Date(), 'yyyy-MM-dd'), // Usar data local (sem conversão UTC que causa D-1)
+      transaction_date: format(new Date(), 'yyyy-MM-dd'),
       contact_id: appointment.contact_id,
       payment_method: 'pix',
       status: 'concluida',
@@ -251,13 +251,14 @@ const deductStockForAppointment = async (
         const deductQuantity = Math.min(remainingQuantity, batch.quantity);
 
         // Criar movimento de saída (OUT) - o trigger do banco atualiza o saldo
+        // quantity DEVE ser negativo para OUT (trigger faz: batch.quantity + movement.quantity)
+        // organization_id removido pois não existe na tabela inventory_movements
         const { error: movementError } = await (supabase.from('inventory_movements' as any) as any)
           .insert({
             batch_id: batch.id,
             type: 'OUT',
-            quantity: deductQuantity,
+            quantity: -deductQuantity,
             created_by: userId,
-            organization_id: organizationId,
             description: `Dedução automática - Consulta concluída (ID: ${appointmentId})`
           });
 

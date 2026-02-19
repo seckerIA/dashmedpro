@@ -85,7 +85,7 @@ const TransactionForm = () => {
     type: 'entrada',
     description: '',
     amount: '',
-    transaction_date: new Date().toISOString().split('T')[0],
+    transaction_date: format(new Date(), 'yyyy-MM-dd'),
     category_id: '',
     account_id: '',
     payment_method: 'pix',

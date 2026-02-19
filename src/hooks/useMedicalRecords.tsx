@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
+import { format } from 'date-fns';
 import { useAuth } from './useAuth';
 import {
   MedicalRecord,
@@ -377,7 +378,7 @@ export function usePrescriptions(contactId?: string) {
         notes: input.notes || null,
         valid_until: input.valid_until || null,
         prescription_type: input.prescription_type || 'simple',
-        prescription_date: new Date().toISOString().split('T')[0],
+        prescription_date: format(new Date(), 'yyyy-MM-dd'),
       };
 
       const { data, error } = await (supabase.from('prescriptions' as any) as any)

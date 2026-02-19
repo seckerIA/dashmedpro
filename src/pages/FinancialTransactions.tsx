@@ -310,16 +310,15 @@ const FinancialTransactions = ({ embedded = false }: FinancialTransactionsProps)
                             >
                               <Edit className="w-4 h-4" />
                             </Button>
-                            {isAdmin && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleDelete(transaction.id)}
-                                disabled={deleteTransaction.isPending}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDelete(transaction.id)}
+                              disabled={deleteTransaction.isPending}
+                              className="text-muted-foreground hover:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>

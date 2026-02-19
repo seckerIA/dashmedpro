@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery'
 import { ensureValidSession } from '@/utils/supabaseHelpers'
+import { format } from 'date-fns'
 import { toast } from '@/hooks/use-toast'
 import { FinancialRecurringTransaction, FinancialRecurringTransactionWithTemplate } from '@/types/financial'
 
@@ -215,7 +216,7 @@ export const useExecuteRecurringTransaction = () => {
       const { error: updateError } = await (supabase
         .from('financial_recurring_transactions') as any)
         .update({
-          next_occurrence: nextOccurrence.toISOString().split('T')[0]
+          next_occurrence: format(nextOccurrence, 'yyyy-MM-dd')
         })
         .eq('id', id)
 

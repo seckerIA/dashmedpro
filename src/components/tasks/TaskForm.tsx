@@ -557,44 +557,6 @@ export function TaskForm({ task, onSave, onCancel, isLoading = false, teamMember
             onOpenChange={setShowCategoryManager}
           />
 
-          {/* Deal Relacionado */}
-          {deals.length > 0 && (
-            <div className="space-y-3">
-              <label className="text-base font-bold text-foreground flex items-center gap-2">
-                <Target className="h-5 w-5 text-primary" />
-                Deal Relacionado
-              </label>
-              <Select
-                value={watchedDealId || 'none'}
-                onValueChange={(value) => setValue('deal_id', value === 'none' ? '' : value)}
-              >
-                <SelectTrigger className="bg-card text-foreground border-border text-base font-medium h-12 rounded-xl transition-all">
-                  <SelectValue placeholder="Selecione um contrato (opcional)" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover text-foreground border-border rounded-xl">
-                  <SelectItem value="none" className="hover:bg-accent">Nenhum contrato</SelectItem>
-                  {deals.map((deal) => (
-                    <SelectItem key={deal.id} value={deal.id} className="hover:bg-accent">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{deal.title}</span>
-                        {deal.value && (
-                          <Badge variant="outline" className="text-xs">
-                            R$ {deal.value.toLocaleString('pt-BR')}
-                          </Badge>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {watchedDealId && (
-                <p className="text-sm text-foreground font-medium">
-                  Deal: {deals.find(deal => deal.id === watchedDealId)?.title}
-                </p>
-              )}
-            </div>
-          )}
-
           {/* Contato Relacionado */}
           {contacts.length > 0 && (
             <div className="space-y-3">

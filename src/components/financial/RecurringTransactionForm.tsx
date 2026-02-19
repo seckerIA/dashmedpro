@@ -139,8 +139,8 @@ export const RecurringTransactionForm = ({ onSuccess }: RecurringTransactionForm
         type: transactionType, // Convertido para 'entrada' ou 'saida'
         category_id: data.category_id,
         account_id: data.account_id,
-        date: startDate.toISOString().split('T')[0],
-        transaction_date: startDate.toISOString().split('T')[0],
+        date: format(startDate, 'yyyy-MM-dd'),
+        transaction_date: format(startDate, 'yyyy-MM-dd'),
         notes: data.notes,
         tags: tags,
         contact_id: null,
@@ -161,9 +161,9 @@ export const RecurringTransactionForm = ({ onSuccess }: RecurringTransactionForm
         user_id: (await supabase.auth.getUser()).data.user?.id!,
         template_transaction_id: templateTransaction.id,
         frequency: data.frequency, // Já está em português (mensal, trimestral, etc)
-        start_date: startDate.toISOString().split('T')[0],
-        end_date: endDate?.toISOString().split('T')[0] || null,
-        next_occurrence: nextExecutionDate.toISOString().split('T')[0],
+        start_date: format(startDate, 'yyyy-MM-dd'),
+        end_date: endDate ? format(endDate, 'yyyy-MM-dd') : null,
+        next_occurrence: format(nextExecutionDate, 'yyyy-MM-dd'),
         is_active: true,
         execution_count: 0
       } as any)

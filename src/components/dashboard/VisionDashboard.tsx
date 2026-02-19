@@ -102,7 +102,7 @@ export default function VisionDashboard({ viewMode, onViewModeChange }: ViewMode
                     <Button variant="outline" size="icon" className="bg-card border-border text-foreground hover:bg-muted/50 rounded-xl shrink-0">
                         <Filter className="h-4 w-4" />
                     </Button>
-                    <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 border-0 rounded-xl shrink-0">
+                    <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 border-0 rounded-xl shrink-0" onClick={() => navigate('/calendar?openForm=true')}>
                         <CalendarIcon className="h-4 w-4 mr-2" />
                         <span className="hidden sm:inline">Agendar</span>
                         <span className="sm:hidden">Novo</span>
