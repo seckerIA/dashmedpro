@@ -1,4 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { formatDisplayDate } from "@/utils/dateUtils"
 import { AnimatedCurrency } from "@/components/ui/animated-number"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -186,7 +187,7 @@ const Financial = () => {
     // Implementação básica de exportação para CSV
     const headers = ["Data", "Descrição", "Categoria", "Valor", "Tipo", "Status"];
     const rows = transactions?.map(t => [
-      format(new Date(t.transaction_date), 'dd/MM/yyyy'),
+      formatDisplayDate(t.transaction_date),
       t.description,
       t.category?.name || '-',
       formatCurrency(t.amount),
@@ -826,7 +827,7 @@ const Financial = () => {
                   {recentTransactions.map((transaction) => (
                     <TableRow key={transaction.id}>
                       <TableCell className="text-muted-foreground">
-                        {format(new Date(transaction.transaction_date), 'dd/MM/yyyy')}
+                        {formatDisplayDate(transaction.transaction_date)}
                       </TableCell>
                       <TableCell className="font-medium">{transaction.description}</TableCell>
                       <TableCell>

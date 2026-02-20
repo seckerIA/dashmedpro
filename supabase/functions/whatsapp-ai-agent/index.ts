@@ -290,12 +290,9 @@ serve(async (req: Request) => {
 
     // ==========================================
     // STEP 12: BACKGROUND LEAD EXTRACTION (GPT-4o-mini)
-    // ==========================================
-    try {
-      await extractLeadData(supabase, conversationId, messages, conversation, leadData);
-    } catch (e) {
-      console.warn('[Agent] Lead extraction failed:', e);
-    }
+    // 12. Extract lead data in background (GPT-4o-mini)
+    // Runs in background (fire and forget)
+    extractLeadData(supabase, conversationId, messages, conversation, leadData, conversation.user_id).catch(e => console.warn('[Agent] Extraction error:', e));
 
     // ==========================================
     // STEP 13: UPDATE ANALYSIS TABLE (for dashboard)
@@ -323,12 +320,12 @@ serve(async (req: Request) => {
     // Always release lock on error
     if (conversationId) {
       const supabaseCleanup = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-      await supabaseCleanup.rpc('release_ai_lock', { p_conversation_id: conversationId }).catch(() => {});
+      await supabaseCleanup.rpc('release_ai_lock', { p_conversation_id: conversationId }).catch(() => { });
       await supabaseCleanup.from('debug_logs').insert({
         function_name: 'whatsapp-ai-agent',
         message: 'Agent Error',
         data: { conversation_id: conversationId, error: error.message, stack: error.stack },
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     return new Response(JSON.stringify({ error: error.message }), { status: 200, headers: corsHeaders });
@@ -682,9 +679,13 @@ async function buildScheduleContext(supabase: any, userId: string): Promise<stri
             const isBusy = docEvents.some(evt => slotStartStamp < evt.end && slotEndStamp > evt.start);
 
             if (!isBusy) {
-              const dispHour = currentSlotAbs.getUTCHours() - 3;
-              const dispMin = currentSlotAbs.getUTCMinutes();
-              freeSlots.push(`${dispHour.toString().padStart(2, '0')}:${dispMin.toString().padStart(2, '0')}`);
+              const slotTimeLabel = currentSlotAbs.toLocaleTimeString('pt-BR', {
+                timeZone: 'America/Sao_Paulo',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+              });
+              freeSlots.push(slotTimeLabel);
             }
           }
           currentSlotAbs.setMinutes(currentSlotAbs.getUTCMinutes() + 30);
@@ -755,7 +756,7 @@ async function searchKnowledgeBase(supabase: any, userId: string, query: string,
 /**
  * Extract lead data in background using GPT-4o-mini
  */
-async function extractLeadData(supabase: any, conversationId: string, messages: any[], conversation: any, existingLead: any) {
+async function extractLeadData(supabase: any, conversationId: string, messages: any[], conversation: any, existingLead: any, userId: string) {
   const messagesContext = [...messages]
     .reverse()
     .map(m => {
@@ -810,7 +811,7 @@ async function extractLeadData(supabase: any, conversationId: string, messages: 
       .from('whatsapp_lead_qualifications')
       .upsert(leadUpdate, { onConflict: 'conversation_id' });
 
-    // Enrich CRM contact
+    // 2. Enrich CRM contact
     if (conversation.contact_id) {
       const contactUpdate: any = {};
       if (extracted.full_name_correction) contactUpdate.full_name = extracted.full_name_correction;
@@ -834,6 +835,62 @@ async function extractLeadData(supabase: any, conversationId: string, messages: 
           .from('crm_contacts')
           .update(contactUpdate)
           .eq('id', conversation.contact_id);
+      }
+    }
+
+    // 3. Autonomous Booking (NEW)
+    if (extracted.agendamento_confirmado?.is_confirmed && extracted.agendamento_confirmado.data_iso) {
+      console.log('[Agent] Attempting autonomous booking:', extracted.agendamento_confirmado.data_iso);
+
+      const bookDate = new Date(extracted.agendamento_confirmado.data_iso);
+      const endDate = new Date(bookDate.getTime() + 30 * 60000); // 30 min duration
+      const doctorId = extracted.agendamento_confirmado.medico_id || conversation.user_id;
+
+      // Double check availability (conflict check)
+      const { count: conflictCount } = await supabase
+        .from('medical_appointments')
+        .select('*', { count: 'exact', head: true })
+        .eq('doctor_id', doctorId)
+        .neq('status', 'cancelled')
+        .lt('start_time', endDate.toISOString())
+        .gt('end_time', bookDate.toISOString());
+
+      if (!conflictCount || conflictCount === 0) {
+        // Get organization_id
+        const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', userId).single();
+
+        const { error: bookingError } = await supabase
+          .from('medical_appointments')
+          .insert({
+            doctor_id: doctorId,
+            contact_id: conversation.contact_id,
+            user_id: userId,
+            organization_id: profile?.organization_id,
+            start_time: bookDate.toISOString(),
+            end_time: endDate.toISOString(),
+            status: 'scheduled',
+            title: `Consulta - ${extracted.agendamento_confirmado.procedimento || 'Geral'}`,
+            appointment_type: 'first_visit',
+            duration_minutes: 30,
+            notes: 'Agendado via IA (whatsapp-ai-agent)',
+          });
+
+        if (!bookingError) {
+          console.log('[Agent] Successfully booked appointment!');
+
+          // Update Pipeline Stage to 'agendado'
+          if (conversation.contact_id) {
+            await supabase
+              .from('crm_deals')
+              .update({ stage: 'agendado' })
+              .eq('contact_id', conversation.contact_id)
+              .not('stage', 'in', '("fechado_ganho","fechado_perdido")');
+          }
+        } else {
+          console.error('[Agent] Booking error:', bookingError);
+        }
+      } else {
+        console.warn('[Agent] Conflict detected for autonomous booking, skipping.');
       }
     }
   } catch (e) {

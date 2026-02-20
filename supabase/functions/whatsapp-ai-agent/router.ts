@@ -108,8 +108,14 @@ export function detectPhase(
     'agendar consulta', 'tem horario', 'tem horário',
     'horarios disponiveis', 'horários disponíveis',
     'quando posso', 'pode ser', 'qual horario', 'qual horário',
+    'tem vaga', 'tem espaço', 'vaga para', 'espaço para',
   ];
-  const wantsSchedule = agendamentoKeywords.some(k => msg.includes(k));
+
+  // Regex para detectar horários (ex: "10h", "10:00")
+  const timeRegex = /\b([0-1]?[0-9]|2[0-3])[h:]\b|\b([0-1]?[0-9]|2[0-3]):[0-5][0-9]\b/i;
+  const mentionsTime = timeRegex.test(msg);
+
+  const wantsSchedule = agendamentoKeywords.some(k => msg.includes(k)) || mentionsTime;
   if (wantsSchedule && messageCount > 3) {
     return {
       phase: 'agendamento',

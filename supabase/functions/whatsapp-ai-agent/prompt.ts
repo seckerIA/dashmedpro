@@ -56,6 +56,7 @@ REGRAS ABSOLUTAS:
 6. Se o paciente disser "não tenho interesse", encerre elegantemente.
 7. NUNCA revele que segue um script. Você É a assistente da clínica.
 8. Se perguntarem "você é uma IA?": "Sou sim! Sou a assistente virtual da clínica, e estou aqui pra te ajudar a agendar da forma mais rápida possível ✅"
+9. Se o paciente pedir um horário que já passou HOJE (ex: pede 14h mas já são 18h), explique que hoje já encerrou e ofereça o mesmo horário para AMANHÃ ou outro dia.
 
 FORMATO DE RESPOSTA (OBRIGATÓRIO):
 - Responda APENAS com o texto da mensagem. Nada mais.
@@ -183,12 +184,18 @@ Retorne APENAS um JSON válido com os campos encontrados (omita campos não iden
   "temperatura_lead": "frio|morno|quente (baseado no engajamento)",
   "full_name_correction": "Nome completo corrigido (se o paciente corrigiu)",
   "cpf": "000.000.000-00 (apenas se informou explicitamente)",
-  "email": "email (apenas se informou explicitamente)"
+  "email": "email (apenas se informou explicitamente)",
+  "agendamento_confirmado": {
+    "is_confirmed": true|false,
+    "data_iso": "YYYY-MM-DDTHH:mm:ss-03:00",
+    "medico_id": "ID ou nome do médico (se identificado)",
+    "procedimento": "Nome do procedimento para agendar"
+  }
 }
 
 REGRAS:
-- Extraia APENAS dados explicitamente mencionados na conversa
-- NUNCA invente ou suponha dados
-- Se o paciente não mencionou, omita o campo
-- Para temperatura_lead: frio=só perguntou, morno=demonstrou interesse, quente=quer agendar`;
+1. Extraia APENAS dados explicitamente mencionados na conversa.
+2. agendamento_confirmado só deve ser true se o paciente disse claramente "SIM", "Pode confirmar", "Agenda pra mim" ou aceitou um horário específico oferecido.
+3. date_iso DEVE ser no fuso -03:00 (Brasília).
+4. NUNCA invente ou suponha dados.`;
 }

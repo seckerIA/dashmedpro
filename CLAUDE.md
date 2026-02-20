@@ -359,3 +359,17 @@ supabase/functions/
   - Colunas inexistentes em upsert são rejeitadas silenciosamente via `supabase.functions.invoke`
   - Record `meta_oauth` na `ad_platform_connections` NÃO é conta de anúncios — sempre filtrar
   - Token de deploy do Supabase CLI está em `.env` como `SUPABASE_ACCES_TOKEN` (com typo)
+### Contexto Atual (20/02/2026 - Sprint Agente IA Humanizado v5)
+- **Migração para whatsapp-ai-agent**:
+  - Webhook e Trigger (`trigger_whatsapp_ai_analysis`) agora apontam para a nova função `whatsapp-ai-agent`, substituindo a legada `whatsapp-ai-analyze`.
+  - O novo agente possui arquitetura modular com `router.ts` e `prompt.ts` separados.
+- **Melhorias de Agendamento Autônomo**:
+  - **Detecção de Intenção**: Adicionada Regex para capturar horários específicos (ex: "10h", "15:30") e ativar imediatamente a fase de agendamento.
+  - **Extração de Dados**: Refatorada a função `extractLeadData` para processar confirmações de agendamento em background via GPT-4o-mini.
+  - **Booking**: Quando o paciente confirma ("pode agendar", "ok"), a IA insere automaticamente o registro em `medical_appointments` e atualiza o pipeline do CRM para `agendado`.
+- **Correções Críticas**:
+  - **Fuso Horário**: Corrigido bug na exibição de slots livres que usava `getUTCHours() - 3` (causava erros em horários de virada de dia). Agora usa `toLocaleTimeString` com `America/Sao_Paulo`.
+  - **Regra de Horários Passados**: Adicionada regra absoluta para a IA não oferecer horários que já passaram no dia atual, sugerindo automaticamente o mesmo horário para o dia seguinte.
+  - **Sumarização de Agenda**: Removida a lógica que escondia horários livres em blocos, dando visibilidade total dos slots para a IA.
+- **Deploy**: Funções `whatsapp-ai-agent` e `whatsapp-webhook` atualizadas com sucesso.
+- **Status**: Fluxo de agendamento 100% automatizado via WhatsApp e testado via CLI.

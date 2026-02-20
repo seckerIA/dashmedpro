@@ -24,9 +24,13 @@ import {
   Plus,
   ClipboardList,
   Pill,
-  History
+  History,
+  Printer
 } from "lucide-react";
-import { differenceInYears, parseISO } from "date-fns";
+import { format, differenceInYears, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { useMedicalRecords } from "@/hooks/useMedicalRecords";
+import { RECORD_TYPES } from "@/types/medicalRecords";
 import { cn } from "@/lib/utils";
 
 const SECTIONS = [
@@ -53,6 +57,162 @@ const MedicalRecords = () => {
 
   // Buscar dados do paciente selecionado
   const { patient: selectedPatient, isLoading: patientLoading } = usePatient(selectedPatientId);
+  const { records } = useMedicalRecords(selectedPatientId || undefined);
+
+  const getRecordTypeInfo = (type: string) => {
+    const typeInfo = RECORD_TYPES.find(t => t.value === type);
+    return typeInfo || { label: type, description: '' };
+  };
+
+  const handlePrintFullRecord = () => {
+    if (!records || records.length === 0 || !selectedPatient) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const content = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Prontuário Completo - ${selectedPatient.full_name || 'Paciente'}</title>
+          <style>
+            @page { margin: 20mm; }
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
+            .header { text-align: center; margin-bottom: 40px; border-bottom: 2px solid #2563eb; padding-bottom: 20px; }
+            .logo { font-size: 28px; font-weight: bold; color: #2563eb; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
+            .subtitle { font-size: 14px; color: #666; margin-top: 5px; }
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px; background: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; }
+            .info-item { margin-bottom: 8px; }
+            .label { font-size: 12px; text-transform: uppercase; color: #64748b; font-weight: 600; display: block; margin-bottom: 2px; }
+            .value { font-size: 15px; font-weight: 500; color: #0f172a; }
+            .record-block { margin-bottom: 40px; page-break-inside: avoid; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+            .record-header { background: #f1f5f9; padding: 15px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+            .record-date { font-weight: bold; font-size: 16px; color: #0f172a; }
+            .record-type { background: #e2e8f0; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; color: #475569; margin-left: 10px; }
+            .record-doctor { font-size: 13px; color: #64748b; }
+            .record-body { padding: 20px; }
+            .section { margin-bottom: 20px; }
+            .section-title { font-size: 14px; font-weight: 700; color: #334155; border-bottom: 1px dashed #cbd5e1; padding-bottom: 4px; margin-bottom: 8px; display: flex; align-items: center; }
+            .content { font-size: 14px; white-space: pre-wrap; color: #334155; }
+            .tag { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 500; margin-right: 5px; background: #e2e8f0; color: #475569; }
+            .footer { margin-top: 50px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+            @media print {
+              body { padding: 0; }
+              .no-print { display: none; }
+              .header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              .record-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; background-color: #f1f5f9 !important; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="logo">DashMed Pro</div>
+            <div class="subtitle">Prontuário Médico Completo</div>
+          </div>
+
+          <div class="info-grid">
+            <div>
+              <div class="info-item">
+                <span class="label">Paciente</span>
+                <span class="value">${selectedPatient.full_name || 'N/A'}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Data de Nascimento</span>
+                <span class="value">${selectedPatient.birth_date ? new Date(selectedPatient.birth_date).toLocaleDateString('pt-BR') : 'N/A'}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">CPF</span>
+                <span class="value">${selectedPatient.cpf || 'N/A'}</span>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div class="info-item">
+                <span class="label">Data de Emissão</span>
+                <span class="value">${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Total de Registros</span>
+                <span class="value">${records.length}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="records-container">
+            ${records.map(record => `
+              <div class="record-block">
+                <div class="record-header">
+                  <div>
+                    <span class="record-date">${new Date(record.created_at).toLocaleDateString('pt-BR')} ${new Date(record.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                    <span class="record-type">${getRecordTypeInfo(record.record_type).label}</span>
+                  </div>
+                  <div class="record-doctor">
+                    ${record.doctor ? `Dr(a). ${record.doctor.full_name}` : 'Médico não identificado'}
+                  </div>
+                </div>
+                
+                <div class="record-body">
+                  ${record.chief_complaint ? `
+                    <div class="section">
+                      <div class="section-title">Queixa Principal</div>
+                      <div class="content">${record.chief_complaint}</div>
+                    </div>
+                  ` : ''}
+
+                  ${record.history_current_illness ? `
+                    <div class="section">
+                      <div class="section-title">HDA</div>
+                      <div class="content">${record.history_current_illness}</div>
+                    </div>
+                  ` : ''}
+
+                  ${record.diagnostic_hypothesis ? `
+                    <div class="section">
+                      <div class="section-title">Diagnóstico</div>
+                      <div class="content">${record.diagnostic_hypothesis}</div>
+                      ${record.cid_codes && record.cid_codes.length > 0 ? `
+                        <div style="margin-top: 5px;">
+                          ${record.cid_codes.map((cid: string) => `<span class="tag">CID: ${cid}</span>`).join('')}
+                        </div>
+                      ` : ''}
+                    </div>
+                  ` : ''}
+
+                  ${record.treatment_plan ? `
+                    <div class="section">
+                      <div class="section-title">Conduta</div>
+                      <div class="content">${record.treatment_plan}</div>
+                    </div>
+                  ` : ''}
+
+                  ${record.prescriptions && record.prescriptions.length > 0 ? `
+                    <div class="section">
+                      <div class="section-title">Prescrições</div>
+                      <div class="content">
+                        ${record.prescriptions.map((p: any) => `
+                          <div style="margin-bottom: 5px;">• ${p.medication} ${p.dosage} - ${p.frequency}</div>
+                        `).join('')}
+                      </div>
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="footer">
+            Documento gerado eletronicamente pelo sistema DashMed Pro em ${new Date().toLocaleDateString('pt-BR')}.
+          </div>
+
+          <script>
+            window.onload = function() { window.print(); }
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(content);
+    printWindow.document.close();
+  };
 
   // Scroll para seção ao clicar no guia
   const scrollToSection = useCallback((sectionId: string) => {
@@ -193,10 +353,23 @@ const MedicalRecords = () => {
             Gerencie prontuários, histórico clínico e receitas dos pacientes
           </p>
         </div>
-        <Button onClick={() => setIsPatientSelectorModalOpen(true)} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Criar Novo Prontuário
-        </Button>
+        <div className="flex gap-2">
+          {selectedPatientId && (
+            <Button
+              variant="outline"
+              onClick={() => handlePrintFullRecord()}
+              className="gap-2 hidden md:flex"
+              disabled={!records || records.length === 0}
+            >
+              <Printer className="h-4 w-4" />
+              Imprimir Prontuário
+            </Button>
+          )}
+          <Button onClick={() => setIsPatientSelectorModalOpen(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Criar Novo Prontuário
+          </Button>
+        </div>
       </div>
 
       {/* Main Content */}

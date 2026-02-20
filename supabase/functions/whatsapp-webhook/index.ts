@@ -362,6 +362,7 @@ async function processIncomingMessage(
   console.log('[Webhook] Message saved:', savedMessage.id);
 
   // --- DISPARO DA IA (AGENTE HUMANIZADO) ---
+  // ATUALIZADO: Apontando para o agente principal mais sofisticado (v4+)
   const aiUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/whatsapp-ai-agent`;
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
@@ -471,6 +472,15 @@ async function getOrCreateConversation(
   let contactId = contact?.id;
   let finalContactName = contactName || contact?.full_name || phoneNumber;
 
+  // Buscar organização do usuário
+  const { data: userProfile } = await supabase
+    .from('profiles')
+    .select('organization_id')
+    .eq('id', userId)
+    .single();
+
+  const organizationId = userProfile?.organization_id || null;
+
   // SE NÃO EXISTE CONTATO: CRIAR AUTO-LEAD E DEAL
   if (!contactId) {
     console.log('[Webhook] Contact not found, creating new Lead/Deal for:', phoneNumber);
@@ -480,6 +490,7 @@ async function getOrCreateConversation(
       .from('crm_contacts')
       .insert({
         user_id: userId,
+        organization_id: organizationId,
         full_name: finalContactName,
         phone: phoneNumber,
         tags: ['whatsapp_auto'],
@@ -496,6 +507,7 @@ async function getOrCreateConversation(
         .from('crm_deals')
         .insert({
           user_id: userId,
+          organization_id: organizationId,
           contact_id: contactId,
           title: `Oportunidade: ${finalContactName}`,
           stage: 'lead_novo',
@@ -525,6 +537,7 @@ async function getOrCreateConversation(
     .from('whatsapp_conversations')
     .insert({
       user_id: userId,
+      organization_id: organizationId,
       phone_number_id: phoneNumberId,
       phone_number: phoneNumber,
       contact_id: contactId || null,

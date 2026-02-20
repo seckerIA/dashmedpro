@@ -251,6 +251,7 @@ const handler = async (req: Request): Promise<Response> => {
           let docDayHours = docAllHours.filter((h: any) => h.day_of_week === dayOfWeek);
 
           // Fallback to default if NO layout defined at all
+          // RESTORED: User expectation is "Empty Calendar" = "Available Business Hours"
           if (!hasCustomSchedule) {
             if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Mon-Fri
               docDayHours = [{ start_time: '08:00:00', end_time: '18:00:00' }];
@@ -321,8 +322,16 @@ const handler = async (req: Request): Promise<Response> => {
                 });
 
                 if (!isBusy) {
-                  const hours = currentSlot.getHours().toString().padStart(2, '0');
-                  const minutes = currentSlot.getMinutes().toString().padStart(2, '0');
+                  // CORREÇÃO DE FUSO HORÁRIO: Garantir que a hora extraída seja a do BRASIL (UTC-3), não UTC
+                  // O Supabase Edge Functions roda em UTC, então new Date() é UTC.
+                  // Se 08:00 BRT = 11:00 UTC, .getHours() retornaria 11. Queremos 08.
+                  const timeString = currentSlot.toLocaleTimeString('pt-BR', {
+                    timeZone: 'America/Sao_Paulo',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                  });
+                  const [hours, minutes] = timeString.split(':');
                   const slotString = `${hours}:${minutes}`;
                   freeSlots.push(slotString);
 
@@ -340,7 +349,16 @@ const handler = async (req: Request): Promise<Response> => {
             hasSlots = true;
             const docProfile = (doctorProfiles || []).find((p: any) => p.id === docId);
             const docDisplayName = docProfile?.full_name || `Médico ${docId.slice(0, 4)}`;
-            dayOutput += `\n  - ${docDisplayName}: ${freeSlots.join(', ')}`;
+
+            // SMART FORMATTING: If many free slots, summarize to avoid overwhelming AI (and hallucinations)
+            if (freeSlots.length > 12) {
+              // Summarize: "08:00 ... 18:00 (Muitos horários)"
+              const first = freeSlots[0];
+              const last = freeSlots[freeSlots.length - 1];
+              dayOutput += `\n  - ${docDisplayName}: ${first} até ${last} (Dia livre com muitos horários)`;
+            } else {
+              dayOutput += `\n  - ${docDisplayName}: ${freeSlots.join(', ')}`;
+            }
           }
         }
 
@@ -710,6 +728,14 @@ Analise a conversa, extraia dados e gere respostas.`;
               // 2. Resolver o Paciente/Contato
               let contactId = conversation.contact_id;
 
+              // Buscar organization_id do usuário (reutilizando da função anterior ou buscando agora)
+              const { data: userProfile } = await supabaseAdmin
+                .from('profiles')
+                .select('organization_id')
+                .eq('id', conversation.user_id)
+                .single();
+              const organizationId = userProfile?.organization_id || null;
+
               if (!contactId) {
                 const { data: existingContact } = await supabaseAdmin
                   .from('crm_contacts')
@@ -723,6 +749,7 @@ Analise a conversa, extraia dados e gere respostas.`;
                     full_name: conversation.contact_name || 'Paciente WhatsApp',
                     phone: conversation.phone_number,
                     user_id: conversation.user_id,
+                    organization_id: organizationId,
                     tags: ['whatsapp_auto']
                   }).select('id').single();
                   if (newContact) contactId = newContact.id;
@@ -736,6 +763,7 @@ Analise a conversa, extraia dados e gere respostas.`;
                   .insert({
                     doctor_id: aiResponse.schedule_confirmation.doctor_id || conversation.user_id,
                     contact_id: contactId, // Usando contact_id correto (crm_contacts)
+                    organization_id: organizationId,
                     start_time: bookDate.toISOString(),
                     end_time: endDate.toISOString(),
                     status: 'scheduled',
