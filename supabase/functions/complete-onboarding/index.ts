@@ -242,6 +242,29 @@ const handler = async (req: Request): Promise<Response> => {
       console.log('✅ [complete-onboarding] Default financial categories created');
     }
 
+    // 5.6. Create default WhatsApp AI Agent config
+    console.log(`🤖 [complete-onboarding] Creating WhatsApp AI config`);
+    const { error: aiConfigError } = await supabaseAdmin
+      .from('whatsapp_ai_config')
+      .insert({
+        user_id: user.id,
+        is_enabled: true,
+        auto_reply_enabled: false,
+        auto_scheduling_enabled: false,
+        agent_name: 'Sofia',
+        clinic_name: clinic.name,
+        specialist_name: doctor.fullName,
+        suggestion_language: 'pt-BR',
+        suggestion_tone: 'professional',
+      });
+
+    if (aiConfigError) {
+      console.error('Error creating AI config:', aiConfigError);
+      // Non-critical, continue
+    } else {
+      console.log('✅ [complete-onboarding] WhatsApp AI config created');
+    }
+
     // 6. Create Commercial Procedures
     if (procedures && procedures.length > 0) {
       console.log(`📋 [complete-onboarding] Creating ${procedures.length} procedures`);

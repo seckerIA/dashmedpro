@@ -108,6 +108,7 @@ export interface AIConfig {
   agent_greeting?: string;
   clinic_name?: string;
   specialist_name?: string;
+  doctor_info?: string;
 
   created_at: string;
   updated_at: string;

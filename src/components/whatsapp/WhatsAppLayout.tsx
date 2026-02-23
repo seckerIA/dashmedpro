@@ -3,7 +3,6 @@
  * Layout de 3 colunas: Inbox | Chat | Sidebar
  */
 
-import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { PanelRightClose, PanelRightOpen } from 'lucide-react';
@@ -25,20 +24,15 @@ export function WhatsAppLayout({
   onToggleSidebar,
   selectedConversationId,
 }: WhatsAppLayoutProps) {
-  const [isMobileView, setIsMobileView] = useState<'inbox' | 'chat'>('inbox');
-
-  // No mobile, mostrar apenas inbox ou chat
-  const showInboxOnMobile = !selectedConversationId || isMobileView === 'inbox';
-
   return (
-    <div className="h-[calc(100vh-64px)] flex overflow-hidden bg-background relative">
+    <div className="h-[calc(100dvh-64px)] flex overflow-hidden bg-background relative">
       {/* Coluna 1: Inbox/Lista de conversas */}
       <div
         className={cn(
           'w-full md:w-80 lg:w-96 border-r flex-shrink-0 flex flex-col',
-          // Hide inbox on screens smaller than XL when a chat is selected
-          // to give more room for Chat + AI Sidebar
-          selectedConversationId && 'hidden xl:flex'
+          // Hide inbox on mobile/tablet when a chat is selected
+          // Show again at lg (1024px+) where there's room for both panes
+          selectedConversationId && 'hidden lg:flex'
         )}
       >
         {inbox}
@@ -47,7 +41,7 @@ export function WhatsAppLayout({
       {/* Coluna 2: Chat */}
       <div
         className={cn(
-          'flex-1 flex flex-col min-w-0 md:min-w-[400px]',
+          'flex-1 flex flex-col min-w-0',
           // Mobile: esconder quando nenhum chat selecionado
           !selectedConversationId && 'hidden md:flex'
         )}

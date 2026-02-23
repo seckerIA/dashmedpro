@@ -263,6 +263,7 @@ All colors MUST be HSL.
     font-size: 15px;
     scroll-behavior: smooth !important;
     -webkit-overflow-scrolling: touch;
+    overflow-x: hidden;
   }
 
   body {

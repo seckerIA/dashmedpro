@@ -36,8 +36,8 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
     queryKey: ['conversation-owner', conversationId],
     queryFn: async () => {
       if (!conversationId) return null;
-      const { data } = await (supabase
-        .from('whatsapp_conversations' as any) as any)
+      const { data } = await supabase
+        .from('whatsapp_conversations')
         .select('user_id')
         .eq('id', conversationId)
         .single();
@@ -47,7 +47,7 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
   });
 
   // Determinar quem é o dono da config
-  const configOwnerId = targetUserId || (conversationData as any)?.user_id || user?.id;
+  const configOwnerId = targetUserId || conversationData?.user_id || user?.id;
 
   // =====================================================
   // Realtime Subscriptions
@@ -104,7 +104,7 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
       if (!conversationId) return null;
 
       const { data, error } = await supabase
-        .from('whatsapp_conversation_analysis' as any)
+        .from('whatsapp_conversation_analysis')
         .select('*')
         .eq('conversation_id', conversationId)
         .maybeSingle();
@@ -114,7 +114,7 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
         return null;
       }
 
-      return data as unknown as ConversationAnalysis | null;
+      return data as ConversationAnalysis | null;
     },
     enabled: !!conversationId,
     staleTime: 30000, // 30 segundos
@@ -129,7 +129,7 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
       if (!conversationId) return [];
 
       const { data, error } = await supabase
-        .from('whatsapp_ai_suggestions' as any)
+        .from('whatsapp_ai_suggestions')
         .select('*')
         .eq('conversation_id', conversationId)
         .eq('was_used', false)
@@ -141,7 +141,7 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
         return [];
       }
 
-      return (data || []) as unknown as AISuggestion[];
+      return (data || []) as AISuggestion[];
     },
     enabled: !!conversationId,
     staleTime: 30000,
@@ -210,8 +210,8 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
       if (!conversationId || !user) throw new Error('Missing required data');
 
       // Verificar se análise existe
-      const { data: existingAnalysis } = await (supabase
-        .from('whatsapp_conversation_analysis' as any) as any)
+      const { data: existingAnalysis } = await supabase
+        .from('whatsapp_conversation_analysis')
         .select('id')
         .eq('conversation_id', conversationId)
         .maybeSingle();
@@ -219,23 +219,23 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
       if (existingAnalysis) {
         // Atualizar existente
         const { error } = await supabase
-          .from('whatsapp_conversation_analysis' as any)
+          .from('whatsapp_conversation_analysis')
           .update({
             lead_status: status,
             updated_at: new Date().toISOString(),
-          } as any)
-          .eq('id', (existingAnalysis as any).id);
+          })
+          .eq('id', existingAnalysis.id);
 
         if (error) throw error;
       } else {
         // Criar nova análise
         const { error } = await supabase
-          .from('whatsapp_conversation_analysis' as any)
+          .from('whatsapp_conversation_analysis')
           .insert({
             conversation_id: conversationId,
             user_id: user.id,
             lead_status: status,
-          } as any);
+          });
 
         if (error) throw error;
       }
@@ -266,12 +266,12 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
   const markSuggestionUsedMutation = useMutation({
     mutationFn: async ({ suggestionId, wasModified = false }: { suggestionId: string; wasModified?: boolean }) => {
       const { error } = await supabase
-        .from('whatsapp_ai_suggestions' as any)
+        .from('whatsapp_ai_suggestions')
         .update({
           was_used: true,
           was_modified: wasModified,
           used_at: new Date().toISOString(),
-        } as any)
+        })
         .eq('id', suggestionId);
 
       if (error) throw error;
@@ -289,13 +289,13 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
     queryFn: async () => {
       if (!user) return [];
 
-      const { data, error } = await supabase.rpc('get_hot_leads' as any, {
+      const { data, error } = await supabase.rpc('get_hot_leads', {
         p_user_id: user.id,
         p_limit: 5,
       });
 
       if (error) {
-        if ((error as any).code === 'PGRST202' || (error as any).message?.includes('404')) return [];
+        if (error.code === 'PGRST202' || error.message?.includes('404')) return [];
         console.error('[useWhatsAppAI] Error fetching hot leads:', error);
         return [];
       }
@@ -314,13 +314,13 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
     queryFn: async () => {
       if (!user) return [];
 
-      const { data, error } = await supabase.rpc('get_pending_followups' as any, {
+      const { data, error } = await supabase.rpc('get_pending_followups', {
         p_user_id: user.id,
         p_hours: 24,
       });
 
       if (error) {
-        if ((error as any).code === 'PGRST202' || (error as any).message?.includes('404')) return [];
+        if (error.code === 'PGRST202' || error.message?.includes('404')) return [];
         console.error('[useWhatsAppAI] Error fetching pending followups:', error);
         return [];
       }
@@ -339,12 +339,12 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
     queryFn: async () => {
       if (!user) return null;
 
-      const { data, error } = await supabase.rpc('get_ai_stats' as any, {
+      const { data, error } = await supabase.rpc('get_ai_stats', {
         p_user_id: user.id,
       });
 
       if (error) {
-        if ((error as any).code === 'PGRST202' || (error as any).message?.includes('404')) return null;
+        if (error.code === 'PGRST202' || error.message?.includes('404')) return null;
         console.error('[useWhatsAppAI] Error fetching AI stats:', error);
         return null;
       }
@@ -397,20 +397,20 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
 
       if (existing) {
         const { error } = await supabase
-          .from('whatsapp_ai_config' as any)
+          .from('whatsapp_ai_config')
           .update({
             ...updates,
             updated_at: new Date().toISOString(),
-          } as any)
-          .eq('id', (existing as any).id);
+          })
+          .eq('id', existing.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
-          .from('whatsapp_ai_config' as any)
+          .from('whatsapp_ai_config')
           .insert({
             ...updates,
-            user_id: configOwnerId, // Salva no ID do médico!
-          } as any);
+            user_id: configOwnerId,
+          });
         if (error) throw error;
       }
     },

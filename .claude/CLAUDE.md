@@ -17,6 +17,7 @@
 | **Captain America** | SECURITY | `.claude/agents/SECURITY.md` | Auth, RLS policies, seguranca, code review |
 | **Vision** | SYSTEM | `.claude/agents/SYSTEM.md` | DevOps, deploy, performance, testes, docs |
 | **Thanos** | META_SPECIALIST | `.claude/agents/META_SPECIALIST.md` | Meta Graph API, App Review, OAuth, WhatsApp Cloud API, Meta Ads |
+| **Doctor Strange** | QA_ENGINEER | `.claude/agents/QA_ENGINEER.md` | QA integration tests, cross-module verification, bug discovery |
 
 ### Squad DEBUGGERS (Debugadores)
 
@@ -82,6 +83,13 @@ SEGURANCA / AUTH / RLS REVIEW:
   -> Consultar: .claude/agents/SECURITY.md
   -> Exemplos: "review seguranca", "verifica RLS", "auth nao funciona"
 
+QA / TESTES DE INTEGRACAO / VERIFICACAO DE FLUXOS:
+  -> Ativar Doctor Strange (QA_ENGINEER)
+  -> Consultar: .claude/agents/QA_ENGINEER.md
+  -> Comandos: npm run test:qa (todos) ou npm run test:qa:flowN (especifico)
+  -> Exemplos: "testa o sistema", "roda os testes", "verifica fluxos",
+     "pre-deploy check", "testa integracao", "procura bugs"
+
 QA / APROVACAO FINAL:
   -> Ativar Hulk (GUARDIAN)
   -> Consultar: .claude/agents/GUARDIAN.md
@@ -112,8 +120,9 @@ TAREFA COMPLEXA MULTI-DOMINIO:
 2. Captain America (SECURITY) -> Review do schema e RLS
 3. Thor (BACKEND)         -> Edge Functions (se necessario)
 4. Iron Man (FRONTEND)    -> Componentes, hooks, UI
-5. Captain America (SECURITY) -> Review final
-6. Vision (SYSTEM)        -> Deploy, docs
+5. Doctor Strange (QA_ENGINEER) -> Integration tests (atualizar scripts de teste)
+6. Captain America (SECURITY) -> Review final
+7. Vision (SYSTEM)        -> Deploy, docs
 ```
 
 ### Ordem Tipica para Bug Fixes
@@ -122,7 +131,21 @@ TAREFA COMPLEXA MULTI-DOMINIO:
 1. Black Widow (DETECTIVE)  -> Investigar e coletar evidencias
 2. Hawkeye (RESEARCHER)     -> Pesquisar solucao
 3. Spider-Man (FIXER)       -> Implementar fix cirurgico
-4. Hulk (GUARDIAN)          -> Validar que nao quebrou nada
+4. Doctor Strange (QA_ENGINEER) -> Rodar suite para verificar regressao
+5. Hulk (GUARDIAN)          -> Validar que nao quebrou nada
+```
+
+### Regra Obrigatoria — Atualizacao de Testes
+
+```
+SEMPRE que funcionalidades novas forem inseridas no DashMedPro,
+ATUALIZAR os scripts de teste do Doctor Strange para cobrir os novos fluxos.
+
+Se um novo modulo for criado (ex: teleconsulta):
+  1. Criar novo test-flow-N-novo-modulo.ts em scripts/qa/
+  2. Registrar no run-all.ts (importar + adicionar ao array)
+  3. Adicionar script no package.json (test:qa:flowN)
+  4. Documentar no QA_ENGINEER.md (mapa de fluxos)
 ```
 
 ---
@@ -358,6 +381,8 @@ supabase/functions/
 npm run dev           # Vite dev server (port 8080)
 npm run build         # Production build
 npm run lint          # ESLint check
+npm run test:qa       # Doctor Strange — all 7 integration flows
+npm run test:qa:flowN # Doctor Strange — specific flow (N=1-7)
 ```
 
 ---
@@ -543,6 +568,25 @@ Meta Webhook -> whatsapp-webhook -> fire-and-forget -> whatsapp-ai-agent
 - UI de CRUD para `sofia_knowledge_base` (fase 2 — por agora usa textarea simples)
 - Teste end-to-end via mensagem WhatsApp real
 
+### Sessao 22/02/2026 — Claude Code Security Integration
+
+#### Contexto
+Integracao do novo recurso **Claude Code Security** (lancado pela Anthropic em Fev 2026) ao agente Captain America (SECURITY.md). O recurso usa IA para escanear vulnerabilidades com raciocinio profundo — traca fluxo de dados, entende interacoes entre componentes e detecta falhas que regex/SAST tradicionais nao pegam.
+
+#### O que foi feito
+- **SECURITY.md v1.1.0**: Adicionado **Mode 3: AUTOMATED SCAN** com `/security-review`, Step 0 no Review Process, items nas checklists, secao CI/CD com GitHub Actions
+- **SAFETY_PROTOCOL.md**: Quality Loop atualizado (6 fases) — Fase 4 agora e SECURITY SCAN para features que tocam auth/RLS/Edge Functions/dados sensiveis
+- **GitHub Actions**: Criado `.github/workflows/security-review.yml` com scan automatico em PRs para `main`, instrucoes customizadas para ameacas DashMedPro-especificas
+
+#### Como usar
+- **CLI (Recomendado)**: Rodar `/security-review` no Claude Code — usa assinatura Max, sem custo extra
+- **GitHub Actions (Opcional)**: Automatico em PRs — requer `CLAUDE_API_KEY` nos GitHub Secrets (API paga separada)
+
+#### Arquivos
+- `.claude/agents/SECURITY.md` — Mode 3, Step 0, checklists, CI/CD
+- `.claude/agents/SAFETY_PROTOCOL.md` — Quality Loop Fase 4
+- `.github/workflows/security-review.yml` — GitHub Actions workflow
+
 ---
 
 ## Safety Protocol (J.A.R.V.I.S.)
@@ -560,4 +604,42 @@ Regras criticas:
 
 ---
 
-**Version:** 0.7.0 | 2026-02-19 | DevSquad Avengers Edition
+### Sessao 22/02/2026 — Doctor Strange QA System + Claude Code Security
+
+#### 1. Claude Code Security Integration
+- Integrado `/security-review` no agente Captain America (SECURITY)
+- Adicionado Mode 3 (AUTOMATED SCAN) e Step 0 no Review Process
+- Criado `.github/workflows/security-review.yml` (GitHub Actions, OPCIONAL — requer API key separada)
+- Quality Loop ampliado para 6 fases (Fase 4: SECURITY SCAN)
+- Prioridade: uso local via CLI (coberto pela assinatura Max)
+
+#### 2. Doctor Strange QA System (NOVO)
+- **Agente**: Doctor Strange (QA_ENGINEER) — `.claude/agents/QA_ENGINEER.md`
+- **7 fluxos de integracao E2E** testando fluxos cross-module contra Supabase real:
+  - Flow 1: CRM → Agendamento → Financeiro (o mais critico)
+  - Flow 2: Pipeline Transitions (lead_novo → agendado → inadimplente → follow_up → aguardando_retorno)
+  - Flow 3: Sinal Payment (pagamento parcial + restante)
+  - Flow 4: Inventory Deduction FEFO (First Expire First Out)
+  - Flow 5: Medical Records + Prescriptions
+  - Flow 6: WhatsApp Auto-Lead Creation
+  - Flow 7: Secretary Permissions (RLS)
+- **Infraestrutura**: `scripts/qa/config.ts` (clients + auth + cleanup) + `helpers.ts` (assertions + reporting)
+- **Orquestrador**: `scripts/qa/run-all.ts` → `npm run test:qa`
+- **Cleanup**: Dados tagueados com `QA_{timestamp}`, limpeza automatica apos execucao
+- **Regra**: SEMPRE atualizar scripts de teste quando features novas forem inseridas
+
+**Arquivos criados**:
+- `.claude/agents/QA_ENGINEER.md`
+- `scripts/qa/config.ts`, `helpers.ts`, `run-all.ts`
+- `scripts/qa/test-flow-1-crm-to-financial.ts` a `test-flow-7-secretary-permissions.ts`
+- `.github/workflows/security-review.yml`
+
+**Arquivos modificados**:
+- `.claude/CLAUDE.md` — Doctor Strange no squad, auto-activation rules, test update rule
+- `.claude/agents/SECURITY.md` — Mode 3, Step 0, checklists
+- `.claude/agents/SAFETY_PROTOCOL.md` — Quality Loop Phase 4
+- `package.json` — Scripts test:qa
+
+---
+
+**Version:** 0.9.0 | 2026-02-22 | DevSquad Avengers Edition + Doctor Strange QA

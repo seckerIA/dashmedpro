@@ -353,7 +353,7 @@ const Financial = () => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-9 gap-2 h-auto p-1 bg-muted/50 mb-6">
+        <TabsList className="flex flex-wrap w-full gap-1.5 h-auto p-1 bg-muted/50 mb-6">
           <TabsTrigger value="dashboard" className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm py-3">
             <BarChart3 className="w-4 h-4 mr-2" />
             Dashboard

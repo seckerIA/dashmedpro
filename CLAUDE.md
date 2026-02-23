@@ -119,6 +119,8 @@ import { toast } from '@/components/ui/use-toast';
 npm run dev           # Vite dev server (port 8080)
 npm run build         # Production build
 npm run lint          # ESLint check
+npm run test:qa       # Doctor Strange — 7 integration test flows (E2E contra Supabase real)
+npm run test:qa:flowN # Flow especifico (N=1-7)
 ```
 
 ## Contexto Atual (2026-01-03)

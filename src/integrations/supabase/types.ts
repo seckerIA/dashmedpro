@@ -3985,60 +3985,75 @@ export type Database = {
       }
       whatsapp_ai_config: {
         Row: {
+          agent_greeting: string | null
+          agent_name: string | null
           already_known_info: string | null
           analysis_cooldown_minutes: number | null
           auto_analyze: boolean | null
           auto_create_deals: boolean | null
           auto_reply_enabled: boolean | null
           auto_scheduling_enabled: boolean | null
+          clinic_name: string | null
           created_at: string | null
           custom_prompt_instructions: string | null
+          doctor_info: string | null
           id: string
           include_emojis: boolean | null
           is_enabled: boolean | null
           knowledge_base: string | null
           max_suggestions_per_conversation: number | null
           openai_api_key_encrypted: string | null
+          specialist_name: string | null
           suggestion_language: string | null
           suggestion_tone: string | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
+          agent_greeting?: string | null
+          agent_name?: string | null
           already_known_info?: string | null
           analysis_cooldown_minutes?: number | null
           auto_analyze?: boolean | null
           auto_create_deals?: boolean | null
           auto_reply_enabled?: boolean | null
           auto_scheduling_enabled?: boolean | null
+          clinic_name?: string | null
           created_at?: string | null
           custom_prompt_instructions?: string | null
+          doctor_info?: string | null
           id?: string
           include_emojis?: boolean | null
           is_enabled?: boolean | null
           knowledge_base?: string | null
           max_suggestions_per_conversation?: number | null
           openai_api_key_encrypted?: string | null
+          specialist_name?: string | null
           suggestion_language?: string | null
           suggestion_tone?: string | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
+          agent_greeting?: string | null
+          agent_name?: string | null
           already_known_info?: string | null
           analysis_cooldown_minutes?: number | null
           auto_analyze?: boolean | null
           auto_create_deals?: boolean | null
           auto_reply_enabled?: boolean | null
           auto_scheduling_enabled?: boolean | null
+          clinic_name?: string | null
           created_at?: string | null
           custom_prompt_instructions?: string | null
+          doctor_info?: string | null
           id?: string
           include_emojis?: boolean | null
           is_enabled?: boolean | null
           knowledge_base?: string | null
           max_suggestions_per_conversation?: number | null
           openai_api_key_encrypted?: string | null
+          specialist_name?: string | null
           suggestion_language?: string | null
           suggestion_tone?: string | null
           updated_at?: string | null

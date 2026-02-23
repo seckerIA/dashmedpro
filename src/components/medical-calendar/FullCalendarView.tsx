@@ -9,6 +9,7 @@ import { MedicalAppointmentWithRelations } from '@/types/medicalAppointments';
 import { AppointmentEventCard } from './AppointmentEventCard';
 import { Loader2 } from 'lucide-react';
 import { useRef, useEffect } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface FullCalendarViewProps {
   appointments: MedicalAppointmentWithRelations[];
@@ -30,6 +31,7 @@ export function FullCalendarView({
   currentDate,
 }: FullCalendarViewProps) {
   const calendarRef = useRef<FullCalendar>(null);
+  const isMobile = useIsMobile();
 
   // Transform appointments to FullCalendar events
   const transformToEvents = (appts: MedicalAppointmentWithRelations[]): EventInput[] => {
@@ -97,13 +99,15 @@ export function FullCalendarView({
   useEffect(() => {
     const calendarApi = calendarRef.current?.getApi();
     if (calendarApi) {
-      calendarApi.changeView(view);
+      // On mobile, use listWeek instead of timeGridWeek for better readability
+      const effectiveView = isMobile && view === 'timeGridWeek' ? 'listWeek' : view;
+      calendarApi.changeView(effectiveView);
     }
-  }, [view]);
+  }, [view, isMobile]);
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-[600px] border border-border rounded-2xl bg-card">
+      <div className="flex items-center justify-center h-[400px] md:h-[600px] border border-border rounded-2xl bg-card">
         <div className="flex flex-col items-center gap-2">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="text-sm text-muted-foreground">Carregando agenda...</p>
@@ -117,7 +121,7 @@ export function FullCalendarView({
       <FullCalendar
         ref={calendarRef}
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
-        initialView={view}
+        initialView={isMobile && view === 'timeGridWeek' ? 'listWeek' : view}
         headerToolbar={false} // Using custom toolbar
         height="auto"
         locale={ptBrLocale}

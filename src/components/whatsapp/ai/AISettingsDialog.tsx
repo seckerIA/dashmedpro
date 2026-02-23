@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Sparkles, Save, Info, Bot, ShieldCheck, User, Building2 } from 'lucide-react';
+import { Sparkles, Save, Info, Bot, ShieldCheck, User, Stethoscope } from 'lucide-react';
 import { useWhatsAppAI } from '@/hooks/useWhatsAppAI';
 import { cn } from '@/lib/utils';
 import {
@@ -36,6 +36,7 @@ export function AISettingsDialog({ open, onOpenChange, targetUserId }: AISetting
         clinic_name: '',
         specialist_name: '',
         agent_greeting: '',
+        doctor_info: '',
         knowledge_base: '',
         already_known_info: '',
         custom_prompt_instructions: '',
@@ -50,6 +51,7 @@ export function AISettingsDialog({ open, onOpenChange, targetUserId }: AISetting
                 clinic_name: aiConfig.clinic_name || '',
                 specialist_name: aiConfig.specialist_name || '',
                 agent_greeting: aiConfig.agent_greeting || '',
+                doctor_info: aiConfig.doctor_info || '',
                 knowledge_base: aiConfig.knowledge_base || '',
                 already_known_info: aiConfig.already_known_info || '',
                 custom_prompt_instructions: aiConfig.custom_prompt_instructions || '',
@@ -98,36 +100,44 @@ export function AISettingsDialog({ open, onOpenChange, targetUserId }: AISetting
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <Label htmlFor="clinic_name" className="text-xs text-muted-foreground">Nome da Clinica</Label>
+                                <Label htmlFor="specialist_name" className="text-xs text-muted-foreground">Nome do Medico</Label>
                                 <Input
-                                    id="clinic_name"
-                                    placeholder="Clinica Odonto Premium"
-                                    value={formData.clinic_name}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, clinic_name: e.target.value }))}
+                                    id="specialist_name"
+                                    placeholder="Dr. Rafael"
+                                    value={formData.specialist_name}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, specialist_name: e.target.value }))}
                                     className="h-9 text-sm bg-background"
                                 />
                             </div>
                         </div>
                         <div className="space-y-1.5">
-                            <Label htmlFor="specialist_name" className="text-xs text-muted-foreground">Nome do especialista (para handoff)</Label>
-                            <Input
-                                id="specialist_name"
-                                placeholder="Dr. Carlos"
-                                value={formData.specialist_name}
-                                onChange={(e) => setFormData(prev => ({ ...prev, specialist_name: e.target.value }))}
-                                className="h-9 text-sm bg-background"
-                            />
-                        </div>
-                        <div className="space-y-1.5">
                             <Label htmlFor="agent_greeting" className="text-xs text-muted-foreground">Saudacao personalizada (opcional)</Label>
                             <Textarea
                                 id="agent_greeting"
-                                placeholder="Ola! Sou a Sofia, assistente virtual da Clinica Premium. Como posso te ajudar?"
+                                placeholder="Ola! Sou a Sofia, assistente do Dr. Rafael. Como posso te ajudar?"
                                 className="h-16 text-sm resize-none bg-background"
                                 value={formData.agent_greeting}
                                 onChange={(e) => setFormData(prev => ({ ...prev, agent_greeting: e.target.value }))}
                             />
                         </div>
+                    </div>
+
+                    {/* Informacoes do Medico */}
+                    <div className="space-y-3 p-4 rounded-xl border border-blue-500/20 bg-blue-500/5">
+                        <div className="flex items-center gap-2">
+                            <Stethoscope className="h-4 w-4 text-blue-500" />
+                            <Label htmlFor="doctor_info" className="text-sm font-bold">Informacoes do Medico</Label>
+                        </div>
+                        <Textarea
+                            id="doctor_info"
+                            placeholder="Ex: Dr. Carlos Silva, Cirurgiao Plastico com 15 anos de experiencia. Especialista em rinoplastia e lipoaspiracao. Abordagem humanizada, foco em resultado natural. CRM 12345-SP."
+                            className="min-h-[100px] text-sm resize-none bg-background"
+                            value={formData.doctor_info}
+                            onChange={(e) => setFormData(prev => ({ ...prev, doctor_info: e.target.value }))}
+                        />
+                        <p className="text-[11px] text-muted-foreground">
+                            Bio, especialidade e abordagem do medico. A IA usara essas informacoes para responder sobre o profissional.
+                        </p>
                     </div>
 
                     {/* Base de Conhecimento */}

@@ -109,14 +109,25 @@ export function detectPhase(
     'horarios disponiveis', 'horários disponíveis',
     'quando posso', 'pode ser', 'qual horario', 'qual horário',
     'tem vaga', 'tem espaço', 'vaga para', 'espaço para',
+    'disponibilidade', 'disponivel', 'disponível',
+    'agendar', 'agenda', 'consulta',
+    'dia da semana', 'semana que vem', 'proxima semana', 'próxima semana',
+    'segunda', 'terca', 'terça', 'quarta', 'quinta', 'sexta', 'sabado', 'sábado',
+    'de manha', 'da manha', 'da manhã', 'de manhã',
+    'de tarde', 'da tarde', 'a tarde', 'à tarde',
+    'horario', 'horário', 'horas', 'hrs',
   ];
 
-  // Regex para detectar horários (ex: "10h", "10:00")
-  const timeRegex = /\b([0-1]?[0-9]|2[0-3])[h:]\b|\b([0-1]?[0-9]|2[0-3]):[0-5][0-9]\b/i;
+  // Regex para detectar horários (ex: "10h", "10:00", "10 horas", "10 da manhã", "as 09")
+  const timeRegex = /\b([0-1]?[0-9]|2[0-3])\s*[h:]\s*([0-5][0-9])?\b|\b([0-1]?[0-9]|2[0-3])\s*(horas|hrs|da\s*manh[aã]|da\s*tarde)\b|\b[àa]s\s*([0-1]?[0-9]|2[0-3])\b/i;
   const mentionsTime = timeRegex.test(msg);
 
-  const wantsSchedule = agendamentoKeywords.some(k => msg.includes(k)) || mentionsTime;
-  if (wantsSchedule && messageCount > 3) {
+  // Regex para detectar datas (ex: "dia 24", "24/02", "dia 24 de fevereiro")
+  const dateRegex = /\bdia\s+\d{1,2}\b|\b\d{1,2}\/\d{1,2}\b|\b\d{1,2}\s+de\s+(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)/i;
+  const mentionsDate = dateRegex.test(msg);
+
+  const wantsSchedule = agendamentoKeywords.some(k => msg.includes(k)) || mentionsTime || mentionsDate;
+  if (wantsSchedule && messageCount > 1) {
     return {
       phase: 'agendamento',
       shouldLoadRAG: true,

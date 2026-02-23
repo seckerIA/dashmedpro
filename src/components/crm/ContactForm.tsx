@@ -657,7 +657,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {contact ? "Editar Contato" : "Novo Contato"}

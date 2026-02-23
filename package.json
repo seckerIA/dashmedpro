@@ -12,7 +12,15 @@
     "verify:supabase": "node scripts/verify-supabase-config.js",
     "insert:mock-data": "node scripts/insert-mock-commercial-data.mjs",
     "create:user-joao": "node scripts/create-user-joao.mjs",
-    "populate:mock-data": "node scripts/clean-and-populate-database.mjs"
+    "populate:mock-data": "node scripts/clean-and-populate-database.mjs",
+    "test:qa": "npx tsx scripts/qa/run-all.ts",
+    "test:qa:flow1": "npx tsx scripts/qa/test-flow-1-crm-to-financial.ts",
+    "test:qa:flow2": "npx tsx scripts/qa/test-flow-2-pipeline-transitions.ts",
+    "test:qa:flow3": "npx tsx scripts/qa/test-flow-3-sinal-payment.ts",
+    "test:qa:flow4": "npx tsx scripts/qa/test-flow-4-inventory-deduction.ts",
+    "test:qa:flow5": "npx tsx scripts/qa/test-flow-5-medical-records.ts",
+    "test:qa:flow6": "npx tsx scripts/qa/test-flow-6-whatsapp-auto-lead.ts",
+    "test:qa:flow7": "npx tsx scripts/qa/test-flow-7-secretary-permissions.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -130,8 +130,11 @@ TODA tarefa que modifica codigo DEVE seguir o Quality Loop Protocol:
   1. PRE-FLIGHT   -> Ler arquivos, entender estado, planejar mudanca
   2. IMPLEMENTAR  -> Editar cirurgicamente, um arquivo por vez
   3. VERIFICAR    -> npm run build + reler TODAS as mudancas feitas
-  4. RE-AVALIAR   -> Comparar com pedido original, analisar impacto
-  5. DOCUMENTAR   -> Atualizar CLAUDE.md, informar usuario
+  4. SECURITY SCAN -> Para features que tocam auth, RLS, Edge Functions
+                      ou dados sensiveis: rodar `/security-review`
+                      Findings CRITICAL bloqueiam deploy
+  5. RE-AVALIAR   -> Comparar com pedido original, analisar impacto
+  6. DOCUMENTAR   -> Atualizar CLAUDE.md, informar usuario
 
 Referencia completa: `.claude/CLAUDE.md` secao "Quality Loop Protocol"
 

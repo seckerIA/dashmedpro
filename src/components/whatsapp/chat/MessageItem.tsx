@@ -78,7 +78,7 @@ export const MessageItem = memo(function MessageItem({
       {/* Bolha da mensagem */}
       <div
         className={cn(
-          'relative max-w-[70%] rounded-2xl px-3 py-2',
+          'relative max-w-[70%] rounded-2xl px-3 py-1.5',
           isOutbound
             ? isAIMessage
               ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-br-md shadow-sm'
@@ -118,7 +118,7 @@ export const MessageItem = memo(function MessageItem({
         {/* Footer: hora + status */}
         <div
           className={cn(
-            'flex items-center justify-end gap-1 mt-1',
+            'flex items-center justify-end gap-1 mt-0.5',
             isOutbound ? 'text-white/70' : 'text-muted-foreground'
           )}
         >

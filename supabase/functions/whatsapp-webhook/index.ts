@@ -481,48 +481,10 @@ async function getOrCreateConversation(
 
   const organizationId = userProfile?.organization_id || null;
 
-  // SE NÃO EXISTE CONTATO: CRIAR AUTO-LEAD E DEAL
+  // Contato CRM será criado pelo AI Agent somente quando o paciente demonstrar
+  // interesse em consulta/agendamento (fase "agendamento" ou "pos_agendamento")
   if (!contactId) {
-    console.log('[Webhook] Contact not found, creating new Lead/Deal for:', phoneNumber);
-
-    // 1. Criar Contato
-    const { data: newContact, error: createContactError } = await supabase
-      .from('crm_contacts')
-      .insert({
-        user_id: userId,
-        organization_id: organizationId,
-        full_name: finalContactName,
-        phone: phoneNumber,
-        tags: ['whatsapp_auto'],
-        lead_score: 10, // Score inicial
-      })
-      .select('id')
-      .single();
-
-    if (!createContactError && newContact) {
-      contactId = newContact.id;
-
-      // 2. Criar Deal no Pipeline (Lead Novo)
-      const { error: createDealError } = await supabase
-        .from('crm_deals')
-        .insert({
-          user_id: userId,
-          organization_id: organizationId,
-          contact_id: contactId,
-          title: `Oportunidade: ${finalContactName}`,
-          stage: 'lead_novo',
-          value: 0,
-          description: 'Lead criado automaticamente via WhatsApp'
-        });
-
-      if (createDealError) {
-        console.error('[Webhook] Error creating auto-deal:', createDealError);
-      } else {
-        console.log('[Webhook] Auto-deal created successfully');
-      }
-    } else {
-      console.error('[Webhook] Error creating auto-contact:', createContactError);
-    }
+    console.log('[Webhook] No CRM contact for:', phoneNumber, '- will be created by AI agent when interest is detected');
   }
 
   // Buscar config de IA do usuário para definir modo inicial

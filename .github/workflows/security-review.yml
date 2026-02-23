@@ -1,0 +1,67 @@
+# Claude Code Security Review — Automated PR Scanning
+# OPCIONAL: Requer CLAUDE_API_KEY nos GitHub Secrets (API paga separada do Max)
+# Para uso local sem custo extra, use /security-review no CLI do Claude Code
+# Para ativar: GitHub repo → Settings → Secrets → Actions → CLAUDE_API_KEY
+
+name: Claude Code Security Review
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  security-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-security-review@main
+        with:
+          comment-pr: true
+          upload-results: true
+          claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
+          claude-model: claude-opus-4-6
+          claudecode-timeout: 20
+          exclude-directories: "node_modules,dist,.next,supabase/.temp"
+          custom-security-scan-instructions: |
+            This is DashMedPro, a medical CRM built with React + Supabase.
+            Focus on these DashMedPro-specific security concerns:
+
+            1. Supabase RLS policy bypasses:
+               - Secretaries should ONLY access data from doctors linked via secretary_doctor_links
+               - Medical records are creator-only (NOT even admin can access)
+               - Check for policies using USING(true) which disables RLS
+
+            2. WhatsApp token exposure:
+               - access_token stored in whatsapp_config table
+               - Must NEVER appear in logs, error messages, or frontend code
+               - Only Edge Functions with service_role should read tokens
+
+            3. Edge Function input validation:
+               - Functions with verify_jwt=false (webhooks) need manual auth validation
+               - All request body fields must be validated before use
+               - Never pass unvalidated input to SQL queries or external APIs
+
+            4. Medical data exposure (HIPAA-adjacent):
+               - Patient records (medical_records, crm_contacts) must be protected
+               - Diagnosis, treatment plans, CPF are sensitive PII
+               - Check for over-fetching with SELECT *
+
+            5. service_role_key security:
+               - Must NEVER appear in frontend code (no VITE_ prefix)
+               - Must NEVER be logged or included in error responses
+               - Only use in Edge Functions for system operations
+
+            6. XSS in WhatsApp chat:
+               - User messages rendered in chat UI must be sanitized
+               - No dangerouslySetInnerHTML without DOMPurify
+
+            7. Authentication:
+               - Use getUser() NOT getSession() for authorization checks
+               - getSession() reads from localStorage and can be manipulated
