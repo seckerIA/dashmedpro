@@ -30,6 +30,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { MessageList } from './MessageList';
 import { MessageInput, type MessageInputHandle } from './MessageInput';
 import { ProceduresList } from './ProceduresList';
@@ -87,10 +94,13 @@ export function ChatWindow({
     targetUserId: conversation.user_id // <-- Passa o dono da conversa diretamente
   });
 
+  const isMobile = useIsMobile();
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [showAISettings, setShowAISettings] = useState(false);
   const [isAIProcessing, setIsAIProcessing] = useState(false);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [showMobileAISheet, setShowMobileAISheet] = useState(false);
+  const [showMobileProceduresSheet, setShowMobileProceduresSheet] = useState(false);
 
   // Messages
   const {
@@ -528,6 +538,37 @@ export function ChatWindow({
                   <UserPlus className="h-4 w-4 mr-2" />
                   {conversation.assigned_to ? 'Transferir conversa' : 'Atribuir conversa'}
                 </DropdownMenuItem>
+
+                {/* Mobile-only actions (hidden on md+) */}
+                {isMobile && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setShowAISettings(true)}>
+                      <Bot className="h-4 w-4 mr-2 text-primary" />
+                      Configurar IA
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => {
+                      setShowMobileAISheet(true);
+                      setShowMobileProceduresSheet(false);
+                    }}>
+                      <Sparkles className="h-4 w-4 mr-2 text-purple-500" />
+                      Análise IA
+                    </DropdownMenuItem>
+                    {canViewProcedures && (
+                      <DropdownMenuItem onClick={() => {
+                        setShowMobileProceduresSheet(true);
+                        setShowMobileAISheet(false);
+                      }}>
+                        <Stethoscope className="h-4 w-4 mr-2 text-emerald-500" />
+                        Procedimentos
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem onClick={onToggleSidebar}>
+                      <Search className="h-4 w-4 mr-2" />
+                      Buscar
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -624,6 +665,49 @@ export function ChatWindow({
           <ProceduresList />
         </div>
       )}
+
+      {/* Mobile Sheets */}
+      <Sheet open={showMobileAISheet} onOpenChange={setShowMobileAISheet}>
+        <SheetContent side="right" className="w-full sm:w-[400px] p-0 overflow-y-auto">
+          <SheetHeader className="px-4 pt-4 pb-2">
+            <SheetTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-purple-500" />
+              Análise IA
+            </SheetTitle>
+          </SheetHeader>
+          <div className="p-4 space-y-4">
+            <ConversationInsights
+              analysis={analysis}
+              isLoading={isLoadingAnalysis}
+              isAnalyzing={isAnalyzing}
+              onAnalyze={handleAnalyzeConversation}
+              aiConfig={aiConfig}
+            />
+            {suggestions.length > 0 && (
+              <AISuggestionsPanel
+                suggestions={suggestions}
+                isLoading={isAnalyzing}
+                onSelectSuggestion={handleAISuggestionSelect}
+                onRegenerateSuggestions={() => analyzeConversation(true)}
+              />
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={showMobileProceduresSheet} onOpenChange={setShowMobileProceduresSheet}>
+        <SheetContent side="right" className="w-full sm:w-[400px] p-0 overflow-y-auto">
+          <SheetHeader className="px-4 pt-4 pb-2">
+            <SheetTitle className="flex items-center gap-2">
+              <Stethoscope className="h-5 w-5 text-emerald-500" />
+              Procedimentos
+            </SheetTitle>
+          </SheetHeader>
+          <div className="p-0">
+            <ProceduresList />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Dialogs */}
       <AISettingsDialog

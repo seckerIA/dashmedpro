@@ -52,30 +52,38 @@ export function DailyAppointmentsList({
   const capitalizedDate = formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
 
   return (
-    <Card className="bg-gradient-card shadow-card border-border h-full flex flex-col">
-      <CardHeader className="pb-4">
+    <Card className="shadow-sm border-border h-full flex flex-col">
+      <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6 pt-3 sm:pt-6">
         <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-xl font-bold mb-1">Consultas do Dia</CardTitle>
-            <p className="text-sm text-muted-foreground">{capitalizedDate}</p>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="p-1.5 sm:p-2 rounded-lg bg-primary/10">
+              <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-base sm:text-lg font-bold leading-tight">Consultas do Dia</CardTitle>
+              <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">{capitalizedDate}</p>
+            </div>
           </div>
-          <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 font-semibold">
-            <Calendar className="h-3 w-3 mr-1" />
-            {dailyAppointments.length} {dailyAppointments.length === 1 ? 'consulta' : 'consultas'}
+          <Badge className="bg-primary text-primary-foreground font-bold text-xs sm:text-sm px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-lg">
+            {dailyAppointments.length}
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="flex-1 overflow-y-auto min-h-[400px] lg:min-h-[600px]">
+      <CardContent className="flex-1 overflow-y-auto min-h-[200px] sm:min-h-[400px] lg:min-h-[600px] px-3 sm:px-6">
         {dailyAppointments.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <Calendar className="h-12 w-12 text-muted-foreground/50 mb-4" />
-            <p className="text-muted-foreground font-medium">Nenhuma consulta agendada</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              para {format(selectedDate, "d 'de' MMMM", { locale: ptBR })}
-            </p>
+          <div className="flex flex-col items-center justify-center py-8 sm:py-16">
+            <div className="rounded-2xl border-2 border-dashed border-border/60 p-5 sm:p-8 text-center max-w-xs">
+              <div className="mx-auto p-2.5 sm:p-3 rounded-full bg-muted/50 w-fit mb-3 sm:mb-4">
+                <Calendar className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground/40" />
+              </div>
+              <p className="text-xs sm:text-sm font-medium text-muted-foreground">Nenhuma consulta agendada</p>
+              <p className="text-[11px] sm:text-xs text-muted-foreground/70 mt-1">
+                para {format(selectedDate, "d 'de' MMMM", { locale: ptBR })}
+              </p>
+            </div>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             {dailyAppointments.map(appointment => (
               <AppointmentCard
                 key={appointment.id}
@@ -95,4 +103,3 @@ export function DailyAppointmentsList({
     </Card>
   );
 }
-

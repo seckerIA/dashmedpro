@@ -27,7 +27,8 @@ import { Label } from '@/components/ui/label';
 import { useDoctors } from '@/hooks/useDoctors';
 import { MedicalAppointmentWithRelations, AppointmentType, AppointmentStatus, PaymentStatus } from '@/types/medicalAppointments';
 import { GeneralMeeting } from '@/types/generalMeetings';
-import { Calendar, Plus, CalendarDays, Clock } from 'lucide-react';
+import { Calendar, Plus, CalendarDays, Clock, SlidersHorizontal } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { startOfMonth, endOfMonth } from 'date-fns';
 
 type CalendarView = 'monthly' | 'daily-hours';
@@ -536,35 +537,35 @@ export default function MedicalCalendar() {
   }
 
   return (
-    <div className="min-h-screen space-y-6 bg-background pb-20">
+    <div className="min-h-screen space-y-3 sm:space-y-4 bg-background pb-20 px-1 sm:px-0">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-primary/10">
-            <Calendar className="h-8 w-8 text-primary" />
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          <div className="p-2 sm:p-2.5 rounded-xl bg-primary/10">
+            <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-card-foreground">Agenda Médica</h1>
-            <p className="text-muted-foreground text-sm sm:text-lg">Sistema de Agendamento</p>
+            <h1 className="text-lg sm:text-2xl font-bold text-card-foreground">Agenda Médica</h1>
+            <p className="text-muted-foreground text-[11px] sm:text-sm">Sistema de Agendamento</p>
           </div>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
           <Button
             onClick={() => setShowAppointmentForm(true)}
-            size="lg"
-            className="flex-1 sm:flex-none bg-primary hover:bg-primary/90"
+            size="default"
+            className="flex-1 sm:flex-none h-9 sm:h-11 text-xs sm:text-sm bg-primary hover:bg-primary/90 active:bg-primary/80"
           >
-            <Plus className="h-5 w-5 mr-2" />
+            <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
             Nova Consulta
           </Button>
           <Button
             onClick={() => setShowMeetingForm(true)}
-            size="lg"
+            size="default"
             variant="outline"
-            className="flex-1 sm:flex-none"
+            className="flex-1 sm:flex-none h-9 sm:h-11 text-xs sm:text-sm active:bg-muted"
           >
-            <Plus className="h-5 w-5 mr-2" />
-            Nova Reunião
+            <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
+            <span className="hidden sm:inline">Nova </span>Reunião
           </Button>
         </div>
       </div>
@@ -572,38 +573,40 @@ export default function MedicalCalendar() {
       {/* Metrics Cards */}
       <AppointmentMetrics appointments={filteredAppointments} meetings={meetings} />
 
-      {/* View Toggle */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between">
-          <Label className="text-base font-semibold">Visualização</Label>
-          <div className="flex items-center gap-2">
+      {/* Filters + View Toggle */}
+      <Card className="p-3 sm:p-4">
+        {/* Header: Filters title + View toggle */}
+        <div className="flex items-center justify-between mb-2.5 sm:mb-3">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <SlidersHorizontal className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
+            <span className="text-xs sm:text-sm font-semibold text-muted-foreground">Filtros</span>
+          </div>
+          <div className="flex items-center rounded-lg bg-muted/50 p-0.5">
             <Button
-              variant={view === 'monthly' ? 'default' : 'outline'}
+              variant={view === 'monthly' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setView('monthly')}
-              className="gap-2"
+              className={cn("h-7 px-3 text-xs rounded-md gap-1.5", view !== 'monthly' && "text-muted-foreground")}
             >
-              <CalendarDays className="h-4 w-4" />
+              <CalendarDays className="h-3.5 w-3.5" />
               Mensal
             </Button>
             <Button
-              variant={view === 'daily-hours' ? 'default' : 'outline'}
+              variant={view === 'daily-hours' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setView('daily-hours')}
-              className="gap-2"
+              className={cn("h-7 px-3 text-xs rounded-md gap-1.5", view !== 'daily-hours' && "text-muted-foreground")}
             >
-              <Clock className="h-4 w-4" />
-              Diário em Horas
+              <Clock className="h-3.5 w-3.5" />
+              Diário
             </Button>
           </div>
         </div>
-      </Card>
 
-      {/* Filters */}
-      <Card className="p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="space-y-2">
-            <Label>Médico</Label>
+        {/* Filter grid */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-5 gap-2 sm:gap-3">
+          <div className="space-y-1">
+            <Label className="text-xs">Médico</Label>
             <Select
               value={searchFilter.startsWith('doctor:') ? searchFilter : 'all'}
               onValueChange={(value) => {
@@ -631,8 +634,8 @@ export default function MedicalCalendar() {
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label>Paciente</Label>
+          <div className="space-y-1">
+            <Label className="text-xs">Paciente</Label>
             <Select
               value={searchFilter.startsWith('patient:') ? searchFilter : 'all'}
               onValueChange={(value) => {
@@ -660,8 +663,8 @@ export default function MedicalCalendar() {
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label>Tipo de Consulta</Label>
+          <div className="space-y-1">
+            <Label className="text-xs">Tipo de Consulta</Label>
             <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as AppointmentType | 'all')}>
               <SelectTrigger>
                 <SelectValue />
@@ -678,8 +681,8 @@ export default function MedicalCalendar() {
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label>Status</Label>
+          <div className="space-y-1">
+            <Label className="text-xs">Status</Label>
             <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as AppointmentStatus | 'all')}>
               <SelectTrigger>
                 <SelectValue />
@@ -696,8 +699,8 @@ export default function MedicalCalendar() {
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label>Pagamento</Label>
+          <div className="space-y-1">
+            <Label className="text-xs">Pagamento</Label>
             <Select value={paymentFilter} onValueChange={(value) => setPaymentFilter(value as PaymentStatus | 'all')}>
               <SelectTrigger>
                 <SelectValue />
@@ -716,9 +719,9 @@ export default function MedicalCalendar() {
 
       {/* Main Layout: Calendar + Appointments List */}
       {view === 'monthly' ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6">
           {/* Calendar - Left Column */}
-          <div className="lg:col-span-1 order-2 lg:order-1 space-y-6">
+          <div className="lg:col-span-1 order-2 lg:order-1 space-y-3 sm:space-y-6">
             <MonthlyCalendarView
               selectedDate={selectedDate}
               onDateSelect={handleDateSelect}

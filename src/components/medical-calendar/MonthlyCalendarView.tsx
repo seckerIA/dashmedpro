@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday, addMonths, subMonths, getDay } from 'date-fns';
@@ -27,11 +27,11 @@ export function MonthlyCalendarView({
   // Calcular dias do mês
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
-  
+
   // Começar do domingo da semana que contém o primeiro dia do mês
   const startDate = new Date(monthStart);
   startDate.setDate(startDate.getDate() - getDay(monthStart));
-  
+
   // Terminar no sábado da semana que contém o último dia do mês
   const endDate = new Date(monthEnd);
   endDate.setDate(endDate.getDate() + (6 - getDay(monthEnd)));
@@ -41,7 +41,7 @@ export function MonthlyCalendarView({
   // Contar consultas e reuniões por dia
   const eventsByDate = useMemo(() => {
     const map = new Map<string, { appointments: number; meetings: number }>();
-    
+
     // Contar consultas
     if (appointments && appointments.length > 0) {
       appointments.forEach(appt => {
@@ -91,52 +91,42 @@ export function MonthlyCalendarView({
     onDateSelect(today);
   };
 
-  const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const weekDays = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 
   return (
-    <Card className="bg-gradient-card shadow-card border-border">
-      <CardContent className="p-6">
+    <Card className="shadow-sm border-border">
+      <CardContent className="p-3 sm:p-6">
         {/* Header com navegação */}
         <div className="flex items-center justify-between mb-4 sm:mb-6">
           <Button
             variant="ghost"
             size="icon"
             onClick={handlePrevMonth}
-            className="h-8 w-8"
+            className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-muted active:bg-muted"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          
-          <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2">
-            <h3 className="text-base sm:text-lg font-semibold capitalize text-center">
-              {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
-            </h3>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleToday}
-              className="h-7 text-xs"
-            >
-              Hoje
-            </Button>
-          </div>
+
+          <h3 className="text-sm sm:text-base font-semibold capitalize text-foreground">
+            {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
+          </h3>
 
           <Button
             variant="ghost"
             size="icon"
             onClick={handleNextMonth}
-            className="h-8 w-8"
+            className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-muted active:bg-muted"
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
 
         {/* Dias da semana */}
-        <div className="grid grid-cols-7 gap-1 mb-2">
-          {weekDays.map(day => (
+        <div className="grid grid-cols-7 gap-0.5 sm:gap-1 mb-1 sm:mb-2">
+          {weekDays.map((day, i) => (
             <div
-              key={day}
-              className="text-center text-xs font-medium text-muted-foreground py-2"
+              key={i}
+              className="text-center text-[10px] sm:text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wider py-1.5 sm:py-2"
             >
               {day}
             </div>
@@ -144,7 +134,7 @@ export function MonthlyCalendarView({
         </div>
 
         {/* Grid de dias */}
-        <div className="grid grid-cols-7 gap-1">
+        <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
           {days.map((day, dayIdx) => {
             const dateKey = format(day, 'yyyy-MM-dd');
             const dayEvents = eventsByDate.get(dateKey);
@@ -164,19 +154,19 @@ export function MonthlyCalendarView({
                   }
                 }}
                 className={cn(
-                  'aspect-square p-1 rounded-lg transition-all duration-200',
-                  'hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1',
-                  !isCurrentMonth && 'opacity-30 cursor-not-allowed',
+                  'aspect-square p-0.5 rounded-lg sm:rounded-xl transition-all duration-200',
+                  'hover:bg-muted active:bg-muted/80 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1',
+                  !isCurrentMonth && 'opacity-25 cursor-not-allowed',
                   isCurrentMonth && 'cursor-pointer',
-                  isCurrentDay && !isSelected && 'bg-primary/10 ring-1 ring-primary/30',
-                  isSelected && 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-1 shadow-md'
+                  isCurrentDay && !isSelected && 'bg-primary/15 ring-2 ring-primary/40',
+                  isSelected && 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2 ring-offset-background shadow-lg scale-105'
                 )}
               >
                 <div className="flex flex-col items-center justify-center h-full">
                   <span
                     className={cn(
-                      'text-sm font-medium',
-                      isSelected && 'text-primary-foreground',
+                      'text-xs sm:text-sm font-medium',
+                      isSelected && 'text-primary-foreground font-bold',
                       !isSelected && isCurrentDay && 'text-primary font-bold',
                       !isSelected && !isCurrentDay && 'text-foreground'
                     )}
@@ -184,27 +174,25 @@ export function MonthlyCalendarView({
                     {format(day, 'd')}
                   </span>
                   {hasEvents && isCurrentMonth && (
-                    <div className="mt-1 flex items-center justify-center gap-1">
+                    <div className="mt-0.5 flex items-center justify-center gap-0.5">
                       {hasAppointments && (
                         <div
                           className={cn(
-                            'w-2 h-2 rounded-full flex-shrink-0',
+                            'w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full flex-shrink-0',
                             isSelected
                               ? 'bg-primary-foreground'
                               : 'bg-primary'
                           )}
-                          title={`${dayEvents.appointments} ${dayEvents.appointments === 1 ? 'consulta' : 'consultas'}`}
                         />
                       )}
                       {hasMeetings && (
                         <div
                           className={cn(
-                            'w-2 h-2 rounded-full flex-shrink-0',
+                            'w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full flex-shrink-0',
                             isSelected
                               ? 'bg-primary-foreground'
                               : 'bg-orange-500'
                           )}
-                          title={`${dayEvents.meetings} ${dayEvents.meetings === 1 ? 'reunião' : 'reuniões'}`}
                         />
                       )}
                     </div>
@@ -214,8 +202,20 @@ export function MonthlyCalendarView({
             );
           })}
         </div>
+
+        {/* Footer with Go to Today */}
+        <div className="mt-3 sm:mt-4 pt-2.5 sm:pt-3 border-t border-border/50">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleToday}
+            className="w-full h-9 sm:h-8 text-xs text-muted-foreground hover:text-primary active:text-primary"
+          >
+            <CalendarDays className="h-3.5 w-3.5 mr-1.5" />
+            Ir para Hoje
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
 }
-
