@@ -50,55 +50,60 @@ const HeartbeatInitializer = () => {
 
   return null;
 };
-import Dashboard from "./pages/Dashboard";
-import Calculadora from "./pages/Calculadora";
-import CalculadoraSelection from "./pages/CalculadoraSelection";
-import CalculadoraROI from "./pages/CalculadoraROI";
-import PlaceholderPage from "./pages/PlaceholderPage";
-import Settings from "./pages/Settings";
-import NotFound from "./pages/NotFound";
+// Eager imports — needed immediately for auth flow
 import Login from "./pages/Login";
-import ResetPassword from "./pages/ResetPassword";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import TermsOfService from "./pages/TermsOfService";
 import AuthCallback from "./pages/AuthCallback";
 import Onboarding from "./pages/Onboarding";
-import TeamManagement from "./pages/TeamManagement";
-import Procedimentos from "./pages/Procedimentos";
-import Tasks from "./pages/Tasks";
-import CRM from "./pages/CRM";
-import MedicalCalendar from "./pages/MedicalCalendar";
-import Financial from "./pages/Financial";
-import FinancialTransactions from "./pages/FinancialTransactions";
-import FinancialSinais from "./pages/FinancialSinais";
-import FinancialCategories from "./pages/FinancialCategories";
-import FinancialRecurring from "./pages/FinancialRecurring";
-import FinancialReports from "./pages/FinancialReports";
-import FinancialBudgets from "./pages/FinancialBudgets";
-import FinancialForecasts from "./pages/FinancialForecasts";
-import SecretaryFinancial from "./pages/SecretaryFinancial";
-import TransactionForm from "./components/financial/TransactionForm";
-import ProspectingGuide from "./pages/ProspectingGuide";
-import Commercial from "./pages/Commercial";
-import FollowUpPage from "./pages/FollowUpPage";
-import FollowUps from "./pages/FollowUps";
-import Marketing from "./pages/Marketing";
-import MedicalRecords from "./pages/MedicalRecords";
-import Prontuario from "./pages/Prontuario";
-import WhatsAppInbox from "./pages/WhatsAppInbox";
-import WhatsAppSettings from "./pages/WhatsAppSettings";
-import InventoryPage from "./pages/Inventory";
-import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import { SuperAdminLayout } from "./components/admin/SuperAdminLayout";
 import { PasswordChangePrompt } from "./components/auth/PasswordChangePrompt";
-import AdminClinics from "./pages/admin/AdminClinics";
-import AdminUsers from "./pages/admin/AdminUsers";
-import AdminMetrics from "./pages/admin/AdminMetrics";
-import AdminFinancial from "./pages/admin/AdminFinancial";
-import AdminLogs from "./pages/admin/AdminLogs";
-import AdminDatabase from "./pages/admin/AdminDatabase";
-import AdminSecurity from "./pages/admin/AdminSecurity";
-import AdminSettings from "./pages/admin/AdminSettings";
+
+// Lazy imports — loaded on demand for code splitting
+const Dashboard = React.lazy(() => import("./pages/Dashboard"));
+const Calculadora = React.lazy(() => import("./pages/Calculadora"));
+const CalculadoraSelection = React.lazy(() => import("./pages/CalculadoraSelection"));
+const CalculadoraROI = React.lazy(() => import("./pages/CalculadoraROI"));
+const PlaceholderPage = React.lazy(() => import("./pages/PlaceholderPage"));
+const Settings = React.lazy(() => import("./pages/Settings"));
+const NotFound = React.lazy(() => import("./pages/NotFound"));
+const ResetPassword = React.lazy(() => import("./pages/ResetPassword"));
+const PrivacyPolicy = React.lazy(() => import("./pages/PrivacyPolicy"));
+const TermsOfService = React.lazy(() => import("./pages/TermsOfService"));
+const TeamManagement = React.lazy(() => import("./pages/TeamManagement"));
+const Procedimentos = React.lazy(() => import("./pages/Procedimentos"));
+const Tasks = React.lazy(() => import("./pages/Tasks"));
+const CRM = React.lazy(() => import("./pages/CRM"));
+const MedicalCalendar = React.lazy(() => import("./pages/MedicalCalendar"));
+const Financial = React.lazy(() => import("./pages/Financial"));
+const FinancialTransactions = React.lazy(() => import("./pages/FinancialTransactions"));
+const FinancialSinais = React.lazy(() => import("./pages/FinancialSinais"));
+const FinancialCategories = React.lazy(() => import("./pages/FinancialCategories"));
+const FinancialRecurring = React.lazy(() => import("./pages/FinancialRecurring"));
+const FinancialReports = React.lazy(() => import("./pages/FinancialReports"));
+const FinancialBudgets = React.lazy(() => import("./pages/FinancialBudgets"));
+const FinancialForecasts = React.lazy(() => import("./pages/FinancialForecasts"));
+const SecretaryFinancial = React.lazy(() => import("./pages/SecretaryFinancial"));
+const TransactionForm = React.lazy(() => import("./components/financial/TransactionForm"));
+const ProspectingGuide = React.lazy(() => import("./pages/ProspectingGuide"));
+const Commercial = React.lazy(() => import("./pages/Commercial"));
+const FollowUpPage = React.lazy(() => import("./pages/FollowUpPage"));
+const FollowUps = React.lazy(() => import("./pages/FollowUps"));
+const Marketing = React.lazy(() => import("./pages/Marketing"));
+const MedicalRecords = React.lazy(() => import("./pages/MedicalRecords"));
+const Prontuario = React.lazy(() => import("./pages/Prontuario"));
+const WhatsAppInbox = React.lazy(() => import("./pages/WhatsAppInbox"));
+const WhatsAppSettings = React.lazy(() => import("./pages/WhatsAppSettings"));
+const InventoryPage = React.lazy(() => import("./pages/Inventory"));
+const SuperAdminDashboard = React.lazy(() => import("./pages/SuperAdminDashboard"));
+const AdminClinics = React.lazy(() => import("./pages/admin/AdminClinics"));
+const AdminUsers = React.lazy(() => import("./pages/admin/AdminUsers"));
+const AdminMetrics = React.lazy(() => import("./pages/admin/AdminMetrics"));
+const AdminFinancial = React.lazy(() => import("./pages/admin/AdminFinancial"));
+const AdminLogs = React.lazy(() => import("./pages/admin/AdminLogs"));
+const AdminDatabase = React.lazy(() => import("./pages/admin/AdminDatabase"));
+const AdminSecurity = React.lazy(() => import("./pages/admin/AdminSecurity"));
+const AdminSettings = React.lazy(() => import("./pages/admin/AdminSettings"));
+const CallsPage = React.lazy(() => import("@/pages/Calls"));
+const VOIPSettings = React.lazy(() => import("@/pages/VOIPSettings"));
 import {
   TrendingUp,
   Target,
@@ -112,8 +117,6 @@ import {
 } from "lucide-react";
 import { CallOverlay } from "@/components/voip/CallOverlay";
 import { IncomingCallModal } from "@/components/voip/IncomingCallModal";
-import CallsPage from "@/pages/Calls";
-import VOIPSettings from "@/pages/VOIPSettings";
 
 import { focusManager } from "@tanstack/react-query";
 import { checkToken, supabase, wasRecentlyAuthenticated } from "@/integrations/supabase/client";
@@ -317,6 +320,13 @@ const queryClient = new QueryClient({
 
 
 
+// Page loader for React.lazy Suspense
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center">
+    <div className="text-center text-muted-foreground animate-pulse">Carregando...</div>
+  </div>
+);
+
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -449,14 +459,16 @@ const AppRoutes = () => {
 
   if (!user) {
     return (
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/auth/callback" element={<AuthCallback />} />
-        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-        <Route path="/terms-of-service" element={<TermsOfService />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+      <React.Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-of-service" element={<TermsOfService />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </React.Suspense>
     );
   }
 
@@ -489,19 +501,21 @@ const AppRoutes = () => {
   if (isSuperAdmin) {
     return (
       <SuperAdminLayout>
-        <Routes>
-          <Route path="/admin" element={<SuperAdminDashboard />} />
-          <Route path="/admin/clinicas" element={<AdminClinics />} />
-          <Route path="/admin/usuarios" element={<AdminUsers />} />
-          <Route path="/admin/financeiro" element={<AdminFinancial />} />
-          <Route path="/admin/metricas" element={<AdminMetrics />} />
-          <Route path="/admin/logs" element={<AdminLogs />} />
-          <Route path="/admin/database" element={<AdminDatabase />} />
-          <Route path="/admin/seguranca" element={<AdminSecurity />} />
-          <Route path="/admin/configuracoes" element={<AdminSettings />} />
-          <Route path="/" element={<Navigate to="/admin" replace />} />
-          <Route path="*" element={<Navigate to="/admin" replace />} />
-        </Routes>
+        <React.Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/admin" element={<SuperAdminDashboard />} />
+            <Route path="/admin/clinicas" element={<AdminClinics />} />
+            <Route path="/admin/usuarios" element={<AdminUsers />} />
+            <Route path="/admin/financeiro" element={<AdminFinancial />} />
+            <Route path="/admin/metricas" element={<AdminMetrics />} />
+            <Route path="/admin/logs" element={<AdminLogs />} />
+            <Route path="/admin/database" element={<AdminDatabase />} />
+            <Route path="/admin/seguranca" element={<AdminSecurity />} />
+            <Route path="/admin/configuracoes" element={<AdminSettings />} />
+            <Route path="/" element={<Navigate to="/admin" replace />} />
+            <Route path="*" element={<Navigate to="/admin" replace />} />
+          </Routes>
+        </React.Suspense>
       </SuperAdminLayout>
     );
   }
@@ -511,6 +525,7 @@ const AppRoutes = () => {
     <>
       <PasswordChangePrompt />
       <AppLayout>
+        <React.Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/login" element={<Navigate to="/" replace />} />
           <Route path="/reset-password" element={<ResetPassword />} />
@@ -726,6 +741,7 @@ const AppRoutes = () => {
 
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </React.Suspense>
       </AppLayout>
 
       {/* Cortana desativada */}

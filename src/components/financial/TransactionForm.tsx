@@ -576,6 +576,7 @@ const TransactionForm = () => {
                   <Input
                     id="amount"
                     type="text"
+                    inputMode="decimal"
                     placeholder="0,00"
                     value={formData.amount ? formatCurrency(formData.amount) : ''}
                     onChange={(e) => handleAmountChange(e.target.value)}

@@ -181,6 +181,7 @@ function MessageContent({
             <img
               src={message.media[0].media_url}
               alt="Imagem"
+              loading="lazy"
               className="rounded-lg max-w-full h-auto max-h-64 object-cover"
             />
           ) : (
@@ -342,6 +343,7 @@ function MessageContent({
             <img
               src={message.media[0].media_url}
               alt="Sticker"
+              loading="lazy"
               className="max-w-full max-h-full"
             />
           ) : (

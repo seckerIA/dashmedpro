@@ -25,7 +25,7 @@ export function WhatsAppLayout({
   selectedConversationId,
 }: WhatsAppLayoutProps) {
   return (
-    <div className="h-[calc(100dvh-64px)] flex overflow-hidden bg-background relative">
+    <div className="h-[calc(100dvh-64px-var(--bottom-nav-height))] md:h-[calc(100dvh-64px)] flex overflow-hidden bg-background relative">
       {/* Coluna 1: Inbox/Lista de conversas */}
       <div
         className={cn(

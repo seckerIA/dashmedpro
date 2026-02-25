@@ -1002,6 +1002,7 @@ export function AppointmentForm({
               <Input
                 id="estimated_value"
                 type="text"
+                inputMode="decimal"
                 value={estimatedValueDisplay}
                 onChange={(e) => {
                   const formatted = formatCurrencyInput(e.target.value);
@@ -1062,6 +1063,7 @@ export function AppointmentForm({
               <Input
                 id="sinal_amount"
                 type="text"
+                inputMode="decimal"
                 value={sinalAmountDisplay}
                 disabled={hasNoSinal}
                 onChange={(e) => {

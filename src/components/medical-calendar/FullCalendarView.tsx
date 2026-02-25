@@ -99,8 +99,12 @@ export function FullCalendarView({
   useEffect(() => {
     const calendarApi = calendarRef.current?.getApi();
     if (calendarApi) {
-      // On mobile, use listWeek instead of timeGridWeek for better readability
-      const effectiveView = isMobile && view === 'timeGridWeek' ? 'listWeek' : view;
+      // On mobile, use list views for better readability
+      let effectiveView: string = view;
+      if (isMobile) {
+        if (view === 'timeGridWeek') effectiveView = 'listWeek';
+        else if (view === 'dayGridMonth') effectiveView = 'listMonth';
+      }
       calendarApi.changeView(effectiveView);
     }
   }, [view, isMobile]);
@@ -121,7 +125,7 @@ export function FullCalendarView({
       <FullCalendar
         ref={calendarRef}
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
-        initialView={isMobile && view === 'timeGridWeek' ? 'listWeek' : view}
+        initialView={isMobile ? (view === 'timeGridWeek' ? 'listWeek' : view === 'dayGridMonth' ? 'listMonth' : view) : view}
         headerToolbar={false} // Using custom toolbar
         height="auto"
         locale={ptBrLocale}

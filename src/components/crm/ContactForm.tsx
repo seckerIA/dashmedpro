@@ -723,6 +723,8 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
                     <FormControl>
                       <Input
                         type="email"
+                        inputMode="email"
+                        autoComplete="email"
                         placeholder="email@exemplo.com"
                         {...field}
                       />
@@ -740,6 +742,8 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
                     <FormLabel>Telefone</FormLabel>
                     <FormControl>
                       <Input
+                        inputMode="tel"
+                        autoComplete="tel"
                         placeholder="(11) 99999-8888"
                         {...field}
                         value={field.value || ""}
@@ -838,6 +842,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
                     <FormLabel>Valor Estimado da 1ª Consulta *</FormLabel>
                     <FormControl>
                       <Input
+                        inputMode="decimal"
                         placeholder="R$ 0,00"
                         {...field}
                         value={field.value || ""}

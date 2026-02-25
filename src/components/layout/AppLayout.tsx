@@ -275,7 +275,7 @@ export function AppLayout({ children, hideSidebar = false, title: explicitTitle,
                 id="main-content"
                 className={cn(
                   "flex-1 bg-background",
-                  !shouldNoScroll && "p-4 md:p-6 pb-24 md:pb-6 overflow-auto"
+                  !shouldNoScroll && "p-4 md:p-6 pb-28 md:pb-6 overflow-auto"
                 )}
               >
                 {children}

@@ -183,6 +183,7 @@ export function MetricCard({
             <img
               src={illustration}
               alt={title}
+              loading="lazy"
               className="h-16 w-16 object-contain"
             />
           </div>

@@ -393,7 +393,11 @@ async function handler(req: Request): Promise<Response> {
 
     // STEP 1: LOCK
     var lr = await sb.rpc('try_acquire_ai_lock', { p_conversation_id: cid, p_lock_seconds: 60 });
-    if (!lr.data) return new Response(JSON.stringify({ status: 'locked' }), { status: 200, headers: CORS });
+    if (!lr.data) {
+      await safeDebugLog(sb, 'Lock FAILED', { cid: cid, lockData: lr.data, lockError: lr.error ? String(lr.error.message) : null });
+      return new Response(JSON.stringify({ status: 'locked' }), { status: 200, headers: CORS });
+    }
+    await safeDebugLog(sb, 'Lock OK', { cid: cid });
 
     // STEP 2: SMART DEBOUNCE
     var cr0 = await sb.from('whatsapp_messages').select('*', { count: 'exact', head: true }).eq('conversation_id', cid).eq('direction', 'inbound');
@@ -418,9 +422,11 @@ async function handler(req: Request): Promise<Response> {
     var localOff = conv.ai_autonomous_mode === false;
     var globalOn = aic ? aic.auto_reply_enabled === true : false;
     if (!(localOn || (!localOff && globalOn))) {
+      await safeDebugLog(sb, 'Auto-reply DISABLED', { cid: cid, localOn: localOn, localOff: localOff, globalOn: globalOn, aiMode: conv.ai_autonomous_mode });
       await safeReleaseLock(sb, cid);
       return new Response(JSON.stringify({ status: 'auto_reply_disabled' }), { status: 200, headers: CORS });
     }
+    await safeDebugLog(sb, 'Auto-reply ON', { cid: cid, localOn: localOn, globalOn: globalOn });
 
     // STEP 3b: MARK AS READ
     var wac = await getWAConfig(sb, conv.user_id);

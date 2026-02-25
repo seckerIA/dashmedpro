@@ -31,16 +31,20 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DataTablePagination } from "./DataTablePagination"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
+  mobileHiddenColumns?: string[]
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
+  mobileHiddenColumns = [],
 }: DataTableProps<TData, TValue>) {
+  const isMobile = useIsMobile()
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
@@ -48,6 +52,15 @@ export function DataTable<TData, TValue>({
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState({})
+
+  // Auto-hide columns on mobile
+  React.useEffect(() => {
+    if (isMobile && mobileHiddenColumns.length > 0) {
+      const hidden: VisibilityState = {}
+      mobileHiddenColumns.forEach((col) => { hidden[col] = false })
+      setColumnVisibility((prev) => ({ ...prev, ...hidden }))
+    }
+  }, [isMobile, mobileHiddenColumns.join(',')])
 
   const table = useReactTable({
     data,
