@@ -1,6 +1,7 @@
 /**
  * Edge Function: whatsapp-send-message
- * Envia mensagens via WhatsApp Business API (Meta)
+ * Envia mensagens via WhatsApp Business API (Meta) ou Evolution API
+ * Provider routing baseado no campo `provider` em whatsapp_config
  */
 
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
@@ -63,7 +64,7 @@ const handler = async (req: Request): Promise<Response> => {
     // 1. Tentar buscar config do próprio remetente
     let { data: config } = await supabaseAdmin
       .from('whatsapp_config')
-      .select('phone_number_id, access_token')
+      .select('phone_number_id, access_token, provider, evolution_instance_name, evolution_instance_token, evolution_api_url')
       .eq('user_id', configUserId)
       .eq('is_active', true)
       .filter('access_token', 'not.is', null)
@@ -88,7 +89,7 @@ const handler = async (req: Request): Promise<Response> => {
           const doctorIds = links.map((l: any) => l.doctor_id);
           const { data: doctorConfig } = await supabaseAdmin
             .from('whatsapp_config')
-            .select('phone_number_id, access_token')
+            .select('phone_number_id, access_token, provider, evolution_instance_name, evolution_instance_token, evolution_api_url')
             .in('user_id', doctorIds)
             .eq('is_active', true)
             .filter('access_token', 'not.is', null)
@@ -106,7 +107,7 @@ const handler = async (req: Request): Promise<Response> => {
     if (!config) {
       const { data: genericConfig } = await supabaseAdmin
         .from('whatsapp_config')
-        .select('phone_number_id, access_token')
+        .select('phone_number_id, access_token, provider, evolution_instance_name, evolution_instance_token, evolution_api_url')
         .eq('is_active', true)
         .filter('access_token', 'not.is', null)
         .limit(1)
@@ -117,17 +118,93 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    if (!config || !config.access_token) {
-      console.error('[send-message] No token found for user:', configUserId);
-      throw new Error('Configuração do WhatsApp não encontrada. Por favor, configure o Token na tela de Configurações.');
+    if (!config) {
+      console.error('[send-message] No config found for user:', configUserId);
+      throw new Error('Configuração do WhatsApp não encontrada. Por favor, configure na tela de Configurações.');
     }
 
+    // Validate config per provider
+    if (config.provider === 'evolution') {
+      if (!config.evolution_instance_name || !config.evolution_instance_token || !config.evolution_api_url) {
+        throw new Error('Configuração Evolution incompleta. Reconecte a instância.');
+      }
+    } else {
+      if (!config.access_token) {
+        throw new Error('Token do WhatsApp não encontrado. Configure o Token na tela de Configurações.');
+      }
+    }
+
+    // ============================
+    // EVOLUTION API SEND
+    // ============================
+    if (config.provider === 'evolution') {
+      console.log(`[send-message] Sending via Evolution to ${phone_number} (instance: ${config.evolution_instance_name})`);
+
+      const evoPayload: any = {
+        number: phone_number,
+        textMessage: { text: content || '' },
+        options: {
+          delay: 1200,
+          presence: 'composing',
+        },
+      };
+
+      // Evolution doesn't support Meta templates — send as plain text
+      if (template_name && !content) {
+        evoPayload.textMessage.text = `[Template: ${template_name}]`;
+      }
+
+      const response = await fetch(
+        `${config.evolution_api_url}/message/sendText/${config.evolution_instance_name}`,
+        {
+          method: 'POST',
+          headers: {
+            'apikey': config.evolution_instance_token,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(evoPayload),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('[send-message] Evolution API error:', data);
+        await supabaseAdmin
+          .from('whatsapp_messages')
+          .update({
+            status: 'failed',
+            error_message: data.message || data.error || 'Failed to send via Evolution',
+          })
+          .eq('id', message_id);
+        throw new Error(data.message || 'Failed to send message via Evolution API');
+      }
+
+      const waMessageId = data.key?.id || data.id || null;
+
+      await supabaseAdmin
+        .from('whatsapp_messages')
+        .update({
+          message_id: waMessageId,
+          status: 'sent',
+          sent_at: new Date().toISOString(),
+        })
+        .eq('id', message_id);
+
+      return new Response(
+        JSON.stringify({ success: true, whatsapp_message_id: waMessageId }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ============================
+    // META API SEND (existing)
+    // ============================
     const token = config.access_token;
 
     let payload: any;
 
     if (template_name) {
-      // Template message
       payload = {
         messaging_product: 'whatsapp',
         to: phone_number,
@@ -138,7 +215,6 @@ const handler = async (req: Request): Promise<Response> => {
         },
       };
 
-      // Add template variables if provided
       if (template_variables && Object.keys(template_variables).length > 0) {
         const sortedKeys = Object.keys(template_variables).sort();
         payload.template.components = [{
@@ -150,7 +226,6 @@ const handler = async (req: Request): Promise<Response> => {
         }];
       }
     } else {
-      // Text message
       payload = {
         messaging_product: 'whatsapp',
         to: phone_number,
@@ -163,7 +238,7 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    console.log(`[send-message] Sending to ${phone_number} using id ${config.phone_number_id}`);
+    console.log(`[send-message] Sending via Meta to ${phone_number} using id ${config.phone_number_id}`);
 
     const response = await fetch(
       `https://graph.facebook.com/v18.0/${config.phone_number_id}/messages`,

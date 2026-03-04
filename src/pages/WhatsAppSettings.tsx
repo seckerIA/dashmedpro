@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { SUPABASE_URL } from '@/integrations/supabase/client';
-import { MessageCircle, Settings, ArrowLeft, Loader2, Users, Phone, CheckCircle, XCircle, Sparkles, FileText } from 'lucide-react';
+import { MessageCircle, Settings, ArrowLeft, Loader2, Users, Phone, CheckCircle, XCircle, Sparkles, FileText, QrCode } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -16,8 +16,11 @@ import { SetupGuide } from '@/components/whatsapp/settings/SetupGuide';
 import { CredentialsForm } from '@/components/whatsapp/settings/CredentialsForm';
 import { FacebookConnectButton } from '@/components/whatsapp/settings/FacebookConnectButton';
 import { TemplateManager } from '@/components/whatsapp/settings/TemplateManager';
+import { ProviderSelector } from '@/components/whatsapp/settings/ProviderSelector';
+import { EvolutionSetup } from '@/components/whatsapp/settings/EvolutionSetup';
 import { useWhatsAppConfig, useTeamWhatsAppConfigs } from '@/hooks/useWhatsAppConfig';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import type { WhatsAppProvider } from '@/types/whatsapp';
 
 export default function WhatsAppSettings() {
   const { config, isLoading, isConfigured, isActive } = useWhatsAppConfig();
@@ -26,6 +29,9 @@ export default function WhatsAppSettings() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [webhookUrl, setWebhookUrl] = useState<string>('');
   const [webhookVerifyToken, setWebhookVerifyToken] = useState<string>('');
+  const [selectedProvider, setSelectedProvider] = useState<WhatsAppProvider | null>(null);
+
+  const provider = (config as any)?.provider as WhatsAppProvider | undefined;
 
   // Sincronizar tab com URL
   const activeTab = searchParams.get('tab') || (isAdmin ? 'team' : (isConfigured ? 'credentials' : 'connect'));
@@ -99,12 +105,17 @@ export default function WhatsAppSettings() {
                   : 'Ative a integração para começar a usar o chat'}
               </p>
             </div>
-            {(config as any)?.oauth_connected && (
+            {provider === 'evolution' ? (
+              <Badge variant="outline" className="ml-auto">
+                <QrCode className="h-3 w-3 mr-1" />
+                Evolution API
+              </Badge>
+            ) : (config as any)?.oauth_connected ? (
               <Badge variant="outline" className="ml-auto">
                 <Sparkles className="h-3 w-3 mr-1" />
-                Conectado via Facebook
+                Meta Business API
               </Badge>
-            )}
+            ) : null}
           </div>
         </div>
       )}
@@ -215,51 +226,80 @@ export default function WhatsAppSettings() {
           </TabsContent>
         )}
 
-        {/* Tab: Conexão Rápida (OAuth) */}
+        {/* Tab: Conexão Rápida (OAuth + Evolution) */}
         <TabsContent value="connect" className="space-y-6">
-          <div className="grid lg:grid-cols-2 gap-6">
-            {/* Botão Facebook OAuth */}
-            <FacebookConnectButton />
-
-            {/* Ou usar credenciais manuais */}
-            <Card className="border-dashed">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-muted-foreground">
-                  <Settings className="h-5 w-5" />
-                  Configuração Manual
-                </CardTitle>
-                <CardDescription>
-                  Prefere configurar manualmente? Use a aba "Credenciais" para inserir
-                  Phone Number ID e Access Token do Meta Developers.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button variant="outline" asChild className="w-full">
-                  <Link to="?tab=credentials">
-                    Ir para Configuração Manual
-                  </Link>
+          {/* Se já tem provider configurado (Evolution), mostrar setup direto */}
+          {provider === 'evolution' ? (
+            <EvolutionSetup />
+          ) : selectedProvider === 'evolution' ? (
+            <>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedProvider(null)} className="mb-2">
+                <ArrowLeft className="h-4 w-4 mr-1.5" />
+                Voltar
+              </Button>
+              <EvolutionSetup />
+            </>
+          ) : selectedProvider === 'meta' || (isConfigured && provider !== 'evolution') ? (
+            <>
+              {!isConfigured && (
+                <Button variant="ghost" size="sm" onClick={() => setSelectedProvider(null)} className="mb-2">
+                  <ArrowLeft className="h-4 w-4 mr-1.5" />
+                  Voltar
                 </Button>
-              </CardContent>
-            </Card>
-          </div>
+              )}
+              <div className="grid lg:grid-cols-2 gap-6">
+                <FacebookConnectButton />
+                <Card className="border-dashed">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-muted-foreground">
+                      <Settings className="h-5 w-5" />
+                      Configuracao Manual
+                    </CardTitle>
+                    <CardDescription>
+                      Prefere configurar manualmente? Use a aba "Credenciais" para inserir
+                      Phone Number ID e Access Token do Meta Developers.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button variant="outline" asChild className="w-full">
+                      <Link to="?tab=credentials">
+                        Ir para Configuracao Manual
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-center mb-4">
+                <h3 className="text-lg font-semibold">Escolha o metodo de conexao</h3>
+                <p className="text-sm text-muted-foreground">Selecione como deseja conectar seu WhatsApp</p>
+              </div>
+              <ProviderSelector onSelect={setSelectedProvider} />
+            </>
+          )}
 
           {/* Dica */}
-          <Card className="bg-muted/30 border-dashed">
-            <CardContent className="pt-6">
-              <div className="flex gap-4">
-                <div className="p-2 rounded-lg bg-blue-500/10 h-fit">
-                  <MessageCircle className="h-5 w-5 text-blue-500" />
+          {!selectedProvider && !isConfigured && (
+            <Card className="bg-muted/30 border-dashed">
+              <CardContent className="pt-6">
+                <div className="flex gap-4">
+                  <div className="p-2 rounded-lg bg-blue-500/10 h-fit">
+                    <MessageCircle className="h-5 w-5 text-blue-500" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="font-medium">Qual metodo escolher?</p>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Meta Business API</strong>: Ideal para empresas com conta Business verificada. Suporta templates e envio em massa.
+                      <br />
+                      <strong>Evolution API</strong>: Conexao rapida via QR Code. Ideal para testes ou uso pessoal. Requer servidor proprio.
+                    </p>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <p className="font-medium">Primeira vez configurando?</p>
-                  <p className="text-sm text-muted-foreground">
-                    Você precisa de uma conta no WhatsApp Business e acesso ao Meta Business Suite.
-                    Ao clicar em "Conectar com Facebook", você será guiado pelo processo de autorização.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="guide" className="space-y-6">

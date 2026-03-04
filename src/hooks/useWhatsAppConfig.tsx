@@ -249,7 +249,10 @@ export function useWhatsAppConfig() {
   // =========================================
   // Helpers
   // =========================================
-  const isConfigured = !!configQuery.data?.phone_number_id;
+  const provider = (configQuery.data as any)?.provider || 'meta';
+  const isConfigured = provider === 'evolution'
+    ? !!(configQuery.data as any)?.evolution_instance_name
+    : !!configQuery.data?.phone_number_id;
   const isActive = configQuery.data?.is_active ?? false;
 
   return {

@@ -23,17 +23,19 @@ function buildAgentIdentity(c: any): any {
   };
 }
 
+var WA_CFG_COLS = 'phone_number_id, access_token, provider, evolution_instance_name, evolution_instance_token, evolution_api_url';
+
 async function getWAConfig(sb: any, uid: string): Promise<any> {
-  var r = await sb.from('whatsapp_config').select('phone_number_id, access_token').eq('user_id', uid).eq('is_active', true).filter('access_token', 'not.is', null).maybeSingle();
+  var r = await sb.from('whatsapp_config').select(WA_CFG_COLS).eq('user_id', uid).eq('is_active', true).maybeSingle();
   if (r.data) return r.data;
   var r2 = await sb.from('secretary_doctor_links').select('doctor_id').eq('secretary_id', uid).eq('is_active', true);
   if (r2.data && r2.data.length > 0) {
     var ids: string[] = [];
     for (var i = 0; i < r2.data.length; i++) ids.push(r2.data[i].doctor_id);
-    var r3 = await sb.from('whatsapp_config').select('phone_number_id, access_token').in('user_id', ids).eq('is_active', true).filter('access_token', 'not.is', null).limit(1).maybeSingle();
+    var r3 = await sb.from('whatsapp_config').select(WA_CFG_COLS).in('user_id', ids).eq('is_active', true).limit(1).maybeSingle();
     if (r3.data) return r3.data;
   }
-  var r4 = await sb.from('whatsapp_config').select('phone_number_id, access_token').eq('is_active', true).filter('access_token', 'not.is', null).limit(1).maybeSingle();
+  var r4 = await sb.from('whatsapp_config').select(WA_CFG_COLS).eq('is_active', true).limit(1).maybeSingle();
   return r4.data;
 }
 
@@ -111,6 +113,7 @@ async function readingDelay(len: number): Promise<void> {
 }
 
 async function sendTyping(cfg: any, mid: string): Promise<void> {
+  if (cfg.provider === 'evolution') return; // Evolution handles presence via send options
   try {
     await fetch('https://graph.facebook.com/v18.0/' + cfg.phone_number_id + '/messages', {
       method: 'POST',
@@ -121,21 +124,34 @@ async function sendTyping(cfg: any, mid: string): Promise<void> {
 }
 
 async function sendWA(cfg: any, to: string, text: string, sb: any, cid: string, uid: string): Promise<void> {
+  var prov = cfg.provider || 'meta';
   var ir = await sb.from('whatsapp_messages').insert({
     user_id: uid, conversation_id: cid, phone_number: to, content: text, direction: 'outbound',
     message_type: 'text', status: 'pending', sent_at: new Date().toISOString(),
+    provider: prov,
     metadata: { auto_reply: true, ai_generated: true, agent: 'whatsapp-ai-agent' },
   }).select('id').single();
   var sm = ir.data;
   try {
-    var wr = await fetch('https://graph.facebook.com/v18.0/' + cfg.phone_number_id + '/messages', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + cfg.access_token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messaging_product: 'whatsapp', to: to, type: 'text', text: { body: text } }),
-    });
+    var wr: Response;
+    if (prov === 'evolution') {
+      wr = await fetch(cfg.evolution_api_url + '/message/sendText/' + cfg.evolution_instance_name, {
+        method: 'POST',
+        headers: { 'apikey': cfg.evolution_instance_token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ number: to, textMessage: { text: text }, options: { delay: 1200, presence: 'composing' } }),
+      });
+    } else {
+      wr = await fetch('https://graph.facebook.com/v18.0/' + cfg.phone_number_id + '/messages', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + cfg.access_token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messaging_product: 'whatsapp', to: to, type: 'text', text: { body: text } }),
+      });
+    }
     if (wr.ok && sm) {
       var wd = await wr.json();
-      var wid = (wd.messages && wd.messages[0]) ? wd.messages[0].id : null;
+      var wid = prov === 'evolution'
+        ? (wd.key && wd.key.id ? wd.key.id : null)
+        : ((wd.messages && wd.messages[0]) ? wd.messages[0].id : null);
       if (wid) await sb.from('whatsapp_messages').update({ status: 'sent', message_id: wid }).eq('id', sm.id);
     }
   } catch (e) {
@@ -432,7 +448,7 @@ async function handler(req: Request): Promise<Response> {
     var wac = await getWAConfig(sb, conv.user_id);
     if (wac) {
       var lir = await sb.from('whatsapp_messages').select('message_id').eq('conversation_id', cid).eq('direction', 'inbound').order('created_at', { ascending: false }).limit(1).maybeSingle();
-      if (lir.data && lir.data.message_id) {
+      if (lir.data && lir.data.message_id && (wac.provider || 'meta') !== 'evolution') {
         try {
           await fetch('https://graph.facebook.com/v18.0/' + wac.phone_number_id + '/messages', {
             method: 'POST',

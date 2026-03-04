@@ -33,6 +33,8 @@ export type WhatsAppMediaType = 'image' | 'audio' | 'video' | 'document' | 'stic
 // CONFIG
 // =====================================================
 
+export type WhatsAppProvider = 'meta' | 'evolution';
+
 export interface WhatsAppConfig {
   id: string;
   user_id: string;
@@ -46,6 +48,11 @@ export interface WhatsAppConfig {
   last_synced_at: string | null;
   created_at: string;
   updated_at: string;
+  provider: WhatsAppProvider;
+  evolution_instance_name: string | null;
+  evolution_instance_token: string | null;
+  evolution_api_url: string | null;
+  evolution_instance_status: string | null;
 }
 
 export interface WhatsAppConfigInsert {

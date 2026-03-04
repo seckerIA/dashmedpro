@@ -9,5 +9,8 @@ verify_jwt = false
 [functions.sofia-generate-embedding]
 verify_jwt = false
 
+[functions.evolution-webhook]
+verify_jwt = false
+
 [functions.facebook-leadgen-webhook]
 verify_jwt = false
