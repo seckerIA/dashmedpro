@@ -21,8 +21,11 @@ export function EvolutionSetup() {
   const initialStep: SetupStep = isConnected ? 'connected' : (isEvolution && config?.evolution_instance_name ? 'qrcode' : 'configure');
 
   const [step, setStep] = useState<SetupStep>(initialStep);
-  const [apiUrl, setApiUrl] = useState(config?.evolution_api_url || '');
-  const [instanceName, setInstanceName] = useState(config?.evolution_instance_name || '');
+  const DEFAULT_API_URL = 'https://imperius-evolution-api.ehparc.easypanel.host';
+  const DEFAULT_INSTANCE = 'imperius-dashmed';
+
+  const [apiUrl, setApiUrl] = useState(config?.evolution_api_url || DEFAULT_API_URL);
+  const [instanceName, setInstanceName] = useState(config?.evolution_instance_name || DEFAULT_INSTANCE);
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);

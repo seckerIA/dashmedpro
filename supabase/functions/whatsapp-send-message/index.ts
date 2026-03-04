@@ -155,7 +155,7 @@ const handler = async (req: Request): Promise<Response> => {
       }
 
       const response = await fetch(
-        `${config.evolution_api_url}/message/sendText/${config.evolution_instance_name}`,
+        `${config.evolution_api_url.replace(/\/+$/, '')}/api/v1/message/sendText/${config.evolution_instance_name}`,
         {
           method: 'POST',
           headers: {

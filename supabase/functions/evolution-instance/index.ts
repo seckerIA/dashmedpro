@@ -49,6 +49,12 @@ serve(async (req) => {
       });
     }
 
+    // Helper: build Evolution API URL with /api/v1 prefix
+    const evoUrl = (baseUrl: string, path: string) => {
+      const base = baseUrl.replace(/\/+$/, '');
+      return `${base}/api/v1${path}`;
+    };
+
     // ---- ACTION: CREATE ----
     if (action === 'create') {
       const { instance_name, api_url } = body;
@@ -65,7 +71,7 @@ serve(async (req) => {
       const webhookUrl = `${supabaseUrl}/functions/v1/evolution-webhook`;
 
       // Create instance on Evolution API
-      const createRes = await fetch(`${api_url}/instance/create`, {
+      const createRes = await fetch(evoUrl(api_url, '/instance/create'), {
         method: 'POST',
         headers: {
           'apikey': globalApiKey,
@@ -131,7 +137,7 @@ serve(async (req) => {
       // Try to get QR code immediately
       let qrCode = null;
       try {
-        const qrRes = await fetch(`${api_url}/instance/connect/${safeName}`, {
+        const qrRes = await fetch(evoUrl(api_url, `/instance/connect/${safeName}`), {
           headers: { 'apikey': globalApiKey },
         });
         if (qrRes.ok) {
@@ -172,7 +178,7 @@ serve(async (req) => {
         });
       }
 
-      const qrRes = await fetch(`${apiUrl}/instance/connect/${instance_name}`, {
+      const qrRes = await fetch(evoUrl(apiUrl, `/instance/connect/${instance_name}`), {
         headers: { 'apikey': globalApiKey },
       });
 
@@ -217,7 +223,7 @@ serve(async (req) => {
       // Fetch live status from Evolution
       let liveState = config?.evolution_instance_status || 'disconnected';
       try {
-        const stateRes = await fetch(`${apiUrl}/instance/connectionState/${instance_name}`, {
+        const stateRes = await fetch(evoUrl(apiUrl, `/instance/connectionState/${instance_name}`), {
           headers: { 'apikey': globalApiKey },
         });
         if (stateRes.ok) {
@@ -260,7 +266,7 @@ serve(async (req) => {
       if (apiUrl) {
         // Delete from Evolution server
         try {
-          await fetch(`${apiUrl}/instance/delete/${instance_name}`, {
+          await fetch(evoUrl(apiUrl, `/instance/delete/${instance_name}`), {
             method: 'DELETE',
             headers: { 'apikey': globalApiKey },
           });
