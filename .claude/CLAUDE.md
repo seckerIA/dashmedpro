@@ -361,14 +361,17 @@ import { z } from 'zod';
 ```
 supabase/functions/
 ├── whatsapp-webhook/            # Recebe mensagens do Meta (v18.0) — trigger para AI agent
-├── whatsapp-send-message/       # Envia mensagens via Graph API (v18.0)
-├── whatsapp-ai-agent/           # Agente conversacional humanizado GPT-4o (NOVO)
+├── whatsapp-send-message/       # Envia mensagens via Graph API (v18.0) ou Evolution API
+├── whatsapp-ai-agent/           # Agente conversacional humanizado GPT-4o
 │   ├── index.ts                 # Handler principal (lock, debounce, RAG, send)
 │   ├── router.ts                # Deteccao de fase heuristica (5 fases medicas)
 │   └── prompt.ts                # Prompts por fase + identidade configuravel
-├── whatsapp-ai-analyze/         # Analise de conversas com GPT-4o-mini (backup/legacy)
-├── sofia-generate-embedding/    # Gera embeddings para RAG knowledge base (NOVO)
-├── whatsapp-config-validate/    # Valida tokens e configura webhook
+├── whatsapp-ai-analyze/         # Analise de conversas com GPT-4o-mini (legacy)
+├── evolution-instance/          # Gerencia instancias Evolution API (create, connect, status, delete)
+├── evolution-webhook/           # Recebe webhooks Evolution API (verify_jwt=false)
+├── sofia-generate-embedding/    # Gera embeddings para RAG knowledge base
+├── whatsapp-config-validate/    # Valida tokens e configura webhook Meta
+├── whatsapp-list-accounts/      # Lista WABAs do Business Manager
 ├── meta-token-exchange/         # OAuth token exchange do Meta Business (v22.0)
 ├── meta-oauth-callback/         # OAuth callback + asset discovery (v22.0)
 ├── sync-ad-campaigns/           # Sincroniza campanhas Meta Ads (v22.0)
@@ -397,6 +400,8 @@ npm run test:qa:flowN # Doctor Strange — specific flow (N=1-7)
 - **IA no WhatsApp (Agente Humanizado)**: GPT-4o conversacional com 5 fases medicas (abertura, triagem, agendamento, pos_agendamento, handoff), lock atomico PostgreSQL, RAG pgvector, typing simulation, message splitting ([SPLIT])
 - **IA no WhatsApp (Legacy)**: `whatsapp-ai-analyze` mantido como backup — analise via GPT-4o-mini, qualificacao de leads
 - **AI Agent Identity**: Nome, clinica, especialista e saudacao configuraveis por usuario em `whatsapp_ai_config`
+- **Dual WhatsApp Provider**: Meta Business API (oficial) + Evolution API (QR Code self-hosted). Provider enum em whatsapp_config, conversations e messages. AI agent funciona para ambos.
+- **Evolution API**: Docker self-hosted (atendai/evolution-api:v2.2.3), QR Code connection, Global API Key + Instance Token
 - **Meta Ads**: FB.login() + code exchange, long-lived token (60 dias), Graph API v22.0
 - **Meta OAuth**: `useMetaOAuth` hook centralizado (useWhatsAppOAuth deprecado)
 - **ROAS**: Calculado via `action_values.purchase` / `spend` na sync de campanhas
@@ -642,4 +647,74 @@ Regras criticas:
 
 ---
 
-**Version:** 0.9.0 | 2026-02-22 | DevSquad Avengers Edition + Doctor Strange QA
+### Sessao 03/03/2026 — Evolution API Integration (Dual WhatsApp Provider)
+
+#### Contexto
+Implementacao da Evolution API como segundo provedor WhatsApp. Usuarios podem escolher entre Meta Business API (oficial) ou Evolution API (conexao via QR Code, sem conta Business necessaria).
+
+#### Arquitetura Dual Provider
+```
+whatsapp_config.provider: 'meta' | 'evolution'
+- Meta: Graph API v18.0 (existente, sem mudancas)
+- Evolution: Self-hosted Docker (atendai/evolution-api:v2.2.3)
+- Ambos normalizam para whatsapp_messages/conversations
+- AI agent (whatsapp-ai-agent) funciona identicamente para ambos
+```
+
+#### Migration SQL
+- `whatsapp_provider` ENUM ('meta', 'evolution')
+- `whatsapp_config`: +4 colunas (evolution_instance_name, evolution_instance_token, evolution_api_url, evolution_instance_status)
+- `whatsapp_conversations` e `whatsapp_messages`: +coluna `provider`
+
+#### Arquivos Criados (4)
+- `supabase/migrations/20260303000001_add_evolution_provider.sql`
+- `supabase/functions/evolution-instance/index.ts` — Gerencia ciclo de vida (create, connect/QR, status, delete)
+- `supabase/functions/evolution-webhook/index.ts` — Recebe webhooks Evolution (messages.upsert, connection.update)
+- `src/components/whatsapp/settings/ProviderSelector.tsx` — Selecao Meta vs Evolution
+- `src/components/whatsapp/settings/EvolutionSetup.tsx` — Setup 3-step (config → QR code → conectado)
+
+#### Arquivos Modificados (6)
+- `supabase/functions/whatsapp-send-message/index.ts` — Provider branching no envio
+- `supabase/functions/whatsapp-ai-agent/index.ts` — sendWA + sendTyping + mark-as-read por provider
+- `src/hooks/useWhatsAppConfig.tsx` — isConfigured considera ambos providers
+- `src/pages/WhatsAppSettings.tsx` — ProviderSelector + EvolutionSetup + badge provider
+- `src/types/whatsapp.ts` — WhatsAppProvider type + campos Evolution
+- `supabase/config.toml` — evolution-webhook verify_jwt=false
+
+#### Deploy
+- 4 Edge Functions deployadas: evolution-instance, evolution-webhook, whatsapp-send-message, whatsapp-ai-agent
+- Evolution API server: `https://imperius-evolution-api.ehparc.easypanel.host/`
+- Secrets configurados: `EVOLUTION_GLOBAL_API_KEY`, `EVOLUTION_API_URL`
+
+---
+
+### Sessao 03/03/2026 — Lucid UI Medical Calendar Redesign
+
+#### Contexto
+Redesign visual completo da agenda medica com novo design system "Lucid UI" e otimizacao mobile.
+
+#### Mudancas
+- Nova interface de agenda com melhor UX
+- Otimizacao responsiva para mobile/tablet
+- PWA improvements, iOS safe areas, code splitting
+
+---
+
+### Sessao 04/03/2026 — Project Cleanup + CLAUDE.md Rewrite
+
+#### Cleanup
+- **45 arquivos deletados** (8821 linhas removidas):
+  - `docs/` inteiro (33 MDs + 2 PNGs de tutoriais e guias)
+  - `PLAN.md`, `.lovable/`, `.agent/`, `.cursor/plans/`, `.cursor/CLAUDE.md`
+  - `public/frontend/`, `dist/frontend/` (demo components)
+  - `.claude/scripts de vendas.md`, `.claude/agents/AGENTE.md`
+
+#### CLAUDE.md Root Rewrite
+- Reescrito completamente com estado atual do projeto
+- Removidos 25+ entradas "Contexto Atual" antigas (Jan-Feb 2026)
+- Adicionado: modulo estoque, Evolution API, Cortana, Edge Functions atualizadas
+- Versao atualizada para 1.0.0
+
+---
+
+**Version:** 1.0.0 | 2026-03-04 | DevSquad Avengers + Evolution API + Inventory Module
