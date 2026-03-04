@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bell, X, CheckCheck, Calendar, ClipboardCheck, Sparkles, MessageSquare, AlertCircle, Clock, AlertTriangle, Snowflake, DollarSign } from 'lucide-react';
+import { Bell, X, CheckCheck, Calendar, ClipboardCheck, Sparkles, MessageSquare, AlertCircle, Clock, AlertTriangle, Snowflake, DollarSign, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -56,6 +56,13 @@ export function NotificationBell({ className }: NotificationBellProps) {
           color: 'bg-orange-500',
           bgLight: 'bg-orange-500/10',
           textColor: 'text-orange-600'
+        };
+      case 'new_lead_form':
+        return {
+          icon: UserPlus,
+          color: 'bg-emerald-500',
+          bgLight: 'bg-emerald-500/10',
+          textColor: 'text-emerald-600'
         };
       case 'message':
         return {

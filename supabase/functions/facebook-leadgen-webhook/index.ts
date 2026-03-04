@@ -437,4 +437,19 @@ async function autoCreateLeadContact(
 
     console.log(`[Leadgen Webhook] Submission ${submissionId} linked to CRM (contact: ${contactId}, deal: ${dealId})`);
   }
+
+  // Notificar usuário sobre novo lead
+  try {
+    await supabase.from('notifications').insert({
+      user_id: userId,
+      type: 'new_lead_form',
+      title: 'Novo Lead via Formulário',
+      message: `${fullName || 'Novo lead'} preencheu o formulário${formName ? ` "${formName}"` : ''}${campaignName ? ` (Campanha: ${campaignName})` : ''}`,
+      read: false,
+      metadata: { submission_id: submissionId, contact_id: contactId, deal_id: dealId },
+    });
+    console.log(`[Leadgen Webhook] Notification created for user ${userId}`);
+  } catch (e) {
+    console.warn('[Leadgen Webhook] Could not create notification:', e);
+  }
 }

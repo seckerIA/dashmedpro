@@ -126,6 +126,27 @@ export function useNotifications() {
     }
   }, [user?.id]);
 
+  // Realtime: atualizar sininho instantaneamente ao receber nova notificação
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('notifications-realtime')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${user.id}`,
+      }, (payload) => {
+        const newNotif = payload.new as Notification;
+        setNotifications(prev => [newNotif, ...prev]);
+        setUnreadCount(prev => prev + 1);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id]);
+
   return {
     notifications,
     unreadCount,
