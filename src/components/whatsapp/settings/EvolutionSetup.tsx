@@ -53,6 +53,7 @@ export function EvolutionSetup() {
     });
 
     if (res.error) throw new Error(res.error.message);
+    if (res.data?.error) throw new Error(res.data.error + (res.data.details ? `: ${res.data.details}` : ''));
     return res.data;
   };
 
@@ -66,13 +67,16 @@ export function EvolutionSetup() {
     setError(null);
 
     try {
+      const safeName = instanceName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
       const result = await callEvolutionInstance('create', {
-        instance_name: instanceName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_'),
+        instance_name: safeName,
         api_url: apiUrl.trim().replace(/\/+$/, ''),
       });
 
-      if (result.qrcode) {
-        setQrCodeData(result.qrcode);
+      setInstanceName(result.instance_name || safeName);
+
+      if (result.qr_code) {
+        setQrCodeData(result.qr_code);
       }
 
       setStep('qrcode');
@@ -91,9 +95,11 @@ export function EvolutionSetup() {
 
   const fetchQrCode = async () => {
     try {
-      const result = await callEvolutionInstance('connect');
-      if (result.qrcode) {
-        setQrCodeData(result.qrcode);
+      const name = instanceName || config?.evolution_instance_name;
+      if (!name) return;
+      const result = await callEvolutionInstance('connect', { instance_name: name });
+      if (result.qr_code) {
+        setQrCodeData(result.qr_code);
       }
     } catch (_e) {
       // ignore — QR code may not be available yet
@@ -102,7 +108,9 @@ export function EvolutionSetup() {
 
   const checkStatus = async () => {
     try {
-      const result = await callEvolutionInstance('status');
+      const name = instanceName || config?.evolution_instance_name;
+      if (!name) return;
+      const result = await callEvolutionInstance('status', { instance_name: name });
       const state = result.state || 'disconnected';
       setConnectionStatus(state);
 
@@ -132,7 +140,8 @@ export function EvolutionSetup() {
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
-      await callEvolutionInstance('delete');
+      const name = instanceName || config?.evolution_instance_name;
+      await callEvolutionInstance('delete', { instance_name: name });
       if (pollingRef.current) clearInterval(pollingRef.current);
       setStep('configure');
       setQrCodeData(null);
