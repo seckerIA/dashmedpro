@@ -15,7 +15,6 @@ export function ThemeToggle({ isCollapsed = false }: ThemeToggleProps) {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
-  // Evitar hidratação mismatch
   useEffect(() => {
     setMounted(true)
   }, [])
@@ -32,17 +31,10 @@ export function ThemeToggle({ isCollapsed = false }: ThemeToggleProps) {
 
   const linkContent = (
     <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} w-full`}>
-      <div className={`flex items-center ${isCollapsed ? '' : 'gap-4'}`}>
-        <Icon className={`
-          w-7 h-7 transition-all duration-200
-          text-muted-foreground group-hover:text-foreground
-          group-hover:scale-105
-        `} />
+      <div className={`flex items-center ${isCollapsed ? '' : 'gap-3'}`}>
+        <Icon className="w-5 h-5 transition-all duration-200 text-muted-foreground group-hover:text-primary" />
         {!isCollapsed && (
-          <span className={`
-            text-lg font-medium transition-colors duration-200
-            text-muted-foreground group-hover:text-foreground
-          `}>
+          <span className="text-sm font-medium transition-colors duration-200 text-muted-foreground group-hover:text-foreground">
             Tema {theme === "light" ? "Escuro" : "Claro"}
           </span>
         )}
@@ -54,8 +46,8 @@ export function ThemeToggle({ isCollapsed = false }: ThemeToggleProps) {
     <button
       onClick={toggleTheme}
       className={`
-        block ${isCollapsed ? 'p-3.5' : 'px-4 py-3.5'} rounded-2xl transition-all duration-200 group relative w-full
-        text-muted-foreground hover:bg-accent hover:text-accent-foreground
+        block ${isCollapsed ? 'p-2' : 'px-3 py-2'} rounded-2xl text-sm font-medium transition-all duration-200 group relative w-full
+        text-muted-foreground hover:bg-accent hover:text-accent-foreground border border-transparent
       `}
     >
       {linkContent}
@@ -77,19 +69,3 @@ export function ThemeToggle({ isCollapsed = false }: ThemeToggleProps) {
 
   return buttonContent
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

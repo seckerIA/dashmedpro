@@ -383,7 +383,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                               <button
                                 className={`
                                   group relative w-full flex items-center justify-center
-                                  p-2.5 rounded-2xl text-base font-medium
+                                  p-2 rounded-2xl text-sm font-medium
                                   transition-all duration-200
                                   ${active
                                     ? 'bg-primary/15 text-primary border border-primary/20 shadow-[0_0_15px_rgba(37,99,235,0.15)]'
@@ -395,15 +395,15 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                                   <img
                                     src={item.iconImage}
                                     alt={item.title}
-                                    className="w-9 h-9 object-contain drop-shadow-[0_4px_6px_rgba(0,0,0,0.3)] transition-transform duration-200 group-hover:scale-110"
+                                    className="w-5 h-5 object-contain transition-transform duration-200 group-hover:scale-110"
                                   />
                                 ) : (
                                   <item.icon
                                     className={`
-                                      w-8 h-8 transition-all duration-300
+                                      w-5 h-5 transition-all duration-200
                                       ${active
-                                        ? 'text-primary fill-primary/20 drop-shadow-[0_0_12px_rgba(37,99,235,0.8)] scale-110 rotate-3'
-                                        : 'text-muted-foreground group-hover:text-primary group-hover:drop-shadow-[0_0_8px_rgba(37,99,235,0.5)] group-hover:scale-105'
+                                        ? 'text-primary'
+                                        : 'text-muted-foreground group-hover:text-primary'
                                       }
                                     `}
                                   />
@@ -458,9 +458,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                             {/* Item pai - botão que navega E expande */}
                             <button
                               onClick={() => {
-                                // Navegar para a URL principal do item
                                 navigate(item.url);
-                                // Expandir se não estiver expandido
                                 if (!expanded) {
                                   toggleExpanded(item.title);
                                 }
@@ -480,15 +478,15 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                                   <img
                                     src={item.iconImage}
                                     alt={item.title}
-                                    className="w-8 h-8 object-contain drop-shadow-[0_4px_6px_rgba(0,0,0,0.3)] transition-transform duration-200 group-hover:scale-110"
+                                    className="w-5 h-5 object-contain transition-transform duration-200 group-hover:scale-110"
                                   />
                                 ) : (
                                   <item.icon
                                     className={`
-                                      w-7 h-7 transition-all duration-300
+                                      w-5 h-5 transition-all duration-200
                                       ${active
-                                        ? 'text-foreground drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] scale-110'
-                                        : 'text-muted-foreground group-hover:text-foreground group-hover:drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]'
+                                        ? 'text-primary'
+                                        : 'text-muted-foreground group-hover:text-primary'
                                       }
                                     `}
                                   />
@@ -510,9 +508,9 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                                 className="p-1 hover:bg-white/10 rounded-lg"
                               >
                                 {expanded ? (
-                                  <ChevronDown className="w-5 h-5 text-muted-foreground transition-transform duration-200" />
+                                  <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform duration-200" />
                                 ) : (
-                                  <ChevronRight className="w-5 h-5 text-muted-foreground transition-transform duration-200" />
+                                  <ChevronRight className="w-4 h-4 text-muted-foreground transition-transform duration-200" />
                                 )}
                               </div>
                             </button>
@@ -549,7 +547,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                                       >
                                         <subItem.icon
                                           className={`
-                                          w-5 h-5 transition-all duration-200
+                                          w-4 h-4 transition-all duration-200
                                           ${subActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-accent-foreground'}
                                         `}
                                         />
@@ -566,20 +564,20 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                       // Item normal sem sub-itens
                       const linkContent = (
                         <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} w-full`}>
-                          <div className={`flex items-center ${isCollapsed ? '' : 'gap-4'}`}>
+                          <div className={`flex items-center ${isCollapsed ? '' : 'gap-3'}`}>
                             {item.iconImage ? (
                               <img
                                 src={item.iconImage}
                                 alt={item.title}
-                                className="w-8 h-8 object-contain drop-shadow-md transition-transform duration-200 group-hover:scale-110"
+                                className="w-5 h-5 object-contain transition-transform duration-200 group-hover:scale-110"
                               />
                             ) : (
                               <item.icon
                                 className={`
-                                  w-7 h-7 transition-all duration-300
+                                  w-5 h-5 transition-all duration-200
                                   ${active
-                                    ? 'text-primary fill-primary/20 drop-shadow-[0_0_12px_rgba(37,99,235,0.8)] scale-110 rotate-3'
-                                    : 'text-muted-foreground group-hover:text-primary group-hover:drop-shadow-[0_0_8px_rgba(37,99,235,0.5)] group-hover:scale-105'
+                                    ? 'text-primary'
+                                    : 'text-muted-foreground group-hover:text-primary'
                                   }
                                 `}
                               />
@@ -587,7 +585,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                             {!isCollapsed && (
                               <span
                                 className={`
-                                  text-base font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden
+                                  text-sm font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden
                                   ${active ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}
                                 `}
                               >
@@ -640,7 +638,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                               className={`
                                 group relative w-full block
                                 ${isCollapsed ? 'p-2' : 'px-3 py-2'}
-                                rounded-2xl text-base font-medium
+                                rounded-2xl text-sm font-medium
                                 transition-all duration-200
                                 ${active
                                   ? 'bg-primary/15 text-primary border border-primary/20 shadow-[0_0_15px_rgba(37,99,235,0.15)]'
@@ -683,18 +681,17 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
             const active = isActive('/configuracoes');
             const linkContent = (
               <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} w-full`}>
-                <div className={`flex items-center ${isCollapsed ? '' : 'gap-4'}`}>
+                <div className={`flex items-center ${isCollapsed ? '' : 'gap-3'}`}>
                   <Settings
                     className={`
-                      w-7 h-7 transition-all duration-200
-                      ${active ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}
-                      group-hover:scale-105
+                      w-5 h-5 transition-all duration-200
+                      ${active ? 'text-primary' : 'text-muted-foreground group-hover:text-primary'}
                     `}
                   />
                   {!isCollapsed && (
                     <span
                       className={`
-                        text-base font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden
+                        text-sm font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden
                         ${active ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}
                       `}
                     >
@@ -713,12 +710,12 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                     onClick={() => onNavigate?.()}
                     className={`
                       group relative w-full block
-                      ${isCollapsed ? 'p-2' : 'px-4 py-2.5'}
-                      rounded-2xl text-base font-medium
+                      ${isCollapsed ? 'p-2' : 'px-3 py-2'}
+                      rounded-2xl text-sm font-medium
                       transition-all duration-200
                       ${active
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                        ? 'bg-primary/15 text-primary border border-primary/20 shadow-[0_0_15px_rgba(37,99,235,0.15)]'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground border border-transparent'
                       }
                     `}
                   >
@@ -746,7 +743,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                 onClick={handleSignOut}
                 className="w-full justify-start px-2.5 py-1.5 h-8 rounded-2xl text-sm text-muted-foreground hover:text-foreground hover:bg-accent"
               >
-                <LogOut className="mr-2 h-5 w-5" />
+                <LogOut className="mr-2 h-4 w-4" />
                 Sair
               </Button>
             </div>

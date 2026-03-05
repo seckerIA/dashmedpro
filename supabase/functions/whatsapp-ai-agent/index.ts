@@ -135,7 +135,7 @@ async function sendWA(cfg: any, to: string, text: string, sb: any, cid: string, 
   try {
     var wr: Response;
     if (prov === 'evolution') {
-      wr = await fetch(cfg.evolution_api_url.replace(/\/+$/, '') + '/api/v1/message/sendText/' + cfg.evolution_instance_name, {
+      wr = await fetch(cfg.evolution_api_url.replace(/\/+$/, '') + '/message/sendText/' + cfg.evolution_instance_name, {
         method: 'POST',
         headers: { 'apikey': cfg.evolution_instance_token, 'Content-Type': 'application/json' },
         body: JSON.stringify({ number: to, textMessage: { text: text }, options: { delay: 1200, presence: 'composing' } }),

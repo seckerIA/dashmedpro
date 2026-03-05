@@ -49,10 +49,10 @@ serve(async (req) => {
       });
     }
 
-    // Helper: build Evolution API URL with /api/v1 prefix
+    // Helper: build Evolution API URL (no prefix — v2 uses root paths)
     const evoUrl = (baseUrl: string, path: string) => {
       const base = baseUrl.replace(/\/+$/, '');
-      return `${base}/api/v1${path}`;
+      return `${base}${path}`;
     };
 
     // ---- ACTION: CREATE ----
