@@ -18,6 +18,7 @@ import {
   Bot,
   ArrowUpCircle,
   Paperclip as PaperclipIcon,
+  Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -187,6 +188,8 @@ export function ChatWindow({
     isChangingStatus,
     toggleMute,
     isTogglingMute,
+    deleteConversation,
+    isDeleting,
   } = useWhatsAppConversations();
 
   const displayName =
@@ -250,6 +253,12 @@ export function ChatWindow({
       mute: !conversation.is_muted,
     });
   }, [toggleMute, conversation.id, conversation.is_muted]);
+
+  const handleDelete = useCallback(async () => {
+    if (!window.confirm('Tem certeza que deseja excluir esta conversa e todas as mensagens?')) return;
+    await deleteConversation(conversation.id);
+    onBack?.();
+  }, [deleteConversation, conversation.id, onBack]);
 
   // Estado para passar texto sugerido para o input
   const [inputTextOverride, setInputTextOverride] = useState<string | undefined>(undefined);
@@ -537,6 +546,17 @@ export function ChatWindow({
                 <DropdownMenuItem onClick={() => setShowAssignDialog(true)}>
                   <UserPlus className="h-4 w-4 mr-2" />
                   {conversation.assigned_to ? 'Transferir conversa' : 'Atribuir conversa'}
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator />
+
+                <DropdownMenuItem
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className="text-red-500 focus:text-red-500"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Excluir conversa
                 </DropdownMenuItem>
 
                 {/* Mobile-only actions (hidden on md+) */}

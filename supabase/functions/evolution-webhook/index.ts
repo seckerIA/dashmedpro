@@ -70,11 +70,7 @@ const handler = async (req: Request): Promise<Response> => {
         return new Response('OK', { status: 200 });
       }
 
-      // Skip outgoing messages (fromMe = true)
-      if (data.key.fromMe) {
-        console.log('[EvoWebhook] Skipping outgoing message');
-        return new Response('OK', { status: 200 });
-      }
+      const isFromMe = !!data.key.fromMe;
 
       // Extract phone number (strip @s.whatsapp.net)
       const remoteJid = data.key.remoteJid || '';
@@ -86,6 +82,19 @@ const handler = async (req: Request): Promise<Response> => {
       if (remoteJid.endsWith('@g.us')) {
         console.log('[EvoWebhook] Skipping group message');
         return new Response('OK', { status: 200 });
+      }
+
+      // Skip old historical messages (older than 5 minutes = likely from initial sync)
+      if (data.messageTimestamp) {
+        const msgTs = typeof data.messageTimestamp === 'number'
+          ? data.messageTimestamp * 1000
+          : parseInt(data.messageTimestamp) * 1000;
+        const ageMs = Date.now() - msgTs;
+        const MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
+        if (ageMs > MAX_AGE_MS) {
+          console.log('[EvoWebhook] Skipping old message (age:', Math.round(ageMs / 1000), 's)');
+          return new Response('OK', { status: 200 });
+        }
       }
 
       // Extract content
@@ -133,7 +142,7 @@ const handler = async (req: Request): Promise<Response> => {
           conversation_id: conversationId,
           message_id: messageId,
           phone_number: phoneNumber,
-          direction: 'inbound',
+          direction: isFromMe ? 'outbound' : 'inbound',
           content: content,
           message_type: messageType,
           status: 'delivered',
@@ -154,32 +163,39 @@ const handler = async (req: Request): Promise<Response> => {
       }
 
       // Update conversation
-      await supabaseAdmin
-        .from('whatsapp_conversations')
-        .update({
-          last_message_at: new Date().toISOString(),
-          last_message_preview: content.substring(0, 100),
-          last_message_direction: 'inbound',
-          contact_name: contactName || undefined,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', conversationId);
-
-      // Increment unread count
-      const { data: convData } = await supabaseAdmin
-        .from('whatsapp_conversations')
-        .select('unread_count')
-        .eq('id', conversationId)
-        .single();
+      const convUpdate: Record<string, any> = {
+        last_message_at: new Date().toISOString(),
+        last_message_preview: content.substring(0, 100),
+        last_message_direction: isFromMe ? 'outbound' : 'inbound',
+        updated_at: new Date().toISOString(),
+      };
+      if (contactName) convUpdate.contact_name = contactName;
 
       await supabaseAdmin
         .from('whatsapp_conversations')
-        .update({ unread_count: (convData?.unread_count || 0) + 1 })
+        .update(convUpdate)
         .eq('id', conversationId);
 
-      console.log('[EvoWebhook] Message saved:', savedMessage.id);
+      // Increment unread count only for inbound messages
+      if (!isFromMe) {
+        const { data: convData } = await supabaseAdmin
+          .from('whatsapp_conversations')
+          .select('unread_count')
+          .eq('id', conversationId)
+          .single();
 
-      // ---- Trigger AI Agent (same as Meta webhook) ----
+        await supabaseAdmin
+          .from('whatsapp_conversations')
+          .update({ unread_count: (convData?.unread_count || 0) + 1 })
+          .eq('id', conversationId);
+      }
+
+      console.log('[EvoWebhook] Message saved:', savedMessage.id, isFromMe ? '(outbound)' : '(inbound)');
+
+      // ---- Trigger AI Agent only for inbound messages ----
+      if (isFromMe) {
+        return new Response('OK', { status: 200, headers: corsHeaders });
+      }
       const aiUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/whatsapp-ai-agent`;
       const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 

@@ -428,6 +428,41 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
   });
 
   // =========================================
+  // Mutation: Excluir conversa (e mensagens)
+  // =========================================
+  const deleteConversationMutation = useMutation({
+    mutationFn: async (conversationId: string) => {
+      // Delete messages first (FK constraint)
+      const { error: msgErr } = await supabase
+        .from('whatsapp_messages')
+        .delete()
+        .eq('conversation_id', conversationId);
+
+      if (msgErr) throw msgErr;
+
+      // Delete conversation
+      const { error: convErr } = await supabase
+        .from('whatsapp_conversations')
+        .delete()
+        .eq('id', conversationId);
+
+      if (convErr) throw convErr;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [WHATSAPP_CONVERSATIONS_KEY] });
+      queryClient.invalidateQueries({ queryKey: [WHATSAPP_INBOX_STATS_KEY] });
+      toast({ title: 'Conversa excluída' });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao excluir conversa',
+        description: error.message,
+      });
+    },
+  });
+
+  // =========================================
   // Helpers
   // =========================================
   const getConversationById = (id: string) => {
@@ -462,6 +497,9 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
 
     toggleMute: toggleMuteMutation.mutateAsync,
     isTogglingMute: toggleMuteMutation.isPending,
+
+    deleteConversation: deleteConversationMutation.mutateAsync,
+    isDeleting: deleteConversationMutation.isPending,
 
     // Helpers
     getConversationById,
