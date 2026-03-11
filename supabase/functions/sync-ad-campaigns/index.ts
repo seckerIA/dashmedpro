@@ -14,10 +14,6 @@ const corsHeaders = {
 
 const GRAPH_API_VERSION = "v22.0";
 
-interface SyncRequest {
-  connection_id: string;
-}
-
 interface MetaCampaign {
   id: string;
   name: string;
@@ -48,23 +44,28 @@ interface CampaignWithInsights extends MetaCampaign {
 }
 
 const handler = async (req: Request): Promise<Response> => {
+  // Handle CORS
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const authHeader = req.headers.get('Authorization')!;
+  const supabaseAdmin = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
 
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
+  let current_connection_id: string | null = null;
+  let current_user_id: string | null = null;
+
+  try {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'No authorization header' }), { 
+        status: 401, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -75,22 +76,27 @@ const handler = async (req: Request): Promise<Response> => {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
+        status: 401, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
     }
 
-    const { connection_id }: SyncRequest = await req.json();
+    current_user_id = user.id;
+
+    // Safe JSON parsing
+    const body = await req.json().catch(() => ({}));
+    const { connection_id } = body;
+    current_connection_id = connection_id;
 
     if (!connection_id) {
-      return new Response(
-        JSON.stringify({ error: 'connection_id is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: 'connection_id is required' }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
     }
 
-    // Buscar conexão
+    // Buscar conexão usando o token do usuário (garante permissão)
     const { data: connection, error: connError } = await supabase
       .from('ad_platform_connections')
       .select('*')
@@ -99,24 +105,20 @@ const handler = async (req: Request): Promise<Response> => {
       .single();
 
     if (connError || !connection) {
-      return new Response(
-        JSON.stringify({ error: 'Connection not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: 'Connection not found or access denied' }), { 
+        status: 404, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
     }
 
-    // Atualizar status para pending
+    // Atualizar status para pending via admin
     await supabaseAdmin
       .from('ad_platform_connections')
-      .update({
-        sync_status: 'pending',
-        error_message: null
-      })
+      .update({ sync_status: 'pending', error_message: null })
       .eq('id', connection_id);
 
     let syncResult;
 
-    // Chamar função específica baseada na plataforma
     if (connection.platform === 'google_ads') {
       syncResult = await syncGoogleAds(connection, supabaseAdmin, user.id);
     } else if (connection.platform === 'meta_ads') {
@@ -125,305 +127,192 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Unsupported platform');
     }
 
-    // Atualizar status da conexão
+    // Atualizar status final (sucesso ou erro esperado)
     await supabaseAdmin
       .from('ad_platform_connections')
       .update({
         sync_status: syncResult.success ? 'success' : 'error',
         last_sync_at: new Date().toISOString(),
-        error_message: syncResult.error || null
+        error_message: (syncResult as any).error || null
       })
       .eq('id', connection_id);
 
-    return new Response(
-      JSON.stringify(syncResult),
-      {
-        status: syncResult.success ? 200 : 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      }
-    );
+    return new Response(JSON.stringify(syncResult), {
+      status: syncResult.success ? 200 : 400, // Error de negócio é 400, não 500
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
 
   } catch (error: any) {
-    console.error("Error in sync-ad-campaigns function:", error);
-    return new Response(
-      JSON.stringify({ error: error.message, success: false }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      }
-    );
+    console.error("Critical error in sync-ad-campaigns:", error);
+    
+    // Se falhou e temos o ID da conexão, gravar o erro no banco
+    if (current_connection_id) {
+      await supabaseAdmin
+        .from('ad_platform_connections')
+        .update({
+          sync_status: 'error',
+          last_sync_at: new Date().toISOString(),
+          error_message: `Erro interno: ${error.message}`
+        })
+        .eq('id', current_connection_id);
+    }
+
+    return new Response(JSON.stringify({ error: error.message, success: false }), {
+      status: 500,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
   }
 };
 
-// =====================================================
-// Google Ads Sync (placeholder)
-// =====================================================
-
 async function syncGoogleAds(connection: any, supabase: any, userId: string) {
-  try {
-    // TODO: Implementar chamada real à Google Ads API
-    // Requer configuração do Google Ads API Client Library
-    // https://developers.google.com/google-ads/api/docs/client-libs
-
-    return {
-      success: true,
-      campaigns_synced: 0,
-      message: 'Google Ads sync not yet implemented. Please implement Google Ads API integration.'
-    };
-  } catch (error: any) {
-    return {
-      success: false,
-      error: error.message
-    };
-  }
+  return { 
+    success: true, 
+    campaigns_synced: 0, 
+    message: 'Google Ads sync placeholder' 
+  };
 }
-
-// =====================================================
-// Meta Ads Sync (Real Implementation)
-// =====================================================
 
 async function syncMetaAds(connection: any, supabase: any, userId: string) {
   try {
     const accessToken = connection.api_key;
     const accountId = connection.account_id;
 
-    if (!accessToken) {
-      throw new Error('Access token não encontrado. Reconecte sua conta Meta.');
-    }
+    if (!accessToken) throw new Error('Token ausente');
 
-    // Guard: only ad accounts (category 'other') can be synced
-    const category = connection.account_category;
-    if (category && category !== 'other') {
-      return {
-        success: false,
-        error: `Tipo "${category}" não suporta sync de campanhas. Apenas contas de anúncio podem ser sincronizadas.`
+    // Se categoria não for Ad Account, abortar com erro amigável
+    if (connection.account_category && connection.account_category !== 'other') {
+      return { 
+        success: false, 
+        error: `A sincronização não está disponível para o tipo "${connection.account_category}". Apenas contas de anúncios padrão são suportadas.` 
       };
     }
 
-    // Guard: reject known non-ad-account prefixes
+    // Validar se é uma conta de anúncios (prefixo act_)
     if (accountId.startsWith('bm_') || accountId.startsWith('waba_') || accountId.startsWith('page_') || accountId === 'meta_oauth') {
-      return {
-        success: false,
-        error: 'Este registro não é uma conta de anúncios.'
+      return { 
+        success: false, 
+        error: 'Este registro não é uma conta de anúncios (Ad Account). Verifique a conexão.' 
       };
     }
 
-    // Formatar account_id (adicionar prefixo act_ se necessário)
     const formattedAccountId = accountId.startsWith('act_') ? accountId : `act_${accountId}`;
-
-    console.log(`[Meta Ads] Syncing campaigns for account: ${formattedAccountId}`);
-
-    // 1. Buscar campanhas
     const campaigns = await fetchMetaCampaigns(formattedAccountId, accessToken);
-    console.log(`[Meta Ads] Found ${campaigns.length} campaigns`);
 
-    // 2. Buscar insights em batches de 5 (evita rate limit da Meta API)
     const BATCH_SIZE = 5;
     const campaignsWithInsights: CampaignWithInsights[] = [];
 
     for (let i = 0; i < campaigns.length; i += BATCH_SIZE) {
       const batch = campaigns.slice(i, i + BATCH_SIZE);
-      const batchResults = await Promise.all(
-        batch.map(async (campaign) => {
-          try {
-            const insights = await fetchCampaignInsights(campaign.id, accessToken);
-            return { ...campaign, insights };
-          } catch (e) {
-            console.warn(`[Meta Ads] Could not fetch insights for campaign ${campaign.id}:`, e);
-            return campaign as CampaignWithInsights;
-          }
-        })
-      );
-      campaignsWithInsights.push(...batchResults);
-      console.log(`[Meta Ads] Fetched insights batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(campaigns.length / BATCH_SIZE)}`);
+      const results = await Promise.all(batch.map(async (c) => {
+        try { 
+          const insights = await fetchCampaignInsights(c.id, accessToken);
+          return { ...c, insights }; 
+        } catch { 
+          return c as CampaignWithInsights; 
+        }
+      }));
+      campaignsWithInsights.push(...results);
     }
 
-    // 3. Salvar campanhas no banco
     let syncedCount = 0;
     for (const campaign of campaignsWithInsights) {
       try {
         await saveCampaignToDatabase(supabase, userId, connection.id, campaign);
         syncedCount++;
-      } catch (e) {
-        console.error(`[Meta Ads] Error saving campaign ${campaign.id}:`, e);
+      } catch (e) { 
+        console.error(`Error saving ${campaign.id}:`, e); 
       }
     }
 
-    console.log(`[Meta Ads] Successfully synced ${syncedCount} campaigns`);
-
-    return {
-      success: true,
-      campaigns_synced: syncedCount,
-      total_campaigns: campaigns.length,
-      message: `Sincronizadas ${syncedCount} campanhas com sucesso.`
+    return { 
+      success: true, 
+      campaigns_synced: syncedCount, 
+      message: `Sincronizadas ${syncedCount} campanhas com sucesso.` 
     };
 
   } catch (error: any) {
-    console.error('[Meta Ads] Sync error:', error);
-
-    // Verificar se é erro de token expirado
-    if (error.message?.includes('OAuthException') || error.message?.includes('access token')) {
-      return {
-        success: false,
-        error: 'Token de acesso expirado. Por favor, reconecte sua conta Meta.'
-      };
+    if (error.message?.includes('OAuthException') || error.message?.includes('token')) {
+      return { success: false, error: 'Token Meta expirado ou inválido. Reconecte a conta.' };
     }
-
-    return {
-      success: false,
-      error: error.message || 'Erro desconhecido ao sincronizar Meta Ads'
-    };
-  }
-}
-
-// =====================================================
-// Meta Graph API Helpers
-// =====================================================
-
-async function fetchMetaCampaigns(accountId: string, accessToken: string): Promise<MetaCampaign[]> {
-  const fields = [
-    'id',
-    'name',
-    'status',
-    'objective',
-    'daily_budget',
-    'lifetime_budget',
-    'created_time',
-    'updated_time'
-  ].join(',');
-
-  const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${accountId}/campaigns?fields=${fields}&limit=100`;
-
-  const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}` }
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    console.error('[Meta Ads] API Error:', errorData);
-    throw new Error(errorData.error?.message || 'Falha ao buscar campanhas');
-  }
-
-  const data = await response.json();
-  return data.data || [];
-}
-
-async function fetchCampaignInsights(campaignId: string, accessToken: string): Promise<MetaInsights | null> {
-  const fields = [
-    'impressions',
-    'clicks',
-    'spend',
-    'reach',
-    'actions',
-    'action_values',
-    'cpc',
-    'cpm',
-    'ctr',
-    'date_start',
-    'date_stop'
-  ].join(',');
-
-  // Últimos 30 dias
-  const datePreset = 'last_30d';
-
-  const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${campaignId}/insights?fields=${fields}&date_preset=${datePreset}`;
-
-  const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}` }
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    // Insights pode não existir para campanhas sem dados
-    if (errorData.error?.code === 100) {
-      return null;
-    }
-    throw new Error(errorData.error?.message || 'Falha ao buscar insights');
-  }
-
-  const data = await response.json();
-  return data.data?.[0] || null;
-}
-
-async function saveCampaignToDatabase(
-  supabase: any,
-  userId: string,
-  connectionId: string,
-  campaign: CampaignWithInsights
-) {
-  const insights = campaign.insights;
-
-  // Calcular métricas
-  const impressions = parseInt(insights?.impressions || '0', 10);
-  const clicks = parseInt(insights?.clicks || '0', 10);
-  const spend = parseFloat(insights?.spend || '0');
-  const reach = parseInt(insights?.reach || '0', 10);
-
-  // CTR (Click-Through Rate)
-  const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
-
-  // Buscar conversões das actions
-  const conversions = insights?.actions?.find(a =>
-    a.action_type === 'lead' ||
-    a.action_type === 'purchase' ||
-    a.action_type === 'complete_registration'
-  );
-  const conversionCount = parseInt(conversions?.value || '0', 10);
-
-  // CPA (Cost Per Acquisition)
-  const cpa = conversionCount > 0 ? spend / conversionCount : 0;
-
-  // ROAS (Return on Ad Spend) — calculado via action_values (purchase)
-  let purchaseValue = 0;
-  if (insights?.action_values) {
-    const purchaseAction = insights.action_values.find(a => a.action_type === 'purchase');
-    if (purchaseAction) {
-      purchaseValue = parseFloat(purchaseAction.value || '0');
-    }
-  }
-  const roas = spend > 0 ? purchaseValue / spend : 0;
-
-  // Mapear status
-  const statusMap: Record<string, string> = {
-    'ACTIVE': 'active',
-    'PAUSED': 'paused',
-    'DELETED': 'archived',
-    'ARCHIVED': 'archived',
-  };
-
-  // Calcular budget (preferir daily_budget, fallback para lifetime_budget)
-  const budget = parseFloat(campaign.daily_budget || campaign.lifetime_budget || '0');
-
-  const { error } = await supabase
-    .from('ad_campaigns_sync')
-    .upsert({
-      user_id: userId,
-      connection_id: connectionId,
-      platform_campaign_id: campaign.id,
-      platform_campaign_name: campaign.name,
-      platform: 'meta_ads',
-      status: statusMap[campaign.status] || 'paused',
-      budget,
-      impressions,
-      clicks,
-      conversions: conversionCount,
-      conversion_value: purchaseValue,
-      spend,
-      ctr,
-      cpa,
-      roas,
-      start_date: insights?.date_start || null,
-      end_date: insights?.date_stop || null,
-      synced_at: new Date().toISOString(),
-    }, {
-      onConflict: 'connection_id,platform_campaign_id',
-      ignoreDuplicates: false
-    });
-
-  if (error) {
-    console.error('[Meta Ads] Error saving campaign:', error);
     throw error;
   }
 }
 
+async function fetchMetaCampaigns(accountId: string, accessToken: string): Promise<MetaCampaign[]> {
+  const fields = 'id,name,status,objective,daily_budget,lifetime_budget,created_time,updated_time';
+  const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${accountId}/campaigns?fields=${fields}&limit=100`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.error?.message || 'Erro API Meta');
+  }
+  const data = await res.json();
+  return data.data || [];
+}
+
+async function fetchCampaignInsights(campaignId: string, accessToken: string): Promise<MetaInsights | null> {
+  const fields = 'impressions,clicks,spend,reach,actions,action_values,ctr,date_start,date_stop';
+  const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${campaignId}/insights?fields=${fields}&date_preset=last_30d`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.data?.[0] || null;
+}
+
+async function saveCampaignToDatabase(supabase: any, userId: string, connectionId: string, campaign: CampaignWithInsights) {
+  const insights = campaign.insights;
+  const impressions = parseInt(insights?.impressions || '0', 10);
+  const clicks = parseInt(insights?.clicks || '0', 10);
+  const spend = parseFloat(insights?.spend || '0');
+  
+  // Mapeamento de conversões (Leads, Purchases, etc.)
+  const conversions = insights?.actions?.find(a => 
+    ['lead', 'purchase', 'complete_registration'].includes(a.action_type)
+  );
+  const conversionCount = parseInt(conversions?.value || '0', 10);
+  
+  // Valor das conversões (especialmente compras) para cálculo de ROAS
+  const convValueAction = insights?.action_values?.find(av => 
+    ['purchase', 'offsite_conversion.fb_pixel_purchase', 'onsite_conversion.purchase'].includes(av.action_type)
+  );
+  const conversionValue = parseFloat(convValueAction?.value || '0');
+  
+  const cpa = conversionCount > 0 ? spend / conversionCount : 0;
+  const roas = spend > 0 ? conversionValue / spend : 0;
+
+  // Mapeamento de status para os valores permitidos no banco
+  const statusMap: Record<string, string> = { 
+    'ACTIVE': 'active', 
+    'PAUSED': 'paused', 
+    'ARCHIVED': 'paused', // Mapear arquivadas como pausadas ou ended
+    'DELETED': 'removed'
+  };
+
+  const budget = parseFloat(campaign.daily_budget || campaign.lifetime_budget || '0');
+
+  const { error } = await supabase.from('ad_campaigns_sync').upsert({
+    user_id: userId,
+    connection_id: connectionId,
+    platform_campaign_id: campaign.id,
+    platform_campaign_name: campaign.name,
+    platform: 'meta_ads',
+    status: statusMap[campaign.status] || 'paused',
+    budget, 
+    impressions, 
+    clicks, 
+    spend, 
+    ctr: impressions > 0 ? (clicks / impressions) * 100 : 0, 
+    cpa,
+    conversions: conversionCount,
+    conversion_value: conversionValue,
+    roas,
+    start_date: insights?.date_start || (campaign.created_time ? campaign.created_time.split('T')[0] : null),
+    end_date: insights?.date_stop || (campaign.updated_time ? campaign.updated_time.split('T')[0] : null),
+    synced_at: new Date().toISOString(),
+  }, { onConflict: 'connection_id,platform_campaign_id' });
+
+  if (error) throw error;
+}
+
 serve(handler);
+

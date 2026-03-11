@@ -235,7 +235,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         supabaseQueryWithTimeout(
           applyUserFilter(
             fromTable("commercial_campaigns")
-              .select("*"),
+              .select("*, ad_campaigns_sync(spend, budget)"),
             targetUserIds
           ) as any,
           25000,
@@ -433,7 +433,9 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
           s.campaign_id === campaign.id
         ) || [];
         const campaignRevenue = campaignSales.reduce((sum, s) => sum + (s.value || 0), 0);
-        const campaignCost = campaign.budget || 0;
+        
+        // Usar spend da sincronização se disponível
+        const campaignCost = (campaign.ad_campaign_sync as any)?.spend || 0;
         const roi = campaignCost > 0 ? ((campaignRevenue - campaignCost) / campaignCost) * 100 : 0;
 
         return {
@@ -444,6 +446,9 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
           roi: roi,
         };
       }) || [];
+
+      // Calcular marketing spend total para CAC e Margem Líquida
+      const totalCampaignCost = campaignROI.reduce((sum, c) => sum + (c.costs || 0), 0);
 
       // Margem de lucro
       const grossMargin = totalRevenue > 0
@@ -464,7 +469,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
 
       const totalExpenses = (expenses as any[])?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
       const netMargin = totalRevenue > 0
-        ? ((totalRevenue - totalCosts - totalExpenses) / totalRevenue) * 100
+        ? ((totalRevenue - totalCosts - totalExpenses - totalCampaignCost) / totalRevenue) * 100
         : 0;
 
       // Receita por hora
@@ -533,8 +538,6 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         ? ltvByPatient.reduce((sum, p) => sum + p.netValue, 0) / ltvByPatient.length
         : 0;
 
-      // CAC
-      const totalCampaignCost = campaigns?.reduce((sum, c) => sum + (c.budget || 0), 0) || 0;
       const convertedLeads = leads?.filter(l => l.status === 'converted').length || 0;
       const avgCAC = convertedLeads > 0 ? totalCampaignCost / convertedLeads : 0;
 

@@ -79,6 +79,15 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
       const todayData = (todayTransactions || []) as Array<{ type: string; amount: number }>;
       const todayRevenue = todayData.reduce((sum, t) => sum + (t.amount || 0), 0);
 
+      // 3. Buscar gastos de marketing (anúncios) do período
+      const { data: marketingCampaigns } = await supabase
+        .from("ad_campaigns_sync")
+        .select("spend")
+        .gte("synced_at", format(currentMonthStart, "yyyy-MM-dd"))
+        .lte("synced_at", format(currentMonthEnd, "yyyy-MM-dd"));
+
+      const totalMarketingSpend = (marketingCampaigns || [])?.reduce((sum, c) => sum + (Number(c.spend) || 0), 0);
+
       // Calcular custos totais (apenas de entradas)
       const monthTotalCosts = transactionsData
         .filter(t => t.type === "entrada" && t.has_costs)
@@ -87,13 +96,13 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
       // Lucro bruto (receitas - despesas)
       const monthProfit = monthRevenue - monthExpenses;
 
-      // Lucro líquido (receitas - despesas - custos)
-      const monthNetProfit = monthRevenue - monthExpenses - monthTotalCosts;
+      // Lucro líquido (receitas - despesas - custos - marketing)
+      const monthNetProfit = monthRevenue - monthExpenses - monthTotalCosts - totalMarketingSpend;
 
       const profitMargin = monthRevenue > 0 ? (monthProfit / monthRevenue) * 100 : 0;
       const netProfitMargin = monthRevenue > 0 ? (monthNetProfit / monthRevenue) * 100 : 0;
 
-      // 3. Contar transações ativas - RLS handles organization filtering
+      // 4. Contar transações ativas - RLS handles organization filtering
       const { count: activeTransactions } = await supabase
         .from("financial_transactions")
         .select("*", { count: "exact", head: true })
@@ -111,6 +120,7 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
         monthNetProfit,
         netProfitMargin,
         todayRevenue,
+        totalMarketingSpend, // Adicionando campo extra para o componente se precisar
       };
 
       return metricsData;

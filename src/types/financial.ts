@@ -112,6 +112,7 @@ export interface FinancialMetrics {
   monthNetProfit: number;
   netProfitMargin: number;
   todayRevenue: number;
+  totalMarketingSpend?: number;
 }
 
 export interface MonthlyData {
