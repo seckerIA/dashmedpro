@@ -9,12 +9,12 @@ export interface BottleneckMetric {
   stage: string;
   previousStageCount: number;
   currentStageCount: number;
-  dropOffRate: number; // Percentual de perda
-  isCritical: boolean; // Se perda > 40%
+  dropOffRate: number;
+  isCritical: boolean;
 }
 
 export interface ConcentrationMetric {
-  isHighRisk: boolean; // Se > 80% da receita vem de < 20% das fontes
+  isHighRisk: boolean;
   topSource: string;
   topSourceValue: number;
   topSourcePercentage: number;
@@ -25,35 +25,48 @@ export interface TeamMetrics {
   userId: string;
   userName: string;
   userEmail: string;
-  userRole?: string; // Cargo do usuário: admin, dono, medico, secretaria, vendedor
-  totalPipeline: number;
-  totalRevenue: number;
-  activeDeals: number;
-  wonDeals: number;
-  lostDeals: number;
-  totalDeals: number; // Total de deals únicos (para cálculo de conversão sem duplicação)
-  conversionRate: number;
-  totalContacts: number;
-  totalLeads: number;
+  userRole?: string;
+
+  // ── CRM (funil de vendas) ──────────────────────────────────────
+  totalPipeline: number;       // Valor dos deals ativos em crm_deals
+  activeDeals: number;         // Deals ativos no CRM
+  wonDeals: number;            // Deals fechados ganhos (crm_deals stage = fechado_ganho)
+  lostDeals: number;           // Deals fechados perdidos
+  totalDeals: number;          // Total de deals únicos
   dealsByStage: Record<string, { count: number; value: number }>;
   averageDealValue: number;
   averageTimeInPipeline: number;
-  // Novos Insights
+  totalContacts: number;       // crm_contacts
+  totalLeads: number;          // commercial_leads criados no mês
+
+  // ── Médico / Clínica (conversão real) ─────────────────────────
+  appointmentsScheduled: number;  // Consultas agendadas no mês (medical_appointments)
+  totalRevenue: number;           // Receita de entradas no mês (financial_transactions type=income)
+
+  // ── KPI calculado ─────────────────────────────────────────────
+  conversionRate: number;      // appointmentsScheduled / totalLeads * 100
+
+  // ── Insights ──────────────────────────────────────────────────
   bottleneck?: BottleneckMetric;
   revenueConcentration?: ConcentrationMetric;
 }
 
 export interface ConsolidatedTeamMetrics {
+  // CRM
   totalPipeline: number;
-  totalRevenue: number;
   totalActiveDeals: number;
   totalWonDeals: number;
   totalLostDeals: number;
-  averageConversionRate: number;
   totalContacts: number;
   totalLeads: number;
+  // Clínica
+  totalRevenue: number;
+  totalAppointmentsScheduled: number;
+  // KPI
+  averageConversionRate: number;
+  // Detalhes por membro
   teamMetrics: TeamMetrics[];
-  // Insights Consolidados
+  // Insights globais
   globalBottleneck?: BottleneckMetric;
   globalConcentration?: ConcentrationMetric;
 }
@@ -67,10 +80,11 @@ const emptyMetrics: ConsolidatedTeamMetrics = {
   averageConversionRate: 0,
   totalContacts: 0,
   totalLeads: 0,
+  totalAppointmentsScheduled: 0,
   teamMetrics: [],
 };
 
-// Metricas especificas para secretarias
+// ── Métricas específicas de secretárias (leve) ─────────────────────────────
 export interface SecretaryMetrics {
   appointmentsScheduledToday: number;
   appointmentsScheduledThisMonth: number;
@@ -93,7 +107,6 @@ const emptySecretaryMetrics: SecretaryMetrics = {
   userEmail: '',
 };
 
-// Buscar metricas leves para secretarias
 const fetchSecretaryMetrics = async (
   userId: string,
   signal?: AbortSignal
@@ -104,14 +117,12 @@ const fetchSecretaryMetrics = async (
   const monthStart = startOfMonth(now).toISOString();
   const monthEnd = endOfMonth(now).toISOString();
 
-  // Buscar perfil do usuario
   const profileQuery = supabase
     .from('profiles')
     .select('id, email, full_name')
     .eq('id', userId)
     .single() as any;
 
-  // Contar agendamentos criados pela secretaria hoje
   const appointmentsTodayQuery = supabase
     .from('medical_appointments')
     .select('id', { count: 'exact', head: true })
@@ -119,7 +130,6 @@ const fetchSecretaryMetrics = async (
     .gte('created_at', todayStart)
     .lte('created_at', todayEnd);
 
-  // Contar agendamentos criados pela secretaria este mes
   const appointmentsMonthQuery = supabase
     .from('medical_appointments')
     .select('id', { count: 'exact', head: true })
@@ -127,7 +137,6 @@ const fetchSecretaryMetrics = async (
     .gte('created_at', monthStart)
     .lte('created_at', monthEnd);
 
-  // Contar contatos criados pela secretaria hoje
   const contactsTodayQuery = supabase
     .from('crm_contacts')
     .select('id', { count: 'exact', head: true })
@@ -135,7 +144,6 @@ const fetchSecretaryMetrics = async (
     .gte('created_at', todayStart)
     .lte('created_at', todayEnd);
 
-  // Contar contatos criados pela secretaria este mes
   const contactsMonthQuery = supabase
     .from('crm_contacts')
     .select('id', { count: 'exact', head: true })
@@ -143,7 +151,6 @@ const fetchSecretaryMetrics = async (
     .gte('created_at', monthStart)
     .lte('created_at', monthEnd);
 
-  // Contar confirmacoes hoje (agendamentos com status confirmado atualizados hoje)
   const confirmationsTodayQuery = supabase
     .from('medical_appointments')
     .select('id', { count: 'exact', head: true })
@@ -151,7 +158,6 @@ const fetchSecretaryMetrics = async (
     .gte('updated_at', todayStart)
     .lte('updated_at', todayEnd);
 
-  // Contar pendentes de confirmacao
   const pendingConfirmationsQuery = supabase
     .from('medical_appointments')
     .select('id', { count: 'exact', head: true })
@@ -188,225 +194,106 @@ const fetchSecretaryMetrics = async (
   };
 };
 
+// ── Fetch principal ────────────────────────────────────────────────────────
 const fetchTeamMetrics = async (
   userId: string,
   isAdminOrDono: boolean,
   selectedUserIds?: string[],
   signal?: AbortSignal,
-  isMedico?: boolean // Novo parâmetro
+  isMedico?: boolean
 ): Promise<ConsolidatedTeamMetrics> => {
-  // Calcular data de início do mês atual para filtrar métricas
   const now = new Date();
   const monthStart = startOfMonth(now).toISOString();
 
-  // Se for médico (não admin), buscar métricas próprias + secretárias vinculadas
+  // Resolver quais usuários buscar
+  let targetUserIds: string[] = [];
+
   if (isMedico && !isAdminOrDono) {
-    // Buscar IDs de secretárias vinculadas ao médico
+    // Médico: ele mesmo + secretárias vinculadas
     const { data: links } = await (supabase
       .from('secretary_doctor_links' as any) as any)
       .select('secretary_id')
       .eq('doctor_id', userId);
-
     const linkedSecretaryIds = (links as any[])?.map((l: any) => l.secretary_id) || [];
-    const allUserIds = [userId, ...linkedSecretaryIds];
-
-    // Buscar dados para o médico e suas secretárias
-    const dealsQuery = supabase
-      .from('crm_deals')
-      .select(`id, title, value, stage, user_id, assigned_to, created_at, updated_at, contact:crm_contacts(id, full_name)`)
-      .or(allUserIds.map(id => `user_id.eq.${id}`).join(',') + ',' + allUserIds.map(id => `assigned_to.eq.${id}`).join(','))
-      .limit(500);
-
-    const contactsQuery = supabase
-      .from('crm_contacts')
-      .select('*')
-      .in('user_id', allUserIds);
-
-    const leadsQuery = supabase
-      .from('commercial_leads')
-      .select('*')
-      .in('user_id', allUserIds);
-
-    const profilesQuery = supabase
-      .from('profiles')
-      .select('id, email, full_name, role')
-      .in('id', allUserIds);
-
-    // NOVA QUERY: Buscar consultas agendadas no mês atual
-    const appointmentsQuery = supabase
-      .from('medical_appointments')
-      .select('id, user_id, estimated_value, payment_status, created_at')
-      .in('user_id', allUserIds)
-      .gte('created_at', monthStart);
-
-    const [dealsResult, contactsResult, leadsResult, profilesResult, appointmentsResult] = await Promise.all([
-      supabaseQueryWithTimeout(dealsQuery, 25000, signal),
-      supabaseQueryWithTimeout(contactsQuery, 25000, signal),
-      supabaseQueryWithTimeout(leadsQuery, 25000, signal),
-      supabaseQueryWithTimeout(profilesQuery, 25000, signal),
-      supabaseQueryWithTimeout(appointmentsQuery, 25000, signal),
-    ]);
-
-    if (dealsResult.error) throw new Error(`Erro ao buscar deals: ${dealsResult.error.message}`);
-    if (contactsResult.error) throw new Error(`Erro ao buscar contatos: ${contactsResult.error.message}`);
-
-    const deals = (dealsResult.data || []) as any[];
-    const contacts = (contactsResult.data || []) as any[];
-    const leads = (leadsResult.data || []) as any[];
-    const profiles = (profilesResult.data || []) as any[];
-    const appointments = (appointmentsResult.data || []) as any[];
-
-    const profilesMap = new Map(profiles.map((p: any) => [p.id, p]));
-
-    // Calcular métricas por usuário (médico + secretárias)
-    const teamMetrics: TeamMetrics[] = allUserIds.map(targetUserId => {
-      const userDeals = (deals as any[]).filter((d: any) => d.user_id === targetUserId || d.assigned_to === targetUserId);
-      const userContacts = (contacts as any[]).filter((c: any) => c.user_id === targetUserId);
-      const userLeads = (leads as any[]).filter((l: any) => l.user_id === targetUserId);
-      const userAppointments = (appointments as any[]).filter((a: any) => a.user_id === targetUserId);
-      const profile = profilesMap.get(targetUserId);
-
-      return calculateUserMetricsFromData(targetUserId, userDeals, userContacts, userLeads, profile, userAppointments, monthStart);
-    });
-
-    // Calcular métricas consolidadas
-    const totalWonDeals = teamMetrics.reduce((sum, tm) => sum + tm.wonDeals, 0);
-    const totalLostDeals = teamMetrics.reduce((sum, tm) => sum + tm.lostDeals, 0);
-    // Total de leads criados no mês para cálculo de conversão
-    const totalLeadsThisMonth = teamMetrics.reduce((sum, tm) => sum + tm.totalLeads, 0);
-
-    return {
-      totalPipeline: teamMetrics.reduce((sum, tm) => sum + tm.totalPipeline, 0),
-      totalRevenue: teamMetrics.reduce((sum, tm) => sum + tm.totalRevenue, 0),
-      totalActiveDeals: teamMetrics.reduce((sum, tm) => sum + tm.activeDeals, 0),
-      totalWonDeals,
-      totalLostDeals,
-      // Conversão global: total de consultas agendadas / total de leads criados no mês
-      averageConversionRate: totalLeadsThisMonth > 0
-        ? (totalWonDeals / totalLeadsThisMonth) * 100
-        : 0,
-      totalContacts: teamMetrics.reduce((sum, tm) => sum + tm.totalContacts, 0),
-      totalLeads: totalLeadsThisMonth,
-      teamMetrics,
-    };
-  }
-
-  // Se não for admin/dono E não for médico, retornar apenas dados do próprio usuário
-  if (!isAdminOrDono) {
-    const dealsQuery = supabase
-      .from('crm_deals')
-      .select(`id, title, value, stage, user_id, assigned_to, created_at, updated_at, contact:crm_contacts(id, full_name)`)
-      .or(`user_id.eq.${userId},assigned_to.eq.${userId}`)
-      .limit(500);
-
-    const contactsQuery = supabase
-      .from('crm_contacts')
-      .select('*')
-      .eq('user_id', userId);
-
-    const leadsQuery = supabase
-      .from('commercial_leads')
-      .select('*')
-      .eq('user_id', userId);
-
-    const profilesQuery = supabase
-      .from('profiles')
-      .select('id, email, full_name, role')
-      .eq('id', userId);
-
-    // NOVA QUERY: Buscar consultas agendadas no mês atual
-    const appointmentsQuery = supabase
-      .from('medical_appointments')
-      .select('id, user_id, estimated_value, payment_status, created_at')
-      .eq('user_id', userId)
-      .gte('created_at', monthStart);
-
-    const [dealsResult, contactsResult, leadsResult, profilesResult, appointmentsResult] = await Promise.all([
-      supabaseQueryWithTimeout(dealsQuery, 25000, signal),
-      supabaseQueryWithTimeout(contactsQuery, 25000, signal),
-      supabaseQueryWithTimeout(leadsQuery, 25000, signal),
-      supabaseQueryWithTimeout(profilesQuery, 25000, signal),
-      supabaseQueryWithTimeout(appointmentsQuery, 25000, signal),
-    ]);
-
-    if (dealsResult.error) throw new Error(`Erro ao buscar deals: ${dealsResult.error.message}`);
-    if (contactsResult.error) throw new Error(`Erro ao buscar contatos: ${contactsResult.error.message}`);
-
-    const deals = (dealsResult.data || []) as any[];
-    const contacts = (contactsResult.data || []) as any[];
-    const leads = (leadsResult.data || []) as any[];
-    const profiles = (profilesResult.data || []) as any[];
-    const appointments = (appointmentsResult.data || []) as any[];
-
-    const profile = profiles[0];
-    const userMetrics = calculateUserMetrics(userId, deals, contacts, leads, profile, appointments as any[], monthStart);
-
-    return {
-      ...userMetrics,
-      teamMetrics: [userMetrics],
-    };
-  }
-
-  // Admin/Dono: pode ver todos os dados
-  let targetUserIds: string[] = [];
-
-  if (selectedUserIds && selectedUserIds.length > 0) {
-    // Limitar a 50 usuários para evitar queries muito pesadas
-    targetUserIds = selectedUserIds.slice(0, 50);
+    targetUserIds = [userId, ...linkedSecretaryIds];
+  } else if (!isAdminOrDono) {
+    // Usuário comum: apenas ele mesmo
+    targetUserIds = [userId];
   } else {
-    // Limitar busca de perfis para evitar queries muito pesadas
-    const profilesQuery = supabase
-      .from('profiles')
-      .select('id, full_name, role')
-      .eq('is_active', true)
-      .limit(50); // Reduzido de 100 para 50 para melhor performance
-
-    const { data: profiles, error } = await supabaseQueryWithTimeout(profilesQuery as any, 25000, signal);
-    if (!error && profiles && (profiles as any[]).length > 0) {
-      targetUserIds = (profiles as any[]).map((p: any) => p.id);
+    // Admin/Dono: seleção ou todos ativos
+    if (selectedUserIds && selectedUserIds.length > 0) {
+      targetUserIds = selectedUserIds.slice(0, 50);
+    } else {
+      const profilesQuery = supabase
+        .from('profiles')
+        .select('id, full_name, role')
+        .eq('is_active', true)
+        .limit(50);
+      const { data: profiles, error } = await supabaseQueryWithTimeout(profilesQuery as any, 25000, signal);
+      if (!error && profiles && (profiles as any[]).length > 0) {
+        targetUserIds = (profiles as any[]).map((p: any) => p.id);
+      }
     }
   }
 
-  if (targetUserIds.length === 0) {
-    return emptyMetrics;
-  }
+  if (targetUserIds.length === 0) return emptyMetrics;
 
-  // Otimizar: usar in() ao invés de or() quando possível
-  // Para deals, buscar por user_id e assigned_to separadamente e combinar
+  // ── Queries paralelas ─────────────────────────────────────────────────────
+  // 1. CRM — funil de vendas
   const dealsQuery = supabase
     .from('crm_deals')
-    .select(`id, title, value, stage, user_id, assigned_to, created_at, updated_at, contact:crm_contacts(id, full_name)`)
+    .select('id, title, value, stage, user_id, assigned_to, created_at, updated_at')
     .or(`user_id.in.(${targetUserIds.join(',')}),assigned_to.in.(${targetUserIds.join(',')})`)
-    .limit(1000); // Limite de deals para evitar queries muito pesadas
+    .limit(1000);
 
+  // 2. CRM — contatos
   const contactsQuery = supabase
     .from('crm_contacts')
-    .select('*')
+    .select('id, user_id')
     .in('user_id', targetUserIds);
 
+  // 3. CRM — leads do mês (denominador da conversão)
   const leadsQuery = supabase
     .from('commercial_leads')
-    .select('*')
-    .in('user_id', targetUserIds);
+    .select('id, user_id, created_at')
+    .in('user_id', targetUserIds)
+    .gte('created_at', monthStart);
 
+  // 4. Perfis
   const profilesQuery = supabase
     .from('profiles')
     .select('id, email, full_name, role')
     .in('id', targetUserIds);
 
-  // NOVA QUERY: Buscar consultas agendadas no mês atual
+  // 5. CLÍNICA — agendamentos do mês (numerador da conversão)
   const appointmentsQuery = supabase
     .from('medical_appointments')
-    .select('id, user_id, estimated_value, payment_status, created_at')
+    .select('id, user_id, created_at')
     .in('user_id', targetUserIds)
     .gte('created_at', monthStart);
 
-  const [dealsResult, contactsResult, leadsResult, profilesResult, appointmentsResult] = await Promise.all([
+  // 6. FINANCEIRO — receita de entradas do mês (fonte de verdade)
+  const revenueQuery = supabase
+    .from('financial_transactions')
+    .select('id, user_id, amount, type, status')
+    .in('user_id', targetUserIds)
+    .eq('type', 'income' as any)
+    .gte('created_at', monthStart);
+
+  const [
+    dealsResult,
+    contactsResult,
+    leadsResult,
+    profilesResult,
+    appointmentsResult,
+    revenueResult,
+  ] = await Promise.all([
     supabaseQueryWithTimeout(dealsQuery, 25000, signal),
     supabaseQueryWithTimeout(contactsQuery, 25000, signal),
     supabaseQueryWithTimeout(leadsQuery, 25000, signal),
     supabaseQueryWithTimeout(profilesQuery, 25000, signal),
     supabaseQueryWithTimeout(appointmentsQuery, 25000, signal),
+    supabaseQueryWithTimeout(revenueQuery, 25000, signal),
   ]);
 
   if (dealsResult.error) throw new Error(`Erro ao buscar deals: ${dealsResult.error.message}`);
@@ -417,25 +304,41 @@ const fetchTeamMetrics = async (
   const leads = (leadsResult.data || []) as any[];
   const profiles = (profilesResult.data || []) as any[];
   const appointments = (appointmentsResult.data || []) as any[];
+  const revenues = (revenueResult.data || []) as any[];
 
   const profilesMap = new Map(profiles.map((p: any) => [p.id, p]));
 
-  // Calcular métricas por usuário
+  // ── Métricas por usuário ──────────────────────────────────────────────────
   const teamMetrics: TeamMetrics[] = targetUserIds.map(targetUserId => {
-    const userDeals = (deals as any[]).filter((d: any) => d.user_id === targetUserId || d.assigned_to === targetUserId);
-    const userContacts = (contacts as any[]).filter((c: any) => c.user_id === targetUserId);
-    const userLeads = (leads as any[]).filter((l: any) => l.user_id === targetUserId);
-    const userAppointments = (appointments as any[]).filter((a: any) => a.user_id === targetUserId);
+    const userDeals = deals.filter(d => d.user_id === targetUserId || d.assigned_to === targetUserId);
+    const userContacts = contacts.filter(c => c.user_id === targetUserId);
+    const userLeads = leads.filter(l => l.user_id === targetUserId);
+    const userAppointments = appointments.filter(a => a.user_id === targetUserId);
+    const userRevenues = revenues.filter(r => r.user_id === targetUserId);
     const profile = profilesMap.get(targetUserId);
 
-    return calculateUserMetricsFromData(targetUserId, userDeals, userContacts, userLeads, profile, userAppointments, monthStart);
+    return calculateUserMetrics(
+      targetUserId, userDeals, userContacts, userLeads, profile, userAppointments, userRevenues
+    );
   });
 
-  // Calcular métricas consolidadas
+  // ── Consolidado global ────────────────────────────────────────────────────
   const totalWonDeals = teamMetrics.reduce((sum, tm) => sum + tm.wonDeals, 0);
   const totalLostDeals = teamMetrics.reduce((sum, tm) => sum + tm.lostDeals, 0);
-  // Total de leads criados no mês para cálculo de conversão
-  const totalLeadsThisMonth = teamMetrics.reduce((sum, tm) => sum + tm.totalLeads, 0);
+  const totalLeads = teamMetrics.reduce((sum, tm) => sum + tm.totalLeads, 0);
+  const totalAppointments = teamMetrics.reduce((sum, tm) => sum + tm.appointmentsScheduled, 0);
+
+  // Bottleneck global: pegar o mais crítico da equipe
+  const globalBottleneck = teamMetrics
+    .map(tm => tm.bottleneck)
+    .filter(Boolean)
+    .sort((a, b) => (b?.dropOffRate ?? 0) - (a?.dropOffRate ?? 0))[0];
+
+  // Concentração global: pegar a mais crítica
+  const globalConcentration = teamMetrics
+    .map(tm => tm.revenueConcentration)
+    .filter(Boolean)
+    .sort((a, b) => (b?.topSourcePercentage ?? 0) - (a?.topSourcePercentage ?? 0))[0];
 
   return {
     totalPipeline: teamMetrics.reduce((sum, tm) => sum + tm.totalPipeline, 0),
@@ -443,180 +346,117 @@ const fetchTeamMetrics = async (
     totalActiveDeals: teamMetrics.reduce((sum, tm) => sum + tm.activeDeals, 0),
     totalWonDeals,
     totalLostDeals,
-    // Conversão global: total de consultas agendadas / total de leads criados no mês
-    averageConversionRate: totalLeadsThisMonth > 0
-      ? (totalWonDeals / totalLeadsThisMonth) * 100
-      : 0,
     totalContacts: teamMetrics.reduce((sum, tm) => sum + tm.totalContacts, 0),
-    totalLeads: totalLeadsThisMonth,
+    totalLeads,
+    totalAppointmentsScheduled: totalAppointments,
+    // Taxa de conversão global: consultas agendadas / leads no mês
+    averageConversionRate: totalLeads > 0 ? (totalAppointments / totalLeads) * 100 : 0,
     teamMetrics,
+    globalBottleneck,
+    globalConcentration,
   };
 };
 
+// ── Cálculo por usuário ────────────────────────────────────────────────────
 function calculateUserMetrics(
-  userId: string,
-  deals: any[],
-  contacts: any[],
-  leads: any[],
-  profile: any,
-  appointments: any[],
-  monthStart: string
-): ConsolidatedTeamMetrics & TeamMetrics {
-  const metrics = calculateUserMetricsFromData(userId, deals, contacts, leads, profile, appointments, monthStart);
-  return {
-    ...metrics,
-    totalActiveDeals: metrics.activeDeals,
-    totalWonDeals: metrics.wonDeals,
-    totalLostDeals: metrics.lostDeals,
-    averageConversionRate: metrics.conversionRate,
-    teamMetrics: [],
-    globalBottleneck: metrics.bottleneck,
-    globalConcentration: metrics.revenueConcentration,
-  };
-}
-
-function calculateUserMetricsFromData(
   userId: string,
   userDeals: any[],
   userContacts: any[],
   userLeads: any[],
   profile: any,
-  userAppointments: any[] = [],
-  monthStart?: string
+  userAppointments: any[],
+  userRevenues: any[]
 ): TeamMetrics {
-  const activeDealsList = userDeals.filter(d => !d.stage.includes('fechado'));
-  // Considerar como "ganho" tanto o stage tradicional quanto os stages médicos de conversão
-  const wonDeals = userDeals.filter(d =>
-    d.stage === 'fechado_ganho' ||
-    d.stage === 'agendado' ||           // Paciente agendou consulta
-    d.stage === 'em_tratamento' ||      // Paciente em tratamento ativo
-    d.stage === 'aguardando_retorno'    // Paciente aguardando retorno (convertido)
-  );
-  const lostDeals = userDeals.filter(d =>
-    d.stage === 'fechado_perdido' ||
-    d.stage === 'inadimplente'          // Paciente inadimplente (perda)
-  );
+  // ── CRM pipeline ──────────────────────────────────────────────
+  const ACTIVE_STAGES = ['lead', 'qualificado', 'proposta', 'negociacao', 'agendado', 'em_tratamento', 'aguardando_retorno'];
+  const WON_STAGES = ['fechado_ganho'];
+  const LOST_STAGES = ['fechado_perdido', 'inadimplente'];
+
+  const activeDealsList = userDeals.filter(d => ACTIVE_STAGES.includes(d.stage));
+  const wonDealsList = userDeals.filter(d => WON_STAGES.includes(d.stage));
+  const lostDealsList = userDeals.filter(d => LOST_STAGES.includes(d.stage));
 
   const totalPipeline = activeDealsList.reduce((sum, deal) => {
     const value = typeof deal.value === 'string' ? parseFloat(deal.value) : deal.value;
     return sum + (value || 0);
   }, 0);
 
-  const activeDeals = activeDealsList.length;
-
-  // NOVA LÓGICA: Receita total vem de consultas PAGAS no mês
-  const totalRevenue = userAppointments.reduce((sum, appointment) => {
-    if (appointment.payment_status === 'paid' && appointment.estimated_value) {
-      const value = typeof appointment.estimated_value === 'string'
-        ? parseFloat(appointment.estimated_value)
-        : appointment.estimated_value;
-      return sum + (value || 0);
-    }
-    return sum;
-  }, 0);
-
-  // NOVA LÓGICA: Filtrar leads criados NO MÊS ATUAL para cálculo de conversão
-  const leadsThisMonth = monthStart
-    ? userLeads.filter(l => l.created_at >= monthStart)
-    : userLeads;
-
-  // NOVA LÓGICA: Conversão = (consultas agendadas no mês) / (leads criados no mês) * 100
-  const scheduledAppointmentsCount = userAppointments.length;
-  const conversionRate = leadsThisMonth.length > 0
-    ? (scheduledAppointmentsCount / leadsThisMonth.length) * 100
-    : 0;
-
   const dealsByStage: Record<string, { count: number; value: number }> = {};
-  const stageCounts: Record<string, number> = {};
-
   userDeals.forEach(deal => {
-    const stage = deal.stage;
-    if (!dealsByStage[stage]) {
-      dealsByStage[stage] = { count: 0, value: 0 };
-      stageCounts[stage] = 0;
-    }
-    dealsByStage[stage].count++;
+    if (!dealsByStage[deal.stage]) dealsByStage[deal.stage] = { count: 0, value: 0 };
+    dealsByStage[deal.stage].count++;
     const value = typeof deal.value === 'string' ? parseFloat(deal.value) : deal.value;
-    dealsByStage[stage].value += value || 0;
-    stageCounts[stage]++;
+    dealsByStage[deal.stage].value += value || 0;
   });
 
   const averageDealValue = userDeals.length > 0 ? totalPipeline / userDeals.length : 0;
-
   const averageTimeInPipeline = userDeals.length > 0
     ? userDeals.reduce((sum, deal) => {
-      const created = new Date(deal.created_at).getTime();
-      const updated = new Date(deal.updated_at).getTime();
-      return sum + (updated - created);
-    }, 0) / userDeals.length / (1000 * 60 * 60 * 24)
+        const created = new Date(deal.created_at).getTime();
+        const updated = new Date(deal.updated_at).getTime();
+        return sum + (updated - created);
+      }, 0) / userDeals.length / (1000 * 60 * 60 * 24)
     : 0;
 
-  // --- CÁLCULO DE GARGALOS (Bottleneck) ---
-  // Ordem assumida: lead -> qualificado -> proposta -> negociacao -> fechado_ganho
-  // Simplificacao: vamos detectar o estágio com maior % de "não conversão" para o próximo
-  // Para um MVP, vamos pegar apenas stages ativos e ordená-los por volume (suposição de funil)
-  // Em produção, isso deveria vir de uma configuração de Pipeline
+  // ── Clínica: agendamentos (numerador de conversão) ────────────
+  const appointmentsScheduled = userAppointments.length;
+
+  // ── Financeiro: receita de entradas (financial_transactions) ──
+  const totalRevenue = userRevenues.reduce((sum, tx) => {
+    const amount = typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount;
+    return sum + (amount || 0);
+  }, 0);
+
+  // ── Taxa de conversão: consultas / leads ──────────────────────
+  const conversionRate = userLeads.length > 0
+    ? (appointmentsScheduled / userLeads.length) * 100
+    : 0;
+
+  // ── Gargalo (Bottleneck) ──────────────────────────────────────
   let bottleneck: BottleneckMetric | undefined;
-  const stages = Object.keys(dealsByStage).filter(s => !s.includes('fechado')); // Ignora finalizados
-
-  // Se tivermos pelo menos 2 estágios para comparar
-  if (stages.length >= 2) {
-    // Ordenar por volume (assumindo funil decrescente)
-    const sortedStages = stages.sort((a, b) => dealsByStage[b].count - dealsByStage[a].count);
-
+  const activeStageKeys = Object.keys(dealsByStage).filter(s => ACTIVE_STAGES.includes(s));
+  if (activeStageKeys.length >= 2) {
+    const sorted = activeStageKeys.sort((a, b) => dealsByStage[b].count - dealsByStage[a].count);
     let maxDropOff = 0;
-
-    for (let i = 0; i < sortedStages.length - 1; i++) {
-      const current = sortedStages[i];
-      const next = sortedStages[i + 1];
-      const currentCount = dealsByStage[current].count;
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const curr = sorted[i];
+      const next = sorted[i + 1];
+      const currCount = dealsByStage[curr].count;
       const nextCount = dealsByStage[next].count;
-
-      if (currentCount > 0) {
-        const dropOff = ((currentCount - nextCount) / currentCount) * 100;
+      if (currCount > 0) {
+        const dropOff = ((currCount - nextCount) / currCount) * 100;
         if (dropOff > maxDropOff) {
           maxDropOff = dropOff;
           bottleneck = {
-            stage: current,
-            previousStageCount: currentCount,
+            stage: curr,
+            previousStageCount: currCount,
             currentStageCount: nextCount,
             dropOffRate: dropOff,
-            isCritical: dropOff > 50 // Se perder mais de 50% é crítico
+            isCritical: dropOff > 50,
           };
         }
       }
     }
   }
 
-  // --- CÁLCULO DE CONCENTRAÇÃO (Revenue Concentration) ---
-  // Tenta agrupar por "Produto" (usando prefixo do título) ou fallback para "Produto Único"
-  // Ex: "Consulta - Maria" -> "Consulta"
-  const revenueBySource: Record<string, number> = {};
-  if (wonDeals.length > 0) {
-    wonDeals.forEach(d => {
-      // Tenta pegar a primeira palavra como "Produto/Serviço"
+  // ── Concentração de Receita ───────────────────────────────────
+  let revenueConcentration: ConcentrationMetric | undefined;
+  if (wonDealsList.length > 0 && totalRevenue > 0) {
+    const revenueBySource: Record<string, number> = {};
+    wonDealsList.forEach(d => {
       const source = d.title ? d.title.split(' ')[0] : 'Outros';
       revenueBySource[source] = (revenueBySource[source] || 0) + (parseFloat(d.value) || 0);
     });
-
-    // Achar top source
-    const sortedSources = Object.entries(revenueBySource).sort((a, b) => b[1] - a[1]);
-    if (sortedSources.length > 0) {
-      const [topSource, topValue] = sortedSources[0];
-      const percentage = totalRevenue > 0 ? (topValue / totalRevenue) * 100 : 0;
-
-      // Risco se > 80% concentrado em 1 tipo
-      if (percentage > 80) {
-        // revenueConcentration = { ... } (atribuído abaixo)
-      }
-
-      // Retorna metrica mesmo se não for risco alto, para ter dados
-      var calculatedConcentration: ConcentrationMetric = {
+    const sorted = Object.entries(revenueBySource).sort((a, b) => b[1] - a[1]);
+    if (sorted.length > 0) {
+      const [topSource, topValue] = sorted[0];
+      const percentage = (topValue / totalRevenue) * 100;
+      revenueConcentration = {
         isHighRisk: percentage > 80,
-        topSource: topSource,
+        topSource,
         topSourceValue: topValue,
         topSourcePercentage: percentage,
-        totalRevenue
+        totalRevenue,
       };
     }
   }
@@ -626,28 +466,33 @@ function calculateUserMetricsFromData(
     userName: profile?.full_name || profile?.email || 'Usuário',
     userEmail: profile?.email || '',
     userRole: profile?.role || undefined,
+    // CRM
     totalPipeline,
-    totalRevenue,
-    activeDeals, // activeDeals já é um número
-    wonDeals: scheduledAppointmentsCount, // ALTERADO: Agora representa consultas agendadas no mês
-    lostDeals: lostDeals.length,
-    totalDeals: userDeals.length, // Total de deals únicos do usuário
-    conversionRate,
-    totalContacts: userContacts.length,
-    totalLeads: leadsThisMonth.length, // ALTERADO: Apenas leads criados no mês
+    activeDeals: activeDealsList.length,
+    wonDeals: wonDealsList.length,
+    lostDeals: lostDealsList.length,
+    totalDeals: userDeals.length,
     dealsByStage,
     averageDealValue,
     averageTimeInPipeline,
+    totalContacts: userContacts.length,
+    totalLeads: userLeads.length,
+    // Clínica
+    appointmentsScheduled,
+    totalRevenue,
+    // KPI
+    conversionRate,
+    // Insights
     bottleneck,
-    revenueConcentration: typeof calculatedConcentration !== 'undefined' ? calculatedConcentration : undefined
+    revenueConcentration,
   };
 }
 
+// ── Hook público ───────────────────────────────────────────────────────────
 export function useTeamMetrics(selectedUserIds?: string[]) {
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, isSecretaria, isMedico, isLoading: isLoadingProfile } = useUserProfile();
 
-  // Query para metricas de equipe (admins/vendedores/medicos)
   const {
     data: metrics,
     isLoading,
@@ -659,11 +504,12 @@ export function useTeamMetrics(selectedUserIds?: string[]) {
       try {
         return await fetchTeamMetrics(user.id, isAdmin, selectedUserIds, signal, isMedico);
       } catch (error: any) {
-        // Ignorar erros de cancelamento/timeout para evitar logs desnecessários
-        if (error?.message?.includes('cancelada') ||
+        if (
+          error?.message?.includes('cancelada') ||
           error?.message?.includes('timeout') ||
           error?.message?.includes('aborted') ||
-          error?.name === 'AbortError') {
+          error?.name === 'AbortError'
+        ) {
           console.log('Query cancelada, retornando métricas vazias');
           return emptyMetrics;
         }
@@ -671,21 +517,18 @@ export function useTeamMetrics(selectedUserIds?: string[]) {
         return emptyMetrics;
       }
     },
-    // Nao executar para secretarias - elas usam secretaryMetrics
     enabled: !!user?.id && !authLoading && !isLoadingProfile && !isSecretaria,
-    staleTime: 10 * 60 * 1000, // 10 minutos - aumentar cache
-    gcTime: 15 * 60 * 1000, // 15 minutos em cache
+    staleTime: 10 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
-    refetchOnReconnect: false, // Não refetch ao reconectar - usar cache
-    refetchInterval: false, // Não fazer refetch automático
-    retry: 1, // Reduzir retries para evitar acúmulo de queries
+    refetchOnReconnect: false,
+    refetchInterval: false,
+    retry: 1,
     retryDelay: 2000,
-    // Cancelar queries anteriores quando uma nova é iniciada
     networkMode: 'online',
   });
 
-  // Query especifica para secretarias (mais leve e rapida)
   const {
     data: secretaryMetrics,
     isLoading: isLoadingSecretary,
@@ -697,10 +540,12 @@ export function useTeamMetrics(selectedUserIds?: string[]) {
       try {
         return await fetchSecretaryMetrics(user.id, signal);
       } catch (error: any) {
-        if (error?.message?.includes('cancelada') ||
+        if (
+          error?.message?.includes('cancelada') ||
           error?.message?.includes('timeout') ||
           error?.message?.includes('aborted') ||
-          error?.name === 'AbortError') {
+          error?.name === 'AbortError'
+        ) {
           console.log('Query secretaria cancelada');
           return emptySecretaryMetrics;
         }
@@ -708,10 +553,9 @@ export function useTeamMetrics(selectedUserIds?: string[]) {
         return emptySecretaryMetrics;
       }
     },
-    // So executar para secretarias
     enabled: !!user?.id && !authLoading && !isLoadingProfile && isSecretaria,
-    staleTime: 5 * 60 * 1000, // 5 minutos
-    gcTime: 10 * 60 * 1000, // 10 minutos
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     retry: 1,

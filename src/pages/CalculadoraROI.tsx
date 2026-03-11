@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
-import { TrendingUp, Target, DollarSign, Calculator, Lock, LockOpen, ChevronDown, ChevronUp, ArrowRight, ThumbsUp, ThumbsDown } from "lucide-react";
+import { useCRM } from "@/hooks/useCRM";
+import { DownloadCloud, TrendingUp, Target, DollarSign, Calculator, Lock, LockOpen, ChevronDown, ChevronUp, ArrowRight, ThumbsUp, ThumbsDown } from "lucide-react";
 interface ROIInputs {
   // Investimento
   totalInvestment: number;
@@ -41,6 +42,41 @@ const CalculadoraROI = () => {
     conversionRateMax: 40,
     averageTicket: 300
   });
+  const { deals } = useCRM();
+
+  const handleSyncCRM = useCallback(() => {
+    if (!deals || deals.length === 0) {
+      toast({
+        title: "Nenhum dado encontrado",
+        description: "Não há oportunidades no CRM para sincronizar.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const totalLeads = deals.length;
+    const wonDeals = deals.filter(d => ['finalizado', 'fechado_ganho'].includes(d.stage_id || ''));
+    const conversionRate = totalLeads > 0 ? (wonDeals.length / totalLeads) * 100 : 0;
+    
+    const wonDealsWithValue = wonDeals.filter(d => d.value && d.value > 0);
+    const avgTicket = wonDealsWithValue.length > 0 
+      ? wonDealsWithValue.reduce((acc, d) => acc + (Number(d.value) || 0), 0) / wonDealsWithValue.length 
+      : inputs.averageTicket;
+
+    setInputs(prev => ({
+      ...prev,
+      leadsGenerated: totalLeads,
+      conversionRateMin: Math.max(0, conversionRate - 5),
+      conversionRateMax: conversionRate + 5,
+      averageTicket: avgTicket > 0 ? avgTicket : prev.averageTicket
+    }));
+
+    toast({
+      title: "Sincronizado com CRM",
+      description: `Importados ${totalLeads} leads com ticket médio de R$ ${avgTicket.toLocaleString('pt-BR')}.`,
+    });
+  }, [deals, inputs.averageTicket]);
+
   const updateInput = useCallback((field: keyof ROIInputs, value: any) => {
     setInputs(prev => ({
       ...prev,
@@ -267,6 +303,13 @@ const CalculadoraROI = () => {
               <CardContent className="space-y-6">
                 
                 <Separator />
+
+                <div className="flex justify-end mb-4">
+                  <Button variant="outline" onClick={handleSyncCRM} className="rounded-2xl h-10 px-4 text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100">
+                    <DownloadCloud className="w-4 h-4 mr-2" />
+                    Sincronizar com CRM
+                  </Button>
+                </div>
 
                 {/* Return Data Fields */}
                 <div className="space-y-4">

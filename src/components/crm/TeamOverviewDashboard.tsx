@@ -80,20 +80,31 @@ export function TeamOverviewDashboard({ metrics, isLoading }: TeamOverviewDashbo
           format="number"
           isLoading={isLoading}
         />
+        {!isSecretaria && (
+          <MetricCard
+            title="Deals Ganhos (CRM)"
+            value={metrics.totalWonDeals}
+            icon="target"
+            format="number"
+            isLoading={isLoading}
+          />
+        )}
         <MetricCard
-          title="Deals Ganhos"
-          value={metrics.totalWonDeals}
-          icon="target"
+          title="Consultas Agendadas"
+          value={metrics.totalAppointmentsScheduled}
+          icon="calendar"
           format="number"
           isLoading={isLoading}
         />
-        <MetricCard
-          title="Deals Perdidos"
-          value={metrics.totalLostDeals}
-          icon="bar-chart"
-          format="number"
-          isLoading={isLoading}
-        />
+        {!isSecretaria && (
+          <MetricCard
+            title="Deals Perdidos"
+            value={metrics.totalLostDeals}
+            icon="bar-chart"
+            format="number"
+            isLoading={isLoading}
+          />
+        )}
       </div>
 
       {/* Resumo por Equipe */}
@@ -148,7 +159,11 @@ export function TeamOverviewDashboard({ metrics, isLoading }: TeamOverviewDashbo
                             <p className="font-semibold">{teamMetric.conversionRate.toFixed(1)}%</p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground">Ativos</p>
+                            <p className="text-muted-foreground">Consultas</p>
+                            <p className="font-semibold">{teamMetric.appointmentsScheduled}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Deals Ativos</p>
                             <p className="font-semibold">{teamMetric.activeDeals}</p>
                           </div>
                         </div>

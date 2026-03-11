@@ -61,10 +61,38 @@ serve(async (req: Request) => {
     const requestedPageIds: string[] | undefined = body.page_ids;
     const syncLeads: boolean = body.sync_leads !== false; // default true
 
-    // 1. Buscar páginas conectadas do usuário
+    // 1. Determinar quais BMs têm pelo menos 1 ad account ativo (is_active = true)
+    //    Isso evita buscar formulários de BMs que o usuário não selecionou para sync.
+    const { data: activeAdAccounts, error: adAccError } = await supabaseAdmin
+      .from('ad_platform_connections')
+      .select('parent_account_id, account_id')
+      .eq('user_id', user.id)
+      .eq('platform', 'meta_ads')
+      .eq('account_category', 'other')
+      .eq('is_active', true);
+
+    if (adAccError) {
+      console.error('[sync-lead-forms] Error fetching active ad accounts:', adAccError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Erro ao buscar contas de anúncios ativas' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Coletar os IDs das BMs com ad accounts ativos (ou account_id se órfão)
+    const activeBmIds = new Set<string>();
+    for (const acc of (activeAdAccounts || [])) {
+      if (acc.parent_account_id) {
+        activeBmIds.add(acc.parent_account_id);
+      }
+    }
+
+    console.log(`[sync-lead-forms] Active BM IDs: ${[...activeBmIds].join(', ')}`);
+
+    // 2. Buscar TODAS as páginas do usuário (is_active = true)
     const { data: pageConnections, error: connError } = await supabaseAdmin
       .from('ad_platform_connections')
-      .select('account_id, account_name, api_key')
+      .select('account_id, account_name, api_key, parent_account_id')
       .eq('user_id', user.id)
       .eq('platform', 'meta_ads')
       .eq('account_category', 'page')
@@ -85,11 +113,29 @@ serve(async (req: Request) => {
       );
     }
 
-    // Filtrar se page_ids específicos foram solicitados
-    let pages = pageConnections;
+    // 3. Filtrar páginas: manter apenas as que pertencem a BMs com ad accounts ativos
+    //    Páginas órfãs (sem parent_account_id) passam se não houver nenhuma BM ativa (fallback).
+    let filteredByBm = pageConnections.filter(p => {
+      if (!p.parent_account_id) {
+        // Página órfã: inclui apenas se NÃO existe nenhuma BM ativa (compatibilidade)
+        return activeBmIds.size === 0;
+      }
+      return activeBmIds.has(p.parent_account_id);
+    });
+
+    // Se nenhuma BM ativa filtrou páginas, fallback para todas (evita tela em branco)
+    if (filteredByBm.length === 0 && pageConnections.length > 0) {
+      console.warn('[sync-lead-forms] No pages matched active BMs — falling back to all pages');
+      filteredByBm = pageConnections;
+    }
+
+    console.log(`[sync-lead-forms] Pages after BM filter: ${filteredByBm.length} of ${pageConnections.length}`);
+
+    // 4. Filtrar se page_ids específicos foram solicitados
+    let pages = filteredByBm;
     if (requestedPageIds && requestedPageIds.length > 0) {
       const requestedSet = new Set(requestedPageIds);
-      pages = pageConnections.filter(p => {
+      pages = filteredByBm.filter(p => {
         const rawId = p.account_id.replace('page_', '');
         return requestedSet.has(rawId) || requestedSet.has(p.account_id);
       });
@@ -318,8 +364,21 @@ async function syncFormLeads(
 
     console.log(`[sync-lead-forms] Fetched ${leads.length} leads for form ${formId} (${formName})`);
 
-    // Processar leads em batch
+    // Obter IDs dos leads recebidos nesta página para verificar existência
+    const leadIds = leads.map((l: any) => l.id);
+    const { data: existingLeads } = await supabase
+      .from('lead_form_submissions')
+      .select('leadgen_id')
+      .in('leadgen_id', leadIds);
+    
+    const existingSet = new Set(existingLeads?.map((e: any) => e.leadgen_id) || []);
+
+    // Processar apenas novos leads
     for (const lead of leads) {
+      if (existingSet.has(lead.id)) {
+        continue;
+      }
+
       const fieldData = lead.field_data || [];
       const extractedFields: Record<string, string> = {};
       for (const field of fieldData) {
@@ -329,6 +388,79 @@ async function syncFormLeads(
       const email = extractedFields.email || null;
       const fullName = extractedFields.full_name || extractedFields.nome_completo || extractedFields.name || null;
       const phoneNumber = extractedFields.phone_number || extractedFields.telefone || extractedFields.phone || null;
+
+      let contactId = null;
+      let dealId = null;
+
+      // Se temos pelo menos algum dado útil (nome, tel ou email), cadastramos no CRM
+      if (fullName || phoneNumber || email) {
+        // Tentar buscar contato existente na base do usuário
+        let contact = null;
+
+        if (phoneNumber) {
+           const { data: byPhone } = await supabase
+             .from('crm_contacts')
+             .select('id')
+             .eq('user_id', userId)
+             .eq('phone', phoneNumber)
+             .maybeSingle();
+           contact = byPhone;
+        }
+
+        if (!contact && email) {
+           const { data: byEmail } = await supabase
+             .from('crm_contacts')
+             .select('id')
+             .eq('user_id', userId)
+             .eq('email', email)
+             .maybeSingle();
+           contact = byEmail;
+        }
+
+        if (contact) {
+           contactId = contact.id;
+        } else {
+           // Criar novo contato
+           const { data: newContact, error: contactError } = await supabase
+             .from('crm_contacts')
+             .insert({
+                user_id: userId,
+                full_name: fullName || 'Lead Meta Ads',
+                phone: phoneNumber,
+                email: email,
+                tags: ['meta_ads']
+             })
+             .select('id')
+             .single();
+           
+           if (!contactError && newContact) {
+              contactId = newContact.id;
+           } else {
+              console.error(`[sync-lead-forms] Error creating contact for lead ${lead.id}:`, contactError);
+           }
+        }
+
+        // Criar Negócio/Deal
+        if (contactId) {
+          const { data: newDeal, error: dealError } = await supabase
+             .from('crm_deals')
+             .insert({
+                user_id: userId,
+                contact_id: contactId,
+                title: `Lead: FB Form - ${formName}`,
+                stage: 'lead_novo', // Estágio inicial
+                value: 0
+             })
+             .select('id')
+             .single();
+             
+          if (!dealError && newDeal) {
+             dealId = newDeal.id;
+          } else {
+             console.error(`[sync-lead-forms] Error creating deal for lead ${lead.id}:`, dealError);
+          }
+        }
+      }
 
       const { error: upsertError } = await supabase
         .from('lead_form_submissions')
@@ -346,7 +478,10 @@ async function syncFormLeads(
           email,
           full_name: fullName,
           phone_number: phoneNumber,
-          is_processed: false,
+          is_processed: true, // Já processado (inserido no CRM)
+          processed_at: new Date().toISOString(),
+          crm_contact_id: contactId,
+          crm_deal_id: dealId,
           created_at: lead.created_time || new Date().toISOString(),
         }, { onConflict: 'leadgen_id' });
 
@@ -357,7 +492,7 @@ async function syncFormLeads(
       }
     }
 
-    // Próxima página
+    // Próxima página da Graph API
     nextUrl = data.paging?.next || null;
   }
 

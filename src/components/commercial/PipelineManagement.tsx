@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PipelineBoard } from "@/components/crm/PipelineBoard";
@@ -23,6 +23,7 @@ import { useNavigate } from "react-router-dom";
 import { CRMDealWithContact } from "@/types/crm";
 import { format } from "date-fns";
 import { PipelineHelp } from "@/components/crm/PipelineHelp";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export function PipelineManagement() {
   const { user } = useAuth();
@@ -84,6 +85,23 @@ export function PipelineManagement() {
   const [dealForCall, setDealForCall] = useState<CRMDealWithContact | null>(null);
   const [showAppointmentForm, setShowAppointmentForm] = useState(false);
   const [dealForAppointment, setDealForAppointment] = useState<CRMDealWithContact | null>(null);
+  const [tagFilter, setTagFilter] = useState<string>("all");
+
+  const filteredDeals = useMemo(() => {
+    if (tagFilter === "all") return deals;
+    
+    return deals.filter(deal => {
+      const leadTags = deal.tags || [];
+      const contactTags = deal.contact?.tags || [];
+      const hasMeta = leadTags.includes("meta_ads") || contactTags.includes("meta_ads") || leadTags.includes("trafego") || contactTags.includes("trafego");
+      const hasIndicacao = leadTags.includes("indicacao") || contactTags.includes("indicacao") || leadTags.includes("indicação") || contactTags.includes("indicação");
+      
+      if (tagFilter === "meta_ads") return hasMeta;
+      if (tagFilter === "indicacao") return hasIndicacao;
+      if (tagFilter === "ambos") return hasMeta || hasIndicacao;
+      return true;
+    });
+  }, [deals, tagFilter]);
 
   const handleReorderDealsInStage = async (stage: string, dealIds: string[]) => {
     try {
@@ -353,10 +371,17 @@ export function PipelineManagement() {
           />
         </div>
         <PipelineHelp />
-        <Button variant="outline">
-          <Filter className="w-4 h-4 mr-2" />
-          Filtros
-        </Button>
+        <Select value={tagFilter} onValueChange={setTagFilter}>
+          <SelectTrigger className="w-[180px] bg-primary/5 border-primary/20">
+            <SelectValue placeholder="Tags/Origem do Lead" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as Origens</SelectItem>
+            <SelectItem value="meta_ads">Apenas Tráfego Pago</SelectItem>
+            <SelectItem value="indicacao">Apenas Indicações</SelectItem>
+            <SelectItem value="ambos">Tráfego + Indicações</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Team Member Selector - Apenas para Admin/Dono */}
@@ -380,7 +405,7 @@ export function PipelineManagement() {
 
       {/* Pipeline Board */}
       <PipelineBoard
-        deals={deals}
+        deals={filteredDeals}
         followUps={followUps}
         onUpdateDeal={handleUpdateDealStage}
         onReorderDealsInStage={handleReorderDealsInStage}

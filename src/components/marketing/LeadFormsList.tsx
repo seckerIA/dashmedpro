@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +7,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   RefreshCw,
   FileText,
@@ -24,6 +25,7 @@ import {
   Calendar,
   MessageSquare,
   Megaphone,
+  Building2,
 } from 'lucide-react';
 import { type LeadFormSubmission } from '@/hooks/useMetaLeadForms';
 import { useMetaLeadForms, useLeadFormSubmissions, type MetaLeadForm } from '@/hooks/useMetaLeadForms';
@@ -338,6 +340,48 @@ export function LeadFormsList() {
   const { forms, isLoading, syncForms, isSyncing } = useMetaLeadForms();
   const { data: connections } = useAdPlatformConnections();
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
+  const [selectedBmId, setSelectedBmId] = useState<string>('all');
+
+  // BMs disponíveis para filtro (dedup)
+  const bmOptions = useMemo(() => {
+    const bms = (connections || []).filter(
+      (c) => c.account_category === 'bm' && c.platform === 'meta_ads'
+    );
+    const seen = new Set<string>();
+    return bms.filter((b) => {
+      if (seen.has(b.account_id)) return false;
+      seen.add(b.account_id);
+      return true;
+    });
+  }, [connections]);
+
+  // Pré-seleciona a BM sincronizada mais recentemente (igual à escolha em Integrações)
+  useEffect(() => {
+    if (!connections || connections.length === 0) return;
+    const metaConns = connections.filter((c) => c.platform === 'meta_ads');
+
+    // Para cada BM, achar o last_sync_at mais recente entre suas ad accounts
+    const bmLastSync: Record<string, string> = {};
+    metaConns
+      .filter((c) => c.account_category === 'other' && c.parent_account_id && c.last_sync_at)
+      .forEach((c) => {
+        const bmId = c.parent_account_id as string;
+        if (!bmLastSync[bmId] || c.last_sync_at! > bmLastSync[bmId]) {
+          bmLastSync[bmId] = c.last_sync_at as string;
+        }
+      });
+
+    // BM com sync mais recente
+    const sortedBms = Object.entries(bmLastSync).sort(([, a], [, b]) =>
+      b.localeCompare(a)
+    );
+
+    if (sortedBms.length > 0) {
+      setSelectedBmId(sortedBms[0][0]);
+    }
+    // Roda só uma vez quando as conexões carregam
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connections !== undefined]);
 
   // Agrupar formulários por página
   const pageGroups = useMemo(() => {
@@ -345,17 +389,22 @@ export function LeadFormsList() {
       (c) => c.account_category === 'page' && c.platform === 'meta_ads'
     );
 
-    return pages.map((page) => {
-      const rawPageId = page.account_id.replace('page_', '');
-      const pageForms = forms.filter((f) => f.page_id === rawPageId);
-      return {
-        pageId: rawPageId,
-        pageName: page.account_name,
-        parentBm: page.parent_account_id,
-        forms: pageForms,
-      };
-    });
-  }, [connections, forms]);
+    return pages
+      .filter((page) => {
+        if (selectedBmId === 'all') return true;
+        return page.parent_account_id === selectedBmId;
+      })
+      .map((page) => {
+        const rawPageId = page.account_id.replace('page_', '');
+        const pageForms = forms.filter((f) => f.page_id === rawPageId);
+        return {
+          pageId: rawPageId,
+          pageName: page.account_name,
+          parentBm: page.parent_account_id,
+          forms: pageForms,
+        };
+      });
+  }, [connections, forms, selectedBmId]);
 
   const totalForms = forms.length;
   const totalLeads = forms.reduce((sum, f) => sum + (f.leads_count || 0), 0);
@@ -387,9 +436,28 @@ export function LeadFormsList() {
             Formulários nativos do Meta (Instant Forms) conectados às suas páginas
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* BM Filter */}
+          {bmOptions.length > 1 && (
+            <div className="flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+              <Select value={selectedBmId} onValueChange={setSelectedBmId}>
+                <SelectTrigger className="w-[200px] h-9">
+                  <SelectValue placeholder="Filtrar por BM" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as BMs</SelectItem>
+                  {bmOptions.map((bm) => (
+                    <SelectItem key={bm.account_id} value={bm.account_id}>
+                      {bm.account_name || bm.account_id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           {totalForms > 0 && (
-            <div className="flex items-center gap-4 text-sm text-muted-foreground mr-2">
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <span>{totalForms} formulário(s)</span>
               <span>{totalLeads} leads total</span>
             </div>

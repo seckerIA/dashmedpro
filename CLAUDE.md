@@ -199,4 +199,8 @@ npm run test:qa:flowN # Flow especifico (N=1-7)
 - Evolution API: phone format JID (`5511999999999@s.whatsapp.net`) — strip `@s.whatsapp.net` para storage
 
 ---
-**Version:** 1.0.0 | 2026-03-04 | https://github.com/seckerIA/dashmedpro
+**Version:** 1.0.1 | 2026-03-11 | https://github.com/seckerIA/dashmedpro
+
+### Contexto Atual do CLAUDE.md
+- Adicionado filtro por tags ('meta_ads', 'indicacao') nas visualizações de Lista (LeadsList.tsx) e Funil (PipelineManagement.tsx) do CRM.
+- Integrado Calculadora de ROI com CRM via `useCRM` para preenchimento de Leads Gerados e Mínimo/Máximo de Taxa de Conversão.

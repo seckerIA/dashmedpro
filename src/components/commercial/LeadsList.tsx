@@ -25,6 +25,7 @@ export function LeadsList({ searchTerm, viewAsUserIds }: LeadsListProps) {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [originFilter, setOriginFilter] = useState<string>("all");
   const [scoreFilter, setScoreFilter] = useState<string>("all");
+  const [tagFilter, setTagFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"score" | "date">("score");
 
   const filters = {
@@ -42,6 +43,18 @@ export function LeadsList({ searchTerm, viewAsUserIds }: LeadsListProps) {
         lead.phone?.includes(searchTerm);
 
       if (!matchesSearch) return false;
+
+      // Filtro por origem/tags (Meta Ads e Indicação)
+      if (tagFilter !== "all") {
+        const leadTags = (lead as any).tags || [];
+        const contactTags = (lead as any).contact?.tags || [];
+        const hasMeta = leadTags.includes("meta_ads") || contactTags.includes("meta_ads") || leadTags.includes("trafego") || contactTags.includes("trafego");
+        const hasIndicacao = leadTags.includes("indicacao") || contactTags.includes("indicacao") || leadTags.includes("indicação") || contactTags.includes("indicação");
+        
+        if (tagFilter === "meta_ads" && !hasMeta) return false;
+        if (tagFilter === "indicacao" && !hasIndicacao) return false;
+        if (tagFilter === "ambos" && (!hasMeta && !hasIndicacao)) return false;
+      }
 
       // Filtro por score
       if (scoreFilter !== "all") {
@@ -114,6 +127,18 @@ export function LeadsList({ searchTerm, viewAsUserIds }: LeadsListProps) {
             <SelectItem value="high">🟢 Alta Probabilidade</SelectItem>
             <SelectItem value="medium">🟡 Média Probabilidade</SelectItem>
             <SelectItem value="low">🔴 Baixa Probabilidade</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={tagFilter} onValueChange={setTagFilter}>
+          <SelectTrigger className="w-[180px] bg-primary/5 border-primary/20">
+            <SelectValue placeholder="Tags/Origem do Lead" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as Origens (Tags)</SelectItem>
+            <SelectItem value="meta_ads">Apenas Tráfego Pago</SelectItem>
+            <SelectItem value="indicacao">Apenas Indicações</SelectItem>
+            <SelectItem value="ambos">Tráfego + Indicações</SelectItem>
           </SelectContent>
         </Select>
 

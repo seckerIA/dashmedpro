@@ -44,7 +44,8 @@ export function useMetaLeadForms() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // Query: buscar formulários salvos
+  // Query: buscar todos os formulários do usuário
+  // A filtragem por BM é feita no componente LeadFormsList via seletor dropdown
   const formsQuery = useQuery({
     queryKey: ['meta-lead-forms', user?.id],
     queryFn: async (): Promise<MetaLeadForm[]> => {
