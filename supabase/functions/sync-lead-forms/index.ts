@@ -265,6 +265,34 @@ serve(async (req: Request) => {
       console.log(`[sync-lead-forms] Total leads synced: ${totalLeadsSynced}`);
     }
 
+    // 7. Cleanup: remover formulários de páginas que NÃO pertencem a BMs sincronizadas
+    //    Isso garante que a lista de formulários só mostra os de BMs ativas
+    const syncedPageIds = pages.map((p: any) => p.account_id.replace('page_', ''));
+    if (syncedPageIds.length > 0) {
+      // Buscar formulários do usuário que NÃO estão em páginas sincronizadas
+      const { data: allUserForms } = await supabaseAdmin
+        .from('meta_lead_forms')
+        .select('id, page_id')
+        .eq('user_id', user.id);
+
+      const orphanFormIds = (allUserForms || [])
+        .filter((f: any) => !syncedPageIds.includes(f.page_id))
+        .map((f: any) => f.id);
+
+      if (orphanFormIds.length > 0) {
+        const { error: deleteError } = await supabaseAdmin
+          .from('meta_lead_forms')
+          .delete()
+          .in('id', orphanFormIds);
+
+        if (deleteError) {
+          console.error('[sync-lead-forms] Error cleaning up orphan forms:', deleteError);
+        } else {
+          console.log(`[sync-lead-forms] Cleaned up ${orphanFormIds.length} forms from non-synced BMs`);
+        }
+      }
+    }
+
     console.log(`[sync-lead-forms] Done: ${upsertedCount} forms synced, ${totalLeadsSynced} leads synced, ${errors.length} errors`);
 
     return new Response(

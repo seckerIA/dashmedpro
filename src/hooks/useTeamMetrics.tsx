@@ -190,6 +190,15 @@ const fetchTeamMetrics = async (
 
   if (targetUserIds.length === 0) return emptyMetrics;
 
+  // ── Pré-query: buscar form_ids válidos (apenas de BMs sincronizadas) ────
+  const { data: syncedForms } = await supabaseQueryWithTimeout(
+    (supabase.from('meta_lead_forms' as any) as any)
+      .select('meta_form_id')
+      .in('user_id', targetUserIds),
+    25000, signal
+  );
+  const validFormIds: string[] = (syncedForms as any[] || []).map((f: any) => f.meta_form_id);
+
   // ── Queries paralelas ───────────────────────────────────────────────────
   const monthStartDate = monthStart.split('T')[0]; // yyyy-MM-dd
 
@@ -215,12 +224,19 @@ const fetchTeamMetrics = async (
       25000, signal
     ),
     // 3. Leads do mês — fonte: lead_form_submissions (formulários Facebook)
-    //    Esta é a fonte real do funil de marketing (leads → agendamentos)
+    //    Filtra apenas por formulários de BMs sincronizadas (existentes em meta_lead_forms)
     supabaseQueryWithTimeout(
-      (supabase.from('lead_form_submissions' as any) as any)
-        .select('id, user_id')
-        .in('user_id', targetUserIds)
-        .gte('created_at', monthStart),
+      validFormIds.length > 0
+        ? (supabase.from('lead_form_submissions' as any) as any)
+            .select('id, user_id')
+            .in('user_id', targetUserIds)
+            .in('form_id', validFormIds)
+            .gte('created_at', monthStart)
+        : (supabase.from('lead_form_submissions' as any) as any)
+            .select('id, user_id')
+            .in('user_id', targetUserIds)
+            .gte('created_at', monthStart)
+            .limit(0),
       25000, signal
     ),
     // 4. Perfis
