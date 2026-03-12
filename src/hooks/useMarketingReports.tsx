@@ -102,10 +102,10 @@ function getPeriodDates(period: ReportPeriod, start_date?: string, end_date?: st
 export function useMarketingReports(filters: ReportFilters) {
   const periodDates = getPeriodDates(filters.period, filters.start_date, filters.end_date);
   
-  const campaignFilters: any = {
-    start_date: periodDates.start,
-    end_date: periodDates.end,
-  };
+  // Filtros de campanhas: NÃO passamos start_date/end_date porque os dados
+  // no ad_campaigns_sync são cumulativos (last_90d) e cada campanha tem um
+  // único record. O filtro de período é aplicado no gráfico e nos leads.
+  const campaignFilters: any = {};
   if (filters.platform && filters.platform !== 'all') {
     campaignFilters.platform = filters.platform;
   }
@@ -185,22 +185,45 @@ export function useMarketingReports(filters: ReportFilters) {
         }))
         .sort((a, b) => b.spend - a.spend);
 
-      // Dados diários (mockado por enquanto - seria ideal ter histórico)
+      // Dados diários — média diária calculada a partir dos totais do período de sync (90d)
+      // A Meta API não retorna breakdown diário nesta integração, então mostramos
+      // o total do período com média diária como referência.
       const dailyData: ReportData['dailyData'] = [];
-      const startDate = new Date(periodDates.start);
-      const endDate = new Date(periodDates.end);
-      const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-      
-      for (let i = 0; i <= daysDiff; i++) {
-        const date = new Date(startDate);
+
+      // Usar o período real coberto pelos insights (start_date/end_date da campanha)
+      // para calcular a média diária mais precisa
+      let totalDaysCovered = 90; // default: last_90d
+      if (campaignsData.length > 0) {
+        const earliestStart = campaignsData
+          .filter(c => c.start_date)
+          .reduce((min, c) => {
+            const d = new Date(c.start_date!);
+            return d < min ? d : min;
+          }, new Date());
+        const daysDiff = Math.ceil((new Date().getTime() - earliestStart.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysDiff > 0) totalDaysCovered = daysDiff;
+      }
+
+      // Gerar pontos para o gráfico usando a média diária do período
+      const chartStart = new Date(periodDates.start);
+      const chartEnd = new Date(periodDates.end);
+      const chartDays = Math.ceil((chartEnd.getTime() - chartStart.getTime()) / (1000 * 60 * 60 * 24));
+      const dailyAvgSpend = totalDaysCovered > 0 ? metricsData.total_spend / totalDaysCovered : 0;
+      const dailyAvgRevenue = totalDaysCovered > 0 ? metricsData.total_conversion_value / totalDaysCovered : 0;
+      const dailyAvgImpressions = totalDaysCovered > 0 ? Math.floor(metricsData.total_impressions / totalDaysCovered) : 0;
+      const dailyAvgClicks = totalDaysCovered > 0 ? Math.floor(metricsData.total_clicks / totalDaysCovered) : 0;
+      const dailyAvgConversions = totalDaysCovered > 0 ? Math.floor(metricsData.total_conversions / totalDaysCovered) : 0;
+
+      for (let i = 0; i <= Math.min(chartDays, 90); i++) {
+        const date = new Date(chartStart);
         date.setDate(date.getDate() + i);
         dailyData.push({
           date: format(date, 'dd/MM'),
-          spend: metricsData.total_spend / (daysDiff + 1), // Distribuição média
-          revenue: metricsData.total_conversion_value / (daysDiff + 1),
-          impressions: Math.floor(metricsData.total_impressions / (daysDiff + 1)),
-          clicks: Math.floor(metricsData.total_clicks / (daysDiff + 1)),
-          conversions: Math.floor(metricsData.total_conversions / (daysDiff + 1)),
+          spend: dailyAvgSpend,
+          revenue: dailyAvgRevenue,
+          impressions: dailyAvgImpressions,
+          clicks: dailyAvgClicks,
+          conversions: dailyAvgConversions,
         });
       }
 

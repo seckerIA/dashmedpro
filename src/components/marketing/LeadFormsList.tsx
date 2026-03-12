@@ -32,6 +32,7 @@ import { useMetaLeadForms, useLeadFormSubmissions, type MetaLeadForm } from '@/h
 import { useAdPlatformConnections } from '@/hooks/useAdPlatformConnections';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { type PeriodFilter, PERIOD_FILTER_OPTIONS, isWithinPeriod } from '@/lib/periodFilter';
 
 // ========================================
 // Sub-component: Perguntas do formulário
@@ -180,9 +181,14 @@ function LeadDetailDialog({
 // ========================================
 // Sub-component: Leads de um formulário
 // ========================================
-function FormLeads({ formId }: { formId: string }) {
+function FormLeads({ formId, periodFilter }: { formId: string; periodFilter: PeriodFilter }) {
   const { data: submissions, isLoading } = useLeadFormSubmissions(formId);
   const [selectedLead, setSelectedLead] = useState<LeadFormSubmission | null>(null);
+
+  const filteredSubmissions = useMemo(() => {
+    if (!submissions) return [];
+    return submissions.filter((sub) => isWithinPeriod(sub.created_at, periodFilter));
+  }, [submissions, periodFilter]);
 
   if (isLoading) {
     return (
@@ -192,10 +198,12 @@ function FormLeads({ formId }: { formId: string }) {
     );
   }
 
-  if (!submissions || submissions.length === 0) {
+  if (filteredSubmissions.length === 0) {
     return (
       <p className="text-sm text-muted-foreground italic py-2">
-        Nenhum lead recebido neste formulário ainda.
+        {submissions && submissions.length > 0
+          ? 'Nenhum lead no período selecionado.'
+          : 'Nenhum lead recebido neste formulário ainda.'}
       </p>
     );
   }
@@ -214,7 +222,7 @@ function FormLeads({ formId }: { formId: string }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {submissions.map((sub) => (
+            {filteredSubmissions.map((sub) => (
               <TableRow
                 key={sub.id}
                 className="cursor-pointer hover:bg-muted/50"
@@ -259,7 +267,7 @@ function FormLeads({ formId }: { formId: string }) {
 // ========================================
 // Sub-component: Card de um formulário
 // ========================================
-function FormCard({ form }: { form: MetaLeadForm }) {
+function FormCard({ form, periodFilter }: { form: MetaLeadForm; periodFilter: PeriodFilter }) {
   const [showQuestions, setShowQuestions] = useState(false);
   const [showLeads, setShowLeads] = useState(false);
 
@@ -325,7 +333,7 @@ function FormCard({ form }: { form: MetaLeadForm }) {
 
         {showLeads && (
           <div className="pt-2 border-t">
-            <FormLeads formId={form.meta_form_id} />
+            <FormLeads formId={form.meta_form_id} periodFilter={periodFilter} />
           </div>
         )}
       </CardContent>
@@ -341,6 +349,7 @@ export function LeadFormsList() {
   const { data: connections } = useAdPlatformConnections();
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [selectedBmId, setSelectedBmId] = useState<string>('all');
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('30d');
 
   // BMs disponíveis para filtro — combinando BMs das páginas e BMs reais
   const bmOptions = useMemo(() => {
@@ -453,6 +462,18 @@ export function LeadFormsList() {
               </Select>
             </div>
           )}
+          {/* Period Filter */}
+          <Select value={periodFilter} onValueChange={(v) => setPeriodFilter(v as PeriodFilter)}>
+            <SelectTrigger className="w-[170px] h-9">
+              <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PERIOD_FILTER_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {totalForms > 0 && (
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <span>{totalForms} formulário(s)</span>
@@ -551,7 +572,7 @@ export function LeadFormsList() {
               <CardContent className="pt-0">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {group.forms.map((form) => (
-                    <FormCard key={form.id} form={form} />
+                    <FormCard key={form.id} form={form} periodFilter={periodFilter} />
                   ))}
                 </div>
               </CardContent>

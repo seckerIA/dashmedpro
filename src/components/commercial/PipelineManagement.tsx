@@ -17,7 +17,8 @@ import { useMedicalAppointments } from "@/hooks/useMedicalAppointments";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { FollowUp } from "@/types/followUp";
-import { Filter } from "lucide-react";
+import { Filter, Calendar } from "lucide-react";
+import { type PeriodFilter, PERIOD_FILTER_OPTIONS, isWithinPeriod } from "@/lib/periodFilter";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { CRMDealWithContact } from "@/types/crm";
@@ -86,11 +87,15 @@ export function PipelineManagement() {
   const [showAppointmentForm, setShowAppointmentForm] = useState(false);
   const [dealForAppointment, setDealForAppointment] = useState<CRMDealWithContact | null>(null);
   const [tagFilter, setTagFilter] = useState<string>("all");
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("30d");
 
   const filteredDeals = useMemo(() => {
-    if (tagFilter === "all") return deals;
-    
     return deals.filter(deal => {
+      // Filtro por período
+      if (!isWithinPeriod(deal.created_at, periodFilter)) return false;
+
+      // Filtro por tags
+      if (tagFilter === "all") return true;
       const leadTags = deal.tags || [];
       const contactTags = deal.contact?.tags || [];
       const hasMeta = leadTags.includes("meta_ads") || contactTags.includes("meta_ads") || leadTags.includes("trafego") || contactTags.includes("trafego");
@@ -101,7 +106,7 @@ export function PipelineManagement() {
       if (tagFilter === "ambos") return hasMeta || hasIndicacao;
       return true;
     });
-  }, [deals, tagFilter]);
+  }, [deals, tagFilter, periodFilter]);
 
   const handleReorderDealsInStage = async (stage: string, dealIds: string[]) => {
     try {
@@ -371,6 +376,17 @@ export function PipelineManagement() {
           />
         </div>
         <PipelineHelp />
+        <Select value={periodFilter} onValueChange={(v) => setPeriodFilter(v as PeriodFilter)}>
+          <SelectTrigger className="w-[170px]">
+            <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
+            <SelectValue placeholder="Período" />
+          </SelectTrigger>
+          <SelectContent>
+            {PERIOD_FILTER_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={tagFilter} onValueChange={setTagFilter}>
           <SelectTrigger className="w-[180px] bg-primary/5 border-primary/20">
             <SelectValue placeholder="Tags/Origem do Lead" />

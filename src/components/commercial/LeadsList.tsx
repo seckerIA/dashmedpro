@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useSecretaryDoctors } from "@/hooks/useSecretaryDoctors";
 import { useAuth } from "@/hooks/useAuth";
+import { type PeriodFilter, PERIOD_FILTER_OPTIONS, isWithinPeriod } from "@/lib/periodFilter";
 
 interface LeadsListProps {
   searchTerm: string;
@@ -26,6 +27,7 @@ export function LeadsList({ searchTerm, viewAsUserIds }: LeadsListProps) {
   const [originFilter, setOriginFilter] = useState<string>("all");
   const [scoreFilter, setScoreFilter] = useState<string>("all");
   const [tagFilter, setTagFilter] = useState<string>("all");
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("30d");
   const [sortBy, setSortBy] = useState<"score" | "date">("score");
 
   const filters = {
@@ -43,6 +45,9 @@ export function LeadsList({ searchTerm, viewAsUserIds }: LeadsListProps) {
         lead.phone?.includes(searchTerm);
 
       if (!matchesSearch) return false;
+
+      // Filtro por período
+      if (!isWithinPeriod(lead.created_at, periodFilter)) return false;
 
       // Filtro por origem/tags (Meta Ads e Indicação)
       if (tagFilter !== "all") {
@@ -80,7 +85,7 @@ export function LeadsList({ searchTerm, viewAsUserIds }: LeadsListProps) {
     });
 
     return filtered;
-  }, [leads, searchTerm, scoreFilter, sortBy]);
+  }, [leads, searchTerm, scoreFilter, periodFilter, sortBy]);
 
   if (isLoading) {
     return (
@@ -139,6 +144,17 @@ export function LeadsList({ searchTerm, viewAsUserIds }: LeadsListProps) {
             <SelectItem value="meta_ads">Apenas Tráfego Pago</SelectItem>
             <SelectItem value="indicacao">Apenas Indicações</SelectItem>
             <SelectItem value="ambos">Tráfego + Indicações</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={periodFilter} onValueChange={(v) => setPeriodFilter(v as PeriodFilter)}>
+          <SelectTrigger className="w-[170px]">
+            <SelectValue placeholder="Período" />
+          </SelectTrigger>
+          <SelectContent>
+            {PERIOD_FILTER_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
 

@@ -195,12 +195,10 @@ export function useAdCampaignMetrics(filters?: {
       if (filters?.platform) {
         query = query.eq('platform', filters.platform);
       }
-      if (filters?.start_date) {
-        query = query.gte('synced_at', filters.start_date);
-      }
-      if (filters?.end_date) {
-        query = query.lte('synced_at', filters.end_date);
-      }
+      // Nota: NÃO filtramos por synced_at — os dados representam o período
+      // solicitado na última sync (last_90d). Cada campanha tem um único record
+      // com métricas cumulativas do período. Filtrar por synced_at excluiria
+      // campanhas válidas baseado em quando foram sincronizadas, não no período dos dados.
 
       const { data, error } = await query;
 
