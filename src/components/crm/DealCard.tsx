@@ -57,16 +57,16 @@ export function DealCard({ deal, onClick, onEdit, onDelete, onScheduleCall, isDe
       <div className="space-y-3">
         {/* Header */}
         <div className="flex items-start justify-between">
-          <div className="flex-1 cursor-pointer" onClick={onClick}>
+          <div className="flex-1 min-w-0 cursor-pointer" onClick={onClick}>
             <div className="flex items-start gap-2">
-              <div className="flex-1">
-                <h4 className="font-semibold text-sm text-foreground line-clamp-1">
+              <div className="flex-1 min-w-0">
+                <h4 className="font-semibold text-sm text-foreground truncate">
                   {deal.title}
                 </h4>
                 {deal.contact?.full_name && (
-                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                    <User className="w-3 h-3" />
-                    {deal.contact.full_name}
+                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1 min-w-0">
+                    <User className="w-3 h-3 shrink-0" />
+                    <span className="truncate">{deal.contact.full_name}</span>
                   </p>
                 )}
               </div>
@@ -138,10 +138,10 @@ export function DealCard({ deal, onClick, onEdit, onDelete, onScheduleCall, isDe
         {/* Phone - Destacado com botão de copiar */}
         {deal.contact?.phone && (
           <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-200/50 rounded-xl p-3 mb-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Phone className="w-4 h-4 text-blue-600" />
-                <span className="text-sm font-semibold text-blue-700">{deal.contact.phone}</span>
+            <div className="flex items-center justify-between gap-2 min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <Phone className="w-4 h-4 text-blue-600 shrink-0" />
+                <span className="text-sm font-semibold text-blue-700 truncate">{deal.contact.phone}</span>
               </div>
               <Button
                 size="icon"
@@ -178,11 +178,11 @@ export function DealCard({ deal, onClick, onEdit, onDelete, onScheduleCall, isDe
         {/* Service Value - Destacado - oculto para secretária */}
         {!isSecretaria && deal.contact?.service_value && (
           <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-200/50 rounded-xl p-3 mb-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-green-600 uppercase tracking-wide">Valor do Serviço</span>
-              <div className="flex items-center gap-1 text-2xl font-bold text-green-700">
-                <DollarSign className="w-5 h-5" />
-                {formatCurrency(deal.contact.service_value)}
+            <div className="flex items-center justify-between gap-2 min-w-0">
+              <span className="text-xs font-medium text-green-600 uppercase tracking-wide shrink-0">Valor</span>
+              <div className="flex items-center gap-1 text-lg sm:text-2xl font-bold text-green-700 min-w-0 truncate tabular-nums">
+                <DollarSign className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+                <span className="truncate">{formatCurrency(deal.contact.service_value)}</span>
               </div>
             </div>
           </div>
@@ -190,9 +190,9 @@ export function DealCard({ deal, onClick, onEdit, onDelete, onScheduleCall, isDe
 
         {/* Deal Value - oculto para secretária */}
         {!isSecretaria && deal.value && (
-          <div className="flex items-center gap-1 text-sm font-semibold text-primary">
-            <DollarSign className="w-4 h-4" />
-            {formatCurrency(deal.value)}
+          <div className="flex items-center gap-1 text-sm font-semibold text-primary min-w-0">
+            <DollarSign className="w-4 h-4 shrink-0" />
+            <span className="truncate tabular-nums">{formatCurrency(deal.value)}</span>
           </div>
         )}
 

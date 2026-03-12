@@ -61,8 +61,38 @@ serve(async (req: Request) => {
     const requestedPageIds: string[] | undefined = body.page_ids;
     const syncLeads: boolean = body.sync_leads !== false; // default true
 
-    // 1. Buscar TODAS as páginas ativas do usuário
-    //    Lead forms pertencem a PÁGINAS — a filtragem por BM é feita no frontend (dropdown).
+    // 1. Descobrir quais BMs têm campanhas sincronizadas (is_syncing=true)
+    //    Só sincronizamos formulários de páginas pertencentes a essas BMs.
+    const { data: syncingCampaigns } = await supabaseAdmin
+      .from('ad_campaigns_sync')
+      .select('connection_id')
+      .eq('user_id', user.id)
+      .eq('is_syncing', true);
+
+    let syncedBmIds = new Set<string>();
+    if (syncingCampaigns && syncingCampaigns.length > 0) {
+      const connectionIds = [...new Set(syncingCampaigns.map((c: any) => c.connection_id))];
+      // Buscar parent_account_id (BM) de cada ad account com campanhas sincronizadas
+      const { data: adAccounts } = await supabaseAdmin
+        .from('ad_platform_connections')
+        .select('parent_account_id')
+        .in('id', connectionIds);
+
+      for (const acc of adAccounts || []) {
+        if (acc.parent_account_id) syncedBmIds.add(acc.parent_account_id);
+      }
+    }
+
+    console.log(`[sync-lead-forms] Synced BM IDs: ${[...syncedBmIds].join(', ') || 'none'}`);
+
+    if (syncedBmIds.size === 0) {
+      return new Response(
+        JSON.stringify({ success: true, forms: [], message: 'Nenhuma BM com campanhas sincronizadas' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // 2. Buscar páginas ativas que pertencem às BMs sincronizadas
     const { data: pageConnections, error: connError } = await supabaseAdmin
       .from('ad_platform_connections')
       .select('account_id, account_name, api_key, parent_account_id')
@@ -79,20 +109,25 @@ serve(async (req: Request) => {
       );
     }
 
-    if (!pageConnections || pageConnections.length === 0) {
+    // Filtrar apenas páginas de BMs sincronizadas
+    const filteredPages = (pageConnections || []).filter(
+      (p: any) => p.parent_account_id && syncedBmIds.has(p.parent_account_id)
+    );
+
+    if (filteredPages.length === 0) {
       return new Response(
-        JSON.stringify({ success: true, forms: [], message: 'Nenhuma página conectada' }),
+        JSON.stringify({ success: true, forms: [], message: 'Nenhuma página pertence a BMs sincronizadas' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`[sync-lead-forms] Found ${pageConnections.length} active pages: ${pageConnections.map(p => p.account_name || p.account_id).join(', ')}`);
+    console.log(`[sync-lead-forms] Found ${filteredPages.length} pages from synced BMs (of ${pageConnections?.length || 0} total): ${filteredPages.map((p: any) => p.account_name || p.account_id).join(', ')}`);
 
-    // 2. Filtrar se page_ids específicos foram solicitados
-    let pages = pageConnections;
+    // 3. Filtrar se page_ids específicos foram solicitados
+    let pages = filteredPages;
     if (requestedPageIds && requestedPageIds.length > 0) {
       const requestedSet = new Set(requestedPageIds);
-      pages = pageConnections.filter(p => {
+      pages = filteredPages.filter((p: any) => {
         const rawId = p.account_id.replace('page_', '');
         return requestedSet.has(rawId) || requestedSet.has(p.account_id);
       });

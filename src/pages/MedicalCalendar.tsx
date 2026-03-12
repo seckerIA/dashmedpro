@@ -352,14 +352,15 @@ export default function MedicalCalendar() {
     setShowPaymentConfirmation(true);
   };
 
-  const handlePaymentConfirmation = async (paid: boolean) => {
+  const handlePaymentConfirmation = async (paid: boolean, procedureData?: { procedure: { id: string; name: string; price: number }; value: number }) => {
     if (!appointmentForPayment) return;
 
     try {
-      // Marcar como completado com confirmação de pagamento
+      // Marcar como completado com confirmação de pagamento e procedimento opcional
       await markAsCompleted.mutateAsync({
         id: appointmentForPayment.id,
         confirmedPayment: paid,
+        procedureData: procedureData ? { name: procedureData.procedure.name, value: procedureData.value } : undefined,
       });
 
       // Fechar modal

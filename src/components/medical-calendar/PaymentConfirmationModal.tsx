@@ -2,11 +2,16 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { MedicalAppointmentWithRelations } from '@/types/medicalAppointments';
 import { formatCurrency } from '@/lib/currency';
-import { DollarSign, CheckCircle2, XCircle, AlertCircle, Package, Loader2 } from 'lucide-react';
+import { DollarSign, CheckCircle2, XCircle, AlertCircle, Package, Loader2, Stethoscope, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { PaymentStatusBadge } from './PaymentStatusBadge';
-import { useState, useEffect } from 'react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useCommercialProcedures } from '@/hooks/useCommercialProcedures';
+import { CommercialProcedure } from '@/types/commercial';
 
 interface StockUsageItem {
   id: string;
@@ -18,11 +23,16 @@ interface StockUsageItem {
   } | null;
 }
 
+export interface ProcedureSelection {
+  procedure: CommercialProcedure;
+  value: number;
+}
+
 interface PaymentConfirmationModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   appointment: MedicalAppointmentWithRelations | null;
-  onConfirm: (paid: boolean) => void;
+  onConfirm: (paid: boolean, procedureData?: ProcedureSelection) => void;
   isProcessing?: boolean;
 }
 
@@ -35,10 +45,23 @@ export function PaymentConfirmationModal({
 }: PaymentConfirmationModalProps) {
   const [stockUsageItems, setStockUsageItems] = useState<StockUsageItem[]>([]);
   const [isLoadingStock, setIsLoadingStock] = useState(false);
+  const [hadProcedure, setHadProcedure] = useState(false);
+  const [selectedProcedure, setSelectedProcedure] = useState<CommercialProcedure | null>(null);
+  const [procedureSearch, setProcedureSearch] = useState('');
+  const { procedures } = useCommercialProcedures();
+
+  const filteredProcedures = useMemo(() => {
+    if (!procedureSearch.trim()) return procedures.filter(p => p.is_active && p.category !== 'consultation');
+    const search = procedureSearch.toLowerCase();
+    return procedures.filter(p => p.is_active && p.category !== 'consultation' && p.name.toLowerCase().includes(search));
+  }, [procedures, procedureSearch]);
 
   useEffect(() => {
     if (open && appointment?.id) {
       fetchStockUsage();
+      setHadProcedure(false);
+      setSelectedProcedure(null);
+      setProcedureSearch('');
     }
   }, [open, appointment?.id]);
 
@@ -76,12 +99,18 @@ export function PaymentConfirmationModal({
   const alreadyPaid = paymentStatus === 'paid' || paymentStatus === 'partial';
   const sinalPaid = appointment.sinal_paid === true;
 
+  const procedureData = hadProcedure && selectedProcedure
+    ? { procedure: selectedProcedure, value: selectedProcedure.price }
+    : undefined;
+
+  const totalValue = estimatedValue + (procedureData?.value || 0);
+
   const handleConfirmPaid = () => {
-    onConfirm(true);
+    onConfirm(true, procedureData);
   };
 
   const handleConfirmNotPaid = () => {
-    onConfirm(false);
+    onConfirm(false, procedureData);
   };
 
   return (
@@ -193,6 +222,73 @@ export function PaymentConfirmationModal({
               </p>
             </div>
           )}
+
+          {/* Procedimento realizado na consulta */}
+          <div className="border border-purple-200 dark:border-purple-800 rounded-lg p-3 bg-purple-50/50 dark:bg-purple-950/20">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="had-procedure"
+                checked={hadProcedure}
+                onCheckedChange={(checked) => {
+                  setHadProcedure(checked === true);
+                  if (!checked) {
+                    setSelectedProcedure(null);
+                    setProcedureSearch('');
+                  }
+                }}
+              />
+              <Label htmlFor="had-procedure" className="text-sm font-medium text-purple-800 dark:text-purple-200 cursor-pointer flex items-center gap-1.5">
+                <Stethoscope className="h-4 w-4" />
+                Teve procedimento nesta consulta
+              </Label>
+            </div>
+
+            {hadProcedure && (
+              <div className="mt-3 space-y-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar procedimento..."
+                    value={procedureSearch}
+                    onChange={(e) => setProcedureSearch(e.target.value)}
+                    className="pl-8 h-9 text-sm"
+                  />
+                </div>
+                <div className="max-h-32 overflow-y-auto space-y-1">
+                  {filteredProcedures.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-2 text-center">Nenhum procedimento encontrado</p>
+                  ) : (
+                    filteredProcedures.map((proc) => (
+                      <button
+                        key={proc.id}
+                        type="button"
+                        onClick={() => setSelectedProcedure(proc)}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${
+                          selectedProcedure?.id === proc.id
+                            ? 'bg-purple-100 dark:bg-purple-900/40 border border-purple-300 dark:border-purple-700'
+                            : 'hover:bg-muted/50 border border-transparent'
+                        }`}
+                      >
+                        <span className="font-medium truncate">{proc.name}</span>
+                        <span className="text-xs font-semibold text-purple-700 dark:text-purple-300 shrink-0 ml-2">
+                          {formatCurrency(proc.price)}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+
+                {selectedProcedure && (
+                  <div className="flex items-center justify-between pt-2 border-t border-purple-200 dark:border-purple-700">
+                    <span className="text-xs text-muted-foreground">Total (Consulta + Procedimento)</span>
+                    <span className="text-lg font-bold text-purple-700 dark:text-purple-300">
+                      {formatCurrency(totalValue)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         <DialogFooter className="flex-col sm:flex-row gap-2">
@@ -227,7 +323,7 @@ export function PaymentConfirmationModal({
           )}
           {(!hasValue || alreadyPaid) && (
             <Button
-              onClick={() => onConfirm(alreadyPaid)}
+              onClick={() => onConfirm(alreadyPaid, procedureData)}
               disabled={isProcessing}
               className="w-full sm:w-auto"
             >

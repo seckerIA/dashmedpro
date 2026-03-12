@@ -77,10 +77,24 @@ export function useMarketingDashboard() {
       );
       const activeConnIds = new Set(activeConns.map(c => c.id));
 
-      // Filtrar campanhas apenas das contas ATIVAS
+      // Filtrar campanhas apenas das contas ATIVAS e do mês atual
       const allCampaigns = campaigns || [];
+      const monthStart = new Date(startOfCurrentMonth);
+      const monthEnd = new Date(endOfCurrentMonth);
       const campaignsData = activeConnIds.size > 0
-        ? allCampaigns.filter(c => activeConnIds.has(c.connection_id))
+        ? allCampaigns.filter(c => {
+            if (!activeConnIds.has(c.connection_id)) return false;
+            // Filtrar pelo período do mês atual (start_date/end_date ou synced_at)
+            if (c.start_date && c.end_date) {
+              const campEnd = new Date(c.end_date);
+              const campStart = new Date(c.start_date);
+              // Campanha tem overlap com o mês atual
+              return campStart <= monthEnd && campEnd >= monthStart;
+            }
+            // Fallback: usar synced_at se não tem start/end
+            const syncedAt = new Date(c.synced_at);
+            return syncedAt >= monthStart && syncedAt <= monthEnd;
+          })
         : [];
 
       // Filtrar leads do mês atual que vieram de anúncios

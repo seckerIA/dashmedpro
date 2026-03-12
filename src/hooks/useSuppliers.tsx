@@ -124,11 +124,36 @@ export function useSuppliers() {
             });
         },
         onError: (error: any) => {
-            console.error("Erro ao desativar fornecedor:", error);
             toast({
                 variant: "destructive",
                 title: "Erro ao desativar",
                 description: error.message || "Não foi possível desativar o fornecedor.",
+            });
+        },
+    });
+
+    // Excluir fornecedor permanentemente
+    const deleteSupplier = useMutation({
+        mutationFn: async (id: string) => {
+            const { error } = await (supabase
+                .from("inventory_suppliers" as any) as any)
+                .delete()
+                .eq("id", id);
+
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["inventory-suppliers"] });
+            toast({
+                title: "Fornecedor excluído",
+                description: "O fornecedor foi excluído permanentemente.",
+            });
+        },
+        onError: (error: any) => {
+            toast({
+                variant: "destructive",
+                title: "Erro ao excluir",
+                description: error.message || "Não foi possível excluir o fornecedor. Verifique se não há transações vinculadas.",
             });
         },
     });
@@ -139,5 +164,6 @@ export function useSuppliers() {
         createSupplier,
         updateSupplier,
         deactivateSupplier,
+        deleteSupplier,
     };
 }

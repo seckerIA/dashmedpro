@@ -405,7 +405,12 @@ async function handler(req: Request): Promise<Response> {
     cid = body.conversation_id || '';
     if (!cid) throw new Error('conversation_id required');
 
-    await safeDebugLog(sb, 'Started', { cid: cid });
+    await safeDebugLog(sb, 'Started', { cid: cid, hasOpenAIKey: !!OAI, envKeys: Object.keys(Deno.env.toObject()).filter(k => k.includes('OPENAI') || k.includes('SUPABASE')).join(',') });
+
+    if (!OAI) {
+      await safeDebugLog(sb, 'OPENAI_API_KEY missing', { cid: cid });
+      return new Response(JSON.stringify({ error: 'OPENAI_API_KEY not configured' }), { status: 200, headers: CORS });
+    }
 
     // STEP 1: LOCK
     var lr = await sb.rpc('try_acquire_ai_lock', { p_conversation_id: cid, p_lock_seconds: 60 });

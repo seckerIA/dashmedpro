@@ -48,6 +48,8 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhatsAppAI } from '@/hooks/useWhatsAppAI';
 import { CONVERSATION_STATUS_CONFIG } from '@/types/whatsapp';
 import { AISuggestionsPanel, ConversationInsights, LeadScoreBadge, AISettingsDialog } from '@/components/whatsapp/ai';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/components/ui/use-toast';
 import { AssignConversationDialog } from '@/components/whatsapp/assignment';
 import type {
   WhatsAppConversationWithRelations,
@@ -220,12 +222,48 @@ export function ChatWindow({
 
   const handleSendMedia = useCallback(
     async (file: File, caption?: string) => {
-      // Simplificado: idealmente enviaria para storage e pegaria URL
-      // Por agora, assumimos que o hook cuida disso ou apenas simula
-      console.log('Sending media from ChatWindow drop:', file.name);
-      // Aqui integraria com o upload real
+      try {
+        // Determine media type from file
+        let mediaType: 'image' | 'audio' | 'video' | 'document' = 'document';
+        if (file.type.startsWith('image/')) mediaType = 'image';
+        else if (file.type.startsWith('audio/')) mediaType = 'audio';
+        else if (file.type.startsWith('video/')) mediaType = 'video';
+
+        // Upload to Supabase Storage
+        const ext = file.name.split('.').pop() || 'bin';
+        const fileName = `wa_${conversation.id}_${Date.now()}.${ext}`;
+        const filePath = `whatsapp-media/${fileName}`;
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Não autenticado');
+
+        const { error: uploadError } = await supabase.storage
+          .from('media')
+          .upload(filePath, file, { contentType: file.type, upsert: false });
+
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage.from('media').getPublicUrl(filePath);
+        const mediaUrl = urlData?.publicUrl;
+        if (!mediaUrl) throw new Error('Falha ao obter URL do arquivo');
+
+        await sendMedia({
+          conversation_id: conversation.id,
+          media_type: mediaType,
+          media_url: mediaUrl,
+          caption: caption || (mediaType === 'document' ? file.name : undefined),
+          file_name: file.name,
+        });
+      } catch (error: any) {
+        console.error('Error sending media:', error);
+        toast({
+          title: 'Erro ao enviar mídia',
+          description: error.message || 'Tente novamente',
+          variant: 'destructive',
+        });
+      }
     },
-    []
+    [conversation.id, sendMedia]
   );
 
   const handleReply = useCallback((message: WhatsAppMessageWithRelations) => {
@@ -653,6 +691,7 @@ export function ChatWindow({
         <MessageInput
           ref={messageInputRef}
           onSendText={handleSendText}
+          onSendMedia={handleSendMedia}
           replyTo={replyTo}
           onCancelReply={handleCancelReply}
           isSending={isSending}

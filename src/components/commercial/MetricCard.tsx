@@ -84,11 +84,11 @@ export function MetricCard({ title, value, icon, format = "number", isLoading, c
     >
       <Card className="relative overflow-hidden border-border/50 bg-gradient-to-br from-background to-muted/20 hover:from-background hover:to-muted/30 transition-all duration-300">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-        <CardContent className="p-5 flex items-center justify-between gap-4 relative z-10">
-          <div className="space-y-1">
+        <CardContent className="p-5 flex items-center justify-between gap-4 relative z-10 min-w-0">
+          <div className="space-y-1 min-w-0 flex-1">
             <p className="text-sm font-medium text-muted-foreground truncate tracking-wide">{title}</p>
             <motion.p
-              className="text-2xl font-bold tracking-tight text-foreground"
+              className="text-lg sm:text-2xl font-bold tracking-tight text-foreground truncate tabular-nums"
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}

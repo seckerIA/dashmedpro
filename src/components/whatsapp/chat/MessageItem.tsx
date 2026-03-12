@@ -2,7 +2,7 @@
  * Item de mensagem individual no chat
  */
 
-import { memo } from 'react';
+import { memo, useState, useRef, useCallback, useEffect } from 'react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -19,11 +19,14 @@ import {
   User,
   Download,
   Play,
+  Pause,
   CornerUpLeft,
   Bot,
+  Loader2,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Tooltip,
   TooltipContent,
@@ -201,41 +204,7 @@ function MessageContent({
       );
 
     case 'audio':
-      return (
-        <div className="flex items-center gap-3 min-w-[200px]">
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              'h-10 w-10 rounded-full flex-shrink-0',
-              isOutbound
-                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                : 'bg-background'
-            )}
-          >
-            <Play className="h-4 w-4" />
-          </Button>
-          <div className="flex-1">
-            <div
-              className={cn(
-                'h-1 rounded-full',
-                isOutbound ? 'bg-white/30' : 'bg-muted-foreground/30'
-              )}
-            >
-              <div
-                className={cn(
-                  'h-full w-0 rounded-full',
-                  isOutbound ? 'bg-white' : 'bg-emerald-500'
-                )}
-              />
-            </div>
-            <div className="flex justify-between mt-1">
-              <span className="text-[10px]">0:00</span>
-              <Mic className="h-3 w-3 opacity-50" />
-            </div>
-          </div>
-        </div>
-      );
+      return <AudioPlayer message={message} isOutbound={isOutbound} />;
 
     case 'video':
       return (
@@ -384,6 +353,187 @@ function MessageStatusIcon({
     default:
       return <Clock className="h-3 w-3" />;
   }
+}
+
+/**
+ * Audio player component with play/pause, progress bar, and duration
+ */
+function AudioPlayer({
+  message,
+  isOutbound,
+}: {
+  message: WhatsAppMessageWithRelations;
+  isOutbound: boolean;
+}) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [audioSrc, setAudioSrc] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+
+  const mediaId = message.media?.[0]?.whatsapp_media_id;
+  const directUrl = message.media?.[0]?.media_url;
+
+  const loadAudio = useCallback(async () => {
+    if (audioSrc) return audioSrc;
+
+    // Try direct URL first (if stored)
+    if (directUrl) {
+      setAudioSrc(directUrl);
+      return directUrl;
+    }
+
+    // Fallback: use media proxy Edge Function (supports whatsapp_media_id or message_id)
+    const proxyId = mediaId || message.id;
+    if (!proxyId) {
+      setError(true);
+      return null;
+    }
+
+    setIsLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setError(true); return null; }
+
+      const proxyUrl = `${import.meta.env.VITE_SUPABASE_URL || ''}/functions/v1/whatsapp-media-proxy?media_id=${proxyId}`;
+      const res = await fetch(proxyUrl, {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      });
+
+      if (!res.ok) { setError(true); return null; }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      setAudioSrc(url);
+      return url;
+    } catch (e) {
+      console.error('Error loading audio:', e);
+      setError(true);
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [audioSrc, directUrl, mediaId]);
+
+  const togglePlay = useCallback(async () => {
+    if (isPlaying && audioRef.current) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+      return;
+    }
+
+    let src = audioSrc;
+    if (!src) {
+      src = await loadAudio();
+      if (!src) return;
+    }
+
+    if (!audioRef.current) {
+      audioRef.current = new Audio(src);
+      audioRef.current.addEventListener('loadedmetadata', () => {
+        setDuration(audioRef.current!.duration);
+      });
+      audioRef.current.addEventListener('timeupdate', () => {
+        const a = audioRef.current!;
+        setCurrentTime(a.currentTime);
+        setProgress(a.duration > 0 ? (a.currentTime / a.duration) * 100 : 0);
+      });
+      audioRef.current.addEventListener('ended', () => {
+        setIsPlaying(false);
+        setProgress(0);
+        setCurrentTime(0);
+      });
+      audioRef.current.addEventListener('error', () => {
+        setError(true);
+        setIsPlaying(false);
+      });
+    }
+
+    try {
+      await audioRef.current.play();
+      setIsPlaying(true);
+    } catch (e) {
+      setError(true);
+    }
+  }, [isPlaying, audioSrc, loadAudio]);
+
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      if (audioSrc && audioSrc.startsWith('blob:')) {
+        URL.revokeObjectURL(audioSrc);
+      }
+    };
+  }, []);
+
+  const formatTime = (sec: number) => {
+    if (!sec || !isFinite(sec)) return '0:00';
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className="flex items-center gap-3 min-w-[200px]">
+      <Button
+        variant="ghost"
+        size="icon"
+        className={cn(
+          'h-10 w-10 rounded-full flex-shrink-0',
+          isOutbound
+            ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+            : 'bg-background hover:bg-muted'
+        )}
+        onClick={togglePlay}
+        disabled={isLoading || error}
+      >
+        {isLoading ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : error ? (
+          <AlertCircle className="h-4 w-4 opacity-50" />
+        ) : isPlaying ? (
+          <Pause className="h-4 w-4" />
+        ) : (
+          <Play className="h-4 w-4" />
+        )}
+      </Button>
+      <div className="flex-1">
+        <div
+          className={cn(
+            'h-1 rounded-full cursor-pointer',
+            isOutbound ? 'bg-white/30' : 'bg-muted-foreground/30'
+          )}
+          onClick={(e) => {
+            if (!audioRef.current || !duration) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const pct = (e.clientX - rect.left) / rect.width;
+            audioRef.current.currentTime = pct * duration;
+          }}
+        >
+          <div
+            className={cn(
+              'h-full rounded-full transition-all',
+              isOutbound ? 'bg-white' : 'bg-emerald-500'
+            )}
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <div className="flex justify-between mt-1">
+          <span className="text-[10px]">
+            {isPlaying || currentTime > 0 ? formatTime(currentTime) : formatTime(duration)}
+          </span>
+          <Mic className="h-3 w-3 opacity-50" />
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /**

@@ -4,7 +4,6 @@ import { Badge } from "@/components/ui/badge";
 import { MetricCard } from "./MetricCard";
 import { ConversionFunnel } from "./ConversionFunnel";
 import { RevenueChart } from "./RevenueChart";
-import { RevenueDistributionCard } from "./RevenueDistributionCard";
 import { Button } from "@/components/ui/button";
 import { Plus, Calendar, AlertTriangle, TrendingUp, ArrowRight, ChevronDown, ChevronUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -281,11 +280,6 @@ export function CommercialDashboard() {
           </AnimatedWrapper>
         ))}
       </div>
-
-      {/* Card de Distribuição de Receita */}
-      <AnimatedWrapper animationType="slideUp" delay={0.6}>
-        <RevenueDistributionCard />
-      </AnimatedWrapper>
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

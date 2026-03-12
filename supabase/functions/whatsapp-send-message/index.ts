@@ -31,7 +31,7 @@ const handler = async (req: Request): Promise<Response> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
-    const { message_id, phone_number, content, reply_to_wa_id, template_name, template_language, template_variables } = await req.json();
+    const { message_id, phone_number, content, reply_to_wa_id, template_name, template_language, template_variables, media_type, media_url, caption } = await req.json();
 
     if (!message_id) throw new Error('message_id is required');
 
@@ -140,31 +140,65 @@ const handler = async (req: Request): Promise<Response> => {
     if (config.provider === 'evolution') {
       console.log(`[send-message] Sending via Evolution to ${phone_number} (instance: ${config.evolution_instance_name})`);
 
-      const evoPayload: any = {
-        number: phone_number,
-        textMessage: { text: content || '' },
-        options: {
-          delay: 1200,
-          presence: 'composing',
-        },
+      const evoBase = config.evolution_api_url.replace(/\/+$/, '');
+      const evoHeaders = {
+        'apikey': config.evolution_instance_token,
+        'Content-Type': 'application/json',
       };
 
-      // Evolution doesn't support Meta templates — send as plain text
-      if (template_name && !content) {
-        evoPayload.textMessage.text = `[Template: ${template_name}]`;
+      let evoEndpoint: string;
+      let evoPayload: any;
+
+      // Check if this is a media message
+      if (media_type && media_url) {
+        // Evolution API v2: /message/sendMedia/{instance}
+        const mediaTypeMap: Record<string, string> = {
+          'image': 'image',
+          'video': 'video',
+          'audio': 'audio',
+          'document': 'document',
+        };
+        const evoMediaType = mediaTypeMap[media_type] || 'document';
+
+        if (evoMediaType === 'audio') {
+          // Audio uses /message/sendWhatsAppAudio/{instance}
+          evoEndpoint = `${evoBase}/message/sendWhatsAppAudio/${config.evolution_instance_name}`;
+          evoPayload = {
+            number: phone_number,
+            audioMessage: { audio: media_url },
+          };
+        } else {
+          evoEndpoint = `${evoBase}/message/sendMedia/${config.evolution_instance_name}`;
+          evoPayload = {
+            number: phone_number,
+            mediaMessage: {
+              mediatype: evoMediaType,
+              media: media_url,
+              caption: caption || '',
+              fileName: evoMediaType === 'document' ? (caption || 'document') : undefined,
+            },
+          };
+        }
+      } else {
+        // Text message
+        evoEndpoint = `${evoBase}/message/sendText/${config.evolution_instance_name}`;
+        evoPayload = {
+          number: phone_number,
+          textMessage: { text: content || '' },
+          options: { delay: 1200, presence: 'composing' },
+        };
+
+        // Evolution doesn't support Meta templates — send as plain text
+        if (template_name && !content) {
+          evoPayload.textMessage.text = `[Template: ${template_name}]`;
+        }
       }
 
-      const response = await fetch(
-        `${config.evolution_api_url.replace(/\/+$/, '')}/message/sendText/${config.evolution_instance_name}`,
-        {
-          method: 'POST',
-          headers: {
-            'apikey': config.evolution_instance_token,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(evoPayload),
-        }
-      );
+      const response = await fetch(evoEndpoint, {
+        method: 'POST',
+        headers: evoHeaders,
+        body: JSON.stringify(evoPayload),
+      });
 
       const data = await response.json();
 

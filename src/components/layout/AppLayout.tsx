@@ -27,6 +27,7 @@ import { GlobalSearch } from "@/components/crm/GlobalSearch"
 import { useAppointmentAlerts } from "@/hooks/useAppointmentAlerts"
 import { AppointmentAlertModal } from "@/components/alerts/AppointmentAlertModal"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { useVisualViewport, useInputScrollIntoView } from "@/hooks/useVisualViewport"
 import { getProfileDisplayData } from "@/utils/nameUtils"
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Menu } from "lucide-react"
@@ -43,6 +44,10 @@ export function AppLayout({ children, hideSidebar = false, title: explicitTitle,
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [showOverdueList, setShowOverdueList] = useState(false)
   const sidebarRef = useRef<ImperativePanelHandle>(null)
+
+  // iPad/iOS keyboard detection & input scroll-into-view
+  useVisualViewport();
+  useInputScrollIntoView();
 
   // Mapeamento de títulos por rota
   const getTitle = () => {

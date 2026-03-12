@@ -81,6 +81,26 @@ interface MediaContent {
   caption?: string;
 }
 
+/**
+ * Fetch the actual download URL for a media object from Meta Graph API.
+ * GET /{media_id} → returns { url, mime_type, ... }
+ * The returned URL is temporary (~5 min) and requires auth header to download.
+ */
+async function getMediaUrl(mediaId: string, accessToken: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/${GRAPH_API_VERSION}/${mediaId}`,
+      { headers: { 'Authorization': `Bearer ${accessToken}` } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.url || null;
+  } catch (e) {
+    console.error('[Webhook] Error fetching media URL:', e);
+    return null;
+  }
+}
+
 interface StatusUpdate {
   id: string;
   status: 'sent' | 'delivered' | 'read' | 'failed';
@@ -188,7 +208,7 @@ const handler = async (req: Request): Promise<Response> => {
         // Buscar TODAS as configs ativas com este phone_number_id (pode haver múltiplas contas compartilhando o número)
         const { data: configs } = await supabaseAdmin
           .from('whatsapp_config')
-          .select('id, user_id')
+          .select('id, user_id, access_token')
           .eq('phone_number_id', phoneNumberId)
           .eq('is_active', true);
 
@@ -227,10 +247,14 @@ const handler = async (req: Request): Promise<Response> => {
 
         console.log(`[Webhook] Delivering message to primary owner: ${targetUserId}`);
 
+        // Obter access_token da config primária (para download de mídia)
+        const primaryConfig = configs.find((c: any) => c.user_id === targetUserId) || configs[0];
+        const accessToken = primaryConfig?.access_token || null;
+
         // Processar mensagens recebidas
         if (value.messages && value.messages.length > 0) {
           for (const message of value.messages) {
-            await processIncomingMessage(supabaseAdmin, targetUserId, phoneNumberId, message, value.contacts);
+            await processIncomingMessage(supabaseAdmin, targetUserId, phoneNumberId, message, value.contacts, accessToken);
           }
         }
 
@@ -263,7 +287,8 @@ async function processIncomingMessage(
   userId: string,
   phoneNumberId: string,
   message: IncomingMessage,
-  contacts?: Array<{ profile: { name: string }; wa_id: string }>
+  contacts?: Array<{ profile: { name: string }; wa_id: string }>,
+  accessToken?: string | null
 ) {
   const phoneNumber = message.from;
   const contactName = contacts?.find(c => c.wa_id === phoneNumber)?.profile.name || null;
@@ -310,14 +335,26 @@ async function processIncomingMessage(
     return;
   }
 
-  // Se tiver mídia, salvar separadamente
+  // Se tiver mídia, buscar URL real do Meta e salvar
   if (['image', 'audio', 'video', 'document', 'sticker'].includes(message.type)) {
     const mediaData = message[message.type as keyof IncomingMessage] as MediaContent;
     if (mediaData?.id) {
+      // Baixar URL real do Media via Graph API (URL temporária ~5min, mas suficiente para cache/download)
+      let mediaUrl = '';
+      if (accessToken) {
+        const fetchedUrl = await getMediaUrl(mediaData.id, accessToken);
+        if (fetchedUrl) {
+          mediaUrl = fetchedUrl;
+          console.log(`[Webhook] Media URL fetched for ${message.type}: ${mediaData.id}`);
+        } else {
+          console.warn(`[Webhook] Could not fetch media URL for ${mediaData.id}`);
+        }
+      }
+
       await supabase.from('whatsapp_media').insert({
         message_id: savedMessage.id,
         media_type: message.type,
-        media_url: '', // Será preenchido após download
+        media_url: mediaUrl,
         media_mime_type: mediaData.mime_type,
         file_name: (mediaData as any).filename || null,
         whatsapp_media_id: mediaData.id,

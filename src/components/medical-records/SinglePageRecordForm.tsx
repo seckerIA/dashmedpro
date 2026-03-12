@@ -109,19 +109,7 @@ export function SinglePageRecordForm({
   );
   const [openSections, setOpenSections] = useState<string[]>(["anamnese"]);
 
-  // iPad: scroll input into view when keyboard opens (prevents keyboard from covering fields)
-  useEffect(() => {
-    const handleFocusIn = (e: FocusEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
-        setTimeout(() => {
-          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 300);
-      }
-    };
-    document.addEventListener('focusin', handleFocusIn);
-    return () => document.removeEventListener('focusin', handleFocusIn);
-  }, []);
+  // iPad keyboard scroll is now handled globally by useInputScrollIntoView in AppLayout
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -731,8 +719,8 @@ export function SinglePageRecordForm({
         </AccordionItem>
       </Accordion>
 
-      {/* Barra de ações fixa — pb com safe-area para iPad */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] flex justify-end gap-3 z-50">
+      {/* Barra de ações fixa — keyboard-aware para iPad */}
+      <div className="fixed left-0 right-0 bg-background border-t p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] flex justify-end gap-3 z-50" style={{ bottom: 'var(--keyboard-height, 0px)' }}>
         <div className="max-w-4xl mx-auto w-full flex justify-end gap-3">
           <Button
             type="button"

@@ -135,7 +135,7 @@ async function processLeadgenEvent(
   // 1. Buscar page → user_id mapping e token (pages salvas como page_{id} no meta-token-exchange)
   const { data: pageConn } = await supabase
     .from('ad_platform_connections')
-    .select('user_id, api_key')
+    .select('user_id, api_key, parent_account_id')
     .eq('account_id', `page_${pageId}`)
     .eq('is_active', true)
     .limit(1)
@@ -148,6 +148,34 @@ async function processLeadgenEvent(
 
   const userId = pageConn.user_id;
   let accessToken = pageConn.api_key;
+  const pageBmId = pageConn.parent_account_id;
+
+  // 1b. Verificar se esta página pertence a uma BM com campanhas sincronizadas
+  //     Só processamos leads de BMs que o usuário efetivamente sincronizou.
+  if (pageBmId) {
+    const { data: syncingCampaigns } = await supabase
+      .from('ad_campaigns_sync')
+      .select('connection_id')
+      .eq('user_id', userId)
+      .eq('is_syncing', true);
+
+    let bmHasSyncedCampaigns = false;
+    if (syncingCampaigns && syncingCampaigns.length > 0) {
+      const connectionIds = [...new Set(syncingCampaigns.map((c: any) => c.connection_id))];
+      const { data: adAccounts } = await supabase
+        .from('ad_platform_connections')
+        .select('parent_account_id')
+        .in('id', connectionIds);
+
+      const syncedBmIds = new Set((adAccounts || []).map((a: any) => a.parent_account_id).filter(Boolean));
+      bmHasSyncedCampaigns = syncedBmIds.has(pageBmId);
+    }
+
+    if (!bmHasSyncedCampaigns) {
+      console.log(`[Leadgen Webhook] Ignoring lead from page ${pageId} — BM ${pageBmId} has no synced campaigns`);
+      return;
+    }
+  }
 
   // 2. Buscar dados completos do lead via Graph API
   let leadData: any = null;

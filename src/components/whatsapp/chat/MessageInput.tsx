@@ -10,6 +10,7 @@ import {
   Video,
   CornerUpLeft,
   Loader2,
+  Square,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -59,8 +60,13 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   const [text, setText] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Expor métodos via ref
   useImperativeHandle(ref, () => ({
@@ -198,6 +204,87 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     setIsDragging(false);
   }, []);
 
+  const startRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : 'audio/webm',
+      });
+
+      audioChunksRef.current = [];
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        if (audioBlob.size > 0 && onSendMedia) {
+          const file = new File([audioBlob], `audio_${Date.now()}.webm`, { type: 'audio/webm' });
+          await onSendMedia(file);
+        }
+        audioChunksRef.current = [];
+      };
+
+      mediaRecorder.start(250);
+      setIsRecording(true);
+      setRecordingDuration(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1);
+      }, 1000);
+    } catch (e) {
+      console.error('Microphone access denied:', e);
+    }
+  }, [onSendMedia]);
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  }, []);
+
+  const cancelRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.ondataavailable = null;
+      mediaRecorderRef.current.onstop = () => {
+        mediaRecorderRef.current?.stream?.getTracks().forEach(t => t.stop());
+      };
+      mediaRecorderRef.current.stop();
+    }
+    audioChunksRef.current = [];
+    setIsRecording(false);
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  }, []);
+
+  // Cleanup recording on unmount
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stream?.getTracks().forEach(t => t.stop());
+        mediaRecorderRef.current.stop();
+      }
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    };
+  }, []);
+
+  const formatRecordingTime = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
   return (
     <div className="border-t bg-background">
       {/* Reply preview */}
@@ -307,40 +394,85 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
           onChange={handleFileSelect}
         />
 
-        {/* Text input */}
-        <div className="flex-1 relative">
-          <Textarea
-            ref={textareaRef}
-            value={text}
-            onChange={e => setText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Digite uma mensagem..."
-            className={cn(
-              'min-h-[40px] max-h-[150px] py-2.5 px-4 resize-none',
-              'rounded-2xl border-muted-foreground/20',
-              'focus-visible:ring-green-500/50'
-            )}
-            disabled={disabled || isSending}
-            rows={1}
-          />
-        </div>
+        {/* Text input / Recording UI */}
+        {isRecording ? (
+          <div className="flex-1 flex items-center gap-3 px-4 py-2 bg-red-50 dark:bg-red-950/20 rounded-2xl border border-red-200 dark:border-red-800">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 flex-shrink-0 text-red-500 hover:text-red-600 hover:bg-red-100"
+              onClick={cancelRecording}
+              aria-label="Cancelar gravação"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center gap-2 flex-1">
+              <div className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-sm font-medium text-red-600 dark:text-red-400 tabular-nums">
+                {formatRecordingTime(recordingDuration)}
+              </span>
+              <span className="text-xs text-red-500/70">Gravando...</span>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 relative">
+            <Textarea
+              ref={textareaRef}
+              value={text}
+              onChange={e => setText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Digite uma mensagem..."
+              className={cn(
+                'min-h-[40px] max-h-[150px] py-2.5 px-4 resize-none',
+                'rounded-2xl border-muted-foreground/20',
+                'focus-visible:ring-green-500/50'
+              )}
+              disabled={disabled || isSending}
+              rows={1}
+            />
+          </div>
+        )}
 
-        {/* Send button */}
-        <Button
-          size="icon"
-          className={cn(
-            'h-10 w-10 rounded-full flex-shrink-0',
-            'bg-green-500 hover:bg-green-600'
-          )}
-          onClick={handleSubmit}
-          disabled={!text.trim() || disabled || isSending}
-        >
-          {isSending ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
-          ) : (
-            <Send className="h-5 w-5" />
-          )}
-        </Button>
+        {/* Send / Mic / Stop button */}
+        {isRecording ? (
+          <Button
+            size="icon"
+            className="h-10 w-10 rounded-full flex-shrink-0 bg-red-500 hover:bg-red-600"
+            onClick={stopRecording}
+            aria-label="Enviar áudio"
+          >
+            <Send className="h-5 w-5 text-white" />
+          </Button>
+        ) : text.trim() ? (
+          <Button
+            size="icon"
+            className={cn(
+              'h-10 w-10 rounded-full flex-shrink-0',
+              'bg-green-500 hover:bg-green-600'
+            )}
+            onClick={handleSubmit}
+            disabled={disabled || isSending}
+          >
+            {isSending ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <Send className="h-5 w-5" />
+            )}
+          </Button>
+        ) : (
+          <Button
+            size="icon"
+            className={cn(
+              'h-10 w-10 rounded-full flex-shrink-0',
+              'bg-green-500 hover:bg-green-600'
+            )}
+            onClick={startRecording}
+            disabled={disabled || isSending || !onSendMedia}
+            aria-label="Gravar áudio"
+          >
+            <Mic className="h-5 w-5" />
+          </Button>
+        )}
       </div>
     </div>
   );

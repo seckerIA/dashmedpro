@@ -1164,10 +1164,11 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
 
   // Helper: Mark as completed
   const markAsCompleted = useMutation({
-    mutationFn: async (params: string | { id: string; confirmedPayment?: boolean }) => {
+    mutationFn: async (params: string | { id: string; confirmedPayment?: boolean; procedureData?: { name: string; value: number } }) => {
       // Suportar tanto string (compatibilidade) quanto objeto com confirmação
       const id = typeof params === 'string' ? params : params.id;
       const confirmedPayment = typeof params === 'object' ? params.confirmedPayment : undefined;
+      const procedureData = typeof params === 'object' ? params.procedureData : undefined;
 
       // Buscar a consulta completa antes de atualizar
       const { data: appointment, error: fetchError } = await supabase
@@ -1282,21 +1283,39 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
         }
       }
 
+      // Se teve procedimento, atualizar o estimated_value para incluir o valor do procedimento
+      // Assim a transação financeira será criada com o valor total (consulta + procedimento)
+      const procedureValue = procedureData?.value || 0;
+      const updatedEstimatedValue = procedureValue > 0
+        ? (appointment.estimated_value || 0) + procedureValue
+        : undefined;
+
+      if (procedureValue > 0) {
+        // Atualizar o estimated_value no banco ANTES do update principal
+        await supabase
+          .from('medical_appointments')
+          .update({ estimated_value: updatedEstimatedValue })
+          .eq('id', id);
+      }
+
       // Atualizar a consulta com status concluído e vincular transação se criada
       // Se o usuário confirmou o pagamento, também atualizar payment_status para 'paid'
       const shouldMarkAsPaid = confirmedPayment === true || appointment.payment_status === 'paid';
 
-      return updateMutation.mutateAsync({
+      const result = await updateMutation.mutateAsync({
         id,
         updates: {
           status: 'completed',
           completed_at: new Date().toISOString(),
+          ...(updatedEstimatedValue ? { estimated_value: updatedEstimatedValue } : {}),
           ...(shouldMarkAsPaid ? { payment_status: 'paid' as PaymentStatus } : {}),
           ...(financialTransactionId && !appointment.financial_transaction_id
             ? { financial_transaction_id: financialTransactionId }
             : {}),
         },
       });
+
+      return result;
     },
     onSuccess: async (data, variables) => {
       // Invalidar queries de appointments e financial primeiro
@@ -1325,9 +1344,16 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
         }
       }
 
+      // Verificar se teve procedimento (checando se o valor mudou no params)
+      const hadProcedure = typeof variables === 'object' && variables.procedureData;
+
       // Montar mensagem de sucesso
       let successMessage = 'A consulta foi marcada como concluída.';
-      if (hasTransaction && stockDeducted) {
+      if (hadProcedure) {
+        successMessage = `Consulta + procedimento (${(variables as any).procedureData.name}) concluídos!`;
+        if (hasTransaction) successMessage += ' Transação financeira criada.';
+        if (stockDeducted) successMessage += ' Estoque deduzido.';
+      } else if (hasTransaction && stockDeducted) {
         successMessage = 'Consulta concluída! Transação financeira criada e estoque deduzido automaticamente.';
       } else if (hasTransaction) {
         successMessage = 'Consulta concluída! Transação financeira criada automaticamente.';
@@ -1340,14 +1366,20 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
         description: successMessage,
       });
 
-      // Verificar se paciente deve ir para "Aguardando Retorno"
-      // Isso só acontece se não estiver em tratamento (verificação feita dentro da função)
+      // Se teve procedimento, mover deal para "em_tratamento"
+      // Caso contrário, verificar se deve ir para "Aguardando Retorno"
       if (data?.contact_id) {
         try {
-          await checkAndMoveToAguardandoRetorno(data.contact_id);
+          if (hadProcedure) {
+            // Procedimento realizado → mover para em_tratamento
+            const doctorId = data.doctor_id || data.user_id;
+            await updateDealToTreatment(data.contact_id, doctorId);
+          } else {
+            // Sem procedimento → verificar aguardando retorno
+            await checkAndMoveToAguardandoRetorno(data.contact_id);
+          }
         } catch (error) {
-          console.error('[markAsCompleted] Erro ao verificar aguardando retorno:', error);
-          // Não mostrar erro ao usuário - é uma operação secundária
+          console.error('[markAsCompleted] Erro ao atualizar pipeline:', error);
         }
       }
 

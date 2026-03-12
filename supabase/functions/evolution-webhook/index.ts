@@ -98,7 +98,7 @@ const handler = async (req: Request): Promise<Response> => {
       }
 
       // Extract content
-      const { content, messageType } = extractEvoContent(data);
+      const { content, messageType, mediaInfo } = extractEvoContent(data);
       if (!content) {
         console.log('[EvoWebhook] Empty content, skipping');
         return new Response('OK', { status: 200 });
@@ -192,6 +192,38 @@ const handler = async (req: Request): Promise<Response> => {
 
       console.log('[EvoWebhook] Message saved:', savedMessage.id, isFromMe ? '(outbound)' : '(inbound)');
 
+      // ---- Save media if present ----
+      if (mediaInfo.hasMedia && savedMessage?.id) {
+        let mediaUrl = '';
+
+        // Try to download media from Evolution API and upload to Supabase Storage
+        try {
+          const base64 = await downloadEvoMedia(config as any, instanceName, data);
+          if (base64) {
+            const uploaded = await uploadMediaToStorage(
+              supabaseAdmin,
+              base64,
+              mediaInfo.mimeType || 'application/octet-stream',
+              savedMessage.id,
+            );
+            if (uploaded) mediaUrl = uploaded;
+          }
+        } catch (e) {
+          console.error('[EvoWebhook] Media processing failed:', e);
+        }
+
+        await supabaseAdmin.from('whatsapp_media').insert({
+          message_id: savedMessage.id,
+          media_type: messageType,
+          media_url: mediaUrl,
+          media_mime_type: mediaInfo.mimeType,
+          file_name: mediaInfo.fileName,
+          duration_seconds: mediaInfo.duration,
+        });
+
+        console.log('[EvoWebhook] Media saved for message:', savedMessage.id, 'type:', messageType, 'url:', mediaUrl ? 'yes' : 'no');
+      }
+
       // ---- Trigger AI Agent only for inbound messages ----
       if (isFromMe) {
         return new Response('OK', { status: 200, headers: corsHeaders });
@@ -274,43 +306,67 @@ const handler = async (req: Request): Promise<Response> => {
 // =========================================
 // Extract content from Evolution message
 // =========================================
-function extractEvoContent(data: any): { content: string; messageType: string } {
+interface EvoMediaInfo {
+  hasMedia: boolean;
+  mimeType: string | null;
+  fileName: string | null;
+  duration: number | null;
+}
+
+function extractEvoContent(data: any): { content: string; messageType: string; mediaInfo: EvoMediaInfo } {
   const msg = data.message;
-  if (!msg) return { content: '', messageType: 'text' };
+  const noMedia: EvoMediaInfo = { hasMedia: false, mimeType: null, fileName: null, duration: null };
+  if (!msg) return { content: '', messageType: 'text', mediaInfo: noMedia };
 
   // Plain text
   if (msg.conversation) {
-    return { content: msg.conversation, messageType: 'text' };
+    return { content: msg.conversation, messageType: 'text', mediaInfo: noMedia };
   }
 
   // Extended text (with formatting/links)
   if (msg.extendedTextMessage?.text) {
-    return { content: msg.extendedTextMessage.text, messageType: 'text' };
+    return { content: msg.extendedTextMessage.text, messageType: 'text', mediaInfo: noMedia };
   }
 
   // Image
   if (msg.imageMessage) {
-    return { content: msg.imageMessage.caption || '[Imagem]', messageType: 'image' };
+    return {
+      content: msg.imageMessage.caption || '[Imagem]',
+      messageType: 'image',
+      mediaInfo: { hasMedia: true, mimeType: msg.imageMessage.mimetype || 'image/jpeg', fileName: null, duration: null },
+    };
   }
 
   // Audio
   if (msg.audioMessage) {
-    return { content: '[Áudio]', messageType: 'audio' };
+    return {
+      content: '[Áudio]',
+      messageType: 'audio',
+      mediaInfo: { hasMedia: true, mimeType: msg.audioMessage.mimetype || 'audio/ogg', fileName: null, duration: msg.audioMessage.seconds || null },
+    };
   }
 
   // Video
   if (msg.videoMessage) {
-    return { content: msg.videoMessage.caption || '[Vídeo]', messageType: 'video' };
+    return {
+      content: msg.videoMessage.caption || '[Vídeo]',
+      messageType: 'video',
+      mediaInfo: { hasMedia: true, mimeType: msg.videoMessage.mimetype || 'video/mp4', fileName: null, duration: msg.videoMessage.seconds || null },
+    };
   }
 
   // Document
   if (msg.documentMessage) {
-    return { content: msg.documentMessage.fileName || '[Documento]', messageType: 'document' };
+    return {
+      content: msg.documentMessage.fileName || '[Documento]',
+      messageType: 'document',
+      mediaInfo: { hasMedia: true, mimeType: msg.documentMessage.mimetype || 'application/octet-stream', fileName: msg.documentMessage.fileName || null, duration: null },
+    };
   }
 
   // Sticker
   if (msg.stickerMessage) {
-    return { content: '[Sticker]', messageType: 'sticker' };
+    return { content: '[Sticker]', messageType: 'sticker', mediaInfo: { hasMedia: true, mimeType: msg.stickerMessage.mimetype || 'image/webp', fileName: null, duration: null } };
   }
 
   // Location
@@ -319,17 +375,98 @@ function extractEvoContent(data: any): { content: string; messageType: string } 
     return {
       content: loc.name || loc.address || `[Localização: ${loc.degreesLatitude}, ${loc.degreesLongitude}]`,
       messageType: 'location',
+      mediaInfo: noMedia,
     };
   }
 
   // Contact
   if (msg.contactMessage) {
-    return { content: msg.contactMessage.displayName || '[Contato]', messageType: 'contact' };
+    return { content: msg.contactMessage.displayName || '[Contato]', messageType: 'contact', mediaInfo: noMedia };
   }
 
   // Fallback
   const msgType = data.messageType || 'unknown';
-  return { content: `[${msgType}]`, messageType: msgType };
+  return { content: `[${msgType}]`, messageType: msgType, mediaInfo: noMedia };
+}
+
+// =========================================
+// Download media from Evolution API
+// =========================================
+async function downloadEvoMedia(
+  config: { evolution_api_url: string; evolution_instance_token: string },
+  instanceName: string,
+  messageData: any,
+): Promise<string | null> {
+  try {
+    const evoUrl = config.evolution_api_url.replace(/\/+$/, '');
+    const res = await fetch(`${evoUrl}/chat/getBase64FromMediaMessage/${instanceName}`, {
+      method: 'POST',
+      headers: {
+        'apikey': config.evolution_instance_token,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ message: messageData.key, convertToMp4: false }),
+    });
+    if (!res.ok) {
+      console.error('[EvoWebhook] Media download failed:', res.status, await res.text().catch(() => ''));
+      return null;
+    }
+    const data = await res.json();
+    // Evolution returns { base64: "data:mime;base64,..." } or { base64: "base64string" }
+    return data.base64 || null;
+  } catch (e) {
+    console.error('[EvoWebhook] Media download error:', e);
+    return null;
+  }
+}
+
+// =========================================
+// Upload base64 media to Supabase Storage
+// =========================================
+async function uploadMediaToStorage(
+  supabase: any,
+  base64Data: string,
+  mimeType: string,
+  messageId: string,
+): Promise<string | null> {
+  try {
+    // Strip data URI prefix if present
+    const raw = base64Data.replace(/^data:[^;]+;base64,/, '');
+
+    // Convert base64 to Uint8Array
+    const binaryStr = atob(raw);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+
+    // Determine extension from mime
+    const extMap: Record<string, string> = {
+      'audio/ogg': 'ogg', 'audio/ogg; codecs=opus': 'ogg', 'audio/mp4': 'mp4',
+      'audio/mpeg': 'mp3', 'audio/webm': 'webm', 'audio/amr': 'amr',
+      'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp',
+      'video/mp4': 'mp4', 'video/3gpp': '3gp',
+      'application/pdf': 'pdf',
+    };
+    const ext = extMap[mimeType.toLowerCase()] || 'bin';
+    const fileName = `evo_${messageId}_${Date.now()}.${ext}`;
+    const filePath = `whatsapp-media/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('media')
+      .upload(filePath, bytes, { contentType: mimeType, upsert: false });
+
+    if (uploadError) {
+      console.error('[EvoWebhook] Storage upload error:', uploadError);
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage.from('media').getPublicUrl(filePath);
+    return urlData?.publicUrl || null;
+  } catch (e) {
+    console.error('[EvoWebhook] Upload error:', e);
+    return null;
+  }
 }
 
 // =========================================

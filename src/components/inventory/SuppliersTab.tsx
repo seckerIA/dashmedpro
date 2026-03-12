@@ -1,6 +1,6 @@
 
 import React, { useState } from "react";
-import { Plus, Search, Edit, EyeOff, Building2 } from "lucide-react";
+import { Plus, Search, Edit, EyeOff, Trash2, Building2 } from "lucide-react";
 import { useSuppliers, Supplier, SupplierInsert } from "@/hooks/useSuppliers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,11 +34,12 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 
 export function SuppliersTab() {
-    const { suppliers, isLoading, createSupplier, updateSupplier, deactivateSupplier } = useSuppliers();
+    const { suppliers, isLoading, createSupplier, updateSupplier, deactivateSupplier, deleteSupplier } = useSuppliers();
     const [searchTerm, setSearchTerm] = useState("");
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
     const [supplierToDeactivate, setSupplierToDeactivate] = useState<string | null>(null);
+    const [supplierToDelete, setSupplierToDelete] = useState<string | null>(null);
     const { user } = useAuth();
 
     const [formData, setFormData] = useState<SupplierInsert>({
@@ -104,6 +105,13 @@ export function SuppliersTab() {
         }
     }
 
+    const handleDelete = async () => {
+        if (supplierToDelete) {
+            await deleteSupplier.mutateAsync(supplierToDelete);
+            setSupplierToDelete(null);
+        }
+    }
+
     return (
         <div className="space-y-4">
             <div className="flex justify-between items-center">
@@ -166,6 +174,9 @@ export function SuppliersTab() {
                                         </Button>
                                         <Button variant="ghost" size="icon" className="text-amber-500 hover:text-amber-700 hover:bg-amber-100" onClick={() => setSupplierToDeactivate(supplier.id)} title="Desativar fornecedor">
                                             <EyeOff className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-700 hover:bg-red-100" onClick={() => setSupplierToDelete(supplier.id)} title="Excluir fornecedor">
+                                            <Trash2 className="h-4 w-4" />
                                         </Button>
                                     </TableCell>
                                 </TableRow>
@@ -259,6 +270,28 @@ export function SuppliersTab() {
                             className="bg-amber-600 text-white hover:bg-amber-700"
                         >
                             Desativar
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={!!supplierToDelete} onOpenChange={(open) => !open && setSupplierToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir Fornecedor</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Tem certeza que deseja excluir este fornecedor permanentemente?
+                            Esta ação não pode ser desfeita. Se houver transações vinculadas, a exclusão será bloqueada.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDelete}
+                            className="bg-red-600 text-white hover:bg-red-700"
+                        >
+                            Excluir Permanentemente
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

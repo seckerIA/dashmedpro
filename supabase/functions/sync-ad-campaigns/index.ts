@@ -283,7 +283,7 @@ async function fetchMetaCampaigns(accountId: string, accessToken: string): Promi
 
 async function fetchCampaignInsights(campaignId: string, accessToken: string): Promise<MetaInsights | null> {
   const fields = 'impressions,clicks,spend,reach,actions,action_values,ctr,date_start,date_stop';
-  const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${campaignId}/insights?fields=${fields}&date_preset=last_30d`;
+  const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${campaignId}/insights?fields=${fields}&date_preset=this_month`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
   if (!res.ok) return null;
   const data = await res.json();
