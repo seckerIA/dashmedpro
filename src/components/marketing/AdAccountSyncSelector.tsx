@@ -63,13 +63,21 @@ export function AdAccountSyncSelector() {
   const [expanded, setExpanded] = useState(false);
   const [expandedBMs, setExpandedBMs] = useState<Set<string>>(new Set());
 
-  // Filter only meta_ads connections (exclude meta_oauth)
   const metaConnections = useMemo(() => {
     if (!allConnections) return [];
     return allConnections.filter(
       (c) => c.platform === 'meta_ads' && c.account_id !== 'meta_oauth'
     );
   }, [allConnections]);
+
+  // Helper: truly syncable ad account (guards against data inconsistency
+  // where category is 'other' but account_id has a non-ad prefix)
+  const isSyncableAdAccount = (c: AdPlatformConnection) =>
+    c.account_category === 'other' &&
+    !c.account_id.startsWith('bm_') &&
+    !c.account_id.startsWith('waba_') &&
+    !c.account_id.startsWith('page_') &&
+    c.account_id !== 'meta_oauth';
 
   // Group connections by BM hierarchy
   const { bmGroups, orphanAdAccounts, orphanPages } = useMemo(() => {
@@ -78,7 +86,7 @@ export function AdAccountSyncSelector() {
       const children = metaConnections.filter((c) => c.parent_account_id === bm.account_id);
       return {
         bm,
-        adAccounts: children.filter((c) => c.account_category === 'other'),
+        adAccounts: children.filter((c) => isSyncableAdAccount(c)),
         wabas: children.filter((c) => c.account_category === 'waba'),
         pages: children.filter((c) => c.account_category === 'page'),
       };
@@ -86,7 +94,7 @@ export function AdAccountSyncSelector() {
 
     // Orphan ad accounts (no parent BM)
     const orphanAds = metaConnections.filter(
-      (c) => c.account_category === 'other' && !c.parent_account_id
+      (c) => isSyncableAdAccount(c) && !c.parent_account_id
     );
 
     // Orphan pages (no parent BM)

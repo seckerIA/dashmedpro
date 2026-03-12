@@ -8,7 +8,7 @@ import {
   Target,
   Users,
   RefreshCw,
-  Link2,
+
   BarChart3,
   Settings,
   AlertTriangle,
@@ -49,8 +49,15 @@ export function MarketingDashboard() {
     }
 
     try {
-      // Filter: only active ad accounts (category 'other') — BMs, WABAs, Pages can't be synced
-      const activeConnections = connections.filter(c => c.is_active && c.account_category === 'other');
+      // Filter: only active ad accounts — category 'other' AND valid ad account prefix
+      const activeConnections = connections.filter(c =>
+        c.is_active &&
+        c.account_category === 'other' &&
+        !c.account_id.startsWith('bm_') &&
+        !c.account_id.startsWith('waba_') &&
+        !c.account_id.startsWith('page_') &&
+        c.account_id !== 'meta_oauth'
+      );
       for (const connection of activeConnections) {
         await syncCampaigns.mutateAsync(connection.id);
       }
@@ -281,13 +288,7 @@ export function MarketingDashboard() {
                   </>
                 )}
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => navigate('/marketing?tab=utms')}
-              >
-                <Link2 className="h-4 w-4 mr-2" />
-                Gerar Novo Link UTM
-              </Button>
+
               <Button
                 variant="outline"
                 onClick={() => navigate('/marketing?tab=reports')}

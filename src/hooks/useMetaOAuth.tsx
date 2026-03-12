@@ -93,6 +93,7 @@ export function useMetaOAuth() {
 
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSdkReady, setIsSdkReady] = useState(false);
+  const [sdkError, setSdkError] = useState<string | null>(null);
 
   // =====================================================
   // Effect: Carregar Facebook SDK
@@ -106,10 +107,14 @@ export function useMetaOAuth() {
     loadFacebookSDK(FB_APP_ID)
       .then(() => {
         setIsSdkReady(true);
+        setSdkError(null);
         console.log('[Meta OAuth] Facebook SDK ready');
       })
       .catch((error) => {
         console.error('[Meta OAuth] Failed to load Facebook SDK:', error);
+        setSdkError(
+          'O Facebook SDK foi bloqueado pelo navegador. Desative o bloqueador de anúncios ou a "Prevenção de Rastreamento" do Edge para esta página e recarregue.'
+        );
       });
   }, []);
 
@@ -382,6 +387,7 @@ export function useMetaOAuth() {
     isConnecting: isConnecting || exchangeTokenMutation.isPending,
     isOAuthConfigured: !!FB_APP_ID,
     isSdkReady,
+    sdkError,
 
     // Status de integrações
     integrationStatus: integrationStatusQuery.data,

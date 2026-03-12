@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useCommercialLeads } from './useCommercialLeads';
 import { useAdCampaignsSync } from './useAdCampaignsSync';
 import { useGeneratedUtms } from './useUtmGenerator';
+import { supabase } from "@/integrations/supabase/client";
 
 export interface MarketingLead {
   id: string;
@@ -39,27 +40,40 @@ export function useMarketingLeads(filters?: {
   return useQuery({
     queryKey: ['marketing-leads', allLeads, campaigns, utms, filters],
     queryFn: async (): Promise<MarketingLead[]> => {
+      // Se não houver campanhas sincronizadas, não há como vincular ou filtrar leads para exibição
+      if (!campaigns || campaigns.length === 0) return [];
+
+      // 1. Fetch lead form submissions (Meta Ads)
+      const { data: formLeads, error: formsError } = await supabase
+        .from('lead_form_submissions')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (formsError) {
+        console.error('Error fetching lead forms:', formsError);
+      }
+
+      // 2. Process commercial_leads
       const leads = allLeads || [];
-      
-      // Filtrar apenas leads que vieram de anúncios
       const marketingLeads = leads.filter(lead => {
         return lead.origin === 'google' ||
                lead.origin === 'facebook' ||
                lead.origin === 'instagram';
       });
 
-      // Enriquecer com informações de campanha e UTM
-      const enrichedLeads = marketingLeads.map(lead => {
-        // Tentar encontrar campanha relacionada via UTM
+      const enrichedManualLeads = marketingLeads.reduce((acc, lead) => {
         const relatedUtm = utms?.find(utm => 
           utm.full_url.includes(`utm_source=${lead.origin}`)
         );
         
         const campaign = relatedUtm?.ad_campaign_sync_id
-          ? campaigns?.find(c => c.id === relatedUtm.ad_campaign_sync_id)
+          ? campaigns.find(c => c.id === relatedUtm.ad_campaign_sync_id)
           : null;
 
-        const enriched = {
+        // Se o lead não estiver vinculado a uma campanha sincronizada, ignora
+        if (!campaign) return acc;
+
+        acc.push({
           id: lead.id,
           name: lead.name,
           email: lead.email,
@@ -69,15 +83,47 @@ export function useMarketingLeads(filters?: {
           estimated_value: lead.estimated_value,
           created_at: lead.created_at,
           utm_id: relatedUtm?.id || null,
-          ad_campaign_sync_id: campaign?.id || null,
-          campaign_name: campaign?.platform_campaign_name || null,
-          platform: campaign?.platform || null,
-        };
+          ad_campaign_sync_id: campaign.id,
+          campaign_name: campaign.platform_campaign_name || null,
+          platform: campaign.platform || null,
+        } as MarketingLead);
 
-        return enriched;
-      });
+        return acc;
+      }, [] as MarketingLead[]);
 
-      return enrichedLeads;
+      // 3. Process form leads
+      const formLeadsMapped = (formLeads || []).reduce((acc, lead) => {
+        // Ignora se não houver campaign_id atrelado (orgânico)
+        if (!lead.campaign_id) return acc;
+
+        // Try mapping the campaign_id perfectly to synced campaigns
+        const campaign = campaigns.find(c => c.platform_campaign_id === lead.campaign_id);
+        
+        // Garante que só puxa Leads de campanhas sincronizadas! (O usuário pediu restrição total)
+        if (!campaign) return acc;
+        
+        acc.push({
+          id: lead.id, // we might need lead.leadgen_id or id
+          name: lead.full_name || 'Lead Meta Ads',
+          email: lead.email,
+          phone: lead.phone_number,
+          origin: 'facebook',
+          status: 'novo', // Default status for form leads, they are created in crm_deals as lead_novo
+          estimated_value: 0,
+          created_at: lead.created_at,
+          utm_id: null,
+          ad_campaign_sync_id: campaign.id,
+          campaign_name: lead.campaign_name || lead.form_name,
+          platform: 'meta_ads',
+        } as MarketingLead);
+
+        return acc;
+      }, [] as MarketingLead[]);
+
+      // 4. Merge and ensure no duplicates
+      const allMerged = [...formLeadsMapped, ...enrichedManualLeads];
+      
+      return allMerged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     },
     enabled: true,
   });

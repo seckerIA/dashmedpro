@@ -4,7 +4,7 @@
  */
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,6 +13,7 @@ const corsHeaders = {
 };
 
 const GRAPH_API_VERSION = "v22.0";
+
 
 interface MetaCampaign {
   id: string;
@@ -52,7 +53,7 @@ const handler = async (req: Request): Promise<Response> => {
   const supabaseAdmin = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    { auth: { autoRefreshToken: false, persistSession: false } }
+    { auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false } }
   );
 
   let current_connection_id: string | null = null;
@@ -61,22 +62,32 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
+      console.error('[sync-ad-campaigns] No Authorization header present');
       return new Response(JSON.stringify({ error: 'No authorization header' }), { 
         status: 401, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       });
     }
 
+    // Diagnostic: log JWT signature prefix to identify if anon key vs user token
+    const tokenPart = authHeader.replace('Bearer ', '');
+    const sigPrefix = tokenPart.split('.').pop()?.substring(0, 6) ?? '?';
+    console.log(`[sync-ad-campaigns] Auth token signature prefix: ${sigPrefix}`);
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
+      { 
+        auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
+        global: { headers: { Authorization: authHeader } } 
+      }
     );
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await supabase.auth.getUser(tokenPart);
 
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
+      console.error('[sync-ad-campaigns] Auth failed:', authError?.message, '| sig:', sigPrefix);
+      return new Response(JSON.stringify({ error: 'Unauthorized', detail: authError?.message }), { 
         status: 401, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       });
@@ -84,17 +95,30 @@ const handler = async (req: Request): Promise<Response> => {
 
     current_user_id = user.id;
 
-    // Safe JSON parsing
-    const body = await req.json().catch(() => ({}));
-    const { connection_id } = body;
-    current_connection_id = connection_id;
+    // Safe JSON parsing with diagnostics
+    let body: Record<string, unknown> = {};
+    try {
+      body = await req.json();
+    } catch (parseErr: any) {
+      console.warn('[sync-ad-campaigns] Failed to parse request body:', parseErr.message);
+      return new Response(JSON.stringify({ error: 'Invalid or empty request body' }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
+
+    const { connection_id } = body as { connection_id?: string };
+    current_connection_id = connection_id ?? null;
 
     if (!connection_id) {
+      console.warn('[sync-ad-campaigns] Missing connection_id in body:', JSON.stringify(body));
       return new Response(JSON.stringify({ error: 'connection_id is required' }), { 
         status: 400, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       });
     }
+
+
 
     // Buscar conexão usando o token do usuário (garante permissão)
     const { data: connection, error: connError } = await supabase
@@ -137,13 +161,17 @@ const handler = async (req: Request): Promise<Response> => {
       })
       .eq('id', connection_id);
 
+    if (!syncResult.success) {
+      console.warn(`[sync-ad-campaigns] Sync failed for connection ${connection_id}:`, (syncResult as any).error);
+    }
+
     return new Response(JSON.stringify(syncResult), {
-      status: syncResult.success ? 200 : 400, // Error de negócio é 400, não 500
+      status: syncResult.success ? 200 : 400,
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
 
   } catch (error: any) {
-    console.error("Critical error in sync-ad-campaigns:", error);
+    console.error("[sync-ad-campaigns] Critical error:", error.message, error.stack);
     
     // Se falhou e temos o ID da conexão, gravar o erro no banco
     if (current_connection_id) {

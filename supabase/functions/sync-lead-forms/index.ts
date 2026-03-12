@@ -61,35 +61,8 @@ serve(async (req: Request) => {
     const requestedPageIds: string[] | undefined = body.page_ids;
     const syncLeads: boolean = body.sync_leads !== false; // default true
 
-    // 1. Determinar quais BMs têm pelo menos 1 ad account ativo (is_active = true)
-    //    Isso evita buscar formulários de BMs que o usuário não selecionou para sync.
-    const { data: activeAdAccounts, error: adAccError } = await supabaseAdmin
-      .from('ad_platform_connections')
-      .select('parent_account_id, account_id')
-      .eq('user_id', user.id)
-      .eq('platform', 'meta_ads')
-      .eq('account_category', 'other')
-      .eq('is_active', true);
-
-    if (adAccError) {
-      console.error('[sync-lead-forms] Error fetching active ad accounts:', adAccError);
-      return new Response(
-        JSON.stringify({ success: false, error: 'Erro ao buscar contas de anúncios ativas' }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Coletar os IDs das BMs com ad accounts ativos (ou account_id se órfão)
-    const activeBmIds = new Set<string>();
-    for (const acc of (activeAdAccounts || [])) {
-      if (acc.parent_account_id) {
-        activeBmIds.add(acc.parent_account_id);
-      }
-    }
-
-    console.log(`[sync-lead-forms] Active BM IDs: ${[...activeBmIds].join(', ')}`);
-
-    // 2. Buscar TODAS as páginas do usuário (is_active = true)
+    // 1. Buscar TODAS as páginas ativas do usuário
+    //    Lead forms pertencem a PÁGINAS — a filtragem por BM é feita no frontend (dropdown).
     const { data: pageConnections, error: connError } = await supabaseAdmin
       .from('ad_platform_connections')
       .select('account_id, account_name, api_key, parent_account_id')
@@ -113,29 +86,13 @@ serve(async (req: Request) => {
       );
     }
 
-    // 3. Filtrar páginas: manter apenas as que pertencem a BMs com ad accounts ativos
-    //    Páginas órfãs (sem parent_account_id) passam se não houver nenhuma BM ativa (fallback).
-    let filteredByBm = pageConnections.filter(p => {
-      if (!p.parent_account_id) {
-        // Página órfã: inclui apenas se NÃO existe nenhuma BM ativa (compatibilidade)
-        return activeBmIds.size === 0;
-      }
-      return activeBmIds.has(p.parent_account_id);
-    });
+    console.log(`[sync-lead-forms] Found ${pageConnections.length} active pages: ${pageConnections.map(p => p.account_name || p.account_id).join(', ')}`);
 
-    // Se nenhuma BM ativa filtrou páginas, fallback para todas (evita tela em branco)
-    if (filteredByBm.length === 0 && pageConnections.length > 0) {
-      console.warn('[sync-lead-forms] No pages matched active BMs — falling back to all pages');
-      filteredByBm = pageConnections;
-    }
-
-    console.log(`[sync-lead-forms] Pages after BM filter: ${filteredByBm.length} of ${pageConnections.length}`);
-
-    // 4. Filtrar se page_ids específicos foram solicitados
-    let pages = filteredByBm;
+    // 2. Filtrar se page_ids específicos foram solicitados
+    let pages = pageConnections;
     if (requestedPageIds && requestedPageIds.length > 0) {
       const requestedSet = new Set(requestedPageIds);
-      pages = filteredByBm.filter(p => {
+      pages = pageConnections.filter(p => {
         const rawId = p.account_id.replace('page_', '');
         return requestedSet.has(rawId) || requestedSet.has(p.account_id);
       });
@@ -168,7 +125,7 @@ serve(async (req: Request) => {
           errors.push(`Página ${page.account_name || pageId}: ${data.error.message}`);
 
           // Se token expirou, tentar com token do usuário (meta_oauth)
-          if (data.error.code === 190) {
+          if (data.error.code === 190 || data.error.type === 'OAuthException') {
             const retryForms = await retryWithUserToken(supabaseAdmin, user.id, pageId, page.account_name);
             if (retryForms) {
               for (const form of retryForms) {
@@ -176,6 +133,9 @@ serve(async (req: Request) => {
               }
               // Limpar o erro se retry funcionou
               errors.pop();
+            } else {
+              // Se o retry falhar, lançamos erro detalhado ou repassamos
+              console.warn(`[sync-lead-forms] Retry with User Token failed for page ${pageId}`);
             }
           }
           continue;
@@ -227,7 +187,23 @@ serve(async (req: Request) => {
       }
     }
 
-    // 4. Sincronizar leads de cada formulário
+    // 4. Buscar organization_id do usuário logado
+    const { data: userProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('organization_id')
+      .eq('id', user.id)
+      .single();
+    const organizationId = userProfile?.organization_id || null;
+
+    // 5. Buscar IDs de campanhas vinculadas que estão ativamente sincronizadas
+    const { data: activeCampaigns } = await supabaseAdmin
+      .from('ad_campaigns_sync')
+      .select('platform_campaign_id')
+      .eq('user_id', user.id)
+      .eq('is_syncing', true);
+    const activeCampaignIds = new Set<string>(activeCampaigns?.map((c: any) => c.platform_campaign_id) || []);
+
+    // 6. Sincronizar leads de cada formulário
     let totalLeadsSynced = 0;
     if (syncLeads && allForms.length > 0) {
       console.log(`[sync-lead-forms] Syncing leads for ${allForms.length} forms...`);
@@ -240,7 +216,9 @@ serve(async (req: Request) => {
             form.meta_form_id,
             form.form_name,
             form.pageId,
-            form.accessToken
+            form.accessToken,
+            organizationId,
+            activeCampaignIds
           );
           totalLeadsSynced += leadsSynced;
         } catch (e: any) {
@@ -343,7 +321,9 @@ async function syncFormLeads(
   formId: string,
   formName: string,
   pageId: string,
-  accessToken: string
+  accessToken: string,
+  organizationId: string | null,
+  activeCampaignIds: Set<string>
 ): Promise<number> {
   const MAX_LEADS = 500;
   const PER_PAGE = 100;
@@ -356,7 +336,7 @@ async function syncFormLeads(
 
     if (data.error) {
       console.error(`[sync-lead-forms] Error fetching leads for form ${formId}:`, data.error);
-      break;
+      throw new Error(data.error.message || 'Erro ao buscar leads do formulário');
     }
 
     const leads = data.data || [];
@@ -379,6 +359,11 @@ async function syncFormLeads(
         continue;
       }
 
+      // NOVO: Filtrar leads que não pertencem a campanhas ativas
+      if (!lead.campaign_id || !activeCampaignIds.has(lead.campaign_id)) {
+        continue; // Ignora completely if it's not a synced campaign
+      }
+
       const fieldData = lead.field_data || [];
       const extractedFields: Record<string, string> = {};
       for (const field of fieldData) {
@@ -386,7 +371,10 @@ async function syncFormLeads(
       }
 
       const email = extractedFields.email || null;
-      const fullName = extractedFields.full_name || extractedFields.nome_completo || extractedFields.name || null;
+      let fullName = extractedFields.full_name || extractedFields.nome_completo || extractedFields.name || null;
+      if (!fullName && (extractedFields.first_name || extractedFields.last_name)) {
+        fullName = `${extractedFields.first_name || ''} ${extractedFields.last_name || ''}`.trim();
+      }
       const phoneNumber = extractedFields.phone_number || extractedFields.telefone || extractedFields.phone || null;
 
       let contactId = null;
@@ -420,11 +408,12 @@ async function syncFormLeads(
         if (contact) {
            contactId = contact.id;
         } else {
-           // Criar novo contato
+           // Criar novo contato com organization_id
            const { data: newContact, error: contactError } = await supabase
              .from('crm_contacts')
              .insert({
                 user_id: userId,
+                organization_id: organizationId,
                 full_name: fullName || 'Lead Meta Ads',
                 phone: phoneNumber,
                 email: email,
@@ -446,6 +435,7 @@ async function syncFormLeads(
              .from('crm_deals')
              .insert({
                 user_id: userId,
+                organization_id: organizationId,
                 contact_id: contactId,
                 title: `Lead: FB Form - ${formName}`,
                 stage: 'lead_novo', // Estágio inicial
@@ -466,6 +456,7 @@ async function syncFormLeads(
         .from('lead_form_submissions')
         .upsert({
           user_id: userId,
+          organization_id: organizationId,
           leadgen_id: lead.id,
           form_id: formId,
           form_name: formName,

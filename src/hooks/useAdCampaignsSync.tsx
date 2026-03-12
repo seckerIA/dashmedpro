@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
@@ -75,19 +76,44 @@ export function useAdCampaignSync(id: string) {
 // SYNC OPERATIONS
 // =====================================================
 
+// Track in-flight syncs to prevent duplicate calls from re-renders
+const inFlightSyncIds = new Set<string>();
+
 export function useSyncAdCampaigns() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (connection_id: string) => {
-      const { data, error } = await supabase.functions.invoke('sync-ad-campaigns', {
-        body: { connection_id },
-      });
+      // Guard: skip if this connection is already being synced
+      if (inFlightSyncIds.has(connection_id)) {
+        console.warn(`[useSyncAdCampaigns] Skipping duplicate sync for ${connection_id}`);
+        return { duplicate: true, skipped: true };
+      }
 
-      if (error) throw error;
-      return data;
+      inFlightSyncIds.add(connection_id);
+      try {
+        // Ensure session is fresh before invoking edge function
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          const { error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshError) {
+            throw new Error('Sessão expirada. Faça login novamente.');
+          }
+        }
+
+        const { data, error } = await supabase.functions.invoke('sync-ad-campaigns', {
+          body: { connection_id },
+        });
+
+        if (error) throw error;
+        return data;
+      } finally {
+        inFlightSyncIds.delete(connection_id);
+      }
     },
-    onSuccess: () => {
+    onSuccess: (_data) => {
+      // Skip cache invalidation for duplicate/skipped calls
+      if (_data?.skipped) return;
       queryClient.invalidateQueries({ queryKey: ['ad-campaigns-sync'] });
       queryClient.invalidateQueries({ queryKey: ['ad-platform-connections'] });
     },

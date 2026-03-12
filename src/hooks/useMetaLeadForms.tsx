@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useAdCampaignsSync } from './useAdCampaignsSync';
 
 export interface MetaLeadForm {
   id: string;
@@ -100,24 +101,31 @@ export function useMetaLeadForms() {
   };
 }
 
-/**
- * Hook para buscar submissions de um formulário específico
- */
 export function useLeadFormSubmissions(formId: string | null) {
   const { user } = useAuth();
+  const { data: campaigns } = useAdCampaignsSync();
 
   return useQuery({
-    queryKey: ['lead-form-submissions', formId, user?.id],
+    queryKey: ['lead-form-submissions', formId, user?.id, campaigns],
     queryFn: async (): Promise<LeadFormSubmission[]> => {
       const { data, error } = await (supabase.from('lead_form_submissions' as any) as any)
         .select('*')
         .eq('user_id', user!.id)
         .eq('form_id', formId!)
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(200);
 
       if (error) throw error;
-      return (data || []) as LeadFormSubmission[];
+      const subs = (data || []) as LeadFormSubmission[];
+
+      // Filtrar CADA lead (submission) para exibir APENAS se ele vier de uma campanha ativamente sincronizada!
+      // Se não houver campanha vinculada ao lead, também não exibimos (evita poluição orgânica ou de campanhas antigas)
+      if (!campaigns || campaigns.length === 0) return [];
+
+      return subs.filter(sub => {
+        if (!sub.campaign_id) return false;
+        return campaigns.some(c => c.platform_campaign_id === sub.campaign_id);
+      }).slice(0, 50); // limit to 50 for UI performance
     },
     enabled: !!user && !!formId,
   });

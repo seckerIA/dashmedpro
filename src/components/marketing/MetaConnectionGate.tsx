@@ -21,6 +21,7 @@ import {
   ArrowRight,
   CheckCircle2,
   RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
 import { useMetaOAuth } from '@/hooks/useMetaOAuth';
 
@@ -33,6 +34,7 @@ export function MetaConnectionGate({ children }: MetaConnectionGateProps) {
     isConnecting,
     isOAuthConfigured,
     isSdkReady,
+    sdkError,
     integrationStatus,
     isLoadingStatus,
     isConnected,
@@ -129,7 +131,28 @@ export function MetaConnectionGate({ children }: MetaConnectionGateProps) {
             {/* Status do SDK */}
             {isOAuthConfigured && (
               <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                {isSdkReady ? (
+                {sdkError ? (
+                  <div className="w-full p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg text-center space-y-3">
+                    <div className="flex items-center justify-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-amber-600" />
+                      <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                        Facebook SDK bloqueado
+                      </span>
+                    </div>
+                    <p className="text-xs text-amber-700 dark:text-amber-300">
+                      {sdkError}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.location.reload()}
+                      className="mt-2"
+                    >
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                      Recarregar página
+                    </Button>
+                  </div>
+                ) : isSdkReady ? (
                   <>
                     <CheckCircle2 className="h-4 w-4 text-green-500" />
                     <span>Facebook SDK carregado</span>

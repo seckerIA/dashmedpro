@@ -342,46 +342,41 @@ export function LeadFormsList() {
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [selectedBmId, setSelectedBmId] = useState<string>('all');
 
-  // BMs disponíveis para filtro (dedup)
+  // BMs disponíveis para filtro — combinando BMs das páginas e BMs reais
   const bmOptions = useMemo(() => {
-    const bms = (connections || []).filter(
+    if (!connections) return [];
+
+    const pages = connections.filter(
+      (c) => c.account_category === 'page' && c.platform === 'meta_ads'
+    );
+    
+    const bms = connections.filter(
       (c) => c.account_category === 'bm' && c.platform === 'meta_ads'
     );
-    const seen = new Set<string>();
-    return bms.filter((b) => {
-      if (seen.has(b.account_id)) return false;
-      seen.add(b.account_id);
-      return true;
+
+    const bmMap = new Map<string, string>();
+
+    // 1. Adicionar BMs reais das conexões
+    bms.forEach((bm) => {
+      bmMap.set(bm.account_id, bm.account_name || bm.account_id);
     });
+
+    // 2. Adicionar BMs parentes das páginas (mesmo se não tiverem row própria)
+    pages.forEach((page) => {
+      if (page.parent_account_id && !bmMap.has(page.parent_account_id)) {
+        bmMap.set(page.parent_account_id, page.parent_account_id.replace('bm_', 'BM '));
+      }
+    });
+
+    return Array.from(bmMap.entries()).map(([id, name]) => ({
+      account_id: id,
+      account_name: name,
+    }));
   }, [connections]);
 
-  // Pré-seleciona a BM sincronizada mais recentemente (igual à escolha em Integrações)
-  useEffect(() => {
-    if (!connections || connections.length === 0) return;
-    const metaConns = connections.filter((c) => c.platform === 'meta_ads');
-
-    // Para cada BM, achar o last_sync_at mais recente entre suas ad accounts
-    const bmLastSync: Record<string, string> = {};
-    metaConns
-      .filter((c) => c.account_category === 'other' && c.parent_account_id && c.last_sync_at)
-      .forEach((c) => {
-        const bmId = c.parent_account_id as string;
-        if (!bmLastSync[bmId] || c.last_sync_at! > bmLastSync[bmId]) {
-          bmLastSync[bmId] = c.last_sync_at as string;
-        }
-      });
-
-    // BM com sync mais recente
-    const sortedBms = Object.entries(bmLastSync).sort(([, a], [, b]) =>
-      b.localeCompare(a)
-    );
-
-    if (sortedBms.length > 0) {
-      setSelectedBmId(sortedBms[0][0]);
-    }
-    // Roda só uma vez quando as conexões carregam
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connections !== undefined]);
+  // Não vamos auto-selecionar nenhuma BM. 
+  // O melhor UX aqui é sempre mostrar 'Todas as BMs' por padrão, 
+  // já que os forms são presos a páginas que podem estar em BMs centralizadoras.
 
   // Agrupar formulários por página
   const pageGroups = useMemo(() => {
