@@ -165,8 +165,10 @@ const handler = async (req: Request): Promise<Response> => {
       console.warn(`[sync-ad-campaigns] Sync failed for connection ${connection_id}:`, (syncResult as any).error);
     }
 
+    // SEMPRE retornar 200 — supabase.functions.invoke trata non-2xx como FunctionsHttpError genérico
+    // O campo success/error no body indica o resultado real
     return new Response(JSON.stringify(syncResult), {
-      status: syncResult.success ? 200 : 400,
+      status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
 
@@ -185,8 +187,9 @@ const handler = async (req: Request): Promise<Response> => {
         .eq('id', current_connection_id);
     }
 
+    // Retornar 200 com success: false — supabase.functions.invoke precisa de 2xx
     return new Response(JSON.stringify({ error: error.message, success: false }), {
-      status: 500,
+      status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   }

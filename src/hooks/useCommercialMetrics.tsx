@@ -549,12 +549,6 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         a.status === 'scheduled' || a.status === 'confirmed' || a.status === 'completed'
       ) || [];
 
-      console.log('📊 [Conversion Debug]', {
-        totalLeads,
-        statuses: leads?.map(l => l.status),
-        salesCount: sales?.length || 0,
-        appointmentsCount: allScheduledAppointments.length
-      });
 
       const convertedLeadsCount = leads?.filter(l =>
         l.status === 'converted' ||
@@ -945,15 +939,6 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
           },
         },
       };
-
-      console.log('✅ useCommercialMetrics - Retornando resultado:', {
-        totalLeads: result.totalLeads,
-        totalRevenue: result.totalRevenue,
-        scheduledProcedures: result.scheduledProcedures,
-        newPatients: result.newPatients,
-        conversionRate: result.conversionRate,
-        averageRevenue: result.averageRevenue,
-      });
 
       try {
         // Verificar se todas as propriedades obrigatórias estão presentes

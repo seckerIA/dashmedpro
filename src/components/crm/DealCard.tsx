@@ -86,14 +86,15 @@ export function DealCard({ deal, onClick, onEdit, onDelete, onScheduleCall, isDe
               {onEdit && (
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0"
+                  size="icon"
+                  className="h-8 w-8 p-0"
+                  aria-label="Editar contrato"
                   onClick={(e) => {
                     e.stopPropagation();
                     onEdit(deal);
                   }}
                 >
-                  <Edit className="w-3 h-3" />
+                  <Edit className="w-3.5 h-3.5" />
                 </Button>
               )}
               {onDelete && (
@@ -101,12 +102,13 @@ export function DealCard({ deal, onClick, onEdit, onDelete, onScheduleCall, isDe
                   <AlertDialogTrigger asChild>
                     <Button
                       variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
+                      size="icon"
+                      className="h-8 w-8 p-0"
+                      aria-label="Excluir contrato"
                       disabled={isDeleting}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
@@ -142,15 +144,16 @@ export function DealCard({ deal, onClick, onEdit, onDelete, onScheduleCall, isDe
                 <span className="text-sm font-semibold text-blue-700">{deal.contact.phone}</span>
               </div>
               <Button
-                size="sm"
+                size="icon"
                 variant="ghost"
-                className="h-7 w-7 p-0 hover:bg-blue-500/20"
+                className="h-8 w-8 p-0 hover:bg-blue-500/20"
+                aria-label="Copiar telefone"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleCopyPhone(deal.contact!.phone!);
                 }}
               >
-                <Copy className="w-3 h-3 text-blue-600" />
+                <Copy className="w-3.5 h-3.5 text-blue-600" />
               </Button>
             </div>
           </div>

@@ -65,14 +65,16 @@ export function useInventoryReports() {
             const movementsQuery = fromTable("inventory_movements")
                 .select(`id, type, quantity, description, created_at, inventory_batches (id, inventory_items (id, name, category, sell_price, unit))`)
                 .gte("created_at", sixMonthsAgo.toISOString())
-                .order("created_at", { ascending: false });
+                .order("created_at", { ascending: false })
+                .limit(5000);
 
             const { data: movementsData, error: movementsError } = await supabaseQueryWithTimeout(movementsQuery, 25000);
             if (movementsError) throw movementsError;
             const movements = (movementsData || []) as any[];
 
             const itemsQuery = fromTable("inventory_items")
-                .select(`id, name, category, sell_price, unit, min_stock, inventory_batches (quantity, is_active)`);
+                .select(`id, name, category, sell_price, unit, min_stock, inventory_batches (quantity, is_active)`)
+                .limit(1000);
 
             const { data: itemsData, error: itemsError } = await supabaseQueryWithTimeout(itemsQuery, 20000);
             if (itemsError) throw itemsError;

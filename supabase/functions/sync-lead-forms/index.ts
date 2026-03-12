@@ -359,10 +359,8 @@ async function syncFormLeads(
         continue;
       }
 
-      // NOVO: Filtrar leads que não pertencem a campanhas ativas
-      if (!lead.campaign_id || !activeCampaignIds.has(lead.campaign_id)) {
-        continue; // Ignora completely if it's not a synced campaign
-      }
+      // Salvar TODOS os leads do formulário, independente de campanha vinculada
+      // Leads orgânicos (sem campaign_id) ou de campanhas não sincronizadas também são válidos
 
       const fieldData = lead.field_data || [];
       const extractedFields: Record<string, string> = {};

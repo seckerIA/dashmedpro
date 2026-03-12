@@ -84,10 +84,45 @@ export async function validateSession(): Promise<{
   }
 
   try {
-    const { data: { session }, error } = await supabase.auth.getSession();
+    // Retry logic para erros transientes (AbortController, network)
+    let session: any = null;
+    let sessionError: any = null;
 
-    if (error) {
-      errors.push(`Erro ao obter sessão: ${error.message}`);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const result = await supabase.auth.getSession();
+      sessionError = result.error;
+      session = result.data?.session;
+
+      if (!sessionError) break;
+
+      // Se for erro transiente, aguardar e tentar novamente
+      const isTransient = sessionError.message?.includes('signal is aborted') ||
+        sessionError.message?.includes('network') ||
+        sessionError.message?.includes('fetch');
+
+      if (isTransient && attempt === 0) {
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
+      break;
+    }
+
+    if (sessionError) {
+      // Erros transientes (abort, network) NAO devem bloquear o app
+      const isTransient = sessionError.message?.includes('signal is aborted') ||
+        sessionError.message?.includes('network') ||
+        sessionError.message?.includes('fetch');
+
+      if (isTransient) {
+        console.warn('⚠️ Erro transiente na sessão (não bloqueante):', sessionError.message);
+        return {
+          isValid: true,
+          isFromCorrectProject: true,
+          errors: [],
+        };
+      }
+
+      errors.push(`Erro ao obter sessão: ${sessionError.message}`);
       return {
         isValid: false,
         isFromCorrectProject: false,
@@ -162,6 +197,21 @@ export async function validateSession(): Promise<{
       };
     }
   } catch (e: any) {
+    // Erros transientes (abort, network) NAO devem bloquear o app
+    const isTransient = e.message?.includes('signal is aborted') ||
+      e.message?.includes('network') ||
+      e.message?.includes('fetch') ||
+      e.message?.includes('Failed to fetch');
+
+    if (isTransient) {
+      console.warn('⚠️ Erro transiente na validação de sessão (não bloqueante):', e.message);
+      return {
+        isValid: true,
+        isFromCorrectProject: true,
+        errors: [],
+      };
+    }
+
     errors.push(`Erro ao validar sessão: ${e.message}`);
     return {
       isValid: false,

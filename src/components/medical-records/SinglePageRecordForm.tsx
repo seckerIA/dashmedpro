@@ -32,12 +32,14 @@ import {
   Plus,
   X,
   Loader2,
+  ImageIcon,
 } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
   CreateMedicalRecordInput,
   VitalSigns,
   MedicationPrescription,
+  RequestedExam,
   calculateBMI,
   COMMON_CID_CODES,
   RECORD_TYPES,
@@ -67,6 +69,9 @@ const formSchema = z.object({
 
   // Diagnóstico
   diagnostic_hypothesis: z.string().optional(),
+
+  // Exame de Imagem
+  imaging_exams: z.string().optional(),
 
   // Conduta
   treatment_plan: z.string().optional(),
@@ -104,6 +109,20 @@ export function SinglePageRecordForm({
   );
   const [openSections, setOpenSections] = useState<string[]>(["anamnese"]);
 
+  // iPad: scroll input into view when keyboard opens (prevents keyboard from covering fields)
+  useEffect(() => {
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+        setTimeout(() => {
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 300);
+      }
+    };
+    document.addEventListener('focusin', handleFocusIn);
+    return () => document.removeEventListener('focusin', handleFocusIn);
+  }, []);
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -123,6 +142,7 @@ export function SinglePageRecordForm({
       weight: initialData?.vital_signs?.weight?.toString() || "",
       height: initialData?.vital_signs?.height?.toString() || "",
       diagnostic_hypothesis: initialData?.diagnostic_hypothesis || "",
+      imaging_exams: "",
       treatment_plan: initialData?.treatment_plan || "",
       patient_instructions: initialData?.patient_instructions || "",
       follow_up_notes: initialData?.follow_up_notes || "",
@@ -156,6 +176,17 @@ export function SinglePageRecordForm({
     if (data.height) vitalSigns.height = parseFloat(data.height);
     if (bmi) vitalSigns.bmi = bmi;
 
+    // Montar exames de imagem como RequestedExam[]
+    const examsRequested: RequestedExam[] = [];
+    if (data.imaging_exams?.trim()) {
+      data.imaging_exams.split('\n').filter(Boolean).forEach(line => {
+        examsRequested.push({
+          exam_name: line.trim(),
+          category: 'imagem',
+        });
+      });
+    }
+
     return {
       contact_id: patientId,
       appointment_id: appointmentId,
@@ -174,6 +205,7 @@ export function SinglePageRecordForm({
       follow_up_notes: data.follow_up_notes || undefined,
       next_appointment_date: nextAppointmentDate?.toISOString(),
       prescriptions: prescriptions.length > 0 ? prescriptions : undefined,
+      exams_requested: examsRequested.length > 0 ? examsRequested : undefined,
       record_type: data.record_type,
     };
   };
@@ -210,7 +242,7 @@ export function SinglePageRecordForm({
   };
 
   return (
-    <div className="space-y-4 pb-24">
+    <div className="space-y-4 pb-28 [padding-bottom:env(safe-area-inset-bottom,7rem)]">
       {/* Tipo de Atendimento */}
       <Card className="p-4">
         <div className="flex items-center gap-4">
@@ -522,6 +554,30 @@ export function SinglePageRecordForm({
           </AccordionContent>
         </AccordionItem>
 
+        {/* EXAME DE IMAGEM */}
+        <AccordionItem value="exame-imagem" className="border rounded-lg bg-card">
+          <AccordionTrigger className="px-4 hover:no-underline">
+            <div className="flex items-center gap-2">
+              <ImageIcon className="w-5 h-5 text-indigo-500" />
+              <span className="font-semibold">Exame de Imagem</span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4">
+            <div className="space-y-2">
+              <Label htmlFor="imaging_exams">Exames de Imagem Solicitados</Label>
+              <Textarea
+                id="imaging_exams"
+                placeholder={"Ex:\nRaio-X Tórax PA e Perfil\nUltrassonografia Abdominal\nRessonância Magnética Lombar"}
+                className="mt-1.5 min-h-[100px]"
+                {...form.register("imaging_exams")}
+              />
+              <p className="text-xs text-muted-foreground">
+                Um exame por linha
+              </p>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
         {/* CONDUTA */}
         <AccordionItem value="conduta" className="border rounded-lg bg-card">
           <AccordionTrigger className="px-4 hover:no-underline">
@@ -675,8 +731,8 @@ export function SinglePageRecordForm({
         </AccordionItem>
       </Accordion>
 
-      {/* Barra de ações fixa */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4 flex justify-end gap-3 z-50">
+      {/* Barra de ações fixa — pb com safe-area para iPad */}
+      <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] flex justify-end gap-3 z-50">
         <div className="max-w-4xl mx-auto w-full flex justify-end gap-3">
           <Button
             type="button"

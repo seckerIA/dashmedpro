@@ -42,7 +42,8 @@ export function useMedicalRecords(contactId?: string) {
           contact:crm_contacts(id, full_name, phone, email)
         `)
         .eq('contact_id', contactId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(200);
 
       const { data: recordsData, error: recordsError } = await supabaseQueryWithTimeout(query as any, undefined, signal);
 

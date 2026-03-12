@@ -421,6 +421,7 @@ export function ChatWindow({
               className="hidden md:flex text-muted-foreground hover:text-primary"
               onClick={() => setShowAISettings(true)}
               title="Configurar IA"
+              aria-label="Configurar IA"
             >
               <Bot className="h-5 w-5" />
             </Button>
@@ -439,6 +440,7 @@ export function ChatWindow({
                 setShowProcedures(false);
               }}
               title="Análise IA"
+              aria-label="Análise IA"
             >
               {isAnalyzing ? (
                 <RefreshCw className="h-5 w-5 animate-spin" />
@@ -457,6 +459,7 @@ export function ChatWindow({
                   setShowAIPanel(false);
                 }}
                 title="Procedimentos"
+                aria-label="Procedimentos"
               >
                 <Stethoscope className="h-5 w-5" />
               </Button>
@@ -467,6 +470,7 @@ export function ChatWindow({
               size="icon"
               className="hidden md:flex"
               onClick={onToggleSidebar}
+              aria-label="Buscar"
             >
               <Search className="h-5 w-5" />
             </Button>

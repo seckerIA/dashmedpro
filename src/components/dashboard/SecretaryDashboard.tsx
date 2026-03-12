@@ -47,7 +47,7 @@ const SecretaryDashboard = () => {
     return (
       <div className="min-h-screen space-y-5 bg-background font-sans px-3 sm:px-4 lg:px-6 pb-10">
         <Skeleton className="h-12 w-64" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-32" />
           ))}
@@ -124,7 +124,7 @@ const SecretaryDashboard = () => {
 
       {/* HERO: 3 Métricas Principais do Dia */}
       <AnimatedWrapper animationType="fadeIn" delay={0.05}>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {/* Agenda Hoje */}
           <Card className={cn(
             "relative overflow-hidden bg-gradient-to-br border transition-all duration-300 hover:shadow-lg",
@@ -259,7 +259,7 @@ const SecretaryDashboard = () => {
       </AnimatedWrapper>
 
       {/* Grid Principal: Quick Actions + Próximas Consultas */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {/* Quick Actions */}
         <AnimatedWrapper animationType="slideUp" delay={0.1}>
           <Card className="bg-card border-border h-full">
@@ -469,7 +469,7 @@ const SecretaryDashboard = () => {
           badge={`${metrics?.newContactsToday || 0} hoje`}
           defaultOpen={true}
         >
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
               <div className="flex items-center gap-2 mb-2">
                 <UserPlus className="h-4 w-4 text-green-600" />

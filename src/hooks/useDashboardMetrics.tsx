@@ -34,7 +34,8 @@ const fetchDashboardMetrics = async (
     .select(`
       *,
       contact:crm_contacts(*)
-    `);
+    `)
+    .limit(2000);
 
   // Aplicar filtros baseados no papel do usuário
   if (!isAdminOrDono) {
@@ -62,7 +63,8 @@ const fetchDashboardMetrics = async (
   // Buscar contatos
   let contactsQuery = supabase
     .from('crm_contacts')
-    .select('*');
+    .select('*')
+    .limit(2000);
 
   // Aplicar filtros baseados no papel do usuário
   if (!isAdminOrDono) {
@@ -317,11 +319,7 @@ export function useDashboardMetrics() {
         throw error;
       }
     },
-    enabled: (() => {
-      const enabled = !!user?.id && !!profile && !authLoading && !isLoadingProfile && (!isSecretaria || !isLoadingDoctors);
-      console.log(`📊 [DashMetrics] enabled=${enabled} | user=${!!user?.id} profile=${!!profile} authLoading=${authLoading} profileLoading=${isLoadingProfile} isSecretaria=${isSecretaria} doctorsLoading=${isLoadingDoctors}`);
-      return enabled;
-    })(),
+    enabled: !!user?.id && !!profile && !authLoading && !isLoadingProfile && (!isSecretaria || !isLoadingDoctors),
     refetchInterval: () => {
       // Não fazer refetch se tab não está visível
       if (typeof document !== 'undefined' && document.hidden) return false;

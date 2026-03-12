@@ -3,7 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { AlertTriangle, TrendingUp } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
-import { ConcentrationMetric } from "@/hooks/useTeamMetrics";
+export interface ConcentrationMetric {
+  isHighRisk: boolean;
+  topSource: string;
+  topSourceValue: number;
+  topSourcePercentage: number;
+  totalRevenue: number;
+}
 import { cn } from "@/lib/utils";
 
 interface RevenueConcentrationCardProps {

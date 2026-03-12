@@ -106,6 +106,12 @@ export function useSyncAdCampaigns() {
         });
 
         if (error) throw error;
+
+        // Edge Function retorna 200 com success: false quando sync falha
+        if (data && data.success === false) {
+          throw new Error(data.error || 'Erro ao sincronizar campanhas');
+        }
+
         return data;
       } finally {
         inFlightSyncIds.delete(connection_id);

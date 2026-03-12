@@ -1,7 +1,13 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle, TrendingDown, ArrowRight } from "lucide-react";
-import { BottleneckMetric } from "@/hooks/useTeamMetrics";
+export interface BottleneckMetric {
+  stage: string;
+  previousStageCount: number;
+  currentStageCount: number;
+  dropOffRate: number;
+  isCritical: boolean;
+}
 import { cn } from "@/lib/utils";
 
 interface BottleneckInsightCardProps {

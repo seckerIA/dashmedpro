@@ -3,8 +3,6 @@ import { MetricCard } from "@/components/commercial/MetricCard";
 import { ConsolidatedTeamMetrics } from "@/hooks/useTeamMetrics";
 import { formatCurrency } from "@/lib/currency";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import { BottleneckInsightCard } from "./BottleneckInsightCard";
-import { RevenueConcentrationCard } from "./RevenueConcentrationCard";
 
 interface TeamOverviewDashboardProps {
   metrics: ConsolidatedTeamMetrics;
@@ -14,83 +12,19 @@ interface TeamOverviewDashboardProps {
 export function TeamOverviewDashboard({ metrics, isLoading }: TeamOverviewDashboardProps) {
   const { isSecretaria } = useUserProfile();
 
-  const showInsights = (metrics.globalBottleneck || metrics.globalConcentration) && !isLoading && !isSecretaria;
-
   return (
     <div className="space-y-6">
-      {/* Seção de Insights Avançados */}
-      {showInsights && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
-          {metrics.globalBottleneck && (
-            <BottleneckInsightCard bottleneck={metrics.globalBottleneck} isLoading={isLoading} />
-          )}
-          {metrics.globalConcentration && (
-            <RevenueConcentrationCard concentration={metrics.globalConcentration} isLoading={isLoading} />
-          )}
-        </div>
-      )}
-
-      {/* Métricas Consolidadas */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Pipeline Total - oculto para secretária */}
-        {!isSecretaria && (
-          <MetricCard
-            title="Pipeline Total"
-            value={metrics.totalPipeline}
-            icon="dollar-sign"
-            format="currency"
-            isLoading={isLoading}
-          />
-        )}
-        {/* Receita Total - oculto para secretária */}
-        {!isSecretaria && (
-          <MetricCard
-            title="Receita Total"
-            value={metrics.totalRevenue}
-            icon="trending-up"
-            format="currency"
-            isLoading={isLoading}
-          />
-        )}
+      {/* Funil: Leads → Agendados → Receita → Conversão */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
-          title="Taxa de Conversão Média"
-          value={metrics.averageConversionRate}
-          icon="target"
-          format="percentage"
-          isLoading={isLoading}
-        />
-        <MetricCard
-          title="Contratos Ativos"
-          value={metrics.totalActiveDeals}
-          icon="bar-chart"
-          format="number"
-          isLoading={isLoading}
-        />
-        <MetricCard
-          title="Total de Contatos"
-          value={metrics.totalContacts}
+          title="Leads (Mês)"
+          value={metrics.totalLeads}
           icon="user-plus"
           format="number"
           isLoading={isLoading}
         />
         <MetricCard
-          title="Total de Leads"
-          value={metrics.totalLeads}
-          icon="trending-up"
-          format="number"
-          isLoading={isLoading}
-        />
-        {!isSecretaria && (
-          <MetricCard
-            title="Deals Ganhos (CRM)"
-            value={metrics.totalWonDeals}
-            icon="target"
-            format="number"
-            isLoading={isLoading}
-          />
-        )}
-        <MetricCard
-          title="Consultas Agendadas"
+          title="Agendados"
           value={metrics.totalAppointmentsScheduled}
           icon="calendar"
           format="number"
@@ -98,73 +32,67 @@ export function TeamOverviewDashboard({ metrics, isLoading }: TeamOverviewDashbo
         />
         {!isSecretaria && (
           <MetricCard
-            title="Deals Perdidos"
-            value={metrics.totalLostDeals}
-            icon="bar-chart"
-            format="number"
+            title="Receita (Mês)"
+            value={metrics.totalRevenue}
+            icon="dollar-sign"
+            format="currency"
             isLoading={isLoading}
           />
         )}
+        <MetricCard
+          title="Conversão"
+          value={metrics.averageConversionRate}
+          icon="target"
+          format="percentage"
+          isLoading={isLoading}
+        />
       </div>
 
       {/* Resumo por Equipe */}
-      {metrics.teamMetrics.length > 0 && (
+      {metrics.teamMetrics.length > 1 && (
         <Card>
           <CardContent className="pt-6">
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Resumo por Equipe</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {metrics.teamMetrics.map((teamMetric) => (
-                  <Card key={teamMetric.userId} className="bg-muted/50">
+                {metrics.teamMetrics.map((tm) => (
+                  <Card key={tm.userId} className="bg-muted/50">
                     <CardContent className="pt-6">
                       <div className="space-y-2">
                         <div className="flex items-center justify-between gap-2">
-                          <h4 className="font-semibold text-lg">{teamMetric.userName}</h4>
-                          {teamMetric.userRole && (
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${teamMetric.userRole === 'admin' ? 'bg-purple-500/20 text-purple-400' :
-                              teamMetric.userRole === 'dono' ? 'bg-amber-500/20 text-amber-400' :
-                                teamMetric.userRole === 'medico' ? 'bg-emerald-500/20 text-emerald-400' :
-                                  teamMetric.userRole === 'secretaria' ? 'bg-blue-500/20 text-blue-400' :
-                                    teamMetric.userRole === 'vendedor' ? 'bg-cyan-500/20 text-cyan-400' :
-                                      teamMetric.userRole === 'gestor_trafego' ? 'bg-orange-500/20 text-orange-400' :
-                                        'bg-muted text-muted-foreground'
-                              }`}>
-                              {teamMetric.userRole === 'admin' ? 'Admin' :
-                                teamMetric.userRole === 'dono' ? 'Proprietário' :
-                                  teamMetric.userRole === 'medico' ? 'Médico' :
-                                    teamMetric.userRole === 'secretaria' ? 'Secretária' :
-                                      teamMetric.userRole === 'vendedor' ? 'Vendedor' :
-                                        teamMetric.userRole === 'gestor_trafego' ? 'Gestor de Tráfego' :
-                                          teamMetric.userRole}
+                          <h4 className="font-semibold text-lg">{tm.userName}</h4>
+                          {tm.userRole && (
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                              tm.userRole === 'admin' ? 'bg-purple-500/20 text-purple-400' :
+                              tm.userRole === 'dono' ? 'bg-amber-500/20 text-amber-400' :
+                              tm.userRole === 'medico' ? 'bg-emerald-500/20 text-emerald-400' :
+                              tm.userRole === 'secretaria' ? 'bg-blue-500/20 text-blue-400' :
+                              tm.userRole === 'vendedor' ? 'bg-cyan-500/20 text-cyan-400' :
+                              tm.userRole === 'gestor_trafego' ? 'bg-orange-500/20 text-orange-400' :
+                              'bg-muted text-muted-foreground'
+                            }`}>
+                              {tm.userRole === 'admin' ? 'Admin' :
+                               tm.userRole === 'dono' ? 'Proprietário' :
+                               tm.userRole === 'medico' ? 'Médico' :
+                               tm.userRole === 'secretaria' ? 'Secretária' :
+                               tm.userRole === 'vendedor' ? 'Vendedor' :
+                               tm.userRole === 'gestor_trafego' ? 'Gestor de Tráfego' :
+                               tm.userRole}
                             </span>
                           )}
                         </div>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          {/* Pipeline - oculto para secretária */}
-                          {!isSecretaria && (
-                            <div>
-                              <p className="text-muted-foreground">Pipeline</p>
-                              <p className="font-semibold">{formatCurrency(teamMetric.totalPipeline)}</p>
-                            </div>
-                          )}
-                          {/* Receita - oculto para secretária */}
-                          {!isSecretaria && (
-                            <div>
-                              <p className="text-muted-foreground">Receita</p>
-                              <p className="font-semibold">{formatCurrency(teamMetric.totalRevenue)}</p>
-                            </div>
-                          )}
+                        <div className="grid grid-cols-3 gap-2 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">Leads</p>
+                            <p className="font-semibold">{tm.totalLeads}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Agendados</p>
+                            <p className="font-semibold">{tm.appointmentsScheduled}</p>
+                          </div>
                           <div>
                             <p className="text-muted-foreground">Conversão</p>
-                            <p className="font-semibold">{teamMetric.conversionRate.toFixed(1)}%</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Consultas</p>
-                            <p className="font-semibold">{teamMetric.appointmentsScheduled}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Deals Ativos</p>
-                            <p className="font-semibold">{teamMetric.activeDeals}</p>
+                            <p className="font-semibold">{tm.conversionRate.toFixed(1)}%</p>
                           </div>
                         </div>
                       </div>
@@ -179,10 +107,3 @@ export function TeamOverviewDashboard({ metrics, isLoading }: TeamOverviewDashbo
     </div>
   );
 }
-
-
-
-
-
-
-

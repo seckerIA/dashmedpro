@@ -50,6 +50,7 @@ export function CalendarToolbar({
           <Button
             variant="outline"
             size="icon"
+            aria-label="Período anterior"
             onClick={() => onNavigate('prev')}
           >
             <ChevronLeft className="h-4 w-4" />
@@ -62,6 +63,7 @@ export function CalendarToolbar({
           <Button
             variant="outline"
             size="icon"
+            aria-label="Próximo período"
             onClick={() => onNavigate('next')}
           >
             <ChevronRight className="h-4 w-4" />

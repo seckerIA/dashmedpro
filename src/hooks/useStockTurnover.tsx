@@ -59,7 +59,8 @@ export function useStockTurnover() {
             quantity,
             is_active
           )
-        `);
+        `)
+                .limit(1000);
 
             if (itemsError) throw itemsError;
 
@@ -81,7 +82,8 @@ export function useStockTurnover() {
           )
         `)
                 .in("type", ["OUT", "LOSS"])
-                .gte("created_at", thirtyDaysAgo.toISOString());
+                .gte("created_at", thirtyDaysAgo.toISOString())
+                .limit(5000);
 
             if (movementsError) throw movementsError;
 

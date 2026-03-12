@@ -49,13 +49,14 @@ const fetchEnhancedMetrics = async (
     // RLS handles organization filtering automatically
     const dealsQuery = supabase
       .from('crm_deals')
-      .select('*, contact:crm_contacts(id, full_name, email, phone)');
+      .select('*, contact:crm_contacts(id, full_name, email, phone)')
+      .limit(2000);
 
     const dealsResult = await supabaseQueryWithTimeout(dealsQuery as any, 30000, signal);
     dealsData = (dealsResult.data || []) as any[];
   } catch (err) {
-    console.error('⚠️ Erro ao buscar deals no dashboard:', err);
-    const fallbackQuery = supabase.from('crm_deals').select('*');
+    console.error('Erro ao buscar deals no dashboard:', err);
+    const fallbackQuery = supabase.from('crm_deals').select('*').limit(2000);
     const fallbackResult = await supabaseQueryWithTimeout(fallbackQuery as any, 30000, signal);
     dealsData = (fallbackResult.data || []) as any[];
   }
@@ -95,12 +96,13 @@ const fetchEnhancedMetrics = async (
       .from('crm_activities' as any) as any)
       .select('id')
       .eq('completed', false)
-      .eq('activity_type', 'call');
+      .eq('activity_type', 'call')
+      .limit(500);
 
     const followUpsResult = await supabaseQueryWithTimeout(followUpsQuery as any, 30000, signal);
     pendingFollowUps = ((followUpsResult.data || []) as any[]).length;
   } catch (err) {
-    console.error('⚠️ Erro ao buscar follow-ups:', err);
+    console.error('Erro ao buscar follow-ups:', err);
   }
 
   // 3. Consultas do mês
@@ -114,12 +116,13 @@ const fetchEnhancedMetrics = async (
     const appointmentsQuery = supabase
       .from('medical_appointments')
       .select('id, status')
-      .gte('start_time', currentMonth.toISOString());
+      .gte('start_time', currentMonth.toISOString())
+      .limit(1000);
 
     const appointmentsResult = await supabaseQueryWithTimeout(appointmentsQuery as any, 30000, signal);
     appointmentsData = (appointmentsResult.data || []) as any[];
   } catch (err) {
-    console.error('⚠️ Erro ao buscar agendamentos no dashboard:', err);
+    console.error('Erro ao buscar agendamentos no dashboard:', err);
   }
 
   const appointmentsThisMonth = appointmentsData.length;
@@ -182,7 +185,8 @@ const fetchEnhancedMetrics = async (
     // RLS handles organization filtering
     const transactionsQuery = supabase
       .from('financial_transactions' as any)
-      .select('amount, type, status, transaction_date');
+      .select('amount, type, status, transaction_date')
+      .limit(5000);
 
     const transactionsResult = await supabaseQueryWithTimeout(transactionsQuery as any, 30000, signal);
     const transactionsData = (transactionsResult.data || []) as any[];
@@ -213,7 +217,7 @@ const fetchEnhancedMetrics = async (
       });
     }
   } catch (error) {
-    console.error('⚠️ Erro ao buscar dados financeiros no dashboard:', error);
+    console.error('Erro ao buscar dados financeiros no dashboard:', error);
   }
 
   return {

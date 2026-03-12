@@ -127,7 +127,8 @@ export function AppointmentCard({
                       size="sm"
                       variant="default"
                       onClick={onMarkAttended}
-                      className="h-8 sm:h-7 text-xs bg-green-600 hover:bg-green-700 active:bg-green-800"
+                      aria-label="Compareceu"
+                      className="h-9 sm:h-7 text-xs bg-green-600 hover:bg-green-700 active:bg-green-800"
                     >
                       <UserCheck className="h-3.5 w-3.5 sm:mr-1" />
                       <span className="hidden sm:inline">Compareceu</span>
@@ -138,7 +139,8 @@ export function AppointmentCard({
                       size="sm"
                       variant="outline"
                       onClick={onMarkNoShow}
-                      className="h-8 sm:h-7 text-xs border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950 active:bg-red-100 dark:active:bg-red-900"
+                      aria-label="Falta"
+                      className="h-9 sm:h-7 text-xs border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950 active:bg-red-100 dark:active:bg-red-900"
                     >
                       <UserX className="h-3.5 w-3.5 sm:mr-1" />
                       <span className="hidden sm:inline">Falta</span>
@@ -153,7 +155,8 @@ export function AppointmentCard({
                   size="sm"
                   variant="outline"
                   onClick={onMarkCompleted}
-                  className="h-8 sm:h-7 text-xs"
+                  aria-label="Concluído"
+                  className="h-9 sm:h-7 text-xs"
                 >
                   <CheckCircle2 className="h-3.5 w-3.5 sm:mr-1" />
                   <span className="hidden sm:inline">Concluído</span>
@@ -166,7 +169,8 @@ export function AppointmentCard({
                   size="sm"
                   variant="outline"
                   onClick={onCancel}
-                  className="h-8 sm:h-7 text-xs"
+                  aria-label="Cancelar consulta"
+                  className="h-9 sm:h-7 text-xs"
                 >
                   <XCircle className="h-3.5 w-3.5 sm:mr-1" />
                   <span className="hidden sm:inline">Cancelar</span>
@@ -179,7 +183,8 @@ export function AppointmentCard({
                   size="sm"
                   variant="ghost"
                   onClick={onEdit}
-                  className="h-8 sm:h-7 text-xs"
+                  aria-label="Editar consulta"
+                  className="h-9 sm:h-7 text-xs"
                 >
                   <Edit className="h-3.5 w-3.5 sm:mr-1" />
                   <span className="hidden sm:inline">Editar</span>
@@ -192,7 +197,8 @@ export function AppointmentCard({
                   size="sm"
                   variant="ghost"
                   onClick={onDelete}
-                  className="h-8 sm:h-7 text-xs text-destructive hover:text-destructive"
+                  aria-label="Excluir consulta"
+                  className="h-9 sm:h-7 text-xs text-destructive hover:text-destructive"
                 >
                   <Trash2 className="h-3.5 w-3.5 sm:mr-1" />
                   <span className="hidden sm:inline">Excluir</span>

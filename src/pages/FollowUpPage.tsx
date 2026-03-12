@@ -1164,7 +1164,7 @@ export default function FollowUpPage() {
 
           {/* Insights Tab */}
           <TabsContent value="insights" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {/* Sentiment Breakdown */}
               <Card>
                 <CardHeader>

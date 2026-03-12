@@ -43,13 +43,15 @@ export function useInventoryAlerts() {
                     id, batch_number, quantity, expiration_date, is_active,
                     inventory_items (id, name, category)
                 `)
-                .eq("is_active", true);
+                .eq("is_active", true)
+                .limit(2000);
 
             const itemsQuery = fromTable("inventory_items")
                 .select(`
                     id, name, min_stock,
                     inventory_batches (quantity, is_active)
-                `);
+                `)
+                .limit(1000);
 
             try {
                 const [batchesResult, itemsResult] = await Promise.all([

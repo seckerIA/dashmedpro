@@ -41,7 +41,7 @@ export function ConversationSidebar({
       <div className="flex items-center justify-between px-4 py-3 border-b">
         <h3 className="font-medium">Detalhes</h3>
         {onClose && (
-          <Button variant="ghost" size="icon" onClick={onClose}>
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Fechar painel">
             <X className="h-4 w-4" />
           </Button>
         )}

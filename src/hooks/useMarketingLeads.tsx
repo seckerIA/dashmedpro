@@ -40,8 +40,6 @@ export function useMarketingLeads(filters?: {
   return useQuery({
     queryKey: ['marketing-leads', allLeads, campaigns, utms, filters],
     queryFn: async (): Promise<MarketingLead[]> => {
-      // Se não houver campanhas sincronizadas, não há como vincular ou filtrar leads para exibição
-      if (!campaigns || campaigns.length === 0) return [];
 
       // 1. Fetch lead form submissions (Meta Ads)
       const { data: formLeads, error: formsError } = await supabase
@@ -61,19 +59,16 @@ export function useMarketingLeads(filters?: {
                lead.origin === 'instagram';
       });
 
-      const enrichedManualLeads = marketingLeads.reduce((acc, lead) => {
-        const relatedUtm = utms?.find(utm => 
+      const enrichedManualLeads = marketingLeads.map(lead => {
+        const relatedUtm = utms?.find(utm =>
           utm.full_url.includes(`utm_source=${lead.origin}`)
         );
-        
+
         const campaign = relatedUtm?.ad_campaign_sync_id
-          ? campaigns.find(c => c.id === relatedUtm.ad_campaign_sync_id)
+          ? campaigns?.find((c: any) => c.id === relatedUtm.ad_campaign_sync_id)
           : null;
 
-        // Se o lead não estiver vinculado a uma campanha sincronizada, ignora
-        if (!campaign) return acc;
-
-        acc.push({
+        return {
           id: lead.id,
           name: lead.name,
           email: lead.email,
@@ -83,42 +78,33 @@ export function useMarketingLeads(filters?: {
           estimated_value: lead.estimated_value,
           created_at: lead.created_at,
           utm_id: relatedUtm?.id || null,
-          ad_campaign_sync_id: campaign.id,
-          campaign_name: campaign.platform_campaign_name || null,
-          platform: campaign.platform || null,
-        } as MarketingLead);
+          ad_campaign_sync_id: campaign?.id || null,
+          campaign_name: campaign?.platform_campaign_name || lead.origin,
+          platform: campaign?.platform || lead.origin,
+        } as MarketingLead;
+      });
 
-        return acc;
-      }, [] as MarketingLead[]);
+      // 3. Process form leads — exibir TODOS, mesmo sem campanha vinculada
+      const formLeadsMapped = (formLeads || []).map((lead: any) => {
+        const campaign = lead.campaign_id
+          ? campaigns?.find((c: any) => c.platform_campaign_id === lead.campaign_id)
+          : null;
 
-      // 3. Process form leads
-      const formLeadsMapped = (formLeads || []).reduce((acc, lead) => {
-        // Ignora se não houver campaign_id atrelado (orgânico)
-        if (!lead.campaign_id) return acc;
-
-        // Try mapping the campaign_id perfectly to synced campaigns
-        const campaign = campaigns.find(c => c.platform_campaign_id === lead.campaign_id);
-        
-        // Garante que só puxa Leads de campanhas sincronizadas! (O usuário pediu restrição total)
-        if (!campaign) return acc;
-        
-        acc.push({
-          id: lead.id, // we might need lead.leadgen_id or id
+        return {
+          id: lead.id,
           name: lead.full_name || 'Lead Meta Ads',
           email: lead.email,
           phone: lead.phone_number,
           origin: 'facebook',
-          status: 'novo', // Default status for form leads, they are created in crm_deals as lead_novo
+          status: 'novo',
           estimated_value: 0,
           created_at: lead.created_at,
           utm_id: null,
-          ad_campaign_sync_id: campaign.id,
-          campaign_name: lead.campaign_name || lead.form_name,
+          ad_campaign_sync_id: campaign?.id || null,
+          campaign_name: lead.campaign_name || lead.form_name || 'Formulário',
           platform: 'meta_ads',
-        } as MarketingLead);
-
-        return acc;
-      }, [] as MarketingLead[]);
+        } as MarketingLead;
+      });
 
       // 4. Merge and ensure no duplicates
       const allMerged = [...formLeadsMapped, ...enrichedManualLeads];

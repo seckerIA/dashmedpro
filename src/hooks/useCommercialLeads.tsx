@@ -97,7 +97,7 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
       }
       // Se canViewAll && !viewAsUserIds, não filtramos user_id. RLS cuida disso.
 
-      queryPromise = (queryPromise as any).order("created_at", { ascending: false });
+      queryPromise = (queryPromise as any).order("created_at", { ascending: false }).limit(2000);
 
       if (filters?.status) {
         queryPromise = (queryPromise as any).eq("status", filters.status);
@@ -172,7 +172,6 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
 
       // 2. Integração com CRM Pipeline (crm_contacts e crm_deals)
       try {
-        console.log('🔄 Sincronizando novo lead com Pipeline CRM...');
         let contactId: string | null = null;
         const phone = lead.phone?.replace(/\D/g, '') || null;
         const email = lead.email?.trim().toLowerCase() || null;
@@ -188,7 +187,6 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
             const { data: existingContacts } = await query.or(conditions.join(',')).limit(1);
             if (existingContacts && existingContacts.length > 0) {
               contactId = existingContacts[0].id;
-              console.log('✅ Contato existente encontrado:', contactId);
             }
           }
         }
@@ -213,7 +211,6 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
             console.error('❌ Erro ao criar contato no CRM:', contactError);
           } else if (newContact) {
             contactId = newContact.id;
-            console.log('✅ Novo contato criado no CRM:', contactId);
           }
         }
 
@@ -235,7 +232,6 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
           if (dealError) {
             console.error('❌ Erro ao criar deal no CRM:', dealError);
           } else {
-            console.log('✅ Deal criado com sucesso no Pipeline (lead_novo)');
             // Invalidar queries do CRM para atualizar a tela se estiver aberta
             queryClient.invalidateQueries({ queryKey: ["crm-deals"] });
             queryClient.invalidateQueries({ queryKey: ["crm-contacts"] });
@@ -281,7 +277,6 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
       // Sincronizar com crm_contacts se houver um contato vinculado
       try {
         if (data.contact_id && (updates.name || updates.email || updates.phone)) {
-          console.log('🔄 Sincronizando edição com CRM Contact:', data.contact_id);
           const contactUpdates: any = {};
           if (updates.name) contactUpdates.full_name = updates.name;
           // Permitir limpar email/phone se vier como string vazia ou null
@@ -297,7 +292,6 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
             if (syncError) {
               console.error('❌ Erro ao sincronizar contato no CRM:', syncError);
             } else {
-              console.log('✅ Contato CRM sincronizado com sucesso.');
               queryClient.invalidateQueries({ queryKey: ["crm-contacts"] });
               queryClient.invalidateQueries({ queryKey: ["crm-deals"] });
             }

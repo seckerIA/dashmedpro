@@ -23,7 +23,8 @@ export const useInventory = () => {
                     batches:inventory_batches(*),
                     supplier:inventory_suppliers(id, name)
                 `)
-                .order("name");
+                .order("name")
+                .limit(1000);
 
             const { data: itemsData, error: itemsError } = await supabaseQueryWithTimeout(itemsQuery, 20000);
 

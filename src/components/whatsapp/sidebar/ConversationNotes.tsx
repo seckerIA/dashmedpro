@@ -271,16 +271,18 @@ function NoteItem({
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6"
+              className="h-7 w-7"
               onClick={onStartEdit}
+              aria-label="Editar nota"
             >
               <Edit2 className="h-3 w-3" />
             </Button>
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 text-red-500 hover:text-red-600"
+              className="h-7 w-7 text-red-500 hover:text-red-600"
               onClick={onDelete}
+              aria-label="Excluir nota"
             >
               <Trash2 className="h-3 w-3" />
             </Button>
