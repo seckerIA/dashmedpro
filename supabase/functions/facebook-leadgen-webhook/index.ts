@@ -150,29 +150,24 @@ async function processLeadgenEvent(
   let accessToken = pageConn.api_key;
   const pageBmId = pageConn.parent_account_id;
 
-  // 1b. Verificar se esta página pertence a uma BM com campanhas sincronizadas
+  // 1b. Verificar se esta página pertence a uma BM com contas de anúncios ativas
   //     Só processamos leads de BMs que o usuário efetivamente sincronizou.
   if (pageBmId) {
-    const { data: syncingCampaigns } = await supabase
-      .from('ad_campaigns_sync')
-      .select('connection_id')
+    const { data: activeAdAccounts } = await supabase
+      .from('ad_platform_connections')
+      .select('parent_account_id')
       .eq('user_id', userId)
-      .eq('is_syncing', true);
+      .eq('platform', 'meta_ads')
+      .eq('is_active', true)
+      .neq('account_id', 'meta_oauth')
+      .not('account_category', 'in', '("bm","page","waba")');
 
-    let bmHasSyncedCampaigns = false;
-    if (syncingCampaigns && syncingCampaigns.length > 0) {
-      const connectionIds = [...new Set(syncingCampaigns.map((c: any) => c.connection_id))];
-      const { data: adAccounts } = await supabase
-        .from('ad_platform_connections')
-        .select('parent_account_id')
-        .in('id', connectionIds);
+    const syncedBmIds = new Set(
+      (activeAdAccounts || []).map((a: any) => a.parent_account_id).filter(Boolean)
+    );
 
-      const syncedBmIds = new Set((adAccounts || []).map((a: any) => a.parent_account_id).filter(Boolean));
-      bmHasSyncedCampaigns = syncedBmIds.has(pageBmId);
-    }
-
-    if (!bmHasSyncedCampaigns) {
-      console.log(`[Leadgen Webhook] Ignoring lead from page ${pageId} — BM ${pageBmId} has no synced campaigns`);
+    if (!syncedBmIds.has(pageBmId)) {
+      console.log(`[Leadgen Webhook] Ignoring lead from page ${pageId} — BM ${pageBmId} has no active ad accounts`);
       return;
     }
   }

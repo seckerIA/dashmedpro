@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -43,6 +44,14 @@ export function useMetaLeadForms() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [syncSuccess, setSyncSuccess] = useState(false);
+
+  // Auto-hide success badge after 5 seconds
+  useEffect(() => {
+    if (!syncSuccess) return;
+    const timer = setTimeout(() => setSyncSuccess(false), 5000);
+    return () => clearTimeout(timer);
+  }, [syncSuccess]);
 
   // Query: buscar todos os formulários do usuário
   // A filtragem por BM é feita no componente LeadFormsList via seletor dropdown
@@ -75,10 +84,12 @@ export function useMetaLeadForms() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['meta-lead-forms'] });
       queryClient.invalidateQueries({ queryKey: ['lead-form-submissions'] });
-      const parts = [`${data.forms_synced ?? 0} formulário(s)`];
-      if ((data.leads_synced ?? 0) > 0) parts.push(`${data.leads_synced} lead(s) sincronizado(s)`);
-      if (data.message) parts.push(data.message);
+      const formCount = data.forms_synced ?? 0;
+      const leadCount = data.leads_synced ?? 0;
+      const parts = [`${formCount} formulário(s)`];
+      if (leadCount > 0) parts.push(`${leadCount} lead(s) sincronizado(s)`);
       if (data.errors?.length) parts.push(`${data.errors.length} erro(s)`);
+      setSyncSuccess(formCount > 0 || leadCount > 0);
       toast({
         title: 'Sincronização concluída',
         description: parts.join(' · '),
@@ -98,6 +109,7 @@ export function useMetaLeadForms() {
     isLoading: formsQuery.isLoading,
     syncForms: syncFormsMutation.mutate,
     isSyncing: syncFormsMutation.isPending,
+    syncSuccess,
   };
 }
 

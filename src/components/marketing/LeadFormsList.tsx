@@ -337,7 +337,7 @@ function FormCard({ form }: { form: MetaLeadForm }) {
 // Main Component: LeadFormsList
 // ========================================
 export function LeadFormsList() {
-  const { forms, isLoading, syncForms, isSyncing } = useMetaLeadForms();
+  const { forms, isLoading, syncForms, isSyncing, syncSuccess } = useMetaLeadForms();
   const { data: connections } = useAdPlatformConnections();
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [selectedBmId, setSelectedBmId] = useState<string>('all');
@@ -459,14 +459,22 @@ export function LeadFormsList() {
               <span>{totalLeads} leads total</span>
             </div>
           )}
-          <Button onClick={() => syncForms()} disabled={isSyncing}>
-            {isSyncing ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4 mr-2" />
+          <div className="flex items-center gap-2">
+            <Button onClick={() => syncForms()} disabled={isSyncing}>
+              {isSyncing ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              Sincronizar
+            </Button>
+            {syncSuccess && (
+              <Badge className="bg-green-500/15 text-green-600 border-green-500/30 gap-1 animate-in fade-in">
+                <CheckCircle2 className="h-3 w-3" />
+                Sincronizado
+              </Badge>
             )}
-            Sincronizar
-          </Button>
+          </div>
         </div>
       </div>
 

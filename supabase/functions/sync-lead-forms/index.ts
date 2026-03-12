@@ -61,26 +61,20 @@ serve(async (req: Request) => {
     const requestedPageIds: string[] | undefined = body.page_ids;
     const syncLeads: boolean = body.sync_leads !== false; // default true
 
-    // 1. Descobrir quais BMs têm campanhas sincronizadas (is_syncing=true)
+    // 1. Descobrir quais BMs têm contas de anúncios ativas (is_active=true)
     //    Só sincronizamos formulários de páginas pertencentes a essas BMs.
-    const { data: syncingCampaigns } = await supabaseAdmin
-      .from('ad_campaigns_sync')
-      .select('connection_id')
+    const { data: activeAdAccounts } = await supabaseAdmin
+      .from('ad_platform_connections')
+      .select('id, parent_account_id')
       .eq('user_id', user.id)
-      .eq('is_syncing', true);
+      .eq('platform', 'meta_ads')
+      .eq('is_active', true)
+      .neq('account_id', 'meta_oauth')
+      .not('account_category', 'in', '("bm","page","waba")');
 
     let syncedBmIds = new Set<string>();
-    if (syncingCampaigns && syncingCampaigns.length > 0) {
-      const connectionIds = [...new Set(syncingCampaigns.map((c: any) => c.connection_id))];
-      // Buscar parent_account_id (BM) de cada ad account com campanhas sincronizadas
-      const { data: adAccounts } = await supabaseAdmin
-        .from('ad_platform_connections')
-        .select('parent_account_id')
-        .in('id', connectionIds);
-
-      for (const acc of adAccounts || []) {
-        if (acc.parent_account_id) syncedBmIds.add(acc.parent_account_id);
-      }
+    for (const acc of activeAdAccounts || []) {
+      if (acc.parent_account_id) syncedBmIds.add(acc.parent_account_id);
     }
 
     console.log(`[sync-lead-forms] Synced BM IDs: ${[...syncedBmIds].join(', ') || 'none'}`);
@@ -230,13 +224,17 @@ serve(async (req: Request) => {
       .single();
     const organizationId = userProfile?.organization_id || null;
 
-    // 5. Buscar IDs de campanhas vinculadas que estão ativamente sincronizadas
-    const { data: activeCampaigns } = await supabaseAdmin
-      .from('ad_campaigns_sync')
-      .select('platform_campaign_id')
-      .eq('user_id', user.id)
-      .eq('is_syncing', true);
-    const activeCampaignIds = new Set<string>(activeCampaigns?.map((c: any) => c.platform_campaign_id) || []);
+    // 5. Buscar IDs de campanhas vinculadas (de contas ativas)
+    const activeConnIds = (activeAdAccounts || []).map((a: any) => a.id).filter(Boolean);
+    let activeCampaignIds = new Set<string>();
+    if (activeConnIds.length > 0) {
+      const { data: activeCampaigns } = await supabaseAdmin
+        .from('ad_campaigns_sync')
+        .select('platform_campaign_id')
+        .eq('user_id', user.id)
+        .in('connection_id', activeConnIds);
+      activeCampaignIds = new Set<string>(activeCampaigns?.map((c: any) => c.platform_campaign_id) || []);
+    }
 
     // 6. Sincronizar leads de cada formulário
     let totalLeadsSynced = 0;
