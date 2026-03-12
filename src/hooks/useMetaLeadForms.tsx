@@ -75,8 +75,9 @@ export function useMetaLeadForms() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['meta-lead-forms'] });
       queryClient.invalidateQueries({ queryKey: ['lead-form-submissions'] });
-      const parts = [`${data.forms_synced} formulário(s)`];
-      if (data.leads_synced > 0) parts.push(`${data.leads_synced} lead(s) sincronizado(s)`);
+      const parts = [`${data.forms_synced ?? 0} formulário(s)`];
+      if ((data.leads_synced ?? 0) > 0) parts.push(`${data.leads_synced} lead(s) sincronizado(s)`);
+      if (data.message) parts.push(data.message);
       if (data.errors?.length) parts.push(`${data.errors.length} erro(s)`);
       toast({
         title: 'Sincronização concluída',

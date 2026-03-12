@@ -401,8 +401,10 @@ export function LeadFormsList() {
       });
   }, [connections, forms, selectedBmId]);
 
-  const totalForms = forms.length;
-  const totalLeads = forms.reduce((sum, f) => sum + (f.leads_count || 0), 0);
+  // Totais baseados no filtro de BM selecionado (não em todos os forms)
+  const filteredForms = pageGroups.flatMap((g) => g.forms);
+  const totalForms = filteredForms.length;
+  const totalLeads = filteredForms.reduce((sum, f) => sum + (f.leads_count || 0), 0);
 
   const togglePage = (pageId: string) => {
     setExpandedPages((prev) => {
