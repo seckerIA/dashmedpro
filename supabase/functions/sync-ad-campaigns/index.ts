@@ -1,6 +1,7 @@
 /**
  * Edge Function: sync-ad-campaigns
  * Sincroniza campanhas de anúncios do Meta Ads e Google Ads
+ * Inclui métricas diárias (time_increment=1) para relatórios por período
  */
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
@@ -63,9 +64,9 @@ const handler = async (req: Request): Promise<Response> => {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       console.error('[sync-ad-campaigns] No Authorization header present');
-      return new Response(JSON.stringify({ error: 'No authorization header' }), { 
-        status: 401, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      return new Response(JSON.stringify({ error: 'No authorization header' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
@@ -77,9 +78,9 @@ const handler = async (req: Request): Promise<Response> => {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { 
+      {
         auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
-        global: { headers: { Authorization: authHeader } } 
+        global: { headers: { Authorization: authHeader } }
       }
     );
 
@@ -87,9 +88,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (authError || !user) {
       console.error('[sync-ad-campaigns] Auth failed:', authError?.message, '| sig:', sigPrefix);
-      return new Response(JSON.stringify({ error: 'Unauthorized', detail: authError?.message }), { 
-        status: 401, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      return new Response(JSON.stringify({ error: 'Unauthorized', detail: authError?.message }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
@@ -101,9 +102,9 @@ const handler = async (req: Request): Promise<Response> => {
       body = await req.json();
     } catch (parseErr: any) {
       console.warn('[sync-ad-campaigns] Failed to parse request body:', parseErr.message);
-      return new Response(JSON.stringify({ error: 'Invalid or empty request body' }), { 
-        status: 400, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      return new Response(JSON.stringify({ error: 'Invalid or empty request body' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
@@ -112,9 +113,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (!connection_id) {
       console.warn('[sync-ad-campaigns] Missing connection_id in body:', JSON.stringify(body));
-      return new Response(JSON.stringify({ error: 'connection_id is required' }), { 
-        status: 400, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      return new Response(JSON.stringify({ error: 'connection_id is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
@@ -129,9 +130,9 @@ const handler = async (req: Request): Promise<Response> => {
       .single();
 
     if (connError || !connection) {
-      return new Response(JSON.stringify({ error: 'Connection not found or access denied' }), { 
-        status: 404, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      return new Response(JSON.stringify({ error: 'Connection not found or access denied' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
@@ -174,7 +175,7 @@ const handler = async (req: Request): Promise<Response> => {
 
   } catch (error: any) {
     console.error("[sync-ad-campaigns] Critical error:", error.message, error.stack);
-    
+
     // Se falhou e temos o ID da conexão, gravar o erro no banco
     if (current_connection_id) {
       await supabaseAdmin
@@ -196,10 +197,10 @@ const handler = async (req: Request): Promise<Response> => {
 };
 
 async function syncGoogleAds(connection: any, supabase: any, userId: string) {
-  return { 
-    success: true, 
-    campaigns_synced: 0, 
-    message: 'Google Ads sync placeholder' 
+  return {
+    success: true,
+    campaigns_synced: 0,
+    message: 'Google Ads sync placeholder'
   };
 }
 
@@ -212,53 +213,87 @@ async function syncMetaAds(connection: any, supabase: any, userId: string) {
 
     // Se categoria não for Ad Account, abortar com erro amigável
     if (connection.account_category && connection.account_category !== 'other') {
-      return { 
-        success: false, 
-        error: `A sincronização não está disponível para o tipo "${connection.account_category}". Apenas contas de anúncios padrão são suportadas.` 
+      return {
+        success: false,
+        error: `A sincronização não está disponível para o tipo "${connection.account_category}". Apenas contas de anúncios padrão são suportadas.`
       };
     }
 
     // Validar se é uma conta de anúncios (prefixo act_)
     if (accountId.startsWith('bm_') || accountId.startsWith('waba_') || accountId.startsWith('page_') || accountId === 'meta_oauth') {
-      return { 
-        success: false, 
-        error: 'Este registro não é uma conta de anúncios (Ad Account). Verifique a conexão.' 
+      return {
+        success: false,
+        error: 'Este registro não é uma conta de anúncios (Ad Account). Verifique a conexão.'
       };
     }
 
     const formattedAccountId = accountId.startsWith('act_') ? accountId : `act_${accountId}`;
     const campaigns = await fetchMetaCampaigns(formattedAccountId, accessToken);
 
+    // ========================
+    // FASE 1: Metadados + insights cumulativos (existente)
+    // ========================
     const BATCH_SIZE = 5;
     const campaignsWithInsights: CampaignWithInsights[] = [];
 
     for (let i = 0; i < campaigns.length; i += BATCH_SIZE) {
       const batch = campaigns.slice(i, i + BATCH_SIZE);
       const results = await Promise.all(batch.map(async (c) => {
-        try { 
+        try {
           const insights = await fetchCampaignInsights(c.id, accessToken);
-          return { ...c, insights }; 
-        } catch { 
-          return c as CampaignWithInsights; 
+          return { ...c, insights };
+        } catch {
+          return c as CampaignWithInsights;
         }
       }));
       campaignsWithInsights.push(...results);
     }
 
+    // Salvar metadados e obter IDs dos records
+    const campaignSyncIds: Map<string, string> = new Map(); // platform_campaign_id -> sync record id
     let syncedCount = 0;
+
     for (const campaign of campaignsWithInsights) {
       try {
-        await saveCampaignToDatabase(supabase, userId, connection.id, campaign);
+        const syncId = await saveCampaignToDatabase(supabase, userId, connection.id, campaign);
+        if (syncId) {
+          campaignSyncIds.set(campaign.id, syncId);
+        }
         syncedCount++;
-      } catch (e) { 
-        console.error(`Error saving ${campaign.id}:`, e); 
+      } catch (e) {
+        console.error(`Error saving ${campaign.id}:`, e);
       }
     }
 
-    return { 
-      success: true, 
-      campaigns_synced: syncedCount, 
-      message: `Sincronizadas ${syncedCount} campanhas com sucesso.` 
+    // ========================
+    // FASE 2: Métricas diárias (NOVO)
+    // ========================
+    const DAILY_BATCH_SIZE = 3; // Menor que fase 1 para evitar rate limit
+    let dailyMetricsCount = 0;
+
+    const campaignEntries = [...campaignSyncIds.entries()];
+    for (let i = 0; i < campaignEntries.length; i += DAILY_BATCH_SIZE) {
+      const batch = campaignEntries.slice(i, i + DAILY_BATCH_SIZE);
+      await Promise.all(batch.map(async ([platformCampaignId, syncId]) => {
+        try {
+          const dailyInsights = await fetchCampaignDailyInsights(platformCampaignId, accessToken);
+          if (dailyInsights.length > 0) {
+            const saved = await saveDailyMetrics(supabase, userId, syncId, dailyInsights);
+            dailyMetricsCount += saved;
+          }
+        } catch (e: any) {
+          console.error(`[sync-ad-campaigns] Error fetching daily insights for ${platformCampaignId}:`, e.message);
+        }
+      }));
+    }
+
+    console.log(`[sync-ad-campaigns] Saved ${dailyMetricsCount} daily metric rows for ${campaignSyncIds.size} campaigns`);
+
+    return {
+      success: true,
+      campaigns_synced: syncedCount,
+      daily_metrics_saved: dailyMetricsCount,
+      message: `Sincronizadas ${syncedCount} campanhas e ${dailyMetricsCount} métricas diárias.`
     };
 
   } catch (error: any) {
@@ -281,6 +316,7 @@ async function fetchMetaCampaigns(accountId: string, accessToken: string): Promi
   return data.data || [];
 }
 
+// Insights cumulativos (90 dias agregados) — para metadados da campanha
 async function fetchCampaignInsights(campaignId: string, accessToken: string): Promise<MetaInsights | null> {
   const fields = 'impressions,clicks,spend,reach,actions,action_values,ctr,date_start,date_stop';
   const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${campaignId}/insights?fields=${fields}&date_preset=last_90d`;
@@ -290,49 +326,73 @@ async function fetchCampaignInsights(campaignId: string, accessToken: string): P
   return data.data?.[0] || null;
 }
 
-async function saveCampaignToDatabase(supabase: any, userId: string, connectionId: string, campaign: CampaignWithInsights) {
+// Insights diários (um row por dia) — para relatórios por período
+async function fetchCampaignDailyInsights(campaignId: string, accessToken: string): Promise<MetaInsights[]> {
+  const fields = 'impressions,clicks,spend,reach,actions,action_values,ctr,cpc,cpm';
+  let url: string | null = `https://graph.facebook.com/${GRAPH_API_VERSION}/${campaignId}/insights?fields=${fields}&date_preset=last_90d&time_increment=1&limit=100`;
+  const allRows: MetaInsights[] = [];
+
+  while (url) {
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!res.ok) return allRows; // graceful degradation
+    const data = await res.json();
+    allRows.push(...(data.data || []));
+    url = data.paging?.next || null;
+  }
+
+  return allRows;
+}
+
+// Extrair conversões de um row de insights (lógica compartilhada)
+function extractConversions(insights: MetaInsights): { count: number; value: number } {
+  const conversions = insights.actions?.find(a =>
+    ['lead', 'purchase', 'complete_registration'].includes(a.action_type)
+  );
+  const count = parseInt(conversions?.value || '0', 10);
+
+  const convValueAction = insights.action_values?.find(av =>
+    ['purchase', 'offsite_conversion.fb_pixel_purchase', 'onsite_conversion.purchase'].includes(av.action_type)
+  );
+  const value = parseFloat(convValueAction?.value || '0');
+
+  return { count, value };
+}
+
+async function saveCampaignToDatabase(supabase: any, userId: string, connectionId: string, campaign: CampaignWithInsights): Promise<string | null> {
   const insights = campaign.insights;
   const impressions = parseInt(insights?.impressions || '0', 10);
   const clicks = parseInt(insights?.clicks || '0', 10);
   const spend = parseFloat(insights?.spend || '0');
-  
-  // Mapeamento de conversões (Leads, Purchases, etc.)
-  const conversions = insights?.actions?.find(a => 
-    ['lead', 'purchase', 'complete_registration'].includes(a.action_type)
-  );
-  const conversionCount = parseInt(conversions?.value || '0', 10);
-  
-  // Valor das conversões (especialmente compras) para cálculo de ROAS
-  const convValueAction = insights?.action_values?.find(av => 
-    ['purchase', 'offsite_conversion.fb_pixel_purchase', 'onsite_conversion.purchase'].includes(av.action_type)
-  );
-  const conversionValue = parseFloat(convValueAction?.value || '0');
-  
+
+  const { count: conversionCount, value: conversionValue } = insights
+    ? extractConversions(insights)
+    : { count: 0, value: 0 };
+
   const cpa = conversionCount > 0 ? spend / conversionCount : 0;
   const roas = spend > 0 ? conversionValue / spend : 0;
 
   // Mapeamento de status para os valores permitidos no banco
-  const statusMap: Record<string, string> = { 
-    'ACTIVE': 'active', 
-    'PAUSED': 'paused', 
-    'ARCHIVED': 'paused', // Mapear arquivadas como pausadas ou ended
+  const statusMap: Record<string, string> = {
+    'ACTIVE': 'active',
+    'PAUSED': 'paused',
+    'ARCHIVED': 'paused',
     'DELETED': 'removed'
   };
 
   const budget = parseFloat(campaign.daily_budget || campaign.lifetime_budget || '0');
 
-  const { error } = await supabase.from('ad_campaigns_sync').upsert({
+  const { data, error } = await supabase.from('ad_campaigns_sync').upsert({
     user_id: userId,
     connection_id: connectionId,
     platform_campaign_id: campaign.id,
     platform_campaign_name: campaign.name,
     platform: 'meta_ads',
     status: statusMap[campaign.status] || 'paused',
-    budget, 
-    impressions, 
-    clicks, 
-    spend, 
-    ctr: impressions > 0 ? (clicks / impressions) * 100 : 0, 
+    budget,
+    impressions,
+    clicks,
+    spend,
+    ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
     cpa,
     conversions: conversionCount,
     conversion_value: conversionValue,
@@ -340,10 +400,47 @@ async function saveCampaignToDatabase(supabase: any, userId: string, connectionI
     start_date: insights?.date_start || (campaign.created_time ? campaign.created_time.split('T')[0] : null),
     end_date: insights?.date_stop || (campaign.updated_time ? campaign.updated_time.split('T')[0] : null),
     synced_at: new Date().toISOString(),
-  }, { onConflict: 'connection_id,platform_campaign_id' });
+  }, { onConflict: 'connection_id,platform_campaign_id' }).select('id').single();
 
   if (error) throw error;
+  return data?.id || null;
+}
+
+// Salvar métricas diárias em batch
+async function saveDailyMetrics(supabase: any, userId: string, campaignSyncId: string, dailyInsights: MetaInsights[]): Promise<number> {
+  const rows = dailyInsights
+    .filter(day => day.date_start) // Precisa ter data
+    .map(day => {
+      const { count: conversionCount, value: conversionValue } = extractConversions(day);
+      return {
+        user_id: userId,
+        campaign_sync_id: campaignSyncId,
+        metric_date: day.date_start!, // formato YYYY-MM-DD da Meta API
+        impressions: parseInt(day.impressions || '0', 10),
+        clicks: parseInt(day.clicks || '0', 10),
+        spend: parseFloat(day.spend || '0'),
+        conversions: conversionCount,
+        conversion_value: conversionValue,
+        ctr: parseFloat(day.ctr || '0'),
+        cpc: parseFloat(day.cpc || '0'),
+        cpm: parseFloat(day.cpm || '0'),
+        reach: parseInt(day.reach || '0', 10),
+      };
+    });
+
+  if (rows.length === 0) return 0;
+
+  // Batch upsert — Supabase suporta array upsert
+  const { error } = await supabase
+    .from('ad_campaign_daily_metrics')
+    .upsert(rows, { onConflict: 'campaign_sync_id,metric_date' });
+
+  if (error) {
+    console.error(`[sync-ad-campaigns] Error saving daily metrics for campaign ${campaignSyncId}:`, error.message);
+    return 0;
+  }
+
+  return rows.length;
 }
 
 serve(handler);
-

@@ -16,6 +16,8 @@ export interface MarketingLead {
   utm_id?: string | null;
   ad_campaign_sync_id?: string | null;
   campaign_name?: string;
+  form_name?: string | null;
+  ad_name?: string | null;
   platform?: string;
 }
 
@@ -102,6 +104,8 @@ export function useMarketingLeads(filters?: {
           utm_id: null,
           ad_campaign_sync_id: campaign?.id || null,
           campaign_name: lead.campaign_name || lead.form_name || 'Formulário',
+          form_name: lead.form_name || null,
+          ad_name: lead.ad_name || null,
           platform: 'meta_ads',
         } as MarketingLead;
       });

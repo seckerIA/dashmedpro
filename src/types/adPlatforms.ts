@@ -114,6 +114,32 @@ export interface AdCampaignSyncUpdate {
   synced_at?: string;
 }
 
+// =====================================================
+// DAILY CAMPAIGN METRICS
+// =====================================================
+
+export interface AdCampaignDailyMetric {
+  id: string;
+  user_id: string;
+  campaign_sync_id: string;
+  metric_date: string;
+  impressions: number;
+  clicks: number;
+  spend: number;
+  conversions: number;
+  conversion_value: number;
+  ctr: number;
+  cpc: number;
+  cpm: number;
+  reach: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdCampaignDailyMetricWithCampaign extends AdCampaignDailyMetric {
+  campaign?: AdCampaignSync;
+}
+
 export interface UtmTemplate {
   id: string;
   user_id: string;

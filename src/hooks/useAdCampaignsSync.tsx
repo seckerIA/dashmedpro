@@ -122,6 +122,7 @@ export function useSyncAdCampaigns() {
       if (_data?.skipped) return;
       queryClient.invalidateQueries({ queryKey: ['ad-campaigns-sync'] });
       queryClient.invalidateQueries({ queryKey: ['ad-platform-connections'] });
+      queryClient.invalidateQueries({ queryKey: ['ad-campaign-daily-metrics'] });
     },
   });
 }

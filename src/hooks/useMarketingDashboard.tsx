@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAdCampaignsSync } from './useAdCampaignsSync';
 import { useAdPlatformConnections } from './useAdPlatformConnections';
+import { useAdCampaignDailyMetrics, aggregateDailyMetrics } from './useAdCampaignDailyMetrics';
 import { useCommercialLeads } from './useCommercialLeads';
-import { subDays, startOfMonth, endOfMonth } from 'date-fns';
+import { subDays, startOfMonth, endOfMonth, format } from 'date-fns';
 
 export interface ActiveAccountInfo {
   id: string;
@@ -57,17 +58,26 @@ export interface MarketingDashboardData {
 
 export function useMarketingDashboard() {
   // Buscar dados do mês atual
-  const startOfCurrentMonth = startOfMonth(new Date()).toISOString();
-  const endOfCurrentMonth = endOfMonth(new Date()).toISOString();
-  
+  const now = new Date();
+  const startOfCurrentMonth = startOfMonth(now).toISOString();
+  const endOfCurrentMonth = endOfMonth(now).toISOString();
+  const monthStartDate = format(startOfMonth(now), 'yyyy-MM-dd');
+  const monthEndDate = format(endOfMonth(now), 'yyyy-MM-dd');
+
   const { data: campaigns } = useAdCampaignsSync();
   const { data: connections } = useAdPlatformConnections();
 
-  // Buscar leads do mês (vamos usar um hook que já existe ou criar um filtrado)
+  // Métricas diárias do mês atual
+  const { data: dailyMetrics } = useAdCampaignDailyMetrics({
+    start_date: monthStartDate,
+    end_date: monthEndDate,
+  });
+
+  // Buscar leads do mês
   const { leads: allLeads } = useCommercialLeads({});
 
   return useQuery({
-    queryKey: ['marketing-dashboard', campaigns, connections, allLeads],
+    queryKey: ['marketing-dashboard', campaigns, connections, allLeads, dailyMetrics],
     queryFn: async (): Promise<MarketingDashboardData> => {
       const connectionsData = connections || [];
 
@@ -95,23 +105,50 @@ export function useMarketingDashboard() {
         return isInMonth && isFromAds;
       });
 
-      // Calcular métricas por plataforma (das campanhas filtradas)
-      const googleCampaigns = campaignsData.filter(c => c.platform === 'google_ads');
-      const metaCampaigns = campaignsData.filter(c => c.platform === 'meta_ads');
+      // Usar métricas diárias do MÊS ATUAL quando disponíveis
+      const monthlyDailyRows = dailyMetrics || [];
+      const hasDaily = monthlyDailyRows.length > 0;
 
-      const googleAdsSpend = googleCampaigns.reduce((sum, c) => sum + (Number(c.spend) || 0), 0);
-      const metaAdsSpend = metaCampaigns.reduce((sum, c) => sum + (Number(c.spend) || 0), 0);
+      let totalSpend: number, totalRevenue: number, averageROAS: number;
+      let googleAdsSpend: number, metaAdsSpend: number;
+      let googleAdsRevenue: number, metaAdsRevenue: number;
 
-      const googleAdsRevenue = googleCampaigns.reduce((sum, c) => sum + (Number(c.conversion_value) || 0), 0);
-      const metaAdsRevenue = metaCampaigns.reduce((sum, c) => sum + (Number(c.conversion_value) || 0), 0);
+      if (hasDaily) {
+        // Filtrar daily rows pelas contas ativas
+        const activeCampaignIds = new Set(campaignsData.map(c => c.id));
+        const activeRows = monthlyDailyRows.filter(r => activeCampaignIds.has(r.campaign_sync_id));
+        const agg = aggregateDailyMetrics(activeRows);
 
-      // Calcular métricas agregadas das campanhas filtradas
-      const totalSpend = campaignsData.reduce((sum, c) => sum + (Number(c.spend) || 0), 0);
-      const totalRevenue = campaignsData.reduce((sum, c) => sum + (Number(c.conversion_value) || 0), 0);
-      const roasValues = campaignsData.filter(c => c.roas && c.roas > 0).map(c => Number(c.roas));
-      const averageROAS = roasValues.length > 0
-        ? roasValues.reduce((a, b) => a + b, 0) / roasValues.length
-        : 0;
+        totalSpend = agg.total_spend;
+        totalRevenue = agg.total_conversion_value;
+        averageROAS = totalSpend > 0 ? totalRevenue / totalSpend : 0;
+
+        const googleRows = activeRows.filter(r => (r as any).campaign?.platform === 'google_ads');
+        const metaRows = activeRows.filter(r => (r as any).campaign?.platform === 'meta_ads');
+        const googleAgg = aggregateDailyMetrics(googleRows);
+        const metaAgg = aggregateDailyMetrics(metaRows);
+
+        googleAdsSpend = googleAgg.total_spend;
+        metaAdsSpend = metaAgg.total_spend;
+        googleAdsRevenue = googleAgg.total_conversion_value;
+        metaAdsRevenue = metaAgg.total_conversion_value;
+      } else {
+        // Fallback: dados cumulativos (90 dias)
+        const googleCampaigns = campaignsData.filter(c => c.platform === 'google_ads');
+        const metaCampaigns = campaignsData.filter(c => c.platform === 'meta_ads');
+
+        googleAdsSpend = googleCampaigns.reduce((sum, c) => sum + (Number(c.spend) || 0), 0);
+        metaAdsSpend = metaCampaigns.reduce((sum, c) => sum + (Number(c.spend) || 0), 0);
+        googleAdsRevenue = googleCampaigns.reduce((sum, c) => sum + (Number(c.conversion_value) || 0), 0);
+        metaAdsRevenue = metaCampaigns.reduce((sum, c) => sum + (Number(c.conversion_value) || 0), 0);
+
+        totalSpend = campaignsData.reduce((sum, c) => sum + (Number(c.spend) || 0), 0);
+        totalRevenue = campaignsData.reduce((sum, c) => sum + (Number(c.conversion_value) || 0), 0);
+        const roasValues = campaignsData.filter(c => c.roas && c.roas > 0).map(c => Number(c.roas));
+        averageROAS = roasValues.length > 0
+          ? roasValues.reduce((a, b) => a + b, 0) / roasValues.length
+          : 0;
+      }
 
       // Top campanhas por ROAS
       const topCampaignsByROAS = campaignsData
