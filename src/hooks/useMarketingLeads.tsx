@@ -1,7 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useCommercialLeads } from './useCommercialLeads';
 import { useAdCampaignsSync } from './useAdCampaignsSync';
-import { useGeneratedUtms } from './useUtmGenerator';
 import { supabase } from "@/integrations/supabase/client";
 
 export interface MarketingLead {
@@ -35,17 +33,22 @@ export function useMarketingLeads(filters?: {
   platform?: 'google_ads' | 'meta_ads';
   status?: string;
 }) {
-  const { leads: allLeads } = useCommercialLeads(filters);
   const { data: campaigns } = useAdCampaignsSync();
-  const { data: utms } = useGeneratedUtms();
 
   return useQuery({
-    queryKey: ['marketing-leads', allLeads, campaigns, utms, filters],
+    queryKey: ['marketing-leads', campaigns, filters],
     queryFn: async (): Promise<MarketingLead[]> => {
 
-      // 1. Fetch lead form submissions (Meta Ads)
-      const { data: formLeads, error: formsError } = await supabase
-        .from('lead_form_submissions')
+      // 1. Buscar formulários SINCRONIZADOS (meta_lead_forms) para filtrar
+      const { data: syncedForms } = await (supabase
+        .from('meta_lead_forms' as any) as any)
+        .select('meta_form_id');
+
+      const syncedFormIds = new Set((syncedForms || []).map((f: any) => f.meta_form_id));
+
+      // 2. Buscar lead_form_submissions (fonte principal de leads de marketing)
+      const { data: formLeads, error: formsError } = await (supabase
+        .from('lead_form_submissions' as any) as any)
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -53,41 +56,13 @@ export function useMarketingLeads(filters?: {
         console.error('Error fetching lead forms:', formsError);
       }
 
-      // 2. Process commercial_leads
-      const leads = allLeads || [];
-      const marketingLeads = leads.filter(lead => {
-        return lead.origin === 'google' ||
-               lead.origin === 'facebook' ||
-               lead.origin === 'instagram';
-      });
+      // 3. Filtrar APENAS leads de formulários sincronizados
+      const filteredFormLeads = (formLeads || []).filter((lead: any) =>
+        syncedFormIds.has(lead.form_id)
+      );
 
-      const enrichedManualLeads = marketingLeads.map(lead => {
-        const relatedUtm = utms?.find(utm =>
-          utm.full_url.includes(`utm_source=${lead.origin}`)
-        );
-
-        const campaign = relatedUtm?.ad_campaign_sync_id
-          ? campaigns?.find((c: any) => c.id === relatedUtm.ad_campaign_sync_id)
-          : null;
-
-        return {
-          id: lead.id,
-          name: lead.name,
-          email: lead.email,
-          phone: lead.phone,
-          origin: lead.origin,
-          status: lead.status,
-          estimated_value: lead.estimated_value,
-          created_at: lead.created_at,
-          utm_id: relatedUtm?.id || null,
-          ad_campaign_sync_id: campaign?.id || null,
-          campaign_name: campaign?.platform_campaign_name || lead.origin,
-          platform: campaign?.platform || lead.origin,
-        } as MarketingLead;
-      });
-
-      // 3. Process form leads — exibir TODOS, mesmo sem campanha vinculada
-      const formLeadsMapped = (formLeads || []).map((lead: any) => {
+      // 4. Mapear para MarketingLead
+      const formLeadsMapped = filteredFormLeads.map((lead: any) => {
         const campaign = lead.campaign_id
           ? campaigns?.find((c: any) => c.platform_campaign_id === lead.campaign_id)
           : null;
@@ -110,10 +85,7 @@ export function useMarketingLeads(filters?: {
         } as MarketingLead;
       });
 
-      // 4. Merge and ensure no duplicates
-      const allMerged = [...formLeadsMapped, ...enrichedManualLeads];
-      
-      return allMerged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      return formLeadsMapped.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     },
     enabled: true,
   });
