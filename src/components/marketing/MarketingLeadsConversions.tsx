@@ -85,11 +85,13 @@ export function MarketingLeadsConversions() {
     };
   }, [allLeads, periodFilter]);
 
-  // Métricas calculadas dos leads filtrados
+  // Métricas calculadas dos leads filtrados (com dados CRM reais)
   const metrics = useMemo(() => {
     const totalLeads = filteredLeads.length;
-    const convertedLeads = filteredLeads.filter(l => l.status === 'converted').length;
-    const conversionRate = totalLeads > 0 ? (convertedLeads / totalLeads) * 100 : 0;
+    const leadsInCRM = filteredLeads.filter(l => l.crm_contact_id).length;
+    const leadsWithAppointment = filteredLeads.filter(l => l.has_appointment).length;
+    const appointmentsCompleted = filteredLeads.filter(l => l.appointment_status === 'completed').length;
+    const conversionRate = totalLeads > 0 ? (leadsWithAppointment / totalLeads) * 100 : 0;
     const totalRevenue = filteredLeads.reduce((sum, l) => sum + (Number(l.estimated_value) || 0), 0);
     const avgValue = totalLeads > 0 ? totalRevenue / totalLeads : 0;
 
@@ -101,17 +103,18 @@ export function MarketingLeadsConversions() {
       byPlatform[p] = (byPlatform[p] || 0) + 1;
     });
 
-    return { totalLeads, convertedLeads, conversionRate, totalRevenue, avgValue, byPlatform };
+    return { totalLeads, leadsInCRM, leadsWithAppointment, appointmentsCompleted, conversionRate, totalRevenue, avgValue, byPlatform };
   }, [filteredLeads]);
 
   // Breakdown por campanha
   const campaignBreakdown = useMemo(() => {
-    const map = new Map<string, { name: string; count: number; converted: number; revenue: number }>();
+    const map = new Map<string, { name: string; count: number; agendados: number; convertidos: number; revenue: number }>();
     filteredLeads.forEach(lead => {
       const key = lead.campaign_name || 'Sem campanha';
-      const existing = map.get(key) || { name: key, count: 0, converted: 0, revenue: 0 };
+      const existing = map.get(key) || { name: key, count: 0, agendados: 0, convertidos: 0, revenue: 0 };
       existing.count++;
-      if (lead.status === 'converted') existing.converted++;
+      if (lead.has_appointment) existing.agendados++;
+      if (lead.appointment_status === 'completed') existing.convertidos++;
       existing.revenue += Number(lead.estimated_value) || 0;
       map.set(key, existing);
     });
@@ -120,12 +123,12 @@ export function MarketingLeadsConversions() {
 
   // Breakdown por formulário
   const formBreakdown = useMemo(() => {
-    const map = new Map<string, { name: string; count: number; converted: number }>();
+    const map = new Map<string, { name: string; count: number; agendados: number }>();
     filteredLeads.forEach(lead => {
       if (!lead.form_name) return;
-      const existing = map.get(lead.form_name) || { name: lead.form_name, count: 0, converted: 0 };
+      const existing = map.get(lead.form_name) || { name: lead.form_name, count: 0, agendados: 0 };
       existing.count++;
-      if (lead.status === 'converted') existing.converted++;
+      if (lead.has_appointment) existing.agendados++;
       map.set(lead.form_name, existing);
     });
     return [...map.values()].sort((a, b) => b.count - a.count);
@@ -143,7 +146,7 @@ export function MarketingLeadsConversions() {
     return [...map.values()].sort((a, b) => b.count - a.count);
   }, [filteredLeads]);
 
-  // Funil de conversão
+  // Funil de conversão (dados reais do CRM)
   const funnelData = useMemo(() => {
     if (!campaigns) return [];
 
@@ -156,13 +159,15 @@ export function MarketingLeadsConversions() {
     const totalImpressions = filteredCampaigns.reduce((sum, c) => sum + (Number(c.impressions) || 0), 0);
     const totalClicks = filteredCampaigns.reduce((sum, c) => sum + (Number(c.clicks) || 0), 0);
     const totalLeads = filteredLeads.length;
-    const totalConversions = filteredLeads.filter(l => l.status === 'converted').length;
+    const totalAgendados = filteredLeads.filter(l => l.has_appointment).length;
+    const totalCompleted = filteredLeads.filter(l => l.appointment_status === 'completed').length;
 
     return [
       { stage: 'Impressões', value: totalImpressions, percentage: 100 },
       { stage: 'Cliques', value: totalClicks, percentage: totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0 },
-      { stage: 'Leads', value: totalLeads, percentage: totalClicks > 0 ? (totalLeads / totalClicks) * 100 : 0 },
-      { stage: 'Conversões', value: totalConversions, percentage: totalLeads > 0 ? (totalConversions / totalLeads) * 100 : 0 },
+      { stage: 'Leads (Formulários)', value: totalLeads, percentage: totalClicks > 0 ? (totalLeads / totalClicks) * 100 : 0 },
+      { stage: 'Consultas Agendadas', value: totalAgendados, percentage: totalLeads > 0 ? (totalAgendados / totalLeads) * 100 : 0 },
+      { stage: 'Consultas Realizadas', value: totalCompleted, percentage: totalAgendados > 0 ? (totalCompleted / totalAgendados) * 100 : 0 },
     ];
   }, [campaigns, filteredLeads, platformFilter]);
 
@@ -290,7 +295,7 @@ export function MarketingLeadsConversions() {
               {metrics.conversionRate > 0 ? `${metrics.conversionRate.toFixed(1)}%` : '0%'}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {metrics.totalLeads} leads | {metrics.convertedLeads} convertidos
+              {metrics.totalLeads} leads | {metrics.leadsWithAppointment} agendaram
             </p>
           </CardContent>
         </Card>
@@ -366,7 +371,7 @@ export function MarketingLeadsConversions() {
                         />
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {item.converted} convertidos | {formatCurrency(item.revenue)} receita | {pct.toFixed(1)}% do total
+                        {item.agendados} agendaram | {item.convertidos} realizadas | {formatCurrency(item.revenue)} receita
                       </p>
                     </div>
                   </div>
@@ -402,7 +407,7 @@ export function MarketingLeadsConversions() {
                         />
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {item.converted} convertidos | {pct.toFixed(1)}% do total
+                        {item.agendados} agendaram | {pct.toFixed(1)}% do total
                       </p>
                     </div>
                   </div>
@@ -512,12 +517,17 @@ export function MarketingLeadsConversions() {
                       <TableCell>
                         <Badge
                           variant={
-                            lead.status === 'converted' ? 'default' :
-                            lead.status === 'qualified' ? 'secondary' :
+                            lead.status === 'convertido' ? 'default' :
+                            lead.status === 'agendado' ? 'secondary' :
+                            lead.status === 'no_crm' ? 'outline' :
                             'outline'
                           }
                         >
-                          {COMMERCIAL_LEAD_STATUS_LABELS[lead.status as keyof typeof COMMERCIAL_LEAD_STATUS_LABELS] || lead.status}
+                          {lead.status === 'convertido' ? 'Consulta Realizada'
+                            : lead.status === 'agendado' ? 'Agendado'
+                            : lead.status === 'no_crm' ? 'No CRM'
+                            : lead.status === 'novo' ? 'Novo'
+                            : lead.status}
                         </Badge>
                       </TableCell>
                       <TableCell>

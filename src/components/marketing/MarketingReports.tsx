@@ -251,7 +251,9 @@ export function MarketingReports() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {reportData.metrics.roi > 0 ? '+' : ''}{reportData.metrics.roi.toFixed(1)}%
+              {reportData.metrics.total_revenue === 0 && reportData.metrics.total_spend > 0
+                ? '-'
+                : `${reportData.metrics.roi > 0 ? '+' : ''}${reportData.metrics.roi.toFixed(1)}%`}
             </div>
           </CardContent>
         </Card>

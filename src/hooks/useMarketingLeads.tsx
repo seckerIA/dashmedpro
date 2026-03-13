@@ -17,10 +17,21 @@ export interface MarketingLead {
   form_name?: string | null;
   ad_name?: string | null;
   platform?: string;
+  // CRM data
+  crm_contact_id?: string | null;
+  crm_deal_id?: string | null;
+  deal_stage?: string | null;
+  deal_value?: number | null;
+  has_appointment?: boolean;
+  appointment_status?: string | null;
+  appointment_value?: number | null;
 }
 
 export interface LeadConversionMetrics {
   totalLeads: number;
+  leadsInCRM: number;
+  leadsWithAppointment: number;
+  appointmentsCompleted: number;
   leadsByStatus: Record<string, number>;
   leadsByPlatform: Record<string, number>;
   totalRevenue: number;
@@ -46,7 +57,7 @@ export function useMarketingLeads(filters?: {
 
       const syncedFormIds = new Set((syncedForms || []).map((f: any) => f.meta_form_id));
 
-      // 2. Buscar lead_form_submissions (fonte principal de leads de marketing)
+      // 2. Buscar lead_form_submissions com dados CRM
       const { data: formLeads, error: formsError } = await (supabase
         .from('lead_form_submissions' as any) as any)
         .select('*')
@@ -61,11 +72,69 @@ export function useMarketingLeads(filters?: {
         syncedFormIds.has(lead.form_id)
       );
 
-      // 4. Mapear para MarketingLead
+      // 4. Buscar dados CRM (deals + appointments) para os leads vinculados
+      const contactIds = filteredFormLeads
+        .map((l: any) => l.crm_contact_id)
+        .filter(Boolean) as string[];
+      const dealIds = filteredFormLeads
+        .map((l: any) => l.crm_deal_id)
+        .filter(Boolean) as string[];
+
+      // Buscar deals do CRM
+      let dealsMap = new Map<string, { stage: string; value: number }>();
+      if (dealIds.length > 0) {
+        const { data: deals } = await supabase
+          .from('crm_deals')
+          .select('id, stage, value')
+          .in('id', dealIds);
+        (deals || []).forEach((d: any) => {
+          dealsMap.set(d.id, { stage: d.stage, value: Number(d.value) || 0 });
+        });
+      }
+
+      // Buscar appointments vinculados aos contatos
+      let appointmentsMap = new Map<string, { status: string; value: number }>();
+      if (contactIds.length > 0) {
+        const { data: appointments } = await supabase
+          .from('medical_appointments')
+          .select('contact_id, status, estimated_value')
+          .in('contact_id', contactIds);
+        (appointments || []).forEach((a: any) => {
+          // Guardar o appointment mais relevante (completed > confirmed > scheduled)
+          const existing = appointmentsMap.get(a.contact_id);
+          const priority: Record<string, number> = { completed: 3, confirmed: 2, scheduled: 1 };
+          if (!existing || (priority[a.status] || 0) > (priority[existing.status] || 0)) {
+            appointmentsMap.set(a.contact_id, {
+              status: a.status,
+              value: Number(a.estimated_value) || 0,
+            });
+          }
+        });
+      }
+
+      // 5. Mapear para MarketingLead com dados CRM reais
       const formLeadsMapped = filteredFormLeads.map((lead: any) => {
         const campaign = lead.campaign_id
           ? campaigns?.find((c: any) => c.platform_campaign_id === lead.campaign_id)
           : null;
+
+        const deal = lead.crm_deal_id ? dealsMap.get(lead.crm_deal_id) : null;
+        const appointment = lead.crm_contact_id ? appointmentsMap.get(lead.crm_contact_id) : null;
+
+        // Status real baseado no CRM
+        let realStatus = 'novo';
+        if (appointment?.status === 'completed') {
+          realStatus = 'convertido';
+        } else if (appointment?.status === 'confirmed' || appointment?.status === 'scheduled') {
+          realStatus = 'agendado';
+        } else if (deal?.stage && deal.stage !== 'lead_novo') {
+          realStatus = deal.stage;
+        } else if (lead.is_processed && lead.crm_contact_id) {
+          realStatus = 'no_crm';
+        }
+
+        // Valor real do appointment ou deal
+        const realValue = appointment?.value || deal?.value || 0;
 
         return {
           id: lead.id,
@@ -73,8 +142,8 @@ export function useMarketingLeads(filters?: {
           email: lead.email,
           phone: lead.phone_number,
           origin: 'facebook',
-          status: 'novo',
-          estimated_value: 0,
+          status: realStatus,
+          estimated_value: realValue,
           created_at: lead.created_at,
           utm_id: null,
           ad_campaign_sync_id: campaign?.id || null,
@@ -82,6 +151,13 @@ export function useMarketingLeads(filters?: {
           form_name: lead.form_name || null,
           ad_name: lead.ad_name || null,
           platform: 'meta_ads',
+          crm_contact_id: lead.crm_contact_id || null,
+          crm_deal_id: lead.crm_deal_id || null,
+          deal_stage: deal?.stage || null,
+          deal_value: deal?.value || null,
+          has_appointment: !!appointment,
+          appointment_status: appointment?.status || null,
+          appointment_value: appointment?.value || null,
         } as MarketingLead;
       });
 
@@ -103,7 +179,7 @@ export function useMarketingLeadMetrics(filters?: {
     queryKey: ['marketing-lead-metrics', leads, filters],
     queryFn: async (): Promise<LeadConversionMetrics> => {
       const leadsData = leads || [];
-      
+
       // Filtrar por período se fornecido
       let filteredLeads = leadsData;
       if (filters?.start_date || filters?.end_date) {
@@ -115,39 +191,37 @@ export function useMarketingLeadMetrics(filters?: {
         });
       }
 
-      // Calcular métricas
+      // Métricas reais do CRM
       const totalLeads = filteredLeads.length;
-      
+      const leadsInCRM = filteredLeads.filter(l => l.crm_contact_id).length;
+      const leadsWithAppointment = filteredLeads.filter(l => l.has_appointment).length;
+      const appointmentsCompleted = filteredLeads.filter(l => l.appointment_status === 'completed').length;
+
       const leadsByStatus: Record<string, number> = {};
       const leadsByPlatform: Record<string, number> = {};
-      
+
+      // Receita real: soma dos valores de appointments/deals
       let totalRevenue = 0;
-      let convertedLeads = 0;
 
       filteredLeads.forEach(lead => {
-        // Por status
         leadsByStatus[lead.status] = (leadsByStatus[lead.status] || 0) + 1;
-        
-        // Por plataforma
+
         const platform = lead.platform || lead.origin;
         leadsByPlatform[platform] = (leadsByPlatform[platform] || 0) + 1;
-        
-        // Receita
-        if (lead.estimated_value) {
-          totalRevenue += Number(lead.estimated_value);
-        }
-        
-        // Conversões
-        if (lead.status === 'converted') {
-          convertedLeads++;
-        }
+
+        // Receita real do CRM (appointment ou deal value)
+        totalRevenue += Number(lead.estimated_value) || 0;
       });
 
       const averageLeadValue = totalLeads > 0 ? totalRevenue / totalLeads : 0;
-      const conversionRate = totalLeads > 0 ? (convertedLeads / totalLeads) * 100 : 0;
+      // Taxa de conversão = leads que agendaram / total de leads
+      const conversionRate = totalLeads > 0 ? (leadsWithAppointment / totalLeads) * 100 : 0;
 
       return {
         totalLeads,
+        leadsInCRM,
+        leadsWithAppointment,
+        appointmentsCompleted,
         leadsByStatus,
         leadsByPlatform,
         totalRevenue,
@@ -158,4 +232,3 @@ export function useMarketingLeadMetrics(filters?: {
     enabled: !!leads,
   });
 }
-
