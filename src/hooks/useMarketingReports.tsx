@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAdCampaignsSync } from './useAdCampaignsSync';
-import { useAdCampaignDailyMetrics, aggregateDailyMetrics } from './useAdCampaignDailyMetrics';
+import { useAdCampaignDailyMetrics, useHasDailyMetrics, aggregateDailyMetrics } from './useAdCampaignDailyMetrics';
 import { useMarketingLeads, useMarketingLeadMetrics } from './useMarketingLeads';
 import { subDays, startOfDay, endOfDay, format } from 'date-fns';
 
@@ -123,6 +123,9 @@ export function useMarketingReports(filters: ReportFilters) {
     campaign_sync_ids: campaignSyncIds,
   });
 
+  // Verifica se o sistema de daily metrics está ativo (já sincronizou pelo menos uma vez)
+  const { data: hasDailySystem } = useHasDailyMetrics();
+
   // Leads filtrados por período
   const { data: leads } = useMarketingLeads({
     platform: filters.platform !== 'all' ? filters.platform : undefined,
@@ -134,7 +137,7 @@ export function useMarketingReports(filters: ReportFilters) {
   });
 
   return useQuery({
-    queryKey: ['marketing-reports', filters, allCampaigns, dailyMetrics, leads, leadMetrics],
+    queryKey: ['marketing-reports', filters, allCampaigns, dailyMetrics, hasDailySystem, leads, leadMetrics],
     queryFn: async (): Promise<ReportData> => {
       const campaignsData = filters.campaign_id
         ? (allCampaigns || []).filter(c => c.id === filters.campaign_id)
@@ -161,9 +164,11 @@ export function useMarketingReports(filters: ReportFilters) {
       // Métricas agregadas do período (dados REAIS diários)
       const aggregated = aggregateDailyMetrics(filteredDailyRows);
 
-      // Se não tiver dados diários ainda, fallback para dados cumulativos das campanhas
+      // Se o sistema de daily metrics está ativo, usa dados diários (mesmo que 0 para o período)
+      // Só faz fallback para cumulativo se o sistema NUNCA foi sincronizado
       const hasDaily = filteredDailyRows.length > 0;
-      const metricsData = hasDaily ? aggregated : (() => {
+      const useDailySystem = hasDaily || hasDailySystem === true;
+      const metricsData = useDailySystem ? aggregated : (() => {
         let total_spend = 0, total_impressions = 0, total_clicks = 0;
         let total_conversions = 0, total_conversion_value = 0;
         campaignsData.forEach(c => {
@@ -191,7 +196,7 @@ export function useMarketingReports(filters: ReportFilters) {
       const byPlatform: ReportData['byPlatform'] = [];
       const platforms = ['google_ads', 'meta_ads'];
 
-      if (hasDaily) {
+      if (useDailySystem) {
         platforms.forEach(platform => {
           const platformRows = filteredDailyRows.filter(r => (r as any).campaign?.platform === platform);
           const agg = aggregateDailyMetrics(platformRows);
@@ -225,7 +230,7 @@ export function useMarketingReports(filters: ReportFilters) {
       // Agrupar por campanha (dos dados diários no período)
       const byCampaign: ReportData['byCampaign'] = [];
 
-      if (hasDaily) {
+      if (useDailySystem) {
         const campaignMap = new Map<string, { name: string; platform: string; spend: number; revenue: number; conversions: number }>();
         filteredDailyRows.forEach(row => {
           const campaign = (row as any).campaign;
@@ -272,7 +277,7 @@ export function useMarketingReports(filters: ReportFilters) {
       // Dados diários REAIS para o gráfico
       const dailyData: ReportData['dailyData'] = [];
 
-      if (hasDaily) {
+      if (useDailySystem) {
         // Agrupar por data
         const dateMap = new Map<string, { spend: number; revenue: number; impressions: number; clicks: number; conversions: number }>();
         filteredDailyRows.forEach(row => {

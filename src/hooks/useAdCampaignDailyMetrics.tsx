@@ -46,6 +46,23 @@ export function useAdCampaignDailyMetrics(filters: DailyMetricsFilters) {
   });
 }
 
+// Verifica se o sistema de métricas diárias está ativo (pelo menos 1 sync feito)
+// Usado para decidir: mostrar R$ 0 (sem dados no período) vs fallback cumulativo (nunca sincronizou)
+export function useHasDailyMetrics() {
+  return useQuery({
+    queryKey: ['ad-campaign-daily-metrics-exists'],
+    queryFn: async () => {
+      const { data } = await (supabase
+        .from('ad_campaign_daily_metrics' as any) as any)
+        .select('id')
+        .limit(1);
+      return !!(data && data.length > 0);
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+}
+
 // Agregar métricas diárias por período
 export function aggregateDailyMetrics(rows: AdCampaignDailyMetric[]) {
   return {

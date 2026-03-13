@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAdCampaignsSync } from './useAdCampaignsSync';
 import { useAdPlatformConnections } from './useAdPlatformConnections';
-import { useAdCampaignDailyMetrics, aggregateDailyMetrics } from './useAdCampaignDailyMetrics';
+import { useAdCampaignDailyMetrics, useHasDailyMetrics, aggregateDailyMetrics } from './useAdCampaignDailyMetrics';
 import { useCommercialLeads } from './useCommercialLeads';
 import { subDays, startOfMonth, endOfMonth, format } from 'date-fns';
 
@@ -73,11 +73,14 @@ export function useMarketingDashboard() {
     end_date: monthEndDate,
   });
 
+  // Verifica se o sistema de daily metrics está ativo
+  const { data: hasDailySystem } = useHasDailyMetrics();
+
   // Buscar leads do mês
   const { leads: allLeads } = useCommercialLeads({});
 
   return useQuery({
-    queryKey: ['marketing-dashboard', campaigns, connections, allLeads, dailyMetrics],
+    queryKey: ['marketing-dashboard', campaigns, connections, allLeads, dailyMetrics, hasDailySystem],
     queryFn: async (): Promise<MarketingDashboardData> => {
       const connectionsData = connections || [];
 
@@ -108,12 +111,13 @@ export function useMarketingDashboard() {
       // Usar métricas diárias do MÊS ATUAL quando disponíveis
       const monthlyDailyRows = dailyMetrics || [];
       const hasDaily = monthlyDailyRows.length > 0;
+      const useDailyData = hasDaily || hasDailySystem === true;
 
       let totalSpend: number, totalRevenue: number, averageROAS: number;
       let googleAdsSpend: number, metaAdsSpend: number;
       let googleAdsRevenue: number, metaAdsRevenue: number;
 
-      if (hasDaily) {
+      if (useDailyData) {
         // Filtrar daily rows pelas contas ativas
         const activeCampaignIds = new Set(campaignsData.map(c => c.id));
         const activeRows = monthlyDailyRows.filter(r => activeCampaignIds.has(r.campaign_sync_id));
