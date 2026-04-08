@@ -8,5 +8,18 @@
       "Bash(findstr:*)",
       "Bash(powershell -Command \"cd ''e:\\\\dashmedpro-main\\\\dashmedpro-1\\\\dashmed-nextjs''; Remove-Item ''.next\\\\dev\\\\lock'' -Force -ErrorAction SilentlyContinue; npm run dev\")"
     ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/sdd-context.cjs"
+          }
+        ]
+      }
+    ]
   }
 }

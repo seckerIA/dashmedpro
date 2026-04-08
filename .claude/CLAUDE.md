@@ -5,6 +5,43 @@
 
 ---
 
+## Spec-Driven Development (SDD) — OBRIGATORIO para Features
+
+> **Constitution**: `.specify/memory/constitution.md` — princípios INTRANSIGÍVEIS do projeto.
+> Consultar ANTES de qualquer `/speckit.specify`, `/speckit.plan` ou `/speckit.implement`.
+
+### Quando usar SDD (obrigatório)
+- **Feature nova** (> 3 arquivos, cross-module, ou toca banco/RLS/Edge Functions)
+- **Refactor estrutural** (mudança de arquitetura, migração de padrão)
+- **Integração externa** (nova API, novo provider, nova plataforma)
+
+### Quando NÃO usar SDD (pular direto para agente)
+- Bug fix isolado → Black Widow → Hawkeye → Spider-Man → Hulk
+- Ajuste cirúrgico de 1-3 linhas → Spider-Man direto
+- Pergunta/exploração → leitura direta sem specs
+
+### Fluxo SDD completo
+```
+1. /speckit.constitution  → revisar princípios (se mudaram)
+2. /speckit.specify       → Nick Fury valida o QUÊ e PORQUÊ
+3. /speckit.clarify       → (opcional) reduzir ambiguidade
+4. /speckit.plan          → Nick Fury + Thor + Iron Man definem COMO
+5. /speckit.tasks         → quebra em passos numerados
+6. /speckit.analyze       → (opcional) consistência cross-artefato
+7. /speckit.implement     → squad executa, Doctor Strange valida, Captain America revisa
+```
+
+### Artefatos por feature
+- `specs/<feature-name>/spec.md` — requisitos e critérios de aceitação
+- `specs/<feature-name>/plan.md` — arquitetura e decisões técnicas
+- `specs/<feature-name>/tasks.md` — tarefas executáveis numeradas
+
+### Regra de ouro
+> **"Specs são o artefato primário. Código é gerado a partir delas."**
+> Se uma feature foi implementada sem spec, a spec deve ser retroativamente criada antes do próximo PR que toca aquela área.
+
+---
+
 ## Agent System — DevSquad Avengers
 
 ### Squad DEVELOPERS (Desenvolvedores)
@@ -45,6 +82,15 @@
 ### Regras de Ativacao
 
 ```
+FEATURE NOVA / REFACTOR ESTRUTURAL / INTEGRACAO EXTERNA:
+  -> ANTES de tudo: fluxo SDD
+  -> Passo 1: /speckit.specify (Nick Fury valida intenção)
+  -> Passo 2: /speckit.plan (arquitetura cross-squad)
+  -> Passo 3: /speckit.tasks (quebra executável)
+  -> Passo 4: /speckit.implement (squad executa)
+  -> Criterios: > 3 arquivos OU toca RLS/banco/Edge Functions OU cross-module
+  -> Exemplos: "adiciona teleconsulta", "novo módulo de receitas", "integração X"
+
 TAREFA DE UI/COMPONENTES/HOOKS/FORMS/CSS/UX:
   -> Ativar Iron Man (FRONTEND)
   -> Consultar: .claude/agents/FRONTEND.md

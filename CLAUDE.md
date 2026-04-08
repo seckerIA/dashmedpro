@@ -1,6 +1,7 @@
 # DashMedPro - Context Guide
 
 > **IMPORTANTE**: Para o sistema completo de agentes AI (DevSquad Avengers), consulte `.claude/CLAUDE.md`.
+> **SDD (Spec-Driven Development)**: Features novas DEVEM seguir o fluxo `/speckit.specify` → `/speckit.plan` → `/speckit.tasks` → `/speckit.implement`. Constitution em `.specify/memory/constitution.md`. Specs em `specs/<feature-name>/`. Bug fixes seguem o pipeline Detective → Researcher → Fixer → Guardian (sem SDD).
 
 ## Overview
 Sistema CRM medico integrado com agenda, prontuarios, pipeline de pacientes, gestao financeira, estoque e WhatsApp via Supabase RLS.
