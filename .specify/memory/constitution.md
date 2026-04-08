@@ -35,11 +35,12 @@ Qualquer mudança em WhatsApp DEVE funcionar identicamente para **Meta Business 
 - AI agent (`whatsapp-ai-agent`) agnóstico ao provider
 - Schema com coluna `provider` em `whatsapp_config`, `whatsapp_conversations`, `whatsapp_messages`
 
-### V. Data-Driven UI (Mobile-First)
+### V. UI Stack & Mobile-First
 - **Stack obrigatório**: React 18 + TypeScript + Vite + shadcn/ui + Tailwind + TanStack Query v5
-- **Formas**: React Hook Form + Zod (nunca state manual)
+- **Forms**: React Hook Form + Zod (nunca state manual)
 - **Mobile-first**: breakpoints `sm:`/`md:`, touch targets `h-8`/`h-9`, icon-only buttons em mobile
 - **Cache**: invalidação explícita via `queryClient.invalidateQueries` — nunca refetch manual
+- **Simplicidade**: preferir componente shadcn existente a criar um novo; YAGNI
 
 ## Technology Constraints
 

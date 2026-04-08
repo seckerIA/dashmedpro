@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 /**
- * UserPromptSubmit hook — Injeta contexto SDD em todo prompt.
- * Lista specs existentes e lembra o agente do fluxo Spec-Driven Development.
+ * UserPromptSubmit hook — Injeta contexto SDD APENAS quando relevante.
+ * Lê o prompt e só injeta para tarefas de feature/refactor/implementação.
  *
- * Claude Code passa o prompt via stdin (JSON) e espera:
- *  - exit 0 + stdout JSON { "additionalContext": "..." } para adicionar contexto
- *  - exit 0 sem stdout para seguir normal
+ * Exit 0 com JSON no stdout: { hookSpecificOutput: { hookEventName, additionalContext } }
+ * Exit 0 sem stdout: segue normal (sem injeção).
  */
 
 const fs = require('fs');
@@ -15,11 +14,38 @@ const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 const SPECS_DIR = path.join(PROJECT_ROOT, 'specs');
 const CONSTITUTION = path.join(PROJECT_ROOT, '.specify', 'memory', 'constitution.md');
 
+// Palavras-chave que sinalizam tarefa de desenvolvimento (PT + EN)
+const TASK_KEYWORDS = [
+  // feature / nova funcionalidade
+  'feature', 'funcionalidade', 'modulo', 'módulo', 'modulo novo', 'nova', 'novo',
+  'adiciona', 'adicionar', 'add ', 'criar', 'cria ', 'crie ', 'create ', 'build ',
+  'implementa', 'implementar', 'implement',
+  // refactor / estrutura
+  'refatora', 'refatorar', 'refactor', 'reestrutura', 'restructure',
+  'migra', 'migrar', 'migrate', 'migration',
+  // integração
+  'integra', 'integrar', 'integrate', 'integração', 'integracao',
+  // backend / banco
+  'tabela', 'table', 'rls', 'schema', 'edge function', 'trigger', 'policy',
+  // frontend / UI
+  'componente', 'component', 'hook novo', 'página', 'pagina', 'page novo', 'screen',
+  // bug (para lembrar do pipeline correto)
+  'bug', 'erro', 'não funciona', 'nao funciona', 'fix ',
+];
+
+function isTaskPrompt(prompt) {
+  if (!prompt || typeof prompt !== 'string') return false;
+  const trimmed = prompt.trim();
+  if (trimmed.length < 10) return false; // muito curto, provavelmente não é tarefa
+  const lower = trimmed.toLowerCase();
+  return TASK_KEYWORDS.some(kw => lower.includes(kw));
+}
+
 function listSpecs() {
   if (!fs.existsSync(SPECS_DIR)) return [];
   try {
     return fs.readdirSync(SPECS_DIR, { withFileTypes: true })
-      .filter(d => d.isDirectory())
+      .filter(d => d.isDirectory() && !d.name.startsWith('.'))
       .map(d => {
         const specPath = path.join(SPECS_DIR, d.name, 'spec.md');
         const planPath = path.join(SPECS_DIR, d.name, 'plan.md');
@@ -44,12 +70,12 @@ function buildContext() {
     '## SDD Context (auto-injected)',
     '',
     hasConstitution
-      ? '- Constitution ativa: `.specify/memory/constitution.md` (consultar antes de specify/plan/implement)'
-      : '- Constitution NAO encontrada — rodar `/speckit.constitution` se iniciar feature nova',
+      ? '- Constitution ativa: `.specify/memory/constitution.md`'
+      : '- Constitution NAO encontrada — rodar `/speckit.constitution` para features novas',
   ];
 
   if (specs.length === 0) {
-    lines.push('- Nenhuma spec em `specs/` ainda. Para feature nova: `/speckit.specify`');
+    lines.push('- Nenhuma spec em `specs/` ainda.');
   } else {
     lines.push(`- Specs existentes (${specs.length}):`);
     for (const s of specs) {
@@ -62,21 +88,43 @@ function buildContext() {
   }
 
   lines.push('');
-  lines.push('**Regras de auto-activation** (`.claude/CLAUDE.md`):');
-  lines.push('- Feature nova / cross-module / toca RLS/banco/Edge Functions → fluxo SDD (`/speckit.specify` → `/speckit.plan` → `/speckit.tasks` → `/speckit.implement`)');
-  lines.push('- Bug fix isolado → pipeline Detective → Researcher → Fixer → Guardian (sem SDD)');
-  lines.push('- Ajuste cirurgico < 3 linhas → Spider-Man direto');
+  lines.push('**Auto-activation** (`.claude/CLAUDE.md`):');
+  lines.push('- Feature nova / cross-module / toca RLS/banco/Edge Functions → SDD (`/speckit.specify` → `plan` → `tasks` → `implement`)');
+  lines.push('- Bug fix isolado → Detective → Researcher → Fixer → Guardian');
+  lines.push('- Ajuste < 3 linhas → Spider-Man direto');
 
   return lines.join('\n');
 }
 
-async function main() {
-  // Ler stdin (ignoramos o conteúdo — só precisamos injetar contexto)
+async function readStdin() {
   let input = '';
   try {
     for await (const chunk of process.stdin) input += chunk;
   } catch {
     // sem stdin, tudo bem
+  }
+  return input;
+}
+
+function extractPrompt(stdinRaw) {
+  if (!stdinRaw) return '';
+  try {
+    const parsed = JSON.parse(stdinRaw);
+    // Claude Code envia { prompt, session_id, cwd, ... }
+    return parsed.prompt || parsed.user_prompt || '';
+  } catch {
+    // stdin não é JSON — assume que é o prompt direto
+    return stdinRaw;
+  }
+}
+
+async function main() {
+  const stdinRaw = await readStdin();
+  const prompt = extractPrompt(stdinRaw);
+
+  if (!isTaskPrompt(prompt)) {
+    // Prompt trivial ou conversacional — não injetar nada
+    process.exit(0);
   }
 
   const additionalContext = buildContext();
@@ -93,5 +141,5 @@ async function main() {
 
 main().catch((err) => {
   console.error('[sdd-context hook error]', err.message);
-  process.exit(0); // não bloquear o prompt em caso de erro
+  process.exit(0); // nunca bloquear o prompt
 });

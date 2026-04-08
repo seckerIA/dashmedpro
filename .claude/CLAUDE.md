@@ -31,10 +31,12 @@
 7. /speckit.implement     → squad executa, Doctor Strange valida, Captain America revisa
 ```
 
-### Artefatos por feature
+### Artefatos por feature (VERSIONADOS no Git)
 - `specs/<feature-name>/spec.md` — requisitos e critérios de aceitação
 - `specs/<feature-name>/plan.md` — arquitetura e decisões técnicas
 - `specs/<feature-name>/tasks.md` — tarefas executáveis numeradas
+
+Specs são **primeira classe** — commitadas junto com o código que implementam. Nunca adicionar `specs/` ao `.gitignore`. Revisão de PR DEVE verificar alinhamento código vs spec.
 
 ### Regra de ouro
 > **"Specs são o artefato primário. Código é gerado a partir delas."**
