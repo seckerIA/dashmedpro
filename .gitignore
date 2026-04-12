@@ -33,3 +33,9 @@ scripts/.env
 # Windows reserved names
 nul
 .claude/skills/code-review-skill/
+.claude/skills/tanstack-query/
+.claude/skills/supabase-postgres-best-practices/
+.claude/skills/react-best-practices/
+.claude/skills/react-hook-form-zod/
+.claude/skills/sql-query-optimization/
+.claude/skills/web-performance-optimization/
