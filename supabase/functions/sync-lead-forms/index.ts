@@ -434,22 +434,30 @@ async function syncFormLeads(
       if (!fullName && (extractedFields.first_name || extractedFields.last_name)) {
         fullName = `${extractedFields.first_name || ''} ${extractedFields.last_name || ''}`.trim();
       }
-      const phoneNumber = extractedFields.phone_number || extractedFields.telefone || extractedFields.phone || null;
+      // Normalizar telefone: apenas dígitos
+      let phoneNumber = extractedFields.phone_number || extractedFields.telefone || extractedFields.phone || null;
+      if (phoneNumber) {
+        phoneNumber = phoneNumber.replace(/\D/g, '');
+        // Remover prefixo 0 internacional (ex: 055 → 55)
+        if (phoneNumber.startsWith('0')) phoneNumber = phoneNumber.slice(1);
+      }
 
       let contactId = null;
       let dealId = null;
 
       // Se temos pelo menos algum dado útil (nome, tel ou email), cadastramos no CRM
       if (fullName || phoneNumber || email) {
-        // Tentar buscar contato existente na base do usuário
+        // Tentar buscar contato existente (dedup robusto)
         let contact = null;
 
         if (phoneNumber) {
+           // Buscar por telefone (com e sem prefixo +)
            const { data: byPhone } = await supabase
              .from('crm_contacts')
              .select('id')
              .eq('user_id', userId)
-             .eq('phone', phoneNumber)
+             .or(`phone.eq.${phoneNumber},phone.eq.+${phoneNumber}`)
+             .limit(1)
              .maybeSingle();
            contact = byPhone;
         }
@@ -459,13 +467,27 @@ async function syncFormLeads(
              .from('crm_contacts')
              .select('id')
              .eq('user_id', userId)
-             .eq('email', email)
+             .ilike('email', email)
+             .limit(1)
              .maybeSingle();
            contact = byEmail;
         }
 
+        // Busca extra por nome (se phone e email falharam)
+        if (!contact && fullName) {
+          const { data: byName } = await supabase
+            .from('crm_contacts')
+            .select('id')
+            .eq('user_id', userId)
+            .ilike('full_name', fullName)
+            .limit(1)
+            .maybeSingle();
+          contact = byName;
+        }
+
         if (contact) {
            contactId = contact.id;
+           console.log(`[sync-lead-forms] Found existing contact: ${contactId} for lead ${lead.id}`);
         } else {
            // Criar novo contato com organization_id
            const { data: newContact, error: contactError } = await supabase
@@ -480,33 +502,50 @@ async function syncFormLeads(
              })
              .select('id')
              .single();
-           
+
            if (!contactError && newContact) {
               contactId = newContact.id;
+              console.log(`[sync-lead-forms] Created new contact: ${contactId}`);
            } else {
               console.error(`[sync-lead-forms] Error creating contact for lead ${lead.id}:`, contactError);
            }
         }
 
-        // Criar Negócio/Deal
+        // Criar Deal APENAS se não existe um deal ativo para este contato
         if (contactId) {
-          const { data: newDeal, error: dealError } = await supabase
-             .from('crm_deals')
-             .insert({
-                user_id: userId,
-                organization_id: organizationId,
-                contact_id: contactId,
-                title: `Lead: FB Form - ${formName}`,
-                stage: 'lead_novo', // Estágio inicial
-                value: 0
-             })
-             .select('id')
-             .single();
-             
-          if (!dealError && newDeal) {
-             dealId = newDeal.id;
+          // Verificar se já existe deal para este contato
+          const { data: existingDeal } = await supabase
+            .from('crm_deals')
+            .select('id')
+            .eq('contact_id', contactId)
+            .eq('user_id', userId)
+            .in('stage', ['lead_novo', 'agendado', 'em_tratamento'])
+            .limit(1)
+            .maybeSingle();
+
+          if (existingDeal) {
+            dealId = existingDeal.id;
+            console.log(`[sync-lead-forms] Reusing existing deal: ${dealId} for contact ${contactId}`);
           } else {
-             console.error(`[sync-lead-forms] Error creating deal for lead ${lead.id}:`, dealError);
+            const { data: newDeal, error: dealError } = await supabase
+              .from('crm_deals')
+              .insert({
+                  user_id: userId,
+                  organization_id: organizationId,
+                  contact_id: contactId,
+                  title: `Lead: FB Form - ${formName}`,
+                  stage: 'lead_novo',
+                  value: 0
+              })
+              .select('id')
+              .single();
+
+            if (!dealError && newDeal) {
+              dealId = newDeal.id;
+              console.log(`[sync-lead-forms] Created new deal: ${dealId}`);
+            } else {
+              console.error(`[sync-lead-forms] Error creating deal for lead ${lead.id}:`, dealError);
+            }
           }
         }
       }

@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAdCampaignsSync } from './useAdCampaignsSync';
 import { useAdPlatformConnections } from './useAdPlatformConnections';
-import { useAdCampaignDailyMetrics, useHasDailyMetrics, aggregateDailyMetrics } from './useAdCampaignDailyMetrics';
-import { useCommercialLeads } from './useCommercialLeads';
+import { useAdCampaignDailyMetrics, aggregateDailyMetrics } from './useAdCampaignDailyMetrics';
+import { useMarketingLeads } from './useMarketingLeads';
 import { subDays, startOfMonth, endOfMonth, format } from 'date-fns';
 
 export interface ActiveAccountInfo {
@@ -73,14 +73,12 @@ export function useMarketingDashboard() {
     end_date: monthEndDate,
   });
 
-  // Verifica se o sistema de daily metrics está ativo
-  const { data: hasDailySystem } = useHasDailyMetrics();
 
-  // Buscar leads do mês
-  const { leads: allLeads } = useCommercialLeads({});
+  // Buscar leads de formulários (lead_form_submissions + commercial_leads marketing)
+  const { data: allLeads } = useMarketingLeads();
 
   return useQuery({
-    queryKey: ['marketing-dashboard', campaigns, connections, allLeads, dailyMetrics, hasDailySystem],
+    queryKey: ['marketing-dashboard', campaigns, connections, allLeads, dailyMetrics],
     queryFn: async (): Promise<MarketingDashboardData> => {
       const connectionsData = connections || [];
 
@@ -98,20 +96,18 @@ export function useMarketingDashboard() {
         ? allCampaigns.filter(c => activeConnIds.has(c.connection_id))
         : [];
 
-      // Filtrar leads do mês atual que vieram de anúncios
+      // Filtrar leads do mês atual (já vêm de formulários + origens marketing)
       const currentMonthLeads = (allLeads || []).filter(lead => {
         const leadDate = new Date(lead.created_at);
         const startDate = new Date(startOfCurrentMonth);
         const endDate = new Date(endOfCurrentMonth);
-        const isInMonth = leadDate >= startDate && leadDate <= endDate;
-        const isFromAds = lead.origin === 'google' || lead.origin === 'facebook' || lead.origin === 'instagram';
-        return isInMonth && isFromAds;
+        return leadDate >= startDate && leadDate <= endDate;
       });
 
-      // Usar métricas diárias do MÊS ATUAL quando disponíveis
+      // Usar métricas diárias APENAS se existem dados reais para o mês atual
+      // Se daily metrics estão vazias para este mês, usar dados cumulativos (90d)
       const monthlyDailyRows = dailyMetrics || [];
-      const hasDaily = monthlyDailyRows.length > 0;
-      const useDailyData = hasDaily || hasDailySystem === true;
+      const useDailyData = monthlyDailyRows.length > 0;
 
       let totalSpend: number, totalRevenue: number, averageROAS: number;
       let googleAdsSpend: number, metaAdsSpend: number;

@@ -362,9 +362,15 @@ async function autoCreateLeadContact(
     formName: string | null;
   }
 ) {
-  const { fullName, email, phoneNumber, campaignName, formName } = data;
+  let { fullName, email, phoneNumber, campaignName, formName } = data;
 
-  // Buscar contato existente por email ou telefone
+  // Normalizar telefone: apenas dígitos
+  if (phoneNumber) {
+    phoneNumber = phoneNumber.replace(/\D/g, '');
+    if (phoneNumber.startsWith('0')) phoneNumber = phoneNumber.slice(1);
+  }
+
+  // Buscar contato existente (dedup robusto: email → phone → nome)
   let contactId: string | null = null;
 
   if (email) {
@@ -372,7 +378,7 @@ async function autoCreateLeadContact(
       .from('crm_contacts')
       .select('id')
       .eq('user_id', userId)
-      .eq('email', email)
+      .ilike('email', email)
       .limit(1)
       .maybeSingle();
     if (existing) contactId = existing.id;
@@ -384,6 +390,17 @@ async function autoCreateLeadContact(
       .select('id')
       .eq('user_id', userId)
       .or(`phone.eq.${phoneNumber},phone.eq.+${phoneNumber}`)
+      .limit(1)
+      .maybeSingle();
+    if (existing) contactId = existing.id;
+  }
+
+  if (!contactId && fullName) {
+    const { data: existing } = await supabase
+      .from('crm_contacts')
+      .select('id')
+      .eq('user_id', userId)
+      .ilike('full_name', fullName)
       .limit(1)
       .maybeSingle();
     if (existing) contactId = existing.id;
@@ -401,7 +418,7 @@ async function autoCreateLeadContact(
         email: email,
         phone: phoneNumber,
         tags: ['facebook_lead', 'lead_form'],
-        lead_score: 30, // Score maior que WhatsApp auto (10) pois preencheu formulário
+        lead_score: 30,
       })
       .select('id')
       .single();
@@ -416,33 +433,48 @@ async function autoCreateLeadContact(
     console.log(`[Leadgen Webhook] Found existing contact: ${contactId}`);
   }
 
-  // Criar deal no pipeline
+  // Criar deal APENAS se não existe um deal ativo para este contato
   let dealId: string | null = null;
   if (contactId) {
-    const dealTitle = formName
-      ? `Lead Form: ${formName}`
-      : campaignName
-      ? `Lead Ads: ${campaignName}`
-      : `Lead Facebook: ${fullName || 'Novo'}`;
-
-    const { data: newDeal, error: dealError } = await supabase
+    // Verificar deal existente
+    const { data: existingDeal } = await supabase
       .from('crm_deals')
-      .insert({
-        user_id: userId,
-        contact_id: contactId,
-        title: dealTitle,
-        stage: 'lead_novo',
-        value: 0,
-        description: `Lead capturado via formulário Facebook${formName ? ` (${formName})` : ''}${campaignName ? ` - Campanha: ${campaignName}` : ''}`,
-      })
       .select('id')
-      .single();
+      .eq('contact_id', contactId)
+      .eq('user_id', userId)
+      .in('stage', ['lead_novo', 'agendado', 'em_tratamento'])
+      .limit(1)
+      .maybeSingle();
 
-    if (dealError) {
-      console.error('[Leadgen Webhook] Error creating deal:', dealError);
+    if (existingDeal) {
+      dealId = existingDeal.id;
+      console.log(`[Leadgen Webhook] Reusing existing deal: ${dealId}`);
     } else {
-      dealId = newDeal.id;
-      console.log(`[Leadgen Webhook] Created deal: ${dealId}`);
+      const dealTitle = formName
+        ? `Lead Form: ${formName}`
+        : campaignName
+        ? `Lead Ads: ${campaignName}`
+        : `Lead Facebook: ${fullName || 'Novo'}`;
+
+      const { data: newDeal, error: dealError } = await supabase
+        .from('crm_deals')
+        .insert({
+          user_id: userId,
+          contact_id: contactId,
+          title: dealTitle,
+          stage: 'lead_novo',
+          value: 0,
+          description: `Lead capturado via formulário Facebook${formName ? ` (${formName})` : ''}${campaignName ? ` - Campanha: ${campaignName}` : ''}`,
+        })
+        .select('id')
+        .single();
+
+      if (dealError) {
+        console.error('[Leadgen Webhook] Error creating deal:', dealError);
+      } else {
+        dealId = newDeal.id;
+        console.log(`[Leadgen Webhook] Created deal: ${dealId}`);
+      }
     }
   }
 
