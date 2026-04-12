@@ -32,3 +32,4 @@ scripts/.env
 
 # Windows reserved names
 nul
+.claude/skills/code-review-skill/
