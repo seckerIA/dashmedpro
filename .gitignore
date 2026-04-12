@@ -23,14 +23,12 @@ dist-ssr
 *.sln
 *.sw?
 
-# Environment variables
+# Environment variables — NEVER commit secrets
 .env
+.env.*
+!.env.example
+scripts/.env
+!scripts/.env.example
 
 # Windows reserved names
 nul
-
-# Security - never commit secrets
-scripts/.env
-*.env.local
-.env.backup
-.env.production

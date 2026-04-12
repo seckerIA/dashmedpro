@@ -116,6 +116,31 @@ interface StatusUpdate {
 }
 
 // =========================================
+// Verificação de assinatura HMAC-SHA256 (Meta)
+// =========================================
+const META_APP_SECRET = Deno.env.get('FB_APP_SECRET') || Deno.env.get('META_APP_SECRET') || '';
+
+async function verifyMetaSignature(body: string, signatureHeader: string | null): Promise<boolean> {
+  if (!META_APP_SECRET) {
+    console.warn('[Webhook] META_APP_SECRET not set — skipping signature verification');
+    return true; // Permitir enquanto secret não estiver configurado
+  }
+  if (!signatureHeader || !signatureHeader.startsWith('sha256=')) {
+    return false;
+  }
+  const expectedSig = signatureHeader.slice(7); // Remove "sha256="
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw', encoder.encode(META_APP_SECRET),
+    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
+  const computedHex = Array.from(new Uint8Array(sig))
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+  return computedHex === expectedSig;
+}
+
+// =========================================
 // Handler principal
 // =========================================
 
@@ -172,7 +197,15 @@ const handler = async (req: Request): Promise<Response> => {
   // =========================================
   if (req.method === 'POST') {
     try {
-      const payload = await req.json();
+      // Verificar assinatura HMAC-SHA256 do Meta
+      const rawBody = await req.text();
+      const signature = req.headers.get('X-Hub-Signature-256');
+      if (signature && !(await verifyMetaSignature(rawBody, signature))) {
+        console.error('[Webhook] Invalid signature — rejecting payload');
+        return new Response('Invalid signature', { status: 403 });
+      }
+
+      const payload = JSON.parse(rawBody);
       console.log('[Webhook] Received payload:', JSON.stringify(payload));
 
       let events: any[] = [];

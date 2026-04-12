@@ -23,6 +23,25 @@ const corsHeaders = {
 const GRAPH_API_VERSION = 'v22.0';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const LEADGEN_VERIFY_TOKEN = Deno.env.get('LEADGEN_VERIFY_TOKEN') || '';
+const META_APP_SECRET = Deno.env.get('FB_APP_SECRET') || Deno.env.get('META_APP_SECRET') || '';
+
+async function verifyMetaSignature(body: string, signatureHeader: string | null): Promise<boolean> {
+  if (!META_APP_SECRET) {
+    console.warn('[Leadgen Webhook] META_APP_SECRET not set — skipping signature verification');
+    return true;
+  }
+  if (!signatureHeader || !signatureHeader.startsWith('sha256=')) return false;
+  const expectedSig = signatureHeader.slice(7);
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw', encoder.encode(META_APP_SECRET),
+    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
+  const computedHex = Array.from(new Uint8Array(sig))
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+  return computedHex === expectedSig;
+}
 
 serve(async (req: Request) => {
   // CORS
@@ -68,7 +87,14 @@ serve(async (req: Request) => {
   // =========================================
   if (req.method === 'POST') {
     try {
-      const payload = await req.json();
+      const rawBody = await req.text();
+      const signature = req.headers.get('X-Hub-Signature-256');
+      if (signature && !(await verifyMetaSignature(rawBody, signature))) {
+        console.error('[Leadgen Webhook] Invalid signature — rejecting');
+        return new Response('Invalid signature', { status: 403 });
+      }
+
+      const payload = JSON.parse(rawBody);
       console.log('[Leadgen Webhook] Received payload:', JSON.stringify(payload).substring(0, 500));
 
       // Meta Page webhook format:
