@@ -178,7 +178,16 @@ Regras:
     }
 
     const openaiData = await openaiRes.json();
-    const aiResponse = JSON.parse(openaiData.choices[0].message.content);
+    let aiResponse;
+    try {
+      aiResponse = JSON.parse(openaiData.choices[0].message.content);
+    } catch (parseErr) {
+      console.error('[whatsapp-ai-analyze] Failed to parse AI response:', openaiData.choices[0]?.message?.content);
+      return new Response(
+        JSON.stringify({ success: false, error: 'AI returned invalid JSON' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Salvar análise no banco (upsert)
     const analysisRecord = {
@@ -196,18 +205,16 @@ Regras:
       ai_model_used: 'gpt-4o-mini',
     };
 
-    const { data: upsertedAnalysis, error: upsertError } = await supabase
+    const { error: upsertError } = await supabase
       .from('whatsapp_conversation_analysis')
-      .upsert(analysisRecord, { onConflict: 'conversation_id' })
-      .select()
-      .single();
+      .upsert(analysisRecord, { onConflict: 'conversation_id' });
 
     if (upsertError) {
       console.error('[whatsapp-ai-analyze] Upsert error:', upsertError);
     }
 
     // Salvar sugestões (limpar antigas e inserir novas)
-    const suggestions = (aiResponse.suggestions || []).map((s: any, i: number) => ({
+    const suggestions = (aiResponse.suggestions || []).map((s: any) => ({
       conversation_id,
       user_id: conversation.user_id,
       type: s.type || 'response',
@@ -231,7 +238,7 @@ Regras:
         .insert(suggestions);
     }
 
-    const finalAnalysis = upsertedAnalysis || analysisRecord;
+    const finalAnalysis = analysisRecord;
 
     return new Response(
       JSON.stringify({

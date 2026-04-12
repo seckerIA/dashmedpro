@@ -473,13 +473,13 @@ async function syncFormLeads(
            contact = byEmail;
         }
 
-        // Busca extra por nome (se phone e email falharam)
-        if (!contact && fullName) {
+        // Busca extra por nome completo (só se tem 2+ palavras para evitar falso positivo)
+        if (!contact && fullName && fullName.trim().split(/\s+/).length >= 2) {
           const { data: byName } = await supabase
             .from('crm_contacts')
             .select('id')
             .eq('user_id', userId)
-            .ilike('full_name', fullName)
+            .ilike('full_name', fullName.trim())
             .limit(1)
             .maybeSingle();
           contact = byName;

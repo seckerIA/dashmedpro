@@ -395,12 +395,13 @@ async function autoCreateLeadContact(
     if (existing) contactId = existing.id;
   }
 
-  if (!contactId && fullName) {
+  // Busca por nome completo (só se tem 2+ palavras para evitar falso positivo)
+  if (!contactId && fullName && fullName.trim().split(/\s+/).length >= 2) {
     const { data: existing } = await supabase
       .from('crm_contacts')
       .select('id')
       .eq('user_id', userId)
-      .ilike('full_name', fullName)
+      .ilike('full_name', fullName.trim())
       .limit(1)
       .maybeSingle();
     if (existing) contactId = existing.id;

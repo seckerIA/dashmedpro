@@ -73,7 +73,6 @@ export function useMarketingDashboard() {
     end_date: monthEndDate,
   });
 
-
   // Buscar leads de formulários (lead_form_submissions + commercial_leads marketing)
   const { data: allLeads } = useMarketingLeads();
 
