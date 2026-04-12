@@ -16,7 +16,7 @@ export function useAdCampaignsSync(filters?: {
   status?: string;
 }) {
   return useQuery({
-    queryKey: ['ad-campaigns-sync', filters],
+    queryKey: ['ad-campaigns-sync', filters?.connection_id, filters?.platform, filters?.status],
     queryFn: async ({ signal }) => {
       let query = (supabase
         .from('ad_campaigns_sync' as any) as any)
@@ -184,7 +184,7 @@ export function useAdCampaignMetrics(filters?: {
   end_date?: string;
 }) {
   return useQuery({
-    queryKey: ['ad-campaign-metrics', filters],
+    queryKey: ['ad-campaign-metrics', filters?.connection_id, filters?.platform, filters?.start_date, filters?.end_date],
     queryFn: async ({ signal }) => {
       let query = (supabase
         .from('ad_campaigns_sync' as any) as any)

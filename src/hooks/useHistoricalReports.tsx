@@ -49,7 +49,7 @@ export function useHistoricalReports(filters: HistoricalReportsFilters = {}) {
   const { isAdmin } = useUserProfile();
 
   const { data: reports, isLoading, error } = useQuery({
-    queryKey: ['historical-reports', user?.id, filters],
+    queryKey: ['historical-reports', user?.id, filters?.startDate, filters?.endDate, filters?.userId],
     queryFn: async () => {
       if (!user?.id) return [];
 

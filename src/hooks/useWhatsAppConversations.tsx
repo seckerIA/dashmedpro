@@ -65,7 +65,7 @@ export function useWhatsAppConversations(options: UseWhatsAppConversationsOption
   // Query: Lista de conversas
   // =========================================
   const conversationsQuery = useQuery({
-    queryKey: [WHATSAPP_CONVERSATIONS_KEY, filters, limit, userIds, isAdmin],
+    queryKey: [WHATSAPP_CONVERSATIONS_KEY, filters?.status, filters?.search, filters?.ownerId, limit, userIds?.join(','), isAdmin],
     queryFn: async (): Promise<WhatsAppConversationWithRelations[]> => {
       if (!user?.id) return [];
 

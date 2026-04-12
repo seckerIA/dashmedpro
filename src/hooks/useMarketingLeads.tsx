@@ -47,7 +47,7 @@ export function useMarketingLeads(filters?: {
   const { data: campaigns } = useAdCampaignsSync();
 
   return useQuery({
-    queryKey: ['marketing-leads', campaigns, filters],
+    queryKey: ['marketing-leads', campaigns?.length ?? 0, filters?.campaign_id, filters?.platform, filters?.status],
     queryFn: async (): Promise<MarketingLead[]> => {
 
       // 1. Buscar formulários SINCRONIZADOS (meta_lead_forms) para filtrar
@@ -176,7 +176,7 @@ export function useMarketingLeadMetrics(filters?: {
   const { data: leads } = useMarketingLeads(filters);
 
   return useQuery({
-    queryKey: ['marketing-lead-metrics', leads, filters],
+    queryKey: ['marketing-lead-metrics', leads?.length ?? 0, filters?.campaign_id, filters?.platform, filters?.start_date, filters?.end_date],
     queryFn: async (): Promise<LeadConversionMetrics> => {
       const leadsData = leads || [];
 

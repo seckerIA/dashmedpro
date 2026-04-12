@@ -40,7 +40,7 @@ export function useCommercialSales(filters?: { status?: string; procedure_id?: s
   }, [isAdmin, user?.id]);
 
   const { data: sales, isLoading, error } = useQuery({
-    queryKey: ["commercial-sales", user?.id, filters, isAdmin, isSecretaria, doctorIds, allActiveUserIds],
+    queryKey: ["commercial-sales", user?.id, filters?.status, filters?.search, isAdmin, isSecretaria, doctorIds?.join(','), allActiveUserIds?.length ?? 0],
     queryFn: async () => {
       if (!user) throw new Error("User not authenticated");
 

@@ -19,7 +19,7 @@ export const useFinancialTransactions = (filters?: TransactionFilters) => {
 
   // Buscar transações
   const queryResult = useQuery({
-    queryKey: ["financial-transactions", user?.id, profile?.role, filters],
+    queryKey: ["financial-transactions", user?.id, profile?.role, filters?.startDate, filters?.endDate, filters?.type, filters?.category_id, filters?.account_id, filters?.status, filters?.search],
     queryFn: async () => {
       if (!user) throw new Error("Usuário não autenticado");
 

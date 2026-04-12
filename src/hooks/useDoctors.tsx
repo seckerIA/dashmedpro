@@ -38,10 +38,10 @@ export function useDoctors() {
   } = useQuery({
     queryKey: ['doctors'],
     queryFn: ({ signal }) => fetchDoctors(signal),
-    staleTime: 0, // Sempre buscar dados frescos para evitar cache de permissões antigas
+    staleTime: 30_000, // 30s — dados de médicos mudam pouco
     gcTime: 10 * 60 * 1000,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: false,
     refetchOnReconnect: true,
     retry: 2,
     retryDelay: 1000,

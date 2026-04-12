@@ -17,7 +17,7 @@ export function useGeneratedUtms(filters?: {
   ad_campaign_sync_id?: string;
 }) {
   return useQuery({
-    queryKey: ['generated-utms', filters],
+    queryKey: ['generated-utms', filters?.template_id, filters?.ad_campaign_sync_id],
     queryFn: async () => {
       let query = (supabase
         .from('generated_utms' as any) as any)

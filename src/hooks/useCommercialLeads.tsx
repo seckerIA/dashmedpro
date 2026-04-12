@@ -64,7 +64,7 @@ export function useCommercialLeads(filters?: { status?: string; origin?: string 
 
   // Fetch leads
   const { data: leads, isLoading, error } = useQuery({
-    queryKey: ["commercial-leads", user?.id, filters, targetUserIds],
+    queryKey: ["commercial-leads", user?.id, filters?.status, filters?.origin, filters?.search, targetUserIds?.join(',')],
     queryFn: async ({ signal }) => {
       if (!user) throw new Error("User not authenticated");
 

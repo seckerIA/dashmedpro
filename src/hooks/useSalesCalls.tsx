@@ -83,7 +83,7 @@ export function useSalesCalls(filters?: {
 
   // Query para listar calls
   const { data: calls, isLoading, error, refetch } = useQuery({
-    queryKey: ['sales-calls', user?.id, filters],
+    queryKey: ['sales-calls', user?.id, filters?.startDate?.toISOString(), filters?.endDate?.toISOString(), filters?.status],
     queryFn: ({ signal }) => fetchSalesCalls(user!.id, filters, signal),
     enabled: !!user?.id,
     staleTime: 2 * 60 * 1000,

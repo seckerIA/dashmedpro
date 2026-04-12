@@ -137,7 +137,15 @@ export function useMarketingReports(filters: ReportFilters) {
   });
 
   return useQuery({
-    queryKey: ['marketing-reports', filters, allCampaigns, dailyMetrics, hasDailySystem, leads, leadMetrics],
+    queryKey: [
+      'marketing-reports',
+      filters.period, filters.platform, filters.campaign_id,
+      allCampaigns?.length ?? 0,
+      dailyMetrics?.length ?? 0,
+      hasDailySystem ?? false,
+      leads?.length ?? 0,
+      leadMetrics?.totalLeads ?? 0,
+    ],
     queryFn: async (): Promise<ReportData> => {
       const campaignsData = filters.campaign_id
         ? (allCampaigns || []).filter(c => c.id === filters.campaign_id)

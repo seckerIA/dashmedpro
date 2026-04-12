@@ -24,8 +24,8 @@ export const useFinancialCategories = () => {
 
       return data || []
     },
-    staleTime: 0, // Sempre buscar dados frescos
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    staleTime: 60_000, // 60s — categorias mudam raramente
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: false,
   })
 }
