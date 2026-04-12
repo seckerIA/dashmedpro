@@ -42,10 +42,20 @@ export function MarketingReports() {
   const handleExportCSV = () => {
     if (!reportData) return;
 
-    // Criar CSV com dados do relatório
+    // Criar CSV com resumo + dados por campanha
+    const { metrics } = reportData;
+    const summaryRows = [
+      `# Período: ${reportData.period.label}`,
+      `# Gasto Total,${metrics.total_spend.toFixed(2)}`,
+      `# Receita Total,${metrics.total_revenue.toFixed(2)}`,
+      `# ROI,${metrics.roi.toFixed(1)}%`,
+      `# ROAS,${metrics.average_roas.toFixed(2)}x`,
+      `# Leads,${reportData.leadMetrics.totalLeads}`,
+      '',
+    ];
     const headers = ['Campanha', 'Plataforma', 'Gasto', 'Receita', 'Conversões', 'ROAS'];
     const rows = reportData.byCampaign.map(c => [
-      c.campaign_name,
+      `"${c.campaign_name}"`,
       c.platform,
       c.spend.toFixed(2),
       c.revenue.toFixed(2),
@@ -54,6 +64,7 @@ export function MarketingReports() {
     ]);
 
     const csvContent = [
+      ...summaryRows,
       headers.join(','),
       ...rows.map(row => row.join(','))
     ].join('\n');

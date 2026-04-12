@@ -331,7 +331,11 @@ export function useMarketingReports(filters: ReportFilters) {
         }
       }
 
-      const totalRevenue = metricsData.total_conversion_value + leadMetricsData.totalRevenue;
+      // Receita: usar CRM (leads com consultas) se disponível, senão conversion_value da plataforma
+      // Não somar os dois — causaria double-counting
+      const totalRevenue = leadMetricsData.totalRevenue > 0
+        ? leadMetricsData.totalRevenue
+        : metricsData.total_conversion_value;
       const totalSpend = metricsData.total_spend;
       const roi = totalSpend > 0 ? ((totalRevenue - totalSpend) / totalSpend) * 100 : 0;
 

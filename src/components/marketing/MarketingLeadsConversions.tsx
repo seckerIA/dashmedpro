@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { ExternalLink, Search, Calendar, Users, TrendingUp, Target, BarChart3 } from "lucide-react";
 import { useMarketingLeads } from "@/hooks/useMarketingLeads";
 import { useAdCampaignsSync } from "@/hooks/useAdCampaignsSync";
+import { useAdCampaignDailyMetrics, aggregateDailyMetrics } from "@/hooks/useAdCampaignDailyMetrics";
 import { ConversionFunnelChart } from "./ConversionFunnelChart";
 import { formatCurrency } from "@/lib/currency";
 import { Loader2 } from "lucide-react";
@@ -16,8 +17,9 @@ import { COMMERCIAL_LEAD_STATUS_LABELS, COMMERCIAL_LEAD_ORIGIN_LABELS } from "@/
 import { AD_PLATFORM_LABELS } from "@/types/adPlatforms";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { type PeriodFilter, PERIOD_FILTER_OPTIONS, isWithinPeriod } from "@/lib/periodFilter";
+import { type PeriodFilter, PERIOD_FILTER_OPTIONS, isWithinPeriod, getPeriodStartDate } from "@/lib/periodFilter";
 import { cn } from "@/lib/utils";
+import { format as formatDate, subDays } from "date-fns";
 
 export function MarketingLeadsConversions() {
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('30d');
@@ -30,6 +32,15 @@ export function MarketingLeadsConversions() {
 
   const { data: allLeads, isLoading: leadsLoading } = useMarketingLeads();
   const { data: campaigns } = useAdCampaignsSync();
+
+  // Daily metrics para calcular spend/impressões/cliques do período filtrado
+  const periodStartDate = getPeriodStartDate(periodFilter);
+  const dailyMetricsStart = periodStartDate ? formatDate(periodStartDate, 'yyyy-MM-dd') : formatDate(subDays(new Date(), 90), 'yyyy-MM-dd');
+  const dailyMetricsEnd = formatDate(new Date(), 'yyyy-MM-dd');
+  const { data: dailyMetrics } = useAdCampaignDailyMetrics({
+    start_date: dailyMetricsStart,
+    end_date: dailyMetricsEnd,
+  });
 
   // Aplicar TODOS os filtros client-side
   const filteredLeads = useMemo(() => {
@@ -146,18 +157,20 @@ export function MarketingLeadsConversions() {
     return [...map.values()].sort((a, b) => b.count - a.count);
   }, [filteredLeads]);
 
-  // Funil de conversão (dados reais do CRM)
+  // Métricas do período (spend, impressions, clicks) — filtradas pelo mesmo período que leads
+  const periodMetrics = useMemo(() => {
+    const rows = dailyMetrics || [];
+    // Filtrar por plataforma se necessário
+    const filtered = platformFilter !== 'all'
+      ? rows.filter(r => (r as any).campaign?.platform === platformFilter)
+      : rows;
+    return aggregateDailyMetrics(filtered);
+  }, [dailyMetrics, platformFilter]);
+
+  // Funil de conversão (dados reais do período)
   const funnelData = useMemo(() => {
-    if (!campaigns) return [];
-
-    // Filtrar campanhas pela plataforma selecionada
-    let filteredCampaigns = campaigns;
-    if (platformFilter !== 'all') {
-      filteredCampaigns = campaigns.filter(c => c.platform === platformFilter);
-    }
-
-    const totalImpressions = filteredCampaigns.reduce((sum, c) => sum + (Number(c.impressions) || 0), 0);
-    const totalClicks = filteredCampaigns.reduce((sum, c) => sum + (Number(c.clicks) || 0), 0);
+    const totalImpressions = periodMetrics.total_impressions;
+    const totalClicks = periodMetrics.total_clicks;
     const totalLeads = filteredLeads.length;
     const totalAgendados = filteredLeads.filter(l => l.has_appointment).length;
     const totalCompleted = filteredLeads.filter(l => l.appointment_status === 'completed').length;
@@ -169,7 +182,7 @@ export function MarketingLeadsConversions() {
       { stage: 'Consultas Agendadas', value: totalAgendados, percentage: totalLeads > 0 ? (totalAgendados / totalLeads) * 100 : 0 },
       { stage: 'Consultas Realizadas', value: totalCompleted, percentage: totalAgendados > 0 ? (totalCompleted / totalAgendados) * 100 : 0 },
     ];
-  }, [campaigns, filteredLeads, platformFilter]);
+  }, [periodMetrics, filteredLeads]);
 
   if (leadsLoading) {
     return (
@@ -324,13 +337,14 @@ export function MarketingLeadsConversions() {
           </CardHeader>
           <CardContent>
             {(() => {
-              const totalSpend = (campaigns || []).reduce((sum, c) => sum + (Number(c.spend) || 0), 0);
+              // Usar spend do período (daily metrics), não total cumulativo
+              const totalSpend = periodMetrics.total_spend;
               const cpl = metrics.totalLeads > 0 ? totalSpend / metrics.totalLeads : 0;
               return (
                 <>
                   <div className="text-2xl font-bold">{cpl > 0 ? formatCurrency(cpl) : '-'}</div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Gasto total: {formatCurrency(totalSpend)}
+                    Gasto no período: {formatCurrency(totalSpend)}
                   </p>
                 </>
               );

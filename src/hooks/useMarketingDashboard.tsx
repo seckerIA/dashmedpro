@@ -143,10 +143,8 @@ export function useMarketingDashboard() {
 
         totalSpend = campaignsData.reduce((sum, c) => sum + (Number(c.spend) || 0), 0);
         totalRevenue = campaignsData.reduce((sum, c) => sum + (Number(c.conversion_value) || 0), 0);
-        const roasValues = campaignsData.filter(c => c.roas && c.roas > 0).map(c => Number(c.roas));
-        averageROAS = roasValues.length > 0
-          ? roasValues.reduce((a, b) => a + b, 0) / roasValues.length
-          : 0;
+        // ROAS = total revenue / total spend (não média de ROAS individuais)
+        averageROAS = totalSpend > 0 ? totalRevenue / totalSpend : 0;
       }
 
       // Top campanhas por ROAS
