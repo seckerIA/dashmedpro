@@ -9,7 +9,6 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { useUserProfile } from "./hooks/useUserProfile";
 import { SupabaseProjectValidator } from "./components/SupabaseProjectValidator";
-// import { CortanaProvider, CortanaOverlay } from "./components/cortana"; // Cortana desativada
 import { initHeartbeatRecovery, isPostRecoveryMode } from "@/lib/heartbeatRecovery";
 
 // Componente para inicializar o Heartbeat de recuperação
@@ -521,7 +520,6 @@ const AppRoutes = () => {
   }
 
   return (
-    // CortanaProvider removido - Cortana desativada
     <>
       <PasswordChangePrompt />
       <AppLayout>
@@ -743,9 +741,6 @@ const AppRoutes = () => {
         </Routes>
         </React.Suspense>
       </AppLayout>
-
-      {/* Cortana desativada */}
-      {/* <CortanaOverlay /> */}
 
       {/* VOIP Components */}
       <CallOverlay />
