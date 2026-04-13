@@ -43,11 +43,19 @@ export function useActiveCall() {
     }, [isConfigReady, config]);
 
     // Subscribe to realtime updates for call sessions
+    const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
     useEffect(() => {
         if (!user?.id) return;
 
+        // Remove previous channel before creating a new one
+        if (channelRef.current) {
+            supabase.removeChannel(channelRef.current);
+            channelRef.current = null;
+        }
+
         const channel = supabase
-            .channel('voip_call_updates')
+            .channel(`voip_call_updates:${user.id}`)
             .on(
                 'postgres_changes',
                 {
@@ -106,8 +114,11 @@ export function useActiveCall() {
             )
             .subscribe();
 
+        channelRef.current = channel;
+
         return () => {
             supabase.removeChannel(channel);
+            channelRef.current = null;
         };
     }, [user?.id]);
 
