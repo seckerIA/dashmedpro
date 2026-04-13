@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from "@ta
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AppLayout } from "./components/layout/AppLayout";
+import { ActiveCallProvider } from "./hooks/useActiveCall";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { useUserProfile } from "./hooks/useUserProfile";
 import { SupabaseProjectValidator } from "./components/SupabaseProjectValidator";
@@ -761,7 +762,9 @@ const App = () => (
             <Sonner />
             <BrowserRouter>
               <RouteChangeHandler queryClient={queryClient} />
-              <AppRoutes />
+              <ActiveCallProvider>
+                <AppRoutes />
+              </ActiveCallProvider>
             </BrowserRouter>
           </TooltipProvider>
         </AuthProvider>

@@ -1,11 +1,11 @@
 /**
  * Hook for managing active VOIP calls
- * Supports: WhatsApp Cloud API Voice + Twilio WebRTC (hybrid)
+ * Uses a shared Context so only one Realtime subscription is created
  * @module hooks/useActiveCall
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect, useCallback, useRef, createContext, useContext, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useVOIPConfig } from './useVOIPConfig';
@@ -17,7 +17,20 @@ import type {
     WhatsAppCallInitResponse
 } from '@/types/voip';
 
-export function useActiveCall() {
+interface ActiveCallContextValue {
+    deviceState: 'offline' | 'connecting' | 'ready' | 'error';
+    activeCall: ActiveCallState | null;
+    makeCall: (phoneNumber: string, contactId?: string, conversationId?: string, contactName?: string) => Promise<void>;
+    endCall: () => Promise<void>;
+    answerCall: () => Promise<void>;
+    rejectCall: () => Promise<void>;
+    toggleMute: () => void;
+    toggleHold: () => Promise<void>;
+}
+
+const ActiveCallContext = createContext<ActiveCallContextValue | null>(null);
+
+export function ActiveCallProvider({ children }: { children: ReactNode }) {
     const { user } = useAuth();
     const { config, isReady: isConfigReady } = useVOIPConfig();
     const queryClient = useQueryClient();
@@ -42,13 +55,12 @@ export function useActiveCall() {
         }
     }, [isConfigReady, config]);
 
-    // Subscribe to realtime updates for call sessions
+    // Subscribe to realtime updates for call sessions (single subscription)
     const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
     useEffect(() => {
         if (!user?.id) return;
 
-        // Remove previous channel before creating a new one
         if (channelRef.current) {
             supabase.removeChannel(channelRef.current);
             channelRef.current = null;
@@ -69,7 +81,6 @@ export function useActiveCall() {
 
                     if (payload.eventType === 'INSERT') {
                         const newCall = payload.new as any;
-                        // If inbound call, show it
                         if (newCall.direction === 'inbound' && newCall.status === 'ringing') {
                             setActiveCall({
                                 sessionId: newCall.id,
@@ -97,7 +108,6 @@ export function useActiveCall() {
                         setActiveCall((prev) => {
                             if (!prev || prev.sessionId !== updatedCall.id) return prev;
 
-                            // If call ended, clear state
                             if (['completed', 'failed', 'cancelled', 'no_answer', 'busy'].includes(updatedCall.status)) {
                                 return null;
                             }
@@ -163,7 +173,6 @@ export function useActiveCall() {
         try {
             console.log('[useActiveCall] Initiating call to:', phoneNumber);
 
-            // Set optimistic state
             const tempSessionId = 'temp-' + Date.now();
             setActiveCall({
                 sessionId: tempSessionId,
@@ -184,7 +193,6 @@ export function useActiveCall() {
                 duration: 0,
             });
 
-            // Call the edge function
             const { data, error } = await supabase.functions.invoke<WhatsAppCallInitResponse>('whatsapp-voice-call', {
                 body: {
                     to_number: phoneNumber,
@@ -198,7 +206,6 @@ export function useActiveCall() {
                 throw new Error(data?.error || error?.message || 'Falha ao iniciar chamada');
             }
 
-            // Update with real session ID
             setActiveCall((prev) => prev ? ({
                 ...prev,
                 sessionId: data.session_id || prev.sessionId,
@@ -223,7 +230,6 @@ export function useActiveCall() {
         if (!activeCall) return;
 
         try {
-            // Update database
             await supabase
                 .from('voip_call_sessions' as any)
                 .update({
@@ -233,7 +239,6 @@ export function useActiveCall() {
                 })
                 .eq('id', activeCall.sessionId);
 
-            // Close any WebRTC connections
             if (peerConnectionRef.current) {
                 peerConnectionRef.current.close();
                 peerConnectionRef.current = null;
@@ -251,9 +256,6 @@ export function useActiveCall() {
         if (!activeCall || activeCall.direction !== 'inbound') return;
 
         try {
-            // For WhatsApp, answering happens via SIP/WebRTC
-            // This would connect to the SIP bridge
-
             await supabase
                 .from('voip_call_sessions' as any)
                 .update({
@@ -267,9 +269,6 @@ export function useActiveCall() {
                 status: 'in_progress',
                 answeredAt: new Date(),
             }) : null);
-
-            // TODO: Initialize WebRTC connection to SIP bridge here
-            // This would use the SIP credentials from config
 
         } catch (error: any) {
             console.error('[useActiveCall] Answer call error:', error);
@@ -299,10 +298,6 @@ export function useActiveCall() {
     const toggleMute = useCallback(() => {
         setActiveCall((prev) => {
             if (!prev) return null;
-
-            // TODO: Actually mute the audio track
-            // localAudioRef.current?.srcObject?.getAudioTracks().forEach(t => t.enabled = prev.isMuted);
-
             return { ...prev, isMuted: !prev.isMuted };
         });
     }, []);
@@ -324,7 +319,7 @@ export function useActiveCall() {
         }) : null);
     }, [activeCall]);
 
-    return {
+    const value: ActiveCallContextValue = {
         deviceState,
         activeCall,
         makeCall,
@@ -334,4 +329,28 @@ export function useActiveCall() {
         toggleMute,
         toggleHold,
     };
+
+    return (
+        <ActiveCallContext.Provider value={value}>
+            {children}
+        </ActiveCallContext.Provider>
+    );
+}
+
+export function useActiveCall(): ActiveCallContextValue {
+    const ctx = useContext(ActiveCallContext);
+    if (!ctx) {
+        // Return no-op defaults when used outside provider (e.g. during SSR or tests)
+        return {
+            deviceState: 'offline',
+            activeCall: null,
+            makeCall: async () => {},
+            endCall: async () => {},
+            answerCall: async () => {},
+            rejectCall: async () => {},
+            toggleMute: () => {},
+            toggleHold: async () => {},
+        };
+    }
+    return ctx;
 }
