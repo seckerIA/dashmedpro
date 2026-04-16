@@ -25,6 +25,7 @@ export interface MarketingLead {
   has_appointment?: boolean;
   appointment_status?: string | null;
   appointment_value?: number | null;
+  appointment_completed_at?: string | null;
 }
 
 export interface LeadConversionMetrics {
@@ -93,11 +94,11 @@ export function useMarketingLeads(filters?: {
       }
 
       // Buscar appointments vinculados aos contatos
-      let appointmentsMap = new Map<string, { status: string; value: number }>();
+      let appointmentsMap = new Map<string, { status: string; value: number; completed_at: string | null; start_time: string | null }>();
       if (contactIds.length > 0) {
         const { data: appointments } = await supabase
           .from('medical_appointments')
-          .select('contact_id, status, estimated_value')
+          .select('contact_id, status, estimated_value, completed_at, start_time')
           .in('contact_id', contactIds);
         (appointments || []).forEach((a: any) => {
           // Guardar o appointment mais relevante (completed > confirmed > scheduled)
@@ -107,6 +108,8 @@ export function useMarketingLeads(filters?: {
             appointmentsMap.set(a.contact_id, {
               status: a.status,
               value: Number(a.estimated_value) || 0,
+              completed_at: a.completed_at || null,
+              start_time: a.start_time || null,
             });
           }
         });
@@ -158,6 +161,7 @@ export function useMarketingLeads(filters?: {
           has_appointment: !!appointment,
           appointment_status: appointment?.status || null,
           appointment_value: appointment?.value || null,
+          appointment_completed_at: appointment?.completed_at || appointment?.start_time || null,
         } as MarketingLead;
       });
 

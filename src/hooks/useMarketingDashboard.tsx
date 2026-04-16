@@ -101,16 +101,24 @@ export function useMarketingDashboard() {
         ? allCampaigns.filter(c => activeConnIds.has(c.connection_id))
         : [];
 
-      // Filtrar leads do mês atual (já vêm de formulários + origens marketing)
+      const startDate = new Date(startOfCurrentMonth);
+      const endDate = new Date(endOfCurrentMonth);
+
+      // Leads captados no mês atual (volume de lead gen)
       const currentMonthLeads = (allLeads || []).filter(lead => {
         const leadDate = new Date(lead.created_at);
-        const startDate = new Date(startOfCurrentMonth);
-        const endDate = new Date(endOfCurrentMonth);
         return leadDate >= startDate && leadDate <= endDate;
       });
 
-      // Pacientes novos = leads que tem appointment completed (consulta compareceu)
-      const newPatients = currentMonthLeads.filter(l => l.appointment_status === 'completed').length;
+      // Pacientes novos: leads (de qualquer data) que tiveram consulta completed NESTE mês.
+      // O ciclo médico comum é: lead entra em março → consulta em abril.
+      // Contar por data do appointment captura isso corretamente.
+      const newPatients = (allLeads || []).filter(l => {
+        if (l.appointment_status !== 'completed') return false;
+        if (!l.appointment_completed_at) return false;
+        const apptDate = new Date(l.appointment_completed_at);
+        return apptDate >= startDate && apptDate <= endDate;
+      }).length;
 
       // Usar métricas diárias APENAS se existem dados reais para o mês atual
       // Se daily metrics estão vazias para este mês, usar dados cumulativos (90d)
