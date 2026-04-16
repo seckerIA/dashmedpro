@@ -230,11 +230,17 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
       const normalizedEmail = (payload.email || '').trim().toLowerCase();
 
       if (normalizedPhone || normalizedEmail) {
-        const { data: candidates } = await supabase
+        // Buscar dentro da mesma organização quando possível (evita duplicatas entre médico e secretária)
+        let query = supabase
           .from('crm_contacts')
           .select('id, full_name, phone, email')
-          .eq('user_id', user?.id || '')
           .limit(500);
+        if (profile?.organization_id) {
+          query = query.eq('organization_id', profile.organization_id);
+        } else {
+          query = query.eq('user_id', user?.id || '');
+        }
+        const { data: candidates } = await query;
 
         const match = (candidates || []).find((c: any) => {
           const phoneMatch = normalizedPhone && digitsOnly(c.phone).endsWith(normalizedPhone.slice(-10));

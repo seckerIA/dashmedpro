@@ -176,6 +176,14 @@ async function processLeadgenEvent(
   let accessToken = pageConn.api_key;
   const pageBmId = pageConn.parent_account_id;
 
+  // 1c. Buscar organization_id do usuário (necessário para RLS da clínica)
+  const { data: ownerProfile } = await supabase
+    .from('profiles')
+    .select('organization_id')
+    .eq('id', userId)
+    .maybeSingle();
+  const organizationId = ownerProfile?.organization_id || null;
+
   // 1b. Verificar se esta página pertence a uma BM com contas de anúncios ativas
   //     Só processamos leads de BMs que o usuário efetivamente sincronizou.
   if (pageBmId) {
@@ -319,7 +327,7 @@ async function processLeadgenEvent(
   console.log(`[Leadgen Webhook] Lead saved: ${submission.id}`);
 
   // 7. Auto-criar contato e deal no CRM
-  await autoCreateLeadContact(supabase, userId, submission.id, {
+  await autoCreateLeadContact(supabase, userId, organizationId, submission.id, {
     fullName,
     email,
     phoneNumber,
@@ -379,6 +387,7 @@ async function refreshPageToken(
 async function autoCreateLeadContact(
   supabase: any,
   userId: string,
+  organizationId: string | null,
   submissionId: string,
   data: {
     fullName: string | null;
@@ -390,11 +399,12 @@ async function autoCreateLeadContact(
 ) {
   let { fullName, email, phoneNumber, campaignName, formName } = data;
 
-  // Normalizar telefone: apenas dígitos
+  // Normalizar telefone: apenas dígitos, usando os últimos 10 para dedup independente de DDI/formatação
   if (phoneNumber) {
     phoneNumber = phoneNumber.replace(/\D/g, '');
     if (phoneNumber.startsWith('0')) phoneNumber = phoneNumber.slice(1);
   }
+  const phoneLast10 = phoneNumber ? phoneNumber.slice(-10) : null;
 
   // Buscar contato existente (dedup robusto: email → phone → nome)
   let contactId: string | null = null;
@@ -410,15 +420,19 @@ async function autoCreateLeadContact(
     if (existing) contactId = existing.id;
   }
 
-  if (!contactId && phoneNumber) {
-    const { data: existing } = await supabase
+  if (!contactId && phoneLast10) {
+    // Match tolerante a formato: pega os últimos 10 dígitos de cada phone salvo
+    const { data: candidates } = await supabase
       .from('crm_contacts')
-      .select('id')
+      .select('id, phone')
       .eq('user_id', userId)
-      .or(`phone.eq.${phoneNumber},phone.eq.+${phoneNumber}`)
-      .limit(1)
-      .maybeSingle();
-    if (existing) contactId = existing.id;
+      .not('phone', 'is', null)
+      .limit(500);
+    const match = (candidates || []).find((c: any) => {
+      const digits = (c.phone || '').replace(/\D/g, '');
+      return digits.endsWith(phoneLast10);
+    });
+    if (match) contactId = match.id;
   }
 
   // Busca por nome completo (só se tem 2+ palavras para evitar falso positivo)
@@ -441,6 +455,7 @@ async function autoCreateLeadContact(
       .from('crm_contacts')
       .insert({
         user_id: userId,
+        organization_id: organizationId,
         full_name: contactName,
         email: email,
         phone: phoneNumber,
@@ -487,6 +502,7 @@ async function autoCreateLeadContact(
         .from('crm_deals')
         .insert({
           user_id: userId,
+          organization_id: organizationId,
           contact_id: contactId,
           title: dealTitle,
           stage: 'lead_novo',
