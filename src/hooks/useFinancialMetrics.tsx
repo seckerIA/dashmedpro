@@ -79,14 +79,17 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
       const todayData = (todayTransactions || []) as Array<{ type: string; amount: number }>;
       const todayRevenue = todayData.reduce((sum, t) => sum + (t.amount || 0), 0);
 
-      // 3. Buscar gastos de marketing (anúncios) do período
-      const { data: marketingCampaigns } = await supabase
-        .from("ad_campaigns_sync")
+      // 3. Buscar gastos de marketing (anúncios) do período — usa métricas diárias por data real
+      const { data: dailyMarketing } = await (supabase as any)
+        .from("ad_campaign_daily_metrics")
         .select("spend")
-        .gte("synced_at", format(currentMonthStart, "yyyy-MM-dd"))
-        .lte("synced_at", format(currentMonthEnd, "yyyy-MM-dd"));
+        .gte("metric_date", format(currentMonthStart, "yyyy-MM-dd"))
+        .lte("metric_date", format(currentMonthEnd, "yyyy-MM-dd"));
 
-      const totalMarketingSpend = (marketingCampaigns || [])?.reduce((sum, c) => sum + (Number(c.spend) || 0), 0);
+      const totalMarketingSpend = (dailyMarketing || []).reduce(
+        (sum: number, r: any) => sum + (Number(r.spend) || 0),
+        0
+      );
 
       // Calcular custos totais (apenas de entradas)
       const monthTotalCosts = transactionsData

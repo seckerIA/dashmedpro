@@ -217,12 +217,44 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
   });
 
   const createContactMutation = useMutation({
-    mutationFn: (data: any) => {
+    mutationFn: async (data: any) => {
       const payload = {
         ...data,
         user_id: user?.id,
         organization_id: profile?.organization_id
       };
+
+      // Dedup: procurar contato existente por telefone (ignorando formatação) ou email
+      const digitsOnly = (s?: string) => (s || '').replace(/\D/g, '');
+      const normalizedPhone = digitsOnly(payload.phone);
+      const normalizedEmail = (payload.email || '').trim().toLowerCase();
+
+      if (normalizedPhone || normalizedEmail) {
+        const { data: candidates } = await supabase
+          .from('crm_contacts')
+          .select('id, full_name, phone, email')
+          .eq('user_id', user?.id || '')
+          .limit(500);
+
+        const match = (candidates || []).find((c: any) => {
+          const phoneMatch = normalizedPhone && digitsOnly(c.phone).endsWith(normalizedPhone.slice(-10));
+          const emailMatch = normalizedEmail && (c.email || '').trim().toLowerCase() === normalizedEmail;
+          return phoneMatch || emailMatch;
+        });
+
+        if (match) {
+          console.log(`[createContact] Dedup: contact already exists (${match.id}), skipping insert`);
+          // Atualizar campos ausentes no contato existente
+          const patch: any = {};
+          if (!match.email && payload.email) patch.email = payload.email;
+          if (!match.phone && payload.phone) patch.phone = payload.phone;
+          if (Object.keys(patch).length > 0) {
+            await supabase.from('crm_contacts').update(patch).eq('id', match.id);
+          }
+          return { ...match, ...patch };
+        }
+      }
+
       console.log('🚀 useCRM - Executando createContactMutation com payload:', payload);
       return createRecord('crm_contacts', payload);
     },
