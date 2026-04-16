@@ -19,6 +19,12 @@ export interface MarketingDashboardData {
   averageROAS: number;
   totalLeads: number;
 
+  // KPIs de lead gen (essenciais para clínica médica)
+  cpl: number; // Custo por Lead
+  cac: number; // Custo de Aquisição de Paciente (appointment completed)
+  leadToPatientRate: number; // Taxa de conversão Lead → Paciente (%)
+  newPatients: number; // Leads que se tornaram pacientes (appointment completed)
+
   // Comparativos
   googleAdsSpend: number;
   metaAdsSpend: number;
@@ -102,6 +108,9 @@ export function useMarketingDashboard() {
         const endDate = new Date(endOfCurrentMonth);
         return leadDate >= startDate && leadDate <= endDate;
       });
+
+      // Pacientes novos = leads que tem appointment completed (consulta compareceu)
+      const newPatients = currentMonthLeads.filter(l => l.appointment_status === 'completed').length;
 
       // Usar métricas diárias APENAS se existem dados reais para o mês atual
       // Se daily metrics estão vazias para este mês, usar dados cumulativos (90d)
@@ -204,6 +213,30 @@ export function useMarketingDashboard() {
         }
       });
 
+      // Alerta de CPL alto (campanha ativa com CPL > 2× média da conta)
+      const activeCampaignsWithLeads = campaignsData.filter(
+        c => c.status === 'active' && c.conversions > 0 && Number(c.spend) > 0
+      );
+      if (activeCampaignsWithLeads.length > 1) {
+        const avgCpl =
+          activeCampaignsWithLeads.reduce(
+            (sum, c) => sum + Number(c.spend) / c.conversions,
+            0
+          ) / activeCampaignsWithLeads.length;
+
+        activeCampaignsWithLeads.forEach(campaign => {
+          const campaignCpl = Number(campaign.spend) / campaign.conversions;
+          if (campaignCpl > avgCpl * 2) {
+            alerts.push({
+              type: 'low_roas',
+              message: `CPL alto em "${campaign.platform_campaign_name}": R$ ${campaignCpl.toFixed(2)} (2× acima da média R$ ${avgCpl.toFixed(2)})`,
+              campaignId: campaign.id,
+              campaignName: campaign.platform_campaign_name,
+            });
+          }
+        });
+      }
+
       // Lista de contas ativas para exibir no dashboard
       const activeAccountsList: ActiveAccountInfo[] = activeConns.map(c => ({
         id: c.id,
@@ -220,11 +253,20 @@ export function useMarketingDashboard() {
           return dateB.getTime() - dateA.getTime();
         })[0]?.last_sync_at || null;
 
+      const totalLeadsCount = currentMonthLeads.length;
+      const cpl = totalLeadsCount > 0 ? totalSpend / totalLeadsCount : 0;
+      const cac = newPatients > 0 ? totalSpend / newPatients : 0;
+      const leadToPatientRate = totalLeadsCount > 0 ? (newPatients / totalLeadsCount) * 100 : 0;
+
       return {
         totalSpend,
         totalRevenue,
         averageROAS,
-        totalLeads: currentMonthLeads.length,
+        totalLeads: totalLeadsCount,
+        cpl,
+        cac,
+        leadToPatientRate,
+        newPatients,
         googleAdsSpend,
         metaAdsSpend,
         googleAdsRevenue,

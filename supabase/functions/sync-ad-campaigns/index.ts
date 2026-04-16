@@ -316,12 +316,27 @@ async function fetchMetaCampaigns(accountId: string, accessToken: string): Promi
   return data.data || [];
 }
 
+// Calcula time_range explícito (desde 90 dias atrás até hoje, UTC) — mais confiável que date_preset
+function getTimeRange(): { since: string; until: string } {
+  const today = new Date();
+  const since = new Date(today);
+  since.setUTCDate(since.getUTCDate() - 90);
+  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  return { since: fmt(since), until: fmt(today) };
+}
+
 // Insights cumulativos (90 dias agregados) — para metadados da campanha
 async function fetchCampaignInsights(campaignId: string, accessToken: string): Promise<MetaInsights | null> {
   const fields = 'impressions,clicks,spend,reach,actions,action_values,ctr,date_start,date_stop';
-  const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${campaignId}/insights?fields=${fields}&date_preset=last_90d`;
+  const { since, until } = getTimeRange();
+  const timeRange = encodeURIComponent(JSON.stringify({ since, until }));
+  const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${campaignId}/insights?fields=${fields}&time_range=${timeRange}`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const err = await res.text().catch(() => '');
+    console.error(`[fetchCampaignInsights] Campaign ${campaignId} failed: ${res.status} ${err.substring(0, 300)}`);
+    return null;
+  }
   const data = await res.json();
   return data.data?.[0] || null;
 }
@@ -329,17 +344,24 @@ async function fetchCampaignInsights(campaignId: string, accessToken: string): P
 // Insights diários (um row por dia) — para relatórios por período
 async function fetchCampaignDailyInsights(campaignId: string, accessToken: string): Promise<MetaInsights[]> {
   const fields = 'impressions,clicks,spend,reach,actions,action_values,ctr,cpc,cpm';
-  let url: string | null = `https://graph.facebook.com/${GRAPH_API_VERSION}/${campaignId}/insights?fields=${fields}&date_preset=last_90d&time_increment=1&limit=100`;
+  const { since, until } = getTimeRange();
+  const timeRange = encodeURIComponent(JSON.stringify({ since, until }));
+  let url: string | null = `https://graph.facebook.com/${GRAPH_API_VERSION}/${campaignId}/insights?fields=${fields}&time_range=${timeRange}&time_increment=1&limit=100`;
   const allRows: MetaInsights[] = [];
 
   while (url) {
     const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-    if (!res.ok) return allRows; // graceful degradation
+    if (!res.ok) {
+      const err = await res.text().catch(() => '');
+      console.error(`[fetchCampaignDailyInsights] Campaign ${campaignId} failed: ${res.status} ${err.substring(0, 300)}`);
+      return allRows; // graceful degradation but logs the error now
+    }
     const data = await res.json();
     allRows.push(...(data.data || []));
     url = data.paging?.next || null;
   }
 
+  console.log(`[fetchCampaignDailyInsights] Campaign ${campaignId}: ${allRows.length} daily rows, range ${since}..${until}`);
   return allRows;
 }
 

@@ -19,6 +19,8 @@ import {
   Building2,
   MessageSquare,
   MoreHorizontal,
+  UserCheck,
+  Repeat,
 } from "lucide-react";
 import { useMarketingDashboard } from "@/hooks/useMarketingDashboard";
 import { useSyncAdCampaigns } from "@/hooks/useAdCampaignsSync";
@@ -130,42 +132,105 @@ export function MarketingDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Cards de Métricas Principais */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Cards de Métricas Principais — 6 KPIs alinhados com benchmark 2026 */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        {/* 1. Gasto Total */}
         <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/10 border-blue-500/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Gasto Total do Mês</CardTitle>
+            <CardTitle className="text-sm font-medium">Gasto do Mês</CardTitle>
             <DollarSign className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(dashboardData.totalSpend)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {dashboardData.googleAdsSpend + dashboardData.metaAdsSpend > 0 
-                ? `${((dashboardData.googleAdsSpend / (dashboardData.googleAdsSpend + dashboardData.metaAdsSpend)) * 100).toFixed(0)}% Google, ${((dashboardData.metaAdsSpend / (dashboardData.googleAdsSpend + dashboardData.metaAdsSpend)) * 100).toFixed(0)}% Meta`
-                : 'Nenhum gasto registrado'}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-green-500/10 to-green-600/10 border-green-500/20">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Receita Gerada</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(dashboardData.totalRevenue)}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {dashboardData.totalSpend > 0 
-                ? `ROI: ${(((dashboardData.totalRevenue - dashboardData.totalSpend) / dashboardData.totalSpend) * 100).toFixed(1)}%`
+              {dashboardData.googleAdsSpend + dashboardData.metaAdsSpend > 0
+                ? `${((dashboardData.metaAdsSpend / (dashboardData.googleAdsSpend + dashboardData.metaAdsSpend)) * 100).toFixed(0)}% Meta`
                 : 'Sem dados'}
             </p>
           </CardContent>
         </Card>
 
+        {/* 2. Leads Gerados */}
+        <Card className="bg-gradient-to-br from-orange-500/10 to-orange-600/10 border-orange-500/20">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Leads Gerados</CardTitle>
+            <Users className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{dashboardData.totalLeads}</div>
+            <p className="text-xs text-muted-foreground mt-1">do período</p>
+          </CardContent>
+        </Card>
+
+        {/* 3. CPL — Custo por Lead (★ KPI #1 para clínica) */}
+        <Card className="bg-gradient-to-br from-amber-500/10 to-amber-600/10 border-amber-500/20">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">CPL</CardTitle>
+            <Target className="h-4 w-4 text-amber-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {dashboardData.cpl > 0 ? formatCurrency(dashboardData.cpl) : '-'}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {dashboardData.cpl > 0 && dashboardData.cpl <= 15 ? (
+                <span className="text-green-500 flex items-center gap-1">
+                  <ArrowUpRight className="h-3 w-3" />
+                  Ótimo
+                </span>
+              ) : dashboardData.cpl > 15 && dashboardData.cpl <= 30 ? (
+                <span className="text-yellow-500 flex items-center gap-1">Bom</span>
+              ) : dashboardData.cpl > 30 ? (
+                <span className="text-orange-500 flex items-center gap-1">
+                  <ArrowDownRight className="h-3 w-3" />
+                  Revisar
+                </span>
+              ) : (
+                'Custo por Lead'
+              )}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* 4. Conv. Lead → Paciente */}
+        <Card className="bg-gradient-to-br from-cyan-500/10 to-cyan-600/10 border-cyan-500/20">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Conv. Paciente</CardTitle>
+            <Repeat className="h-4 w-4 text-cyan-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {dashboardData.leadToPatientRate > 0
+                ? `${dashboardData.leadToPatientRate.toFixed(1)}%`
+                : '-'}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {dashboardData.newPatients > 0
+                ? `${dashboardData.newPatients} novos pacientes`
+                : 'Lead → Paciente'}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* 5. CAC — Custo por Paciente */}
+        <Card className="bg-gradient-to-br from-rose-500/10 to-rose-600/10 border-rose-500/20">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">CAC</CardTitle>
+            <UserCheck className="h-4 w-4 text-rose-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {dashboardData.cac > 0 ? formatCurrency(dashboardData.cac) : '-'}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Custo por paciente</p>
+          </CardContent>
+        </Card>
+
+        {/* 6. ROAS */}
         <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/10 border-purple-500/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">ROAS Médio</CardTitle>
-            <Target className="h-4 w-4 text-purple-500" />
+            <CardTitle className="text-sm font-medium">ROAS</CardTitle>
+            <TrendingUp className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -178,33 +243,15 @@ export function MarketingDashboard() {
                   Excelente
                 </span>
               ) : dashboardData.averageROAS >= 2 ? (
-                <span className="text-yellow-500 flex items-center gap-1">
-                  <ArrowUpRight className="h-3 w-3" />
-                  Bom
-                </span>
+                <span className="text-yellow-500 flex items-center gap-1">Bom</span>
               ) : dashboardData.averageROAS > 0 ? (
                 <span className="text-orange-500 flex items-center gap-1">
                   <ArrowDownRight className="h-3 w-3" />
                   Atenção
                 </span>
               ) : (
-                'Sem dados'
+                'Receita / Gasto'
               )}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-orange-500/10 to-orange-600/10 border-orange-500/20">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Leads Gerados</CardTitle>
-            <Users className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{dashboardData.totalLeads}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {dashboardData.totalSpend > 0 && dashboardData.totalLeads > 0
-                ? `CPA: ${formatCurrency(dashboardData.totalSpend / dashboardData.totalLeads)}`
-                : 'Sem dados'}
             </p>
           </CardContent>
         </Card>

@@ -160,13 +160,25 @@ export function AdCampaignsList() {
                   <TableHead>Impressões</TableHead>
                   <TableHead>Cliques</TableHead>
                   <TableHead>CTR</TableHead>
+                  <TableHead>CPC</TableHead>
                   <TableHead>Conversões</TableHead>
+                  <TableHead>CPL</TableHead>
                   <TableHead>ROAS</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCampaigns.map((campaign) => (
+                {filteredCampaigns.map((campaign) => {
+                  const spendNum = Number(campaign.spend) || 0;
+                  const cpc = campaign.clicks > 0 ? spendNum / campaign.clicks : 0;
+                  const cpl = campaign.conversions > 0 ? spendNum / campaign.conversions : 0;
+                  // Alerta visual para CPL alto
+                  const cplColor =
+                    cpl > 0 && cpl <= 15 ? 'text-green-500' :
+                    cpl > 15 && cpl <= 30 ? 'text-yellow-500' :
+                    cpl > 30 ? 'text-orange-500' : '';
+
+                  return (
                   <TableRow key={campaign.id}>
                     <TableCell className="font-medium">
                       {campaign.platform_campaign_name}
@@ -186,11 +198,15 @@ export function AdCampaignsList() {
                         {AD_CAMPAIGN_STATUS_LABELS[campaign.status]}
                       </Badge>
                     </TableCell>
-                    <TableCell>{formatCurrency(campaign.spend)}</TableCell>
+                    <TableCell>{formatCurrency(spendNum)}</TableCell>
                     <TableCell>{campaign.impressions.toLocaleString()}</TableCell>
                     <TableCell>{campaign.clicks.toLocaleString()}</TableCell>
                     <TableCell>{campaign.ctr.toFixed(2)}%</TableCell>
+                    <TableCell>{cpc > 0 ? formatCurrency(cpc) : '-'}</TableCell>
                     <TableCell>{campaign.conversions}</TableCell>
+                    <TableCell className={cplColor}>
+                      {cpl > 0 ? formatCurrency(cpl) : '-'}
+                    </TableCell>
                     <TableCell>
                       {campaign.roas ? `${campaign.roas.toFixed(2)}x` : '-'}
                     </TableCell>
@@ -225,7 +241,8 @@ export function AdCampaignsList() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>
