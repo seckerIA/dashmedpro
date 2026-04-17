@@ -68,14 +68,25 @@ export function detectPhase(
 
   // =====================
   // LEAD JÁ AGENDADO
+  // Só mantém em pos_agendamento se:
+  //  (a) agendamento ainda não aconteceu (é futuro OU foi há menos de 2 dias), E
+  //  (b) a nova mensagem NÃO é um pedido explícito de novo agendamento
+  // Caso contrário cai no fluxo normal (agendamento/triagem) — evita prender
+  // pacientes que voltam depois com nova dúvida/nova marcação.
   // =====================
-  if (leadData?.status === 'agendado' || leadData?.data_agendamento) {
-    return {
-      phase: 'pos_agendamento',
-      shouldLoadRAG: true,
-      shouldLoadSchedule: false,
-      reason: 'Lead já agendado — pós-atendimento',
-    };
+  const wantsNewBooking = /\b(agendar|marcar|remarcar|outra\s+consulta|nova\s+consulta|mais\s+uma|reagendar|trocar\s+(o\s+)?hor[aá]rio|mudar\s+(o\s+)?hor[aá]rio|proxim[ao]|pr[oó]xim[ao])\b/i.test(msg);
+  if ((leadData?.status === 'agendado' || leadData?.data_agendamento) && !wantsNewBooking) {
+    const apptTs = leadData.data_agendamento ? new Date(leadData.data_agendamento).getTime() : NaN;
+    const now = Date.now();
+    const apptIsFresh = !isNaN(apptTs) && (apptTs > now - 48 * 3600 * 1000); // futuro ou <48h atrás
+    if (apptIsFresh) {
+      return {
+        phase: 'pos_agendamento',
+        shouldLoadRAG: true,
+        shouldLoadSchedule: false,
+        reason: 'Lead já agendado — pós-atendimento',
+      };
+    }
   }
 
   // =====================

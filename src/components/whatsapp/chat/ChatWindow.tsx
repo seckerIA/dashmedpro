@@ -229,21 +229,20 @@ export function ChatWindow({
         else if (file.type.startsWith('audio/')) mediaType = 'audio';
         else if (file.type.startsWith('video/')) mediaType = 'video';
 
-        // Upload to Supabase Storage
+        // Upload to Supabase Storage (bucket público 'whatsapp-media')
         const ext = file.name.split('.').pop() || 'bin';
-        const fileName = `wa_${conversation.id}_${Date.now()}.${ext}`;
-        const filePath = `whatsapp-media/${fileName}`;
+        const filePath = `wa_${conversation.id}_${Date.now()}.${ext}`;
 
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) throw new Error('Não autenticado');
 
         const { error: uploadError } = await supabase.storage
-          .from('media')
+          .from('whatsapp-media')
           .upload(filePath, file, { contentType: file.type, upsert: false });
 
         if (uploadError) throw uploadError;
 
-        const { data: urlData } = supabase.storage.from('media').getPublicUrl(filePath);
+        const { data: urlData } = supabase.storage.from('whatsapp-media').getPublicUrl(filePath);
         const mediaUrl = urlData?.publicUrl;
         if (!mediaUrl) throw new Error('Falha ao obter URL do arquivo');
 

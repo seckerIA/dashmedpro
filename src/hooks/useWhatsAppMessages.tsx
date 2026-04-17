@@ -117,7 +117,7 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
         throw new Error(`Conversa não encontrada: ${convError?.message || 'desconhecido'}`);
       }
 
-      // Criar mensagem no banco (status: sending)
+      // Criar mensagem no banco (status: pending — edge function marca 'sent' após confirmação)
       const messageData: any = {
         user_id: conversation.user_id,
         organization_id: (profile as any)?.organization_id,
@@ -126,7 +126,7 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
         content: payload.content,
         direction: 'outbound',
         message_type: 'text',
-        status: 'sent',
+        status: 'pending',
         sent_at: new Date().toISOString(),
         reply_to_message_id: payload.reply_to_message_id || null,
       };
@@ -209,7 +209,7 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
         throw new Error('Conversa não encontrada');
       }
 
-      // Criar mensagem no banco
+      // Criar mensagem no banco (status: pending — edge function marca 'sent' após confirmação)
       const { data: message, error: msgError } = await (supabase
         .from('whatsapp_messages' as any)
         .insert({
@@ -220,7 +220,7 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
           content: payload.caption || `[${payload.media_type}]`,
           direction: 'outbound',
           message_type: payload.media_type,
-          status: 'sent',
+          status: 'pending',
           sent_at: new Date().toISOString(),
           reply_to_message_id: payload.reply_to_message_id || null,
         } as any)
@@ -331,7 +331,7 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
         }
       }
 
-      // Criar mensagem no banco
+      // Criar mensagem no banco (status: pending — edge function marca 'sent' após confirmação)
       const { data: message, error: msgError } = await (supabase
         .from('whatsapp_messages' as any)
         .insert({
@@ -342,7 +342,7 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
           content: preview,
           direction: 'outbound',
           message_type: 'template',
-          status: 'sent',
+          status: 'pending',
           sent_at: new Date().toISOString(),
           template_id: payload.template_id,
           metadata: {
@@ -439,7 +439,7 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
           content,
           direction: 'outbound',
           message_type: 'text',
-          status: 'sent',
+          status: 'pending',
           sent_at: new Date().toISOString(),
           conversation_id: conversationId,
         };

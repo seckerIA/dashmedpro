@@ -449,11 +449,10 @@ async function uploadMediaToStorage(
       'application/pdf': 'pdf',
     };
     const ext = extMap[mimeType.toLowerCase()] || 'bin';
-    const fileName = `evo_${messageId}_${Date.now()}.${ext}`;
-    const filePath = `whatsapp-media/${fileName}`;
+    const filePath = `evo_${messageId}_${Date.now()}.${ext}`;
 
     const { error: uploadError } = await supabase.storage
-      .from('media')
+      .from('whatsapp-media')
       .upload(filePath, bytes, { contentType: mimeType, upsert: false });
 
     if (uploadError) {
@@ -461,7 +460,7 @@ async function uploadMediaToStorage(
       return null;
     }
 
-    const { data: urlData } = supabase.storage.from('media').getPublicUrl(filePath);
+    const { data: urlData } = supabase.storage.from('whatsapp-media').getPublicUrl(filePath);
     return urlData?.publicUrl || null;
   } catch (e) {
     console.error('[EvoWebhook] Upload error:', e);

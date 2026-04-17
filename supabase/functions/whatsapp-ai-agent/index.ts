@@ -12,14 +12,16 @@ var BRO = -3 * 60 * 60 * 1000;
 function sleep(ms: number): Promise<void> { return new Promise(function(r) { setTimeout(r, ms); }); }
 
 function buildAgentIdentity(c: any): any {
+  const nonEmpty = (v: any, fallback: string) => (typeof v === 'string' && v.trim().length > 0 ? v.trim() : fallback);
+  const optional = (v: any) => (typeof v === 'string' && v.trim().length > 0 ? v.trim() : undefined);
   return {
-    agent_name: c?.agent_name || 'Sofia',
-    clinic_name: c?.clinic_name || 'nossa clinica',
-    specialist_name: c?.specialist_name || 'nossa equipe',
-    agent_greeting: c?.agent_greeting || undefined,
-    custom_prompt_instructions: c?.custom_prompt_instructions || undefined,
-    already_known_info: c?.already_known_info || undefined,
-    doctor_info: c?.doctor_info || undefined,
+    agent_name: nonEmpty(c?.agent_name, 'Sofia'),
+    clinic_name: nonEmpty(c?.clinic_name, 'nossa clinica'),
+    specialist_name: nonEmpty(c?.specialist_name, 'nossa equipe'),
+    agent_greeting: optional(c?.agent_greeting),
+    custom_prompt_instructions: optional(c?.custom_prompt_instructions),
+    already_known_info: optional(c?.already_known_info),
+    doctor_info: optional(c?.doctor_info),
   };
 }
 

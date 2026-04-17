@@ -35,11 +35,11 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (!message_id) throw new Error('message_id is required');
 
-    // Buscar a mensagem para identificar o dono (user_id)
+    // Buscar a mensagem para identificar o dono (user_id) e conversa
     // Isso é importante para que secretárias possam enviar mensagens usando a config do médico
     const { data: dbMessage, error: msgError } = await supabaseAdmin
       .from('whatsapp_messages')
-      .select('user_id')
+      .select('user_id, conversation_id')
       .eq('id', message_id)
       .single();
 
@@ -49,26 +49,39 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // HANDOVER: Se um humano está enviando mensagem, desligar o modo autônomo da conversa
-    // Isso garante que a UI reflita que a IA parou e o usuário assumiu.
-    const { error: handoverError } = await supabaseAdmin
-      .from('whatsapp_conversations')
-      .update({ ai_autonomous_mode: false } as any)
-      .eq('id', dbMessage.conversation_id || '');
+    if (dbMessage.conversation_id) {
+      const { error: handoverError } = await supabaseAdmin
+        .from('whatsapp_conversations')
+        .update({ ai_autonomous_mode: false } as any)
+        .eq('id', dbMessage.conversation_id);
 
-    if (handoverError) {
-      console.warn('[send-message] Failed to update handover status', handoverError);
+      if (handoverError) {
+        console.warn('[send-message] Failed to update handover status', handoverError);
+      }
     }
 
     let configUserId = dbMessage.user_id;
 
+    // Helper: config is usable if it has credentials for its provider
+    const hasUsableCredentials = (c: any): boolean => {
+      if (!c) return false;
+      if (c.provider === 'evolution') {
+        return !!(c.evolution_instance_name && c.evolution_instance_token && c.evolution_api_url);
+      }
+      return !!c.access_token;
+    };
+
+    const CFG_COLUMNS = 'phone_number_id, access_token, provider, evolution_instance_name, evolution_instance_token, evolution_api_url';
+
     // 1. Tentar buscar config do próprio remetente
     let { data: config } = await supabaseAdmin
       .from('whatsapp_config')
-      .select('phone_number_id, access_token, provider, evolution_instance_name, evolution_instance_token, evolution_api_url')
+      .select(CFG_COLUMNS)
       .eq('user_id', configUserId)
       .eq('is_active', true)
-      .filter('access_token', 'not.is', null)
       .maybeSingle();
+
+    if (!hasUsableCredentials(config)) config = null;
 
     // 2. Se não achou, e for secretária, busca de médicos vinculados
     if (!config) {
@@ -87,35 +100,27 @@ const handler = async (req: Request): Promise<Response> => {
 
         if (links && links.length > 0) {
           const doctorIds = links.map((l: any) => l.doctor_id);
-          const { data: doctorConfig } = await supabaseAdmin
+          const { data: doctorConfigs } = await supabaseAdmin
             .from('whatsapp_config')
-            .select('phone_number_id, access_token, provider, evolution_instance_name, evolution_instance_token, evolution_api_url')
+            .select(CFG_COLUMNS)
             .in('user_id', doctorIds)
-            .eq('is_active', true)
-            .filter('access_token', 'not.is', null)
-            .limit(1)
-            .maybeSingle();
+            .eq('is_active', true);
 
-          if (doctorConfig) {
-            config = doctorConfig;
-          }
+          const usable = (doctorConfigs || []).find(hasUsableCredentials);
+          if (usable) config = usable;
         }
       }
     }
 
-    // 3. Último recurso: buscar QUALQUER config ativa com token (útil para admins)
+    // 3. Último recurso: buscar QUALQUER config ativa utilizável (útil para admins)
     if (!config) {
-      const { data: genericConfig } = await supabaseAdmin
+      const { data: allConfigs } = await supabaseAdmin
         .from('whatsapp_config')
-        .select('phone_number_id, access_token, provider, evolution_instance_name, evolution_instance_token, evolution_api_url')
-        .eq('is_active', true)
-        .filter('access_token', 'not.is', null)
-        .limit(1)
-        .maybeSingle();
+        .select(CFG_COLUMNS)
+        .eq('is_active', true);
 
-      if (genericConfig) {
-        config = genericConfig;
-      }
+      const usable = (allConfigs || []).find(hasUsableCredentials);
+      if (usable) config = usable;
     }
 
     if (!config) {
