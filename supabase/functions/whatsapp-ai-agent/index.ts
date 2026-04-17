@@ -149,15 +149,40 @@ async function sendWA(cfg: any, to: string, text: string, sb: any, cid: string, 
         body: JSON.stringify({ messaging_product: 'whatsapp', to: to, type: 'text', text: { body: text } }),
       });
     }
-    if (wr.ok && sm) {
-      var wd = await wr.json();
-      var wid = prov === 'evolution'
-        ? (wd.key && wd.key.id ? wd.key.id : null)
-        : ((wd.messages && wd.messages[0]) ? wd.messages[0].id : null);
-      if (wid) await sb.from('whatsapp_messages').update({ status: 'sent', message_id: wid }).eq('id', sm.id);
+    var rawBody = '';
+    try { rawBody = await wr.text(); } catch (_e) { rawBody = ''; }
+    var wd: any = null;
+    try { wd = rawBody ? JSON.parse(rawBody) : null; } catch (_e) { wd = null; }
+
+    await safeDebugLog(sb, 'sendWA response', {
+      cid, provider: prov, httpStatus: wr.status, ok: wr.ok, bodyPreview: rawBody.substring(0, 400),
+    });
+
+    if (!sm) return;
+
+    if (!wr.ok) {
+      await sb.from('whatsapp_messages').update({
+        status: 'failed',
+        error_message: (wd && (wd.message || wd.error)) || ('HTTP ' + wr.status + ': ' + rawBody.substring(0, 200)),
+      }).eq('id', sm.id);
+      return;
     }
+
+    // 200 OK — try to extract provider message id; if not found, still mark as sent
+    var wid: string | null = null;
+    if (prov === 'evolution' && wd) {
+      wid = (wd.key && wd.key.id) || wd.id || wd.messageId || (wd.data && wd.data.id) || null;
+    } else if (wd) {
+      wid = (wd.messages && wd.messages[0] && wd.messages[0].id) || null;
+    }
+    await sb.from('whatsapp_messages').update({
+      status: 'sent',
+      message_id: wid,
+      sent_at: new Date().toISOString(),
+    }).eq('id', sm.id);
   } catch (e) {
     console.error('[Agent] Send error:', e);
+    await safeDebugLog(sb, 'sendWA exception', { cid, error: String(e) });
     if (sm) await sb.from('whatsapp_messages').update({ status: 'failed', error_message: String(e) }).eq('id', sm.id);
   }
 }
