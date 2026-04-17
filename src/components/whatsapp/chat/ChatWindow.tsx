@@ -776,6 +776,7 @@ export function ChatWindow({
         open={showAISettings}
         onOpenChange={setShowAISettings}
         targetUserId={conversation.user_id}
+        conversationId={conversation.id}
       />
 
       <AssignConversationDialog

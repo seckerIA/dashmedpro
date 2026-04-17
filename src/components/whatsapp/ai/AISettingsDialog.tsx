@@ -14,6 +14,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Sparkles, Save, Info, Bot, ShieldCheck, User, Stethoscope } from 'lucide-react';
 import { useWhatsAppAI } from '@/hooks/useWhatsAppAI';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import {
     Popover,
@@ -25,11 +28,34 @@ interface AISettingsDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     targetUserId?: string; // ID do médico dono da conversa
+    /**
+     * Quando passado, o toggle "Agente Autônomo" atua POR CONVERSA
+     * (`whatsapp_conversations.ai_autonomous_mode`), permitindo ligar
+     * a IA só nessa conversa mesmo com auto_reply_enabled global=false.
+     * Sem conversationId o toggle atua no global (whatsapp_ai_config).
+     */
+    conversationId?: string;
 }
 
-export function AISettingsDialog({ open, onOpenChange, targetUserId }: AISettingsDialogProps) {
+export function AISettingsDialog({ open, onOpenChange, targetUserId, conversationId }: AISettingsDialogProps) {
     // Passa o targetUserId para garantir que estamos editando a config do médico correto
-    const { aiConfig, updateAIConfig, isUpdatingConfig, isLoadingConfig } = useWhatsAppAI({ targetUserId });
+    const { aiConfig, updateAIConfig, isUpdatingConfig } = useWhatsAppAI({ targetUserId });
+    const queryClient = useQueryClient();
+
+    // Estado do override por conversa (ai_autonomous_mode)
+    const { data: conversationAI } = useQuery({
+        queryKey: ['whatsapp-conversation-ai', conversationId],
+        queryFn: async () => {
+            if (!conversationId) return null;
+            const { data } = await (supabase as any)
+                .from('whatsapp_conversations')
+                .select('ai_autonomous_mode')
+                .eq('id', conversationId)
+                .single();
+            return data as { ai_autonomous_mode: boolean | null } | null;
+        },
+        enabled: !!conversationId && open,
+    });
 
     const [formData, setFormData] = useState({
         agent_name: '',
@@ -55,14 +81,33 @@ export function AISettingsDialog({ open, onOpenChange, targetUserId }: AISetting
                 knowledge_base: aiConfig.knowledge_base || '',
                 already_known_info: aiConfig.already_known_info || '',
                 custom_prompt_instructions: aiConfig.custom_prompt_instructions || '',
-                auto_reply_enabled: aiConfig.auto_reply_enabled || false,
+                // Se estamos em modo per-conversa, o toggle reflete a conversa
+                auto_reply_enabled: conversationId
+                    ? (conversationAI?.ai_autonomous_mode ?? false)
+                    : (aiConfig.auto_reply_enabled || false),
                 auto_scheduling_enabled: aiConfig.auto_scheduling_enabled || false,
             });
         }
-    }, [aiConfig]);
+    }, [aiConfig, conversationAI, conversationId]);
 
     const handleSave = async () => {
-        await updateAIConfig(formData);
+        // Se per-conversa: salvar toggle separadamente em whatsapp_conversations
+        if (conversationId) {
+            const { auto_reply_enabled, ...globalFields } = formData;
+            await updateAIConfig(globalFields);
+            const { error: convErr } = await (supabase as any)
+                .from('whatsapp_conversations')
+                .update({ ai_autonomous_mode: auto_reply_enabled })
+                .eq('id', conversationId);
+            if (convErr) {
+                toast({ title: 'Erro ao salvar IA da conversa', description: convErr.message, variant: 'destructive' });
+            } else {
+                queryClient.invalidateQueries({ queryKey: ['whatsapp-conversation-ai', conversationId] });
+                queryClient.invalidateQueries({ queryKey: ['whatsapp-conversations'] });
+            }
+        } else {
+            await updateAIConfig(formData);
+        }
         onOpenChange(false);
     };
 
@@ -226,7 +271,7 @@ export function AISettingsDialog({ open, onOpenChange, targetUserId }: AISetting
                         <div className="flex items-center justify-between gap-4">
                             <div className="space-y-1">
                                 <Label className="text-sm font-bold flex items-center gap-2">
-                                    Agente Autonomo
+                                    {conversationId ? 'Agente Autônomo (esta conversa)' : 'Agente Autônomo (global)'}
                                     {formData.auto_reply_enabled && (
                                         <span className="text-[10px] bg-emerald-500 text-white px-2 py-0.5 rounded-full font-bold">
                                             ATIVO
@@ -234,8 +279,9 @@ export function AISettingsDialog({ open, onOpenChange, targetUserId }: AISetting
                                     )}
                                 </Label>
                                 <p className="text-xs text-muted-foreground leading-relaxed">
-                                    O agente conversara diretamente com pacientes de forma humanizada,
-                                    qualificando leads e direcionando para agendamento.
+                                    {conversationId
+                                        ? 'Liga a IA apenas nesta conversa, independente do toggle global. Ideal para testar ou atender contatos específicos com IA.'
+                                        : 'O agente conversará diretamente com pacientes de forma humanizada, qualificando leads e direcionando para agendamento.'}
                                 </p>
                             </div>
                             <Switch
