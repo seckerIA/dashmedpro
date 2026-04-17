@@ -137,9 +137,12 @@ async function sendWA(cfg: any, to: string, text: string, sb: any, cid: string, 
   try {
     var wr: Response;
     if (prov === 'evolution') {
+      var evoKey = cfg.evolution_instance_token && cfg.evolution_instance_token.length > 0
+        ? cfg.evolution_instance_token
+        : (Deno.env.get('EVOLUTION_GLOBAL_API_KEY') || '');
       wr = await fetch(cfg.evolution_api_url.replace(/\/+$/, '') + '/message/sendText/' + cfg.evolution_instance_name, {
         method: 'POST',
-        headers: { 'apikey': cfg.evolution_instance_token, 'Content-Type': 'application/json' },
+        headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({ number: to, textMessage: { text: text }, options: { delay: 1200, presence: 'composing' } }),
       });
     } else {

@@ -399,10 +399,11 @@ async function downloadEvoMedia(
 ): Promise<string | null> {
   try {
     const evoUrl = config.evolution_api_url.replace(/\/+$/, '');
+    const evoKey = config.evolution_instance_token || Deno.env.get('EVOLUTION_GLOBAL_API_KEY') || '';
     const res = await fetch(`${evoUrl}/chat/getBase64FromMediaMessage/${instanceName}`, {
       method: 'POST',
       headers: {
-        'apikey': config.evolution_instance_token,
+        'apikey': evoKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ message: messageData.key, convertToMp4: false }),

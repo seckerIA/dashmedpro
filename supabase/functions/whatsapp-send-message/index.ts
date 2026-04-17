@@ -62,11 +62,15 @@ const handler = async (req: Request): Promise<Response> => {
 
     let configUserId = dbMessage.user_id;
 
-    // Helper: config is usable if it has credentials for its provider
+    // Helper: config is usable if it has credentials for its provider.
+    // Para Evolution, aceitamos instance com token vazio desde que exista EVOLUTION_GLOBAL_API_KEY
+    // (fallback — alguns deploys do v2 guardam apenas a global key).
+    const globalEvoKey = Deno.env.get('EVOLUTION_GLOBAL_API_KEY') || '';
     const hasUsableCredentials = (c: any): boolean => {
       if (!c) return false;
       if (c.provider === 'evolution') {
-        return !!(c.evolution_instance_name && c.evolution_instance_token && c.evolution_api_url);
+        if (!c.evolution_instance_name || !c.evolution_api_url) return false;
+        return !!c.evolution_instance_token || !!globalEvoKey;
       }
       return !!c.access_token;
     };
@@ -130,8 +134,11 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Validate config per provider
     if (config.provider === 'evolution') {
-      if (!config.evolution_instance_name || !config.evolution_instance_token || !config.evolution_api_url) {
+      if (!config.evolution_instance_name || !config.evolution_api_url) {
         throw new Error('Configuração Evolution incompleta. Reconecte a instância.');
+      }
+      if (!config.evolution_instance_token && !globalEvoKey) {
+        throw new Error('Token Evolution ausente e EVOLUTION_GLOBAL_API_KEY não configurada.');
       }
     } else {
       if (!config.access_token) {
@@ -146,8 +153,9 @@ const handler = async (req: Request): Promise<Response> => {
       console.log(`[send-message] Sending via Evolution to ${phone_number} (instance: ${config.evolution_instance_name})`);
 
       const evoBase = config.evolution_api_url.replace(/\/+$/, '');
+      const evoKey = config.evolution_instance_token || globalEvoKey;
       const evoHeaders = {
-        'apikey': config.evolution_instance_token,
+        'apikey': evoKey,
         'Content-Type': 'application/json',
       };
 

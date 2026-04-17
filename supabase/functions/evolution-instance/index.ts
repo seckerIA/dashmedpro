@@ -113,7 +113,13 @@ serve(async (req) => {
       }
 
       const createData = await createRes.json();
-      const instanceToken = createData.hash?.apikey || '';
+      // Evolution v2: o token da instância pode vir como `hash.apikey` (v1),
+      // `hash` (string), `instance.token`, `instance.apikey` ou `apikey` na raiz.
+      const instanceToken = (typeof createData.hash === 'string' ? createData.hash : createData.hash?.apikey)
+        || createData.instance?.token
+        || createData.instance?.apikey
+        || createData.apikey
+        || '';
 
       // Save to whatsapp_config
       const { error: upsertError } = await sb.from('whatsapp_config').upsert({
