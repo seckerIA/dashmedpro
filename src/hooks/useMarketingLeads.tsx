@@ -67,7 +67,7 @@ export function useMarketingLeads(filters?: {
         .from('commercial_leads')
         .select('*');
 
-      if (filters?.start_date && filters?.end_date) {
+      if (filters?.start_date && filters?.end_date && !filters?.include_conversions_in_range) {
         commLeadsQuery = commLeadsQuery.gte('created_at', filters.start_date).lte('created_at', filters.end_date);
       }
 
@@ -76,7 +76,7 @@ export function useMarketingLeads(filters?: {
 
       // 3. Fetch lead_form_submissions (Meta Lead Gen)
       let formLeadsQuery = (supabase.from('lead_form_submissions' as any) as any).select('*');
-      if (filters?.start_date && filters?.end_date) {
+      if (filters?.start_date && filters?.end_date && !filters?.include_conversions_in_range) {
         formLeadsQuery = formLeadsQuery.gte('created_at', filters.start_date).lte('created_at', filters.end_date);
       }
       const { data: formSubmissions, error: formsError } = await formLeadsQuery;

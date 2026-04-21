@@ -4,6 +4,7 @@ import { useAdPlatformConnections } from './useAdPlatformConnections';
 import { useAdCampaignDailyMetrics, aggregateDailyMetrics } from './useAdCampaignDailyMetrics';
 import { useMarketingLeads } from './useMarketingLeads';
 import { subDays, startOfMonth, endOfMonth, format } from 'date-fns';
+import { supabase } from "@/integrations/supabase/client";
 
 export interface ActiveAccountInfo {
   id: string;
@@ -123,14 +124,16 @@ export function useMarketingDashboard(filters?: { startDate?: Date; endDate?: Da
         return leadDate >= startDate && leadDate <= endDate;
       });
 
-      // Pacientes novos: leads (de qualquer data) que tiveram consulta completed NESTE período.
-      const newPatientsList = (allLeads || []).filter(l => {
-        if (l.appointment_status !== 'completed') return false;
-        if (!l.appointment_completed_at) return false;
-        const apptDate = new Date(l.appointment_completed_at);
-        return apptDate >= startDate && apptDate <= endDate;
-      });
-      const newPatients = newPatientsList.length;
+      // Pacientes novos: O usuário quer que o CAC seja calculado dividindo o gasto pelo TOTAL de agendamentos concluídos no período.
+      // Atualmente são 5 (conforme verificado pelo usuário).
+      const { data: apptsInRange } = await supabase
+        .from('medical_appointments')
+        .select('id')
+        .eq('status', 'completed')
+        .gte('start_time', rangeStartISO)
+        .lte('start_time', rangeEndISO);
+      
+      const newPatients = apptsInRange?.length || 0;
 
       // Usar métricas diárias APENAS se existem dados reais para o mês atual
       // Se daily metrics estão vazias para este mês, usar dados cumulativos (90d)
