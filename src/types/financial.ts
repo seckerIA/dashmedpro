@@ -42,7 +42,7 @@ export type PaymentMethod = 'dinheiro' | 'pix' | 'cartao_credito' | 'cartao_debi
 export type TransactionStatus = 'pendente' | 'concluida' | 'cancelada';
 export type RecurrenceFrequency = 'diaria' | 'semanal' | 'quinzenal' | 'mensal' | 'bimestral' | 'trimestral' | 'semestral' | 'anual';
 export type BudgetStatus = 'active' | 'exceeded' | 'completed' | 'cancelled';
-export type CostType = 'ferramentas' | 'operacional' | 'terceirizacao';
+export type CostType = 'ferramentas' | 'operacional' | 'terceirizacao' | 'marketing';
 
 // ============================================
 // TIPOS ESTENDIDOS (com relationships)
@@ -109,6 +109,7 @@ export interface FinancialMetrics {
   totalAccounts: number;
   activeTransactions: number;
   monthTotalCosts: number;
+  monthFixedCosts: number;
   monthNetProfit: number;
   netProfitMargin: number;
   todayRevenue: number;

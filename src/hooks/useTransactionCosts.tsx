@@ -62,16 +62,33 @@ export const useCostsBreakdown = (startDate?: string, endDate?: string) => {
         }
       }
 
+      // 1. Buscar custos de transações
       const queryResult = await supabaseQueryWithTimeout(query as any, undefined, signal) as any;
       const { data, error } = queryResult;
 
       if (error) throw error
+
+      // 2. Buscar gastos de marketing (anúncios) do período
+      let totalMarketingSpend = 0;
+      if (startDate && endDate) {
+        const { data: dailyMarketing } = await supabase
+          .from("ad_campaign_daily_metrics")
+          .select("spend")
+          .gte("metric_date", startDate)
+          .lte("metric_date", endDate);
+
+        totalMarketingSpend = (dailyMarketing || []).reduce(
+          (sum: number, r: any) => sum + (Number(r.spend) || 0),
+          0
+        );
+      }
 
       // Calcular totais por tipo
       const breakdown: { [key: string]: number } = {
         ferramentas: 0,
         operacional: 0,
         terceirizacao: 0,
+        marketing: totalMarketingSpend,
       };
 
       (data as any[])?.forEach((cost: any) => {
@@ -86,18 +103,20 @@ export const useCostsBreakdown = (startDate?: string, endDate?: string) => {
         ferramentas: 'Ferramentas',
         operacional: 'Operacional',
         terceirizacao: 'Terceirização',
+        marketing: 'Marketing (Anúncios)',
       }
 
       const costColors: { [key: string]: string } = {
         ferramentas: '#3b82f6', // blue
         operacional: '#10b981', // green
         terceirizacao: '#f59e0b', // amber
+        marketing: '#8b5cf6', // purple
       }
 
       const result: CostBreakdown[] = Object.entries(breakdown)
         .filter(([_, value]) => value > 0)
         .map(([type, value]) => ({
-          type: type as 'ferramentas' | 'operacional' | 'terceirizacao',
+          type: type as any,
           name: costLabels[type],
           value,
           percentage: total > 0 ? (value / total) * 100 : 0,

@@ -423,7 +423,7 @@ export function PipelineBoard({
                     <div className="space-y-3 w-full px-1" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'visible' }}>
                       {stageDeals.map((deal) => (
                         <SortableDealCard
-                          key={`${deal.id}-${deal.contact?.service_value || 0}-${deal.contact?.updated_at || ''}`}
+                          key={deal.id}
                           deal={deal}
                           followUp={followUpMap.get(deal.id)}
                           onClick={() => onDealClick?.(deal)}

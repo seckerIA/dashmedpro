@@ -258,6 +258,8 @@ export default function WhatsAppInbox() {
         setSearchParams({});
       }}
       onToggleSidebar={toggleSidebar}
+      isSidebarOpen={showSidebar}
+      onCloseSidebar={() => setShowSidebar(false)}
       showBackButton={true}
     />
   ) : null;

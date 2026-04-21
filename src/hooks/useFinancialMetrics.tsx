@@ -91,21 +91,42 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
         0
       );
 
-      // Calcular custos totais (apenas de entradas)
+      // 4. Buscar despesas fixas (através de categorias marcadas como is_fixed)
+      const { data: fixedCategoryTransactions } = await supabase
+        .from("financial_transactions")
+        .select(`
+          amount,
+          category:financial_categories!inner(is_fixed)
+        `)
+        .eq("type", "saida")
+        .eq("status", "concluida")
+        .eq("financial_categories.is_fixed", true)
+        .gte("transaction_date", format(currentMonthStart, "yyyy-MM-dd"))
+        .lte("transaction_date", format(currentMonthEnd, "yyyy-MM-dd"));
+
+      const monthFixedTransactionsTotal = (fixedCategoryTransactions || []).reduce(
+        (sum, t: any) => sum + (t.amount || 0),
+        0
+      );
+
+      // Calcular custos totais (apenas de entradas - custos variáveis diretos)
       const monthTotalCosts = transactionsData
         .filter(t => t.type === "entrada" && t.has_costs)
         .reduce((sum, t) => sum + (t.total_costs || 0), 0);
 
-      // Lucro bruto (receitas - despesas)
+      // Lucro bruto (receitas - despesas variáveis/saídas comuns)
       const monthProfit = monthRevenue - monthExpenses;
 
-      // Lucro líquido (receitas - despesas - custos - marketing)
+      // Custos fixos totais = Transações fixas + Marketing
+      const monthFixedCosts = monthFixedTransactionsTotal + totalMarketingSpend;
+
+      // Lucro líquido (receitas - todas as saídas - custos variáveis - marketing)
       const monthNetProfit = monthRevenue - monthExpenses - monthTotalCosts - totalMarketingSpend;
 
       const profitMargin = monthRevenue > 0 ? (monthProfit / monthRevenue) * 100 : 0;
       const netProfitMargin = monthRevenue > 0 ? (monthNetProfit / monthRevenue) * 100 : 0;
 
-      // 4. Contar transações ativas - RLS handles organization filtering
+      // 5. Contar transações ativas
       const { count: activeTransactions } = await supabase
         .from("financial_transactions")
         .select("*", { count: "exact", head: true })
@@ -119,11 +140,12 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
         profitMargin,
         totalAccounts: accountsData?.length || 0,
         activeTransactions: activeTransactions || 0,
-        monthTotalCosts,
+        monthTotalCosts, // Custos Variáveis
+        monthFixedCosts, // Novo campo: Custos Fixos (Incluindo Marketing)
         monthNetProfit,
         netProfitMargin,
         todayRevenue,
-        totalMarketingSpend, // Adicionando campo extra para o componente se precisar
+        totalMarketingSpend,
       };
 
       return metricsData;

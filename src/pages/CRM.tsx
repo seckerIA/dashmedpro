@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
+import { startOfMonth, endOfMonth, parseISO, format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { TeamMemberSelector } from "@/components/crm/TeamMemberSelector";
 import { TeamOverviewDashboard } from "@/components/crm/TeamOverviewDashboard";
 import { TeamComparisonTable } from "@/components/crm/TeamComparisonTable";
 import { TeamMetricsChart } from "@/components/crm/TeamMetricsChart";
+import { MonthPicker } from "@/components/ui/month-picker";
 import { useTeamMetrics } from "@/hooks/useTeamMetrics";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -16,6 +18,7 @@ const CRM = () => {
   const isAdminOrDono = isAdmin;
   const [viewAllMode, setViewAllMode] = useState(false);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState<string>(format(new Date(), 'yyyy-MM'));
 
   // Carregar estado do localStorage ao montar (apenas para admin/dono)
   useEffect(() => {
@@ -46,7 +49,12 @@ const CRM = () => {
   // Medicos/Secretarias sempre veem apenas seus proprios dados (undefined = apenas proprio usuario)
   const selectedIdsForHook = isAdminOrDono && viewAllMode && selectedUserIds.length > 0 ? selectedUserIds : undefined;
 
-  const { metrics, secretaryMetrics, isLoading, isSecretaria } = useTeamMetrics(selectedIdsForHook);
+  const dateFilter = {
+    start: startOfMonth(parseISO(selectedMonth + '-01')).toISOString(),
+    end: endOfMonth(parseISO(selectedMonth + '-01')).toISOString()
+  };
+
+  const { metrics, secretaryMetrics, isLoading, isSecretaria } = useTeamMetrics(selectedIdsForHook, dateFilter);
 
   // Se for secretaria, mostrar dashboard especifico
   if (isSecretaria) {
@@ -173,6 +181,14 @@ const CRM = () => {
               </p>
             </div>
           </div>
+        </div>
+        
+        {/* Filtro de Mes Customizado */}
+        <div className="flex items-center">
+          <MonthPicker 
+            value={selectedMonth} 
+            onChange={setSelectedMonth} 
+          />
         </div>
       </div>
 

@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
 import { useAuth } from './useAuth';
 import { useUserProfile } from './useUserProfile';
-import { startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
+import { startOfMonth, endOfMonth, startOfDay, endOfDay, format } from 'date-fns';
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
 
@@ -157,10 +157,14 @@ const fetchTeamMetrics = async (
   isAdminOrDono: boolean,
   selectedUserIds?: string[],
   signal?: AbortSignal,
-  isMedico?: boolean
+  isMedico?: boolean,
+  dateFilter?: { start: string; end: string }
 ): Promise<ConsolidatedTeamMetrics> => {
   const now = new Date();
-  const monthStart = startOfMonth(now).toISOString();
+  
+  // Usar o dateFilter se fornecido, senao default para o mes atual
+  const monthStart = dateFilter?.start || startOfMonth(now).toISOString();
+  const monthEnd = dateFilter?.end || endOfMonth(now).toISOString();
 
   // ── Resolver quais usuários buscar ──────────────────────────────────────
   let targetUserIds: string[] = [];
@@ -232,10 +236,12 @@ const fetchTeamMetrics = async (
             .in('user_id', targetUserIds)
             .in('form_id', validFormIds)
             .gte('created_at', monthStart)
+            .lte('created_at', monthEnd)
         : (supabase.from('lead_form_submissions' as any) as any)
             .select('id, user_id')
             .in('user_id', targetUserIds)
             .gte('created_at', monthStart)
+            .lte('created_at', monthEnd)
             .limit(0),
       25000, signal
     ),
@@ -251,7 +257,8 @@ const fetchTeamMetrics = async (
       supabase.from('medical_appointments')
         .select('id, user_id')
         .in('user_id', targetUserIds)
-        .gte('created_at', monthStart),
+        .gte('created_at', monthStart)
+        .lte('created_at', monthEnd),
       25000, signal
     ),
     // 6. Receita do mês — tipo 'entrada' (NÃO 'income'), status concluída
@@ -261,7 +268,8 @@ const fetchTeamMetrics = async (
         .in('user_id', targetUserIds)
         .eq('type', 'entrada' as any)
         .eq('status', 'concluida' as any)
-        .gte('transaction_date', monthStartDate),
+        .gte('transaction_date', monthStart.split('T')[0])
+        .lte('transaction_date', monthEnd.split('T')[0]),
       25000, signal
     ),
   ]);
@@ -338,7 +346,7 @@ const fetchTeamMetrics = async (
 
 // ── Hook público ──────────────────────────────────────────────────────────────
 
-export function useTeamMetrics(selectedUserIds?: string[]) {
+export function useTeamMetrics(selectedUserIds?: string[], dateFilter?: { start: string; end: string }) {
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, isSecretaria, isMedico, isLoading: isLoadingProfile } = useUserProfile();
 
@@ -347,11 +355,11 @@ export function useTeamMetrics(selectedUserIds?: string[]) {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ['team-metrics', user?.id, selectedUserIds?.join(','), isMedico],
+    queryKey: ['team-metrics', user?.id, selectedUserIds?.join(','), isMedico, dateFilter?.start, dateFilter?.end],
     queryFn: async ({ signal }) => {
       if (!user?.id) return emptyMetrics;
       try {
-        return await fetchTeamMetrics(user.id, isAdmin, selectedUserIds, signal, isMedico);
+        return await fetchTeamMetrics(user.id, isAdmin, selectedUserIds, signal, isMedico, dateFilter);
       } catch (error: any) {
         if (
           error?.message?.includes('cancelada') ||

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,8 +34,23 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear } from "date-fns";
+import { DateRange } from "react-day-picker";
+
 export function MarketingDashboard() {
-  const { data: dashboardData, isLoading } = useMarketingDashboard();
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date()),
+  });
+
+  const { data: dashboardData, isLoading } = useMarketingDashboard({
+    startDate: dateRange?.from,
+    endDate: dateRange?.to,
+  });
   const { data: connections } = useAdPlatformConnections();
   const syncCampaigns = useSyncAdCampaigns();
   const navigate = useNavigate();
@@ -94,17 +110,6 @@ export function MarketingDashboard() {
     );
   }
 
-  // Dados para gráfico de performance (últimos 30 dias - mockado por enquanto)
-  const performanceData = [
-    { date: '01/01', gasto: 500, receita: 1200 },
-    { date: '05/01', gasto: 750, receita: 1800 },
-    { date: '10/01', gasto: 600, receita: 1500 },
-    { date: '15/01', gasto: 900, receita: 2200 },
-    { date: '20/01', gasto: 800, receita: 1900 },
-    { date: '25/01', gasto: 1100, receita: 2800 },
-    { date: '30/01', gasto: dashboardData.totalSpend, receita: dashboardData.totalRevenue },
-  ];
-
   // Dados para comparativo de plataformas
   const platformComparisonData = [
     { name: 'Google Ads', gasto: dashboardData.googleAdsSpend, receita: dashboardData.googleAdsRevenue },
@@ -132,12 +137,120 @@ export function MarketingDashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Dashboard Header with Date Filter */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-card/30 p-4 rounded-xl border border-border/50">
+        <div>
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-primary" />
+            Visão Geral de Performance
+          </h2>
+          <p className="text-sm text-muted-foreground">Analise os KPIs de marketing no período selecionado</p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className={cn(
+                "justify-start text-left font-normal w-[240px]",
+                !dateRange && "text-muted-foreground"
+              )}>
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateRange?.from ? (
+                  dateRange.to ? (
+                    <>
+                      {format(dateRange.from, "dd/MM/y")} -{" "}
+                      {format(dateRange.to, "dd/MM/y")}
+                    </>
+                  ) : (
+                    format(dateRange.from, "dd/MM/y")
+                  )
+                ) : (
+                  <span>Selecione um período</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <div className="flex border-b border-border">
+                <div className="flex flex-col gap-2 p-3 border-r border-border min-w-[140px] bg-muted/10">
+                  <div className="text-xs font-semibold text-muted-foreground mb-1 px-1">Período</div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="justify-start text-xs font-normal"
+                    onClick={() => setDateRange({
+                      from: startOfMonth(new Date()),
+                      to: endOfMonth(new Date())
+                    })}
+                  >
+                    Este mês
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="justify-start text-xs font-normal"
+                    onClick={() => setDateRange({
+                      from: startOfMonth(subMonths(new Date(), 1)),
+                      to: endOfMonth(subMonths(new Date(), 1))
+                    })}
+                  >
+                    Mês passado
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="justify-start text-xs font-normal"
+                    onClick={() => setDateRange({
+                      from: startOfMonth(subMonths(new Date(), 3)),
+                      to: endOfMonth(new Date())
+                    })}
+                  >
+                    Últimos 3 meses
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="justify-start text-xs font-normal"
+                    onClick={() => setDateRange({
+                      from: startOfYear(new Date()),
+                      to: endOfYear(new Date())
+                    })}
+                  >
+                    Este ano
+                  </Button>
+                </div>
+                <div className="p-0">
+                  <Calendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={dateRange?.from}
+                    selected={dateRange}
+                    onSelect={setDateRange}
+                    numberOfMonths={2}
+                    locale={ptBR}
+                    className="p-3"
+                  />
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+          
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => handleSyncAll()}
+            disabled={syncCampaigns.isPending}
+          >
+            <RefreshCw className={cn("h-4 w-4", syncCampaigns.isPending && "animate-spin")} />
+          </Button>
+        </div>
+      </div>
+
       {/* Cards de Métricas Principais — 6 KPIs alinhados com benchmark 2026 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {/* 1. Gasto Total */}
         <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/10 border-blue-500/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Gasto do Mês</CardTitle>
+            <CardTitle className="text-sm font-medium">Gasto no Período</CardTitle>
             <DollarSign className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
@@ -352,12 +465,12 @@ export function MarketingDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Gasto vs Receita (Últimos 30 dias)</CardTitle>
+            <CardTitle className="text-sm font-medium">Evolução da Performance</CardTitle>
             <CardDescription>Evolução do investimento e retorno</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={performanceData}>
+              <LineChart data={dashboardData.dailyPerformance}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis />

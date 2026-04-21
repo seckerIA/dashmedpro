@@ -19,6 +19,7 @@ import {
   ArrowUpCircle,
   Paperclip as PaperclipIcon,
   Trash2,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -62,6 +63,8 @@ interface ChatWindowProps {
   conversation: WhatsAppConversationWithRelations;
   onBack?: () => void;
   onToggleSidebar?: () => void;
+  isSidebarOpen?: boolean;
+  onCloseSidebar?: () => void;
   showBackButton?: boolean;
 }
 
@@ -69,6 +72,8 @@ export function ChatWindow({
   conversation,
   onBack,
   onToggleSidebar,
+  isSidebarOpen,
+  onCloseSidebar,
   showBackButton,
 }: ChatWindowProps) {
   const [replyTo, setReplyTo] = useState<WhatsAppMessageWithRelations | null>(
@@ -356,7 +361,7 @@ export function ChatWindow({
   }, []);
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full overflow-hidden relative">
       <div
         className="flex-1 flex flex-col h-full min-w-0 border-r relative"
         onDragEnter={handleDragEnter}
@@ -475,6 +480,9 @@ export function ChatWindow({
               onClick={() => {
                 setShowAIPanel(!showAIPanel);
                 setShowProcedures(false);
+                if (!showAIPanel && onCloseSidebar) {
+                  onCloseSidebar();
+                }
               }}
               title="Análise IA"
               aria-label="Análise IA"
@@ -494,6 +502,9 @@ export function ChatWindow({
                 onClick={() => {
                   setShowProcedures(!showProcedures);
                   setShowAIPanel(false);
+                  if (!showProcedures && onCloseSidebar) {
+                    onCloseSidebar();
+                  }
                 }}
                 title="Procedimentos"
                 aria-label="Procedimentos"
@@ -506,7 +517,11 @@ export function ChatWindow({
               variant="ghost"
               size="icon"
               className="hidden md:flex"
-              onClick={onToggleSidebar}
+              onClick={() => {
+                setShowProcedures(false);
+                setShowAIPanel(false);
+                onToggleSidebar?.();
+              }}
               aria-label="Buscar"
             >
               <Search className="h-5 w-5" />
@@ -577,7 +592,11 @@ export function ChatWindow({
                   )}
                 </DropdownMenuItem>
 
-                <DropdownMenuItem onClick={onToggleSidebar}>
+                <DropdownMenuItem onClick={() => {
+                  setShowProcedures(false);
+                  setShowAIPanel(false);
+                  onToggleSidebar?.();
+                }}>
                   <Tag className="h-4 w-4 mr-2" />
                   Ver detalhes
                 </DropdownMenuItem>
@@ -624,7 +643,11 @@ export function ChatWindow({
                         Procedimentos
                       </DropdownMenuItem>
                     )}
-                    <DropdownMenuItem onClick={onToggleSidebar}>
+                    <DropdownMenuItem onClick={() => {
+                      setShowProcedures(false);
+                      setShowAIPanel(false);
+                      onToggleSidebar?.();
+                    }}>
                       <Search className="h-4 w-4 mr-2" />
                       Buscar
                     </DropdownMenuItem>
@@ -698,33 +721,53 @@ export function ChatWindow({
         />
       </div>
 
-      {/* Sidebar de AI */}
+      {/* Sidebar de AI (Overlay para evitar quebra de layout) */}
       {showAIPanel && (
-        <div className="w-[350px] h-full border-l bg-background hidden md:block animate-in slide-in-from-right duration-300 overflow-y-auto shadow-2xl">
-          <div className="p-4 space-y-4">
-            <ConversationInsights
-              analysis={analysis}
-              isLoading={isLoadingAnalysis}
-              isAnalyzing={isAnalyzing}
-              onAnalyze={handleAnalyzeConversation}
-              aiConfig={aiConfig}
-            />
-            {suggestions.length > 0 && (
-              <AISuggestionsPanel
-                suggestions={suggestions}
-                isLoading={isAnalyzing}
-                onSelectSuggestion={handleAISuggestionSelect}
-                onRegenerateSuggestions={() => analyzeConversation(true)}
+        <div className="absolute right-0 top-0 bottom-0 w-[350px] bg-background border-l shadow-2xl z-40 animate-in slide-in-from-right duration-300 flex flex-col">
+          <div className="flex-1 overflow-y-auto relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-2 top-2 z-50 h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm border shadow-sm hover:bg-accent"
+              onClick={() => setShowAIPanel(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+            <div className="p-4 space-y-4">
+              <ConversationInsights
+                analysis={analysis}
+                isLoading={isLoadingAnalysis}
+                isAnalyzing={isAnalyzing}
+                onAnalyze={handleAnalyzeConversation}
+                aiConfig={aiConfig}
               />
-            )}
+              {suggestions.length > 0 && (
+                <AISuggestionsPanel
+                  suggestions={suggestions}
+                  isLoading={isAnalyzing}
+                  onSelectSuggestion={handleAISuggestionSelect}
+                  onRegenerateSuggestions={() => analyzeConversation(true)}
+                />
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Sidebar de Procedimentos */}
+      {/* Sidebar de Procedimentos (Overlay para evitar quebra de layout) */}
       {showProcedures && canViewProcedures && (
-        <div className="w-80 h-full border-l bg-background hidden md:block animate-in slide-in-from-right duration-300">
-          <ProceduresList />
+        <div className="absolute right-0 top-0 bottom-0 w-80 bg-background border-l shadow-2xl z-40 animate-in slide-in-from-right duration-300 flex flex-col">
+          <div className="flex-1 overflow-hidden relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-2 top-2 z-50 h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm border shadow-sm hover:bg-accent"
+              onClick={() => setShowProcedures(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+            <ProceduresList />
+          </div>
         </div>
       )}
 

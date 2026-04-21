@@ -162,6 +162,8 @@ const handler = async (req: Request): Promise<Response> => {
       let evoEndpoint: string;
       let evoPayload: any;
 
+      const cleanNumber = phone_number.replace('+', '').trim();
+
       // Check if this is a media message
       if (media_type && media_url) {
         // Evolution API v2: /message/sendMedia/{instance}
@@ -177,34 +179,40 @@ const handler = async (req: Request): Promise<Response> => {
           // Audio uses /message/sendWhatsAppAudio/{instance}
           evoEndpoint = `${evoBase}/message/sendWhatsAppAudio/${config.evolution_instance_name}`;
           evoPayload = {
-            number: phone_number,
+            number: cleanNumber,
             audioMessage: { audio: media_url },
+            audio: media_url, // fallback root
+            options: { delay: 1200, presence: 'recording' }
           };
         } else {
           evoEndpoint = `${evoBase}/message/sendMedia/${config.evolution_instance_name}`;
           evoPayload = {
-            number: phone_number,
+            number: cleanNumber,
             mediaMessage: {
               mediatype: evoMediaType,
               media: media_url,
               caption: caption || '',
               fileName: evoMediaType === 'document' ? (caption || 'document') : undefined,
             },
+            options: { delay: 1200 }
           };
         }
       } else {
         // Text message
         evoEndpoint = `${evoBase}/message/sendText/${config.evolution_instance_name}`;
-        evoPayload = {
-          number: phone_number,
-          textMessage: { text: content || '' },
-          options: { delay: 1200, presence: 'composing' },
-        };
-
+        let textContent = content || '';
+        
         // Evolution doesn't support Meta templates — send as plain text
         if (template_name && !content) {
-          evoPayload.textMessage.text = `[Template: ${template_name}]`;
+          textContent = `[Template: ${template_name}]`;
         }
+
+        evoPayload = {
+          number: cleanNumber,
+          textMessage: { text: textContent },
+          text: textContent, // fallback root
+          options: { delay: 1200, presence: 'composing' },
+        };
       }
 
       const response = await fetch(evoEndpoint, {

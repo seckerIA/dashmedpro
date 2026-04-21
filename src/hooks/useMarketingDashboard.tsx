@@ -55,6 +55,13 @@ export interface MarketingDashboardData {
     campaignName?: string;
   }>;
 
+  // Dados diários para gráficos
+  dailyPerformance: Array<{
+    date: string;
+    gasto: number;
+    receita: number;
+  }>;
+  
   // Status de integrações
   activeConnections: number;
   activeAccountsList: ActiveAccountInfo[];
@@ -62,28 +69,36 @@ export interface MarketingDashboardData {
   hasConnections: boolean;
 }
 
-export function useMarketingDashboard() {
-  // Buscar dados do mês atual
+export function useMarketingDashboard(filters?: { startDate?: Date; endDate?: Date }) {
+  // Buscar dados baseados no filtro ou mês atual
   const now = new Date();
-  const startOfCurrentMonth = startOfMonth(now).toISOString();
-  const endOfCurrentMonth = endOfMonth(now).toISOString();
-  const monthStartDate = format(startOfMonth(now), 'yyyy-MM-dd');
-  const monthEndDate = format(endOfMonth(now), 'yyyy-MM-dd');
+  const startOfRange = filters?.startDate || startOfMonth(now);
+  const endOfRange = filters?.endDate || endOfMonth(now);
+  
+  const rangeStartISO = startOfRange.toISOString();
+  const rangeEndISO = endOfRange.toISOString();
+  const startDateStr = format(startOfRange, 'yyyy-MM-dd');
+  const endDateStr = format(endOfRange, 'yyyy-MM-dd');
 
   const { data: campaigns } = useAdCampaignsSync();
   const { data: connections } = useAdPlatformConnections();
 
-  // Métricas diárias do mês atual
+  // Métricas diárias do período
   const { data: dailyMetrics } = useAdCampaignDailyMetrics({
-    start_date: monthStartDate,
-    end_date: monthEndDate,
+    start_date: startDateStr,
+    end_date: endDateStr,
   });
 
-  // Buscar leads de formulários (lead_form_submissions + commercial_leads marketing)
-  const { data: allLeads } = useMarketingLeads();
+  // Buscar leads de formulários (lead_form_submissions + commercial_leads marketing) filtrados por data
+  const { data: allLeads } = useMarketingLeads({
+    start_date: rangeStartISO,
+    end_date: rangeEndISO,
+    include_conversions_in_range: true
+  });
 
   return useQuery({
-    queryKey: ['marketing-dashboard', campaigns, connections, allLeads, dailyMetrics],
+    queryKey: ['marketing-dashboard', campaigns, connections, allLeads, dailyMetrics, startDateStr, endDateStr],
+    staleTime: 5 * 60 * 1000, // 5 minutos de cache
     queryFn: async (): Promise<MarketingDashboardData> => {
       const connectionsData = connections || [];
 
@@ -94,31 +109,28 @@ export function useMarketingDashboard() {
       const activeConnIds = new Set(activeConns.map(c => c.id));
 
       // Filtrar campanhas apenas das contas ATIVAS
-      // Os dados no ad_campaigns_sync representam os últimos 90 dias (date_preset=last_90d)
-      // Não filtramos por data aqui — cada campanha tem um único record cumulativo
       const allCampaigns = campaigns || [];
       const campaignsData = activeConnIds.size > 0
         ? allCampaigns.filter(c => activeConnIds.has(c.connection_id))
         : [];
 
-      const startDate = new Date(startOfCurrentMonth);
-      const endDate = new Date(endOfCurrentMonth);
+      const startDate = new Date(rangeStartISO);
+      const endDate = new Date(rangeEndISO);
 
-      // Leads captados no mês atual (volume de lead gen)
-      const currentMonthLeads = (allLeads || []).filter(lead => {
+      // Leads captados no período (volume de lead gen)
+      const leadsCaptured = (allLeads || []).filter(lead => {
         const leadDate = new Date(lead.created_at);
         return leadDate >= startDate && leadDate <= endDate;
       });
 
-      // Pacientes novos: leads (de qualquer data) que tiveram consulta completed NESTE mês.
-      // O ciclo médico comum é: lead entra em março → consulta em abril.
-      // Contar por data do appointment captura isso corretamente.
-      const newPatients = (allLeads || []).filter(l => {
+      // Pacientes novos: leads (de qualquer data) que tiveram consulta completed NESTE período.
+      const newPatientsList = (allLeads || []).filter(l => {
         if (l.appointment_status !== 'completed') return false;
         if (!l.appointment_completed_at) return false;
         const apptDate = new Date(l.appointment_completed_at);
         return apptDate >= startDate && apptDate <= endDate;
-      }).length;
+      });
+      const newPatients = newPatientsList.length;
 
       // Usar métricas diárias APENAS se existem dados reais para o mês atual
       // Se daily metrics estão vazias para este mês, usar dados cumulativos (90d)
@@ -261,7 +273,32 @@ export function useMarketingDashboard() {
           return dateB.getTime() - dateA.getTime();
         })[0]?.last_sync_at || null;
 
-      const totalLeadsCount = currentMonthLeads.length;
+      // Preparar dados diários para o gráfico
+      const dailyPerformanceMap = new Map<string, { gasto: number; receita: number }>();
+      
+      (dailyMetrics || []).forEach(row => {
+        const date = format(new Date(row.metric_date), 'dd/MM');
+        const current = dailyPerformanceMap.get(date) || { gasto: 0, receita: 0 };
+        dailyPerformanceMap.set(date, {
+          gasto: current.gasto + (Number(row.spend) || 0),
+          receita: current.receita + (Number(row.conversion_value) || 0)
+        });
+      });
+
+      const dailyPerformance = Array.from(dailyPerformanceMap.entries())
+        .map(([date, values]) => ({
+          date,
+          gasto: values.gasto,
+          receita: values.receita
+        }))
+        .sort((a, b) => {
+          // Sort by date (DD/MM) - simplistic but works for same-year ranges
+          const [dayA, monthA] = a.date.split('/').map(Number);
+          const [dayB, monthB] = b.date.split('/').map(Number);
+          return (monthA * 100 + dayA) - (monthB * 100 + dayB);
+        });
+
+      const totalLeadsCount = leadsCaptured.length;
       const cpl = totalLeadsCount > 0 ? totalSpend / totalLeadsCount : 0;
       const cac = newPatients > 0 ? totalSpend / newPatients : 0;
       const leadToPatientRate = totalLeadsCount > 0 ? (newPatients / totalLeadsCount) * 100 : 0;
@@ -282,6 +319,7 @@ export function useMarketingDashboard() {
         topCampaignsByROAS,
         topCampaignsByConversions,
         alerts: alerts.slice(0, 5),
+        dailyPerformance,
         activeConnections: activeConns.length,
         activeAccountsList,
         lastSyncTime: lastSync,

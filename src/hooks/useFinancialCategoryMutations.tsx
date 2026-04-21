@@ -8,6 +8,7 @@ interface CreateCategoryData {
     type: 'entrada' | 'saida'
     color?: string
     icon?: string
+    is_fixed?: boolean
 }
 
 export const useCreateFinancialCategory = () => {
@@ -27,6 +28,7 @@ export const useCreateFinancialCategory = () => {
                     type: category.type,
                     color: category.color || '#64748b',
                     icon: category.icon || null,
+                    is_fixed: category.is_fixed || false,
                     is_system: false,
                     organization_id: profile.organization_id
                 } as any)

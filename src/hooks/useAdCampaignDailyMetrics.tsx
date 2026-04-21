@@ -38,9 +38,8 @@ export function useAdCampaignDailyMetrics(filters: DailyMetricsFilters) {
         };
       })[];
     },
-    staleTime: 2 * 60 * 1000,
-    gcTime: 5 * 60 * 1000,
-    refetchOnMount: false,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
     retry: 2,
   });

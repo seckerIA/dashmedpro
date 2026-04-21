@@ -1076,6 +1076,7 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
       // Invalidar queries do CRM/pipeline para refletir mudanças
       queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
       queryClient.invalidateQueries({ queryKey: ['crm-pipeline'] });
+      queryClient.invalidateQueries({ queryKey: ['team-metrics'] });
       // Invalidar queries financeiras (caso tenha criado transação para consulta paga)
       queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['financial-metrics'] });
@@ -1128,6 +1129,7 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
       // Invalidar queries do CRM/pipeline para refletir mudanças
       queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
       queryClient.invalidateQueries({ queryKey: ['crm-pipeline'] });
+      queryClient.invalidateQueries({ queryKey: ['team-metrics'] });
       // Invalidar métricas de sinais para secretárias
       queryClient.invalidateQueries({ queryKey: ['secretary-sinal-metrics'] });
       // Invalidar status de transações financeiras e métricas
@@ -1148,6 +1150,7 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
     mutationFn: deleteAppointment,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['medical-appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['team-metrics'] });
       toast({
         title: 'Consulta excluída',
         description: 'A consulta foi removida da agenda.',
@@ -1410,6 +1413,7 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['medical-appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['team-metrics'] });
       toast({
         title: 'Falta registrada',
         description: 'O paciente foi marcado como não compareceu.',

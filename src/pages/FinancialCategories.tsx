@@ -22,6 +22,7 @@ const FinancialCategories = () => {
     const [newCategoryName, setNewCategoryName] = useState("")
     const [newCategoryType, setNewCategoryType] = useState<"entrada" | "saida">("entrada")
     const [newCategoryColor, setNewCategoryColor] = useState("#10b981")
+    const [newIsFixed, setNewIsFixed] = useState(false)
 
     const handleCreateCategory = () => {
         if (!newCategoryName.trim()) {
@@ -36,13 +37,15 @@ const FinancialCategories = () => {
         createCategory.mutate({
             name: newCategoryName.trim(),
             type: newCategoryType,
-            color: newCategoryColor
+            color: newCategoryColor,
+            is_fixed: newIsFixed
         }, {
             onSuccess: () => {
                 setIsNewCategoryOpen(false)
                 setNewCategoryName("")
                 setNewCategoryType("entrada")
                 setNewCategoryColor("#10b981")
+                setNewIsFixed(false)
                 toast({
                     title: "Categoria criada",
                     description: "A categoria foi criada com sucesso!"
@@ -154,7 +157,12 @@ const FinancialCategories = () => {
                                                 className="w-4 h-4 rounded-full"
                                                 style={{ backgroundColor: cat.color || '#ef4444' }}
                                             />
-                                            <span className="font-medium">{cat.name}</span>
+                                            <div className="flex flex-col">
+                                                <span className="font-medium">{cat.name}</span>
+                                                {(cat as any).is_fixed && (
+                                                    <span className="text-[10px] text-purple-500 font-semibold uppercase tracking-wider">Custo Fixo</span>
+                                                )}
+                                            </div>
                                         </div>
                                         <Button
                                             variant="ghost"
@@ -221,6 +229,21 @@ const FinancialCategories = () => {
                                 />
                             </div>
                         </div>
+
+                        {newCategoryType === "saida" && (
+                            <div className="flex items-center space-x-2 pt-2">
+                                <input
+                                    type="checkbox"
+                                    id="isFixed"
+                                    checked={newIsFixed}
+                                    onChange={(e) => setNewIsFixed(e.target.checked)}
+                                    className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-600"
+                                />
+                                <Label htmlFor="isFixed" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                    Esta é uma despesa fixa (Ex: Aluguel, Marketing)
+                                </Label>
+                            </div>
+                        )}
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsNewCategoryOpen(false)}>Cancelar</Button>

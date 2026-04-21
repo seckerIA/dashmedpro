@@ -277,13 +277,19 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
         organization_id: profile?.organization_id
       });
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['crm-deals'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
+      queryClient.invalidateQueries({ queryKey: ['team-metrics'] });
+    },
     onError: (error) => console.error('❌ createDealMutation error:', error),
   });
 
   const updateDealMutation = useMutation({
     mutationFn: ({ dealId, data }: { dealId: string; data: any }) => updateRecord('crm_deals', dealId, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['crm-deals'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
+      queryClient.invalidateQueries({ queryKey: ['team-metrics'] });
+    },
   });
 
   const updateContactMutation = useMutation({
@@ -302,7 +308,10 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
       }
       return deleteRecord('crm_deals', id);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['crm-deals'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
+      queryClient.invalidateQueries({ queryKey: ['team-metrics'] });
+    },
   });
 
   const convertWhatsAppToDeal = async ({
@@ -351,6 +360,7 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
 
     queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
     queryClient.invalidateQueries({ queryKey: ['crm-contacts'] });
+    queryClient.invalidateQueries({ queryKey: ['team-metrics'] });
     return { contact, deal };
   };
 

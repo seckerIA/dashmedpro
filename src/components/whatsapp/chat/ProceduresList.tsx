@@ -42,7 +42,7 @@ export function ProceduresList() {
     }
 
     return (
-        <Card className="h-full border-l rounded-none bg-background/50 backdrop-blur-sm shadow-xl w-80 flex flex-col">
+        <Card className="h-full border-none rounded-none bg-background/50 backdrop-blur-sm shadow-none w-full flex flex-col overflow-hidden">
             <CardHeader className="py-3 px-4 border-b">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                     <Stethoscope className="h-4 w-4 text-primary" />
@@ -50,7 +50,7 @@ export function ProceduresList() {
                 </CardTitle>
             </CardHeader>
 
-            <div className="p-3 border-b bg-muted/20">
+            <div className="p-3 px-4 border-b bg-muted/20 shrink-0">
                 <div className="relative">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -62,8 +62,8 @@ export function ProceduresList() {
                 </div>
             </div>
 
-            <ScrollArea className="flex-1 p-0">
-                <div className="p-3 space-y-2">
+            <ScrollArea className="flex-1 overflow-y-auto">
+                <div className="p-3 px-4 space-y-2">
                     {filteredProcedures.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground text-xs">
                             Nenhum procedimento encontrado
@@ -76,26 +76,26 @@ export function ProceduresList() {
                                 onDragStart={(e) => handleDragStart(e, proc)}
                                 className="group flex flex-col gap-1 p-3 rounded-md border bg-card hover:bg-accent/50 hover:border-primary/50 cursor-grab active:cursor-grabbing transition-all shadow-sm"
                             >
-                                <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-start justify-between gap-2 overflow-hidden">
                                     <div className="flex-1 min-w-0">
-                                        <div className="font-medium text-sm truncate flex items-center gap-1">
-                                            <GripVertical className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                                            {proc.name}
+                                        <div className="font-semibold text-sm leading-tight flex items-center gap-1">
+                                            <GripVertical className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                                            <span className="break-words line-clamp-2">{proc.name}</span>
                                         </div>
                                     </div>
-                                    <Badge variant="secondary" className="text-xs font-semibold shrink-0 bg-green-500/10 text-green-600 dark:text-green-400 dark:bg-green-500/20">
-                                        R$ {proc.price.toFixed(2)}
+                                    <Badge variant="secondary" className="text-[11px] px-2 py-0.5 font-bold shrink-0 bg-green-500/10 text-green-600 dark:text-green-400 dark:bg-green-500/20 whitespace-nowrap">
+                                        R$ {proc.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                     </Badge>
                                 </div>
 
-                                <div className="flex items-center justify-between mt-1 pl-4">
-                                    <span className="text-[10px] text-muted-foreground flex items-center gap-1 truncate max-w-[120px]">
+                                <div className="flex items-center justify-between mt-2 pl-4 overflow-hidden">
+                                    <span className="text-[11px] text-muted-foreground flex items-center gap-1 truncate">
                                         {proc.doctor_name}
                                     </span>
-                                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70 border px-1 rounded">
+                                    <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground/70 border px-1.5 rounded shrink-0 bg-muted/50">
                                         {proc.category === 'consultation' ? 'Consulta' :
                                             proc.category === 'exam' ? 'Exame' :
-                                                proc.category === 'surgery' ? 'Cirurgia' : 'Proc.'}
+                                                proc.category === 'surgery' ? 'Cirurgia' : 'Proced.'}
                                     </span>
                                 </div>
                             </div>

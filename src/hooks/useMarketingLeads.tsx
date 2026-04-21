@@ -44,11 +44,15 @@ export function useMarketingLeads(filters?: {
   campaign_id?: string;
   platform?: 'google_ads' | 'meta_ads';
   status?: string;
+  start_date?: string;
+  end_date?: string;
+  include_conversions_in_range?: boolean;
 }) {
   const { data: campaigns } = useAdCampaignsSync();
 
   return useQuery({
-    queryKey: ['marketing-leads', campaigns?.length ?? 0, filters?.campaign_id, filters?.platform, filters?.status],
+    queryKey: ['marketing-leads', campaigns?.length ?? 0, filters?.campaign_id, filters?.platform, filters?.status, filters?.start_date, filters?.end_date, filters?.include_conversions_in_range],
+    staleTime: 5 * 60 * 1000, // 5 minutos de cache
     queryFn: async (): Promise<MarketingLead[]> => {
 
       // 1. Buscar formulários SINCRONIZADOS (meta_lead_forms) para filtrar
@@ -58,10 +62,33 @@ export function useMarketingLeads(filters?: {
 
       const syncedFormIds = new Set((syncedForms || []).map((f: any) => f.meta_form_id));
 
-      // 2. Buscar lead_form_submissions com dados CRM
-      const { data: formLeads, error: formsError } = await (supabase
+      // 2. Buscar lead_form_submissions
+      let leadQuery = (supabase
         .from('lead_form_submissions' as any) as any)
-        .select('*')
+        .select('*');
+      
+      let convertedContactIds: string[] = [];
+      if (filters?.include_conversions_in_range && filters?.start_date && filters?.end_date) {
+        // Buscar contatos que tiveram consulta no período
+        const { data: appts } = await supabase
+          .from('medical_appointments')
+          .select('contact_id')
+          .gte('completed_at', filters.start_date)
+          .lte('completed_at', filters.end_date);
+        
+        convertedContactIds = (appts || []).map((a: any) => a.contact_id).filter(Boolean);
+      }
+
+      if (filters?.start_date && filters?.end_date) {
+        if (convertedContactIds.length > 0) {
+          // Filtro inclusivo: criados no período OU convertidos no período
+          leadQuery = leadQuery.or(`created_at.gte.${filters.start_date},and(created_at.lte.${filters.end_date}),crm_contact_id.in.(${convertedContactIds.join(',')})`);
+        } else {
+          leadQuery = leadQuery.gte('created_at', filters.start_date).lte('created_at', filters.end_date);
+        }
+      }
+
+      const { data: formLeads, error: formsError } = await leadQuery
         .order('created_at', { ascending: false });
 
       if (formsError) {

@@ -136,14 +136,15 @@ async function sendWA(cfg: any, to: string, text: string, sb: any, cid: string, 
   var sm = ir.data;
   try {
     var wr: Response;
-    if (prov === 'evolution') {
+      if (prov === 'evolution') {
       var evoKey = cfg.evolution_instance_token && cfg.evolution_instance_token.length > 0
         ? cfg.evolution_instance_token
         : (Deno.env.get('EVOLUTION_GLOBAL_API_KEY') || '');
+      var cleanNumber = to.replace('+', '').trim();
       wr = await fetch(cfg.evolution_api_url.replace(/\/+$/, '') + '/message/sendText/' + cfg.evolution_instance_name, {
         method: 'POST',
         headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ number: to, textMessage: { text: text }, options: { delay: 1200, presence: 'composing' } }),
+        body: JSON.stringify({ number: cleanNumber, textMessage: { text: text }, text: text, options: { delay: 1200, presence: 'composing' } }),
       });
     } else {
       wr = await fetch('https://graph.facebook.com/v18.0/' + cfg.phone_number_id + '/messages', {

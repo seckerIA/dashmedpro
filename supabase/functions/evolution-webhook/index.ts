@@ -192,13 +192,14 @@ const handler = async (req: Request): Promise<Response> => {
 
       console.log('[EvoWebhook] Message saved:', savedMessage.id, isFromMe ? '(outbound)' : '(inbound)');
 
+      let finalContent = content;
+
       // ---- Save media if present ----
       if (mediaInfo.hasMedia && savedMessage?.id) {
         let mediaUrl = '';
-
-        // Try to download media from Evolution API and upload to Supabase Storage
+        let base64 = null;
         try {
-          const base64 = await downloadEvoMedia(config as any, instanceName, data);
+          base64 = await downloadEvoMedia(config as any, instanceName, data);
           if (base64) {
             const uploaded = await uploadMediaToStorage(
               supabaseAdmin,
@@ -222,6 +223,19 @@ const handler = async (req: Request): Promise<Response> => {
         });
 
         console.log('[EvoWebhook] Media saved for message:', savedMessage.id, 'type:', messageType, 'url:', mediaUrl ? 'yes' : 'no');
+
+        // ---- Audio Transcription ----
+        if (messageType === 'audio' && base64) {
+          const openAiKey = Deno.env.get('OPENAI_API_KEY');
+          if (openAiKey) {
+            const transcription = await transcribeAudio(base64, mediaInfo.mimeType || 'audio/ogg', openAiKey);
+            if (transcription) {
+               finalContent = `[Áudio Transcrito]: ${transcription}`;
+               await supabaseAdmin.from('whatsapp_messages').update({ content: finalContent }).eq('id', savedMessage.id);
+               console.log('[EvoWebhook] Audio transcribed successfully:', transcription);
+            }
+          }
+        }
       }
 
       // ---- Trigger AI Agent only for inbound messages ----
@@ -235,7 +249,7 @@ const handler = async (req: Request): Promise<Response> => {
 
       const agentBody = JSON.stringify({
         conversation_id: conversationId,
-        message_content: content,
+        message_content: finalContent,
         phone_number: phoneNumber,
         user_id: userId,
       });
@@ -406,7 +420,7 @@ async function downloadEvoMedia(
         'apikey': evoKey,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ message: messageData.key, convertToMp4: false }),
+      body: JSON.stringify({ message: messageData, convertToMp4: false }),
     });
     if (!res.ok) {
       console.error('[EvoWebhook] Media download failed:', res.status, await res.text().catch(() => ''));
@@ -465,6 +479,46 @@ async function uploadMediaToStorage(
     return urlData?.publicUrl || null;
   } catch (e) {
     console.error('[EvoWebhook] Upload error:', e);
+    return null;
+  }
+}
+
+// =========================================
+// Transcribe Audio using Whisper API
+// =========================================
+async function transcribeAudio(base64Data: string, mimeType: string, openAiKey: string): Promise<string | null> {
+  try {
+    const raw = base64Data.replace(/^data:[^;]+;base64,/, '');
+    const binaryStr = atob(raw);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+    
+    const extMap: Record<string, string> = { 'audio/mp4': 'mp4', 'audio/mpeg': 'mp3', 'audio/webm': 'webm' };
+    const ext = extMap[mimeType.toLowerCase()] || 'ogg';
+    const blob = new Blob([bytes], { type: mimeType || 'audio/ogg' });
+    
+    const formData = new FormData();
+    formData.append('file', blob, `audio.${ext}`);
+    formData.append('model', 'whisper-1');
+    formData.append('language', 'pt');
+
+    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${openAiKey}` },
+      body: formData
+    });
+
+    if (!response.ok) {
+      console.error('[Whisper] API Error:', await response.text());
+      return null;
+    }
+
+    const data = await response.json();
+    return data.text || null;
+  } catch (e) {
+    console.error('[Whisper] Exception:', e);
     return null;
   }
 }

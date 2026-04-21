@@ -441,32 +441,32 @@ const Financial = () => {
                 <Card className="bg-gradient-to-br from-card to-card/50 border-border overflow-hidden">
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-sm text-muted-foreground">Despesas do Mês</p>
+                      <p className="text-sm text-muted-foreground">Despesas Variáveis</p>
                       <ArrowDownLeft className="w-5 h-5 text-red-500" />
                     </div>
-                    <p className="text-xl 2xl:text-2xl font-bold text-red-500 mb-1" title={formatCurrency((metrics?.monthExpenses || 0) + (metrics?.monthTotalCosts || 0))}>
-                      <AnimatedCurrency value={(metrics?.monthExpenses || 0) + (metrics?.monthTotalCosts || 0)} duration={1.2} />
+                    <p className="text-xl 2xl:text-2xl font-bold text-red-500 mb-1" title={formatCurrency(metrics?.monthExpenses || 0)}>
+                      <AnimatedCurrency value={metrics?.monthExpenses || 0} duration={1.2} />
                     </p>
                     <div className="flex items-center gap-1">
                       <TrendingUp className="w-3 h-3 text-red-500" />
-                      <span className="text-xs text-muted-foreground">+8.2% vs mês anterior</span>
+                      <span className="text-xs text-muted-foreground">Saídas avulsas</span>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Custos Totais */}
+                {/* Custos Fixos */}
                 <Card className="bg-gradient-to-br from-card to-card/50 border-border overflow-hidden">
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-sm text-muted-foreground">Custos Totais</p>
-                      <ShoppingCart className="w-5 h-5 text-orange-500" />
+                      <p className="text-sm text-muted-foreground">Custos Fixos</p>
+                      <Zap className="w-5 h-5 text-purple-500" />
                     </div>
-                    <p className="text-xl 2xl:text-2xl font-bold text-orange-500 mb-1" title={formatCurrency(metrics?.monthTotalCosts || 0)}>
-                      <AnimatedCurrency value={metrics?.monthTotalCosts || 0} duration={1.2} />
+                    <p className="text-xl 2xl:text-2xl font-bold text-purple-500 mb-1" title={formatCurrency(metrics?.monthFixedCosts || 0)}>
+                      <AnimatedCurrency value={metrics?.monthFixedCosts || 0} duration={1.2} />
                     </p>
                     <div className="flex items-center gap-1">
-                      <TrendingUp className="w-3 h-3 text-orange-500" />
-                      <span className="text-xs text-muted-foreground">Custos de serviços</span>
+                      <TrendingUp className="w-3 h-3 text-purple-500" />
+                      <span className="text-xs text-muted-foreground">Inclui Marketing</span>
                     </div>
                   </CardContent>
                 </Card>

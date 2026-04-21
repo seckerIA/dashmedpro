@@ -29,7 +29,7 @@ export function WhatsAppLayout({
       {/* Coluna 1: Inbox/Lista de conversas */}
       <div
         className={cn(
-          'w-full md:w-80 lg:w-96 border-r flex-shrink-0 flex flex-col',
+          'w-full md:w-80 border-r flex-shrink-0 flex flex-col',
           // Hide inbox on mobile/tablet when a chat is selected
           // Show again at lg (1024px+) where there's room for both panes
           selectedConversationId && 'hidden lg:flex'
