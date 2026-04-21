@@ -130,8 +130,11 @@ export function useNotifications() {
   useEffect(() => {
     if (!user?.id) return;
 
+    // Criar um ID único para este canal para evitar conflitos entre múltiplas instâncias do hook
+    const channelId = `notifications-${user.id}-${Math.random().toString(36).substring(7)}`;
+
     const channel = supabase
-      .channel('notifications-realtime')
+      .channel(channelId)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -144,7 +147,9 @@ export function useNotifications() {
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { 
+      supabase.removeChannel(channel); 
+    };
   }, [user?.id]);
 
   return {
