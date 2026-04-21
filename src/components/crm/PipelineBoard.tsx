@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -119,6 +119,41 @@ function SortableDealCard({
     </div>
   );
 }
+
+// Componente para coluna droppable movido para fora do escopo de renderização
+const DroppableColumn = ({ stage, children }: { stage: typeof PIPELINE_STAGES[0], children: React.ReactNode }) => {
+  const { setNodeRef, isOver } = useDroppable({
+    id: stage.value,
+    data: {
+      type: 'column',
+      stage: stage.value,
+    }
+  });
+
+  const isMobile = useIsMobile();
+  const widthStyle = isMobile ? '85vw' : '320px';
+
+  return (
+    <Card
+      ref={setNodeRef}
+      className={`flex-shrink-0 w-[85vw] md:w-80 bg-gradient-to-br from-card to-card/50 border-2 shadow-card transition-all duration-100 ease-out snap-center ${isOver
+        ? 'border-primary shadow-glow ring-2 ring-primary/20 scale-[1.01]'
+        : 'border-border hover:shadow-lg'
+        }`}
+      style={{
+        width: widthStyle,
+        maxWidth: widthStyle,
+        minWidth: widthStyle,
+        boxSizing: 'border-box',
+        overflow: 'hidden',
+        transform: 'translateZ(0)', // GPU acceleration
+        willChange: isOver ? 'transform, box-shadow' : 'auto',
+      }}
+    >
+      {children}
+    </Card>
+  );
+};
 
 export interface PipelineBoardProps {
   deals: CRMDealWithContact[];
@@ -335,38 +370,12 @@ export function PipelineBoard({
     }
   };
 
-  // Componente para coluna droppable
-  function DroppableColumn({ stage, children }: { stage: typeof PIPELINE_STAGES[0], children: React.ReactNode }) {
-    const { setNodeRef, isOver } = useDroppable({
-      id: stage.value,
-      data: {
-        type: 'column',
-        stage: stage.value,
-      }
-    });
-
-    const isMobile = useIsMobile();
-    const widthStyle = isMobile ? '85vw' : '320px';
-
+  // Validação de dados para evitar crashes
+  if (!deals || !Array.isArray(deals)) {
     return (
-      <Card
-        ref={setNodeRef}
-        className={`flex-shrink-0 w-[85vw] md:w-80 bg-gradient-to-br from-card to-card/50 border-2 shadow-card transition-all duration-100 ease-out snap-center ${isOver
-          ? 'border-primary shadow-glow ring-2 ring-primary/20 scale-[1.01]'
-          : 'border-border hover:shadow-lg'
-          }`}
-        style={{
-          width: widthStyle,
-          maxWidth: widthStyle,
-          minWidth: widthStyle,
-          boxSizing: 'border-box',
-          overflow: 'hidden',
-          transform: 'translateZ(0)', // GPU acceleration
-          willChange: isOver ? 'transform, box-shadow' : 'auto',
-        }}
-      >
-        {children}
-      </Card>
+      <div className="flex items-center justify-center h-64 text-muted-foreground bg-card/50 rounded-xl border border-dashed">
+        Aguardando carregamento dos dados do pipeline...
+      </div>
     );
   }
 

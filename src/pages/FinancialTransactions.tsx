@@ -22,9 +22,11 @@ import {
 import { useFinancialTransactions } from "@/hooks/useFinancialTransactions"
 import { useDeleteFinancialTransaction } from "@/hooks/useFinancialTransactionMutations"
 import { useUserProfile } from "@/hooks/useUserProfile"
+import { useFinancialMetrics } from "@/hooks/useFinancialMetrics"
 import { formatDisplayDate, parseLocalDate } from "@/utils/dateUtils"
 import { FinancialTransactionWithDetails } from "@/types/financial"
 import { formatCurrency } from "@/lib/currency"
+import { format } from "date-fns"
 
 interface FinancialTransactionsProps {
   embedded?: boolean;
@@ -35,16 +37,14 @@ const FinancialTransactions = ({ embedded = false }: FinancialTransactionsProps)
   const { transactions, isLoading } = useFinancialTransactions()
   const deleteTransaction = useDeleteFinancialTransaction()
   const { isAdmin } = useUserProfile()
+  const { metrics } = useFinancialMetrics()
+  const totalMarketingSpend = metrics?.totalMarketingSpend || 0
 
   const [searchTerm, setSearchTerm] = useState("")
   const [filterType, setFilterType] = useState<"all" | "entrada" | "saida">("all")
   const [selectedTransaction, setSelectedTransaction] = useState<FinancialTransactionWithDetails | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc")
-
-  // Debug logs
-  // console.log('FinancialTransactions - transactions:', transactions)
-  // console.log('FinancialTransactions - isLoading:', isLoading)
 
   // Filtrar e ordenar transações
   const filteredAndSortedTransactions = useMemo(() => {
@@ -58,8 +58,28 @@ const FinancialTransactions = ({ embedded = false }: FinancialTransactionsProps)
       return matchesType && matchesSearch
     }) || []
 
+    // Adicionar transação virtual de Marketing se houver gasto e não estiver filtrado como receita
+    if (totalMarketingSpend > 0 && (filterType === "all" || filterType === "saida") && (!searchTerm || "marketing".includes(searchTerm.toLowerCase()))) {
+      const virtualMarketing: any = {
+        id: 'virtual-marketing',
+        description: 'Marketing (Meta/Google Ads)',
+        amount: totalMarketingSpend,
+        type: 'saida',
+        status: 'concluida',
+        transaction_date: format(new Date(), 'yyyy-MM-dd'),
+        category: { name: 'Marketing', color: '#8b5cf6' },
+        account: { name: 'Automático' },
+        isVirtual: true
+      };
+      result = [virtualMarketing, ...result];
+    }
+
     // Aplicar ordenação
     return [...result].sort((a, b) => {
+      // Se for virtual, mantém no topo se order for desc
+      if (a.isVirtual) return sortOrder === "desc" ? -1 : 1;
+      if (b.isVirtual) return sortOrder === "desc" ? 1 : -1;
+
       const dateA = parseLocalDate(a.transaction_date).getTime()
       const dateB = parseLocalDate(b.transaction_date).getTime()
 
@@ -67,12 +87,11 @@ const FinancialTransactions = ({ embedded = false }: FinancialTransactionsProps)
         return sortOrder === "desc" ? dateB - dateA : dateA - dateB
       }
 
-      // Se a data for igual, usar created_at como desempate
       const createdA = new Date(a.created_at || 0).getTime()
       const createdB = new Date(b.created_at || 0).getTime()
       return sortOrder === "desc" ? createdB - createdA : createdA - createdB
     })
-  }, [transactions, searchTerm, filterType, sortOrder])
+  }, [transactions, searchTerm, filterType, sortOrder, totalMarketingSpend])
 
   const handleDelete = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir esta transação?')) {
@@ -306,6 +325,7 @@ const FinancialTransactions = ({ embedded = false }: FinancialTransactionsProps)
                               size="sm"
                               variant="ghost"
                               onClick={() => handleEdit(transaction)}
+                              disabled={(transaction as any).isVirtual}
                             >
                               <Edit className="w-4 h-4" />
                             </Button>
@@ -313,7 +333,7 @@ const FinancialTransactions = ({ embedded = false }: FinancialTransactionsProps)
                               size="sm"
                               variant="ghost"
                               onClick={() => handleDelete(transaction.id)}
-                              disabled={deleteTransaction.isPending}
+                              disabled={deleteTransaction.isPending || (transaction as any).isVirtual}
                               className="text-muted-foreground hover:text-destructive"
                             >
                               <Trash2 className="w-4 h-4" />

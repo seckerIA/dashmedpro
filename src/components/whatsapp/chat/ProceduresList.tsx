@@ -16,19 +16,20 @@ export function ProceduresList() {
     const [searchTerm, setSearchTerm] = useState('');
 
     const filteredProcedures = procedures.filter(p =>
-        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.doctor_name?.toLowerCase().includes(searchTerm.toLowerCase())
+        (p.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (p.doctor_name?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     );
 
     const handleDragStart = (e: React.DragEvent, procedure: typeof procedures[0]) => {
-        const text = `Procedimento: *${procedure.name}*\nValor: R$ ${procedure.price.toFixed(2)}${procedure.description ? `\n${procedure.description}` : ''}`;
+        const price = typeof procedure.price === 'number' ? procedure.price : 0;
+        const text = `Procedimento: *${procedure.name || 'Sem nome'}*\nValor: R$ ${price.toFixed(2)}${procedure.description ? `\n${procedure.description}` : ''}`;
         e.dataTransfer.setData('text/plain', text);
         e.dataTransfer.effectAllowed = 'copy';
     };
 
     if (isLoading) {
         return (
-            <Card className="h-full border-l rounded-none">
+            <Card className="h-full border-none rounded-none bg-background/50 backdrop-blur-sm shadow-none w-full flex flex-col">
                 <CardHeader className="py-3 px-4">
                     <Skeleton className="h-6 w-32" />
                 </CardHeader>
@@ -69,37 +70,40 @@ export function ProceduresList() {
                             Nenhum procedimento encontrado
                         </div>
                     ) : (
-                        filteredProcedures.map((proc) => (
-                            <div
-                                key={proc.id}
-                                draggable
-                                onDragStart={(e) => handleDragStart(e, proc)}
-                                className="group flex flex-col gap-1 p-3 rounded-md border bg-card hover:bg-accent/50 hover:border-primary/50 cursor-grab active:cursor-grabbing transition-all shadow-sm"
-                            >
-                                <div className="flex items-start justify-between gap-2 overflow-hidden">
-                                    <div className="flex-1 min-w-0">
-                                        <div className="font-semibold text-sm leading-tight flex items-center gap-1">
-                                            <GripVertical className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                                            <span className="break-words line-clamp-2">{proc.name}</span>
+                        filteredProcedures.map((proc) => {
+                            const price = typeof proc.price === 'number' ? proc.price : 0;
+                            return (
+                                <div
+                                    key={proc.id}
+                                    draggable
+                                    onDragStart={(e) => handleDragStart(e, proc)}
+                                    className="group flex flex-col gap-1 p-3 rounded-md border bg-card hover:bg-accent/50 hover:border-primary/50 cursor-grab active:cursor-grabbing transition-all shadow-sm"
+                                >
+                                    <div className="flex items-start justify-between gap-2 overflow-hidden">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="font-semibold text-sm leading-tight flex items-center gap-1">
+                                                <GripVertical className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                                                <span className="break-words line-clamp-2">{proc.name || 'Sem nome'}</span>
+                                            </div>
                                         </div>
+                                        <Badge variant="secondary" className="text-[11px] px-2 py-0.5 font-bold shrink-0 bg-green-500/10 text-green-600 dark:text-green-400 dark:bg-green-500/20 whitespace-nowrap">
+                                            R$ {price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        </Badge>
                                     </div>
-                                    <Badge variant="secondary" className="text-[11px] px-2 py-0.5 font-bold shrink-0 bg-green-500/10 text-green-600 dark:text-green-400 dark:bg-green-500/20 whitespace-nowrap">
-                                        R$ {proc.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                    </Badge>
-                                </div>
 
-                                <div className="flex items-center justify-between mt-2 pl-4 overflow-hidden">
-                                    <span className="text-[11px] text-muted-foreground flex items-center gap-1 truncate">
-                                        {proc.doctor_name}
-                                    </span>
-                                    <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground/70 border px-1.5 rounded shrink-0 bg-muted/50">
-                                        {proc.category === 'consultation' ? 'Consulta' :
-                                            proc.category === 'exam' ? 'Exame' :
-                                                proc.category === 'surgery' ? 'Cirurgia' : 'Proced.'}
-                                    </span>
+                                    <div className="flex items-center justify-between mt-2 pl-4 overflow-hidden">
+                                        <span className="text-[11px] text-muted-foreground flex items-center gap-1 truncate">
+                                            {proc.doctor_name || 'Médico'}
+                                        </span>
+                                        <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground/70 border px-1.5 rounded shrink-0 bg-muted/50">
+                                            {proc.category === 'consultation' ? 'Consulta' :
+                                                proc.category === 'exam' ? 'Exame' :
+                                                    proc.category === 'surgery' ? 'Cirurgia' : 'Proced.'}
+                                        </span>
+                                    </div>
                                 </div>
-                            </div>
-                        ))
+                            );
+                        })
                     )}
                 </div>
             </ScrollArea>

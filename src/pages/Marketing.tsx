@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Megaphone, Settings, BarChart3, LayoutDashboard, Users, FileText } from "lucide-react";
+import { Megaphone, Settings, BarChart3, LayoutDashboard, Users, FileText, Calendar as CalendarIcon } from "lucide-react";
 import { MarketingDashboard } from "@/components/marketing/MarketingDashboard";
 import { AdPlatformsIntegration } from "@/components/commercial/AdPlatformsIntegration";
 import { AdCampaignsList } from "@/components/commercial/AdCampaignsList";
@@ -10,11 +10,23 @@ import { MarketingLeadsConversions } from "@/components/marketing/MarketingLeads
 import { MarketingReports } from "@/components/marketing/MarketingReports";
 import { MarketingOnboarding, MarketingHelpCard } from "@/components/marketing/MarketingOnboarding";
 import { MetaConnectionGate } from "@/components/marketing/MetaConnectionGate";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { format, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { DateRange } from "react-day-picker";
 
 export default function Marketing() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get("tab") || "dashboard";
   const [activeTab, setActiveTab] = useState(tabFromUrl);
+  
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date()),
+  });
 
   useEffect(() => {
     if (tabFromUrl) {
@@ -35,17 +47,105 @@ export default function Marketing() {
     <MetaConnectionGate>
       <div className="min-h-screen space-y-6 bg-background pb-20">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="p-3 rounded-xl bg-primary/10">
               <Megaphone className="h-8 w-8 text-primary" />
             </div>
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-card-foreground">Marketing</h1>
-              <p className="text-muted-foreground text-sm sm:text-lg">
+              <p className="text-muted-foreground text-sm">
                 Gestão de campanhas de anúncios e estratégias de marketing digital
               </p>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end md:self-auto">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn(
+                  "justify-start text-left font-normal w-[240px] bg-card",
+                  !dateRange && "text-muted-foreground"
+                )}>
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateRange?.from ? (
+                    dateRange.to ? (
+                      <>
+                        {format(dateRange.from, "dd/MM/y")} -{" "}
+                        {format(dateRange.to, "dd/MM/y")}
+                      </>
+                    ) : (
+                      format(dateRange.from, "dd/MM/y")
+                    )
+                  ) : (
+                    <span>Selecione um período</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <div className="flex border-b border-border">
+                  <div className="flex flex-col gap-2 p-3 border-r border-border min-w-[140px] bg-muted/10">
+                    <div className="text-xs font-semibold text-muted-foreground mb-1 px-1">Período</div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="justify-start text-xs font-normal"
+                      onClick={() => setDateRange({
+                        from: startOfMonth(new Date()),
+                        to: endOfMonth(new Date())
+                      })}
+                    >
+                      Este mês
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="justify-start text-xs font-normal"
+                      onClick={() => setDateRange({
+                        from: startOfMonth(subMonths(new Date(), 1)),
+                        to: endOfMonth(subMonths(new Date(), 1))
+                      })}
+                    >
+                      Mês passado
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="justify-start text-xs font-normal"
+                      onClick={() => setDateRange({
+                        from: startOfMonth(subMonths(new Date(), 3)),
+                        to: endOfMonth(new Date())
+                      })}
+                    >
+                      Últimos 3 meses
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="justify-start text-xs font-normal"
+                      onClick={() => setDateRange({
+                        from: startOfYear(new Date()),
+                        to: endOfYear(new Date())
+                      })}
+                    >
+                      Este ano
+                    </Button>
+                  </div>
+                  <div className="p-0">
+                    <Calendar
+                      initialFocus
+                      mode="range"
+                      defaultMonth={dateRange?.from}
+                      selected={dateRange}
+                      onSelect={setDateRange}
+                      numberOfMonths={2}
+                      locale={ptBR}
+                      className="p-3"
+                    />
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
@@ -99,8 +199,11 @@ export default function Marketing() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="dashboard" className="mt-6">
-          <MarketingDashboard />
+        <TabsContent value="dashboard" className="mt-6 outline-none">
+          <MarketingDashboard 
+            startDate={dateRange?.from} 
+            endDate={dateRange?.to} 
+          />
         </TabsContent>
 
         <TabsContent value="campaigns" className="mt-6">

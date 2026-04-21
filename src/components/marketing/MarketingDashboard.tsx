@@ -41,15 +41,10 @@ import { cn } from "@/lib/utils";
 import { startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear } from "date-fns";
 import { DateRange } from "react-day-picker";
 
-export function MarketingDashboard() {
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date()),
-  });
-
+export function MarketingDashboard({ startDate, endDate }: { startDate?: Date; endDate?: Date }) {
   const { data: dashboardData, isLoading } = useMarketingDashboard({
-    startDate: dateRange?.from,
-    endDate: dateRange?.to,
+    startDate,
+    endDate,
   });
   const { data: connections } = useAdPlatformConnections();
   const syncCampaigns = useSyncAdCampaigns();
@@ -148,99 +143,15 @@ export function MarketingDashboard() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className={cn(
-                "justify-start text-left font-normal w-[240px]",
-                !dateRange && "text-muted-foreground"
-              )}>
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateRange?.from ? (
-                  dateRange.to ? (
-                    <>
-                      {format(dateRange.from, "dd/MM/y")} -{" "}
-                      {format(dateRange.to, "dd/MM/y")}
-                    </>
-                  ) : (
-                    format(dateRange.from, "dd/MM/y")
-                  )
-                ) : (
-                  <span>Selecione um período</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <div className="flex border-b border-border">
-                <div className="flex flex-col gap-2 p-3 border-r border-border min-w-[140px] bg-muted/10">
-                  <div className="text-xs font-semibold text-muted-foreground mb-1 px-1">Período</div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="justify-start text-xs font-normal"
-                    onClick={() => setDateRange({
-                      from: startOfMonth(new Date()),
-                      to: endOfMonth(new Date())
-                    })}
-                  >
-                    Este mês
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="justify-start text-xs font-normal"
-                    onClick={() => setDateRange({
-                      from: startOfMonth(subMonths(new Date(), 1)),
-                      to: endOfMonth(subMonths(new Date(), 1))
-                    })}
-                  >
-                    Mês passado
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="justify-start text-xs font-normal"
-                    onClick={() => setDateRange({
-                      from: startOfMonth(subMonths(new Date(), 3)),
-                      to: endOfMonth(new Date())
-                    })}
-                  >
-                    Últimos 3 meses
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="justify-start text-xs font-normal"
-                    onClick={() => setDateRange({
-                      from: startOfYear(new Date()),
-                      to: endOfYear(new Date())
-                    })}
-                  >
-                    Este ano
-                  </Button>
-                </div>
-                <div className="p-0">
-                  <Calendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={dateRange?.from}
-                    selected={dateRange}
-                    onSelect={setDateRange}
-                    numberOfMonths={2}
-                    locale={ptBR}
-                    className="p-3"
-                  />
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-          
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={() => handleSyncAll()}
             disabled={syncCampaigns.isPending}
+            className="hover:bg-primary/10"
           >
-            <RefreshCw className={cn("h-4 w-4", syncCampaigns.isPending && "animate-spin")} />
+            <RefreshCw className={cn("h-4 w-4 mr-2", syncCampaigns.isPending && "animate-spin")} />
+            Sincronizar Dados
           </Button>
         </div>
       </div>
