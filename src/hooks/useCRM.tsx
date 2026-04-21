@@ -289,6 +289,8 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
       queryClient.invalidateQueries({ queryKey: ['team-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['marketing-leads'] });
+      queryClient.invalidateQueries({ queryKey: ['marketing-dashboard'] });
     },
   });
 

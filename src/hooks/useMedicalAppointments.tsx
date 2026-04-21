@@ -1081,6 +1081,8 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
       queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['financial-metrics'] });
       queryClient.invalidateQueries({ queryKey: ['financial-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['marketing-leads'] });
+      queryClient.invalidateQueries({ queryKey: ['marketing-dashboard'] });
       toast({
         title: 'Consulta agendada com sucesso!',
         description: 'A consulta foi adicionada à agenda.',
@@ -1142,6 +1144,8 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
       queryClient.invalidateQueries({ queryKey: ['stock-usage-history'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['marketing-leads'] });
+      queryClient.invalidateQueries({ queryKey: ['marketing-dashboard'] });
     },
   });
 
@@ -1390,6 +1394,8 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
       queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
       queryClient.invalidateQueries({ queryKey: ['crm-pipeline'] });
       queryClient.invalidateQueries({ queryKey: ['crm-contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['marketing-leads'] });
+      queryClient.invalidateQueries({ queryKey: ['marketing-dashboard'] });
     },
     onError: (error: Error) => {
       toast({

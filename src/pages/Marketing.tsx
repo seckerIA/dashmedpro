@@ -124,6 +124,28 @@ export default function Marketing() {
                       size="sm"
                       className="justify-start text-xs font-normal"
                       onClick={() => setDateRange({
+                        from: startOfMonth(subMonths(new Date(), 6)),
+                        to: endOfMonth(new Date())
+                      })}
+                    >
+                      Últimos 6 meses
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="justify-start text-xs font-normal"
+                      onClick={() => setDateRange({
+                        from: startOfMonth(subMonths(new Date(), 12)),
+                        to: endOfMonth(new Date())
+                      })}
+                    >
+                      Últimos 12 meses
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="justify-start text-xs font-normal"
+                      onClick={() => setDateRange({
                         from: startOfYear(new Date()),
                         to: endOfYear(new Date())
                       })}
