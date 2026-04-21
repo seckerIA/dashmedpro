@@ -105,7 +105,7 @@ const navigationGroups: Array<{
         { title: "Calculadora", url: "/calculadora", icon: Calculator, badge: "Novo", variant: "new" as const },
         { title: "Tabela de Preços", url: "/procedimentos", icon: DollarSign, medicoOnly: true, badge: "Novo", variant: "new" as const },
         { title: "Métricas de Equipe", url: "/crm", icon: Users },
-        { title: "Calendário", url: "/calendar", icon: Calendar, badge: "Novo", variant: "new" as const },
+        { title: "Agenda", url: "/calendar", icon: Calendar, badge: "Novo", variant: "new" as const },
         // { title: "Follow-ups", url: "/follow-ups", icon: RotateCcw }, // Ocultado
         // { title: "Funil de Vendas", url: "/funil-vendas", icon: BarChart3 }, // Ocultado - placeholder
       ]
