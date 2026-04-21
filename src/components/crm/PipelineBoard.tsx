@@ -122,6 +122,8 @@ function SortableDealCard({
 
 // Componente para coluna droppable movido para fora do escopo de renderização
 const DroppableColumn = ({ stage, children }: { stage: typeof PIPELINE_STAGES[0], children: React.ReactNode }) => {
+  if (!stage || !stage.value) return null;
+
   const { setNodeRef, isOver } = useDroppable({
     id: stage.value,
     data: {

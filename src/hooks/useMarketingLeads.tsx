@@ -52,147 +52,115 @@ export function useMarketingLeads(filters?: {
 
   return useQuery({
     queryKey: ['marketing-leads', campaigns?.length ?? 0, filters?.campaign_id, filters?.platform, filters?.status, filters?.start_date, filters?.end_date, filters?.include_conversions_in_range],
-    staleTime: 5 * 60 * 1000, // 5 minutos de cache
+    staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<MarketingLead[]> => {
-
-      // 1. Buscar formulários SINCRONIZADOS (meta_lead_forms) para filtrar
+      const marketingOrigins = ['google', 'facebook', 'instagram', 'website', 'indication', 'other', 'indicação'];
+      
+      // 1. Fetch lead forms for specific Meta Ads context
       const { data: syncedForms } = await (supabase
         .from('meta_lead_forms' as any) as any)
         .select('meta_form_id');
-
       const syncedFormIds = new Set((syncedForms || []).map((f: any) => f.meta_form_id));
 
-      // 2. Buscar lead_form_submissions
-      let leadQuery = (supabase
-        .from('lead_form_submissions' as any) as any)
+      // 2. Fetch commercial_leads with marketing origins
+      let commLeadsQuery = supabase
+        .from('commercial_leads')
         .select('*');
-      
-      let convertedContactIds: string[] = [];
-      if (filters?.include_conversions_in_range && filters?.start_date && filters?.end_date) {
-        // Buscar contatos que tiveram consulta no período
-        const { data: appts } = await supabase
-          .from('medical_appointments')
-          .select('contact_id')
-          .gte('completed_at', filters.start_date)
-          .lte('completed_at', filters.end_date);
-        
-        convertedContactIds = (appts || []).map((a: any) => a.contact_id).filter(Boolean);
-      }
 
       if (filters?.start_date && filters?.end_date) {
-        if (convertedContactIds.length > 0) {
-          // Filtro inclusivo: criados no período OU convertidos no período
-          leadQuery = leadQuery.or(`created_at.gte.${filters.start_date},and(created_at.lte.${filters.end_date}),crm_contact_id.in.(${convertedContactIds.join(',')})`);
-        } else {
-          leadQuery = leadQuery.gte('created_at', filters.start_date).lte('created_at', filters.end_date);
-        }
+        commLeadsQuery = commLeadsQuery.gte('created_at', filters.start_date).lte('created_at', filters.end_date);
       }
 
-      const { data: formLeads, error: formsError } = await leadQuery
-        .order('created_at', { ascending: false });
+      const { data: commLeads, error: commError } = await commLeadsQuery;
+      if (commError) console.error('Error fetching commercial leads:', commError);
 
-      if (formsError) {
-        console.error('Error fetching lead forms:', formsError);
+      // 3. Fetch lead_form_submissions (Meta Lead Gen)
+      let formLeadsQuery = (supabase.from('lead_form_submissions' as any) as any).select('*');
+      if (filters?.start_date && filters?.end_date) {
+        formLeadsQuery = formLeadsQuery.gte('created_at', filters.start_date).lte('created_at', filters.end_date);
       }
+      const { data: formSubmissions, error: formsError } = await formLeadsQuery;
+      if (formsError) console.error('Error fetching form submissions:', formsError);
 
-      // 3. Filtrar APENAS leads de formulários sincronizados
-      const filteredFormLeads = (formLeads || []).filter((lead: any) =>
-        syncedFormIds.has(lead.form_id)
-      );
+      // 4. Gather all relevant contact IDs for enrichment
+      const allContactIds = new Set<string>();
+      (commLeads || []).forEach(l => { if (l.contact_id) allContactIds.add(l.contact_id); });
+      (formSubmissions || []).forEach(l => { if (l.crm_contact_id) allContactIds.add(l.crm_contact_id); });
 
-      // 4. Buscar dados CRM (deals + appointments) para os leads vinculados
-      const contactIds = filteredFormLeads
-        .map((l: any) => l.crm_contact_id)
-        .filter(Boolean) as string[];
-      const dealIds = filteredFormLeads
-        .map((l: any) => l.crm_deal_id)
-        .filter(Boolean) as string[];
+      const contactIdsArray = Array.from(allContactIds);
 
-      // Buscar deals do CRM
-      let dealsMap = new Map<string, { stage: string; value: number }>();
-      if (dealIds.length > 0) {
-        const { data: deals } = await supabase
-          .from('crm_deals')
-          .select('id, stage, value')
-          .in('id', dealIds);
-        (deals || []).forEach((d: any) => {
-          dealsMap.set(d.id, { stage: d.stage, value: Number(d.value) || 0 });
-        });
-      }
-
-      // Buscar appointments vinculados aos contatos
-      let appointmentsMap = new Map<string, { status: string; value: number; completed_at: string | null; start_time: string | null }>();
-      if (contactIds.length > 0) {
+      // Fetch appointments for these contacts
+      let appointmentsMap = new Map<string, any>();
+      if (contactIdsArray.length > 0) {
         const { data: appointments } = await supabase
           .from('medical_appointments')
           .select('contact_id, status, estimated_value, completed_at, start_time')
-          .in('contact_id', contactIds);
+          .in('contact_id', contactIdsArray);
+
         (appointments || []).forEach((a: any) => {
-          // Guardar o appointment mais relevante (completed > confirmed > scheduled)
           const existing = appointmentsMap.get(a.contact_id);
           const priority: Record<string, number> = { completed: 3, confirmed: 2, scheduled: 1 };
           if (!existing || (priority[a.status] || 0) > (priority[existing.status] || 0)) {
-            appointmentsMap.set(a.contact_id, {
-              status: a.status,
-              value: Number(a.estimated_value) || 0,
-              completed_at: a.completed_at || null,
-              start_time: a.start_time || null,
-            });
+            appointmentsMap.set(a.contact_id, a);
           }
         });
       }
 
-      // 5. Mapear para MarketingLead com dados CRM reais
-      const formLeadsMapped = filteredFormLeads.map((lead: any) => {
-        const campaign = lead.campaign_id
-          ? campaigns?.find((c: any) => c.platform_campaign_id === lead.campaign_id)
-          : null;
+      // 5. Map and unify
+      const unifiedLeads: MarketingLead[] = [];
+      const processedContactIds = new Set<string>();
 
-        const deal = lead.crm_deal_id ? dealsMap.get(lead.crm_deal_id) : null;
+      // Priority 1: Form Submissions (more detailed Meta info)
+      (formSubmissions || []).forEach((lead: any) => {
+        if (lead.crm_contact_id) processedContactIds.add(lead.crm_contact_id);
+        
         const appointment = lead.crm_contact_id ? appointmentsMap.get(lead.crm_contact_id) : null;
+        const campaign = lead.campaign_id ? campaigns?.find((c: any) => c.platform_campaign_id === lead.campaign_id) : null;
 
-        // Status real baseado no CRM
-        let realStatus = 'novo';
-        if (appointment?.status === 'completed') {
-          realStatus = 'convertido';
-        } else if (appointment?.status === 'confirmed' || appointment?.status === 'scheduled') {
-          realStatus = 'agendado';
-        } else if (deal?.stage && deal.stage !== 'lead_novo') {
-          realStatus = deal.stage;
-        } else if (lead.is_processed && lead.crm_contact_id) {
-          realStatus = 'no_crm';
-        }
-
-        // Valor real do appointment ou deal
-        const realValue = appointment?.value || deal?.value || 0;
-
-        return {
+        unifiedLeads.push({
           id: lead.id,
           name: lead.full_name || 'Lead Meta Ads',
           email: lead.email,
           phone: lead.phone_number,
           origin: 'facebook',
-          status: realStatus,
-          estimated_value: realValue,
+          status: appointment?.status === 'completed' ? 'convertido' : (appointment ? 'agendado' : 'novo'),
+          estimated_value: Number(appointment?.estimated_value) || 0,
           created_at: lead.created_at,
-          utm_id: null,
           ad_campaign_sync_id: campaign?.id || null,
-          campaign_name: lead.campaign_name || lead.form_name || 'Formulário',
-          form_name: lead.form_name || null,
-          ad_name: lead.ad_name || null,
+          campaign_name: lead.campaign_name || lead.form_name || 'Formulário Meta',
           platform: 'meta_ads',
-          crm_contact_id: lead.crm_contact_id || null,
-          crm_deal_id: lead.crm_deal_id || null,
-          deal_stage: deal?.stage || null,
-          deal_value: deal?.value || null,
+          crm_contact_id: lead.crm_contact_id,
           has_appointment: !!appointment,
-          appointment_status: appointment?.status || null,
-          appointment_value: appointment?.value || null,
-          appointment_completed_at: appointment?.completed_at || appointment?.start_time || null,
-        } as MarketingLead;
+          appointment_status: appointment?.status,
+          appointment_completed_at: appointment?.completed_at || appointment?.start_time,
+        } as any);
       });
 
-      return formLeadsMapped.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      // Priority 2: Commercial Leads with Marketing Origin
+      (commLeads || []).forEach((lead: any) => {
+        if (lead.contact_id && processedContactIds.has(lead.contact_id)) return;
+        if (!marketingOrigins.includes(lead.origin)) return;
+
+        const appointment = lead.contact_id ? appointmentsMap.get(lead.contact_id) : null;
+        
+        unifiedLeads.push({
+          id: lead.id,
+          name: lead.name,
+          email: lead.email,
+          phone: lead.phone,
+          origin: lead.origin,
+          status: appointment?.status === 'completed' ? 'convertido' : (appointment ? 'agendado' : lead.status),
+          estimated_value: Number(appointment?.estimated_value) || 0,
+          created_at: lead.created_at,
+          platform: lead.origin === 'google' ? 'google_ads' : 'meta_ads',
+          crm_contact_id: lead.contact_id,
+          has_appointment: !!appointment,
+          appointment_status: appointment?.status,
+          appointment_completed_at: appointment?.completed_at || appointment?.start_time,
+        } as any);
+      });
+
+      return unifiedLeads.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     },
     enabled: true,
   });
