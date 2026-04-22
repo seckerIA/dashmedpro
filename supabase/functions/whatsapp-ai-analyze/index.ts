@@ -172,7 +172,7 @@ Regras:
       const errText = await openaiRes.text();
       console.error('[whatsapp-ai-analyze] OpenAI error:', errText);
       return new Response(
-        JSON.stringify({ success: false, error: 'AI analysis failed' }),
+        JSON.stringify({ success: false, error: `AI analysis failed: ${errText}` }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -217,11 +217,11 @@ Regras:
     const suggestions = (aiResponse.suggestions || []).map((s: any) => ({
       conversation_id,
       user_id: conversation.user_id,
-      type: s.type || 'response',
+      suggestion_type: s.type === 'response' ? 'quick_reply' : (s.type || 'quick_reply'),
       content: s.content,
       confidence: s.confidence || 0.5,
       reasoning: s.reasoning || '',
-      is_used: false,
+      was_used: false,
       created_at: new Date().toISOString(),
     }));
 
@@ -231,19 +231,21 @@ Regras:
         .from('whatsapp_ai_suggestions')
         .delete()
         .eq('conversation_id', conversation_id)
-        .eq('is_used', false);
+        .eq('was_used', false);
 
-      await supabase
+      const { error: insertError } = await supabase
         .from('whatsapp_ai_suggestions')
         .insert(suggestions);
-    }
 
-    const finalAnalysis = analysisRecord;
+      if (insertError) {
+        console.error('[whatsapp-ai-analyze] Insert suggestions error:', insertError);
+      }
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
-        analysis: finalAnalysis,
+        analysis: analysisRecord,
         suggestions: suggestions,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

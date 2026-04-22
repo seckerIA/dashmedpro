@@ -159,7 +159,7 @@ export function useWhatsAppAI(options: UseWhatsAppAIOptions = {}) {
 
       if (!accessToken) throw new Error('Not authenticated');
 
-      const { data, error: functionError } = await supabase.functions.invoke('whatsapp-ai-analyze', {
+      const { data, error: functionError } = await supabase.functions.invoke('whatsapp-ai-analyze-v3', {
         body: {
           conversation_id: conversationId,
           force_reanalyze: forceReanalyze,
