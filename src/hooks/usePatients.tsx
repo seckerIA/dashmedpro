@@ -163,6 +163,12 @@ export function usePatients() {
       if (updates.blood_type !== undefined) {
         updateData.blood_type = updates.blood_type || null;
       }
+      if (updates.cpf !== undefined) {
+        updateData.cpf = updates.cpf || null;
+      }
+      if (updates.gender !== undefined) {
+        updateData.gender = updates.gender || null;
+      }
       if (updates.allergies !== undefined) {
         updateData.allergies = updates.allergies || [];
       }

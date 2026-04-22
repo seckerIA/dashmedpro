@@ -891,12 +891,14 @@ export type Database = {
           blood_type: string | null
           chronic_conditions: string[] | null
           company: string | null
+          cpf: string | null
           created_at: string
           current_medications: string[] | null
           custom_fields: Json | null
           email: string | null
           emergency_contact: Json | null
           full_name: string
+          gender: string | null
           id: string
           last_appointment_at: string | null
           last_contact_at: string | null
@@ -917,12 +919,14 @@ export type Database = {
           blood_type?: string | null
           chronic_conditions?: string[] | null
           company?: string | null
+          cpf?: string | null
           created_at?: string
           current_medications?: string[] | null
           custom_fields?: Json | null
           email?: string | null
           emergency_contact?: Json | null
           full_name: string
+          gender?: string | null
           id?: string
           last_appointment_at?: string | null
           last_contact_at?: string | null
@@ -943,12 +947,14 @@ export type Database = {
           blood_type?: string | null
           chronic_conditions?: string[] | null
           company?: string | null
+          cpf?: string | null
           created_at?: string
           current_medications?: string[] | null
           custom_fields?: Json | null
           email?: string | null
           emergency_contact?: Json | null
           full_name?: string
+          gender?: string | null
           id?: string
           last_appointment_at?: string | null
           last_contact_at?: string | null

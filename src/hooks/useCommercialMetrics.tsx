@@ -539,7 +539,9 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         : 0;
 
       const convertedLeads = leads?.filter(l => l.status === 'converted').length || 0;
-      const avgCAC = convertedLeads > 0 ? totalCampaignCost / convertedLeads : 0;
+      // CAC = Total Marketing Spend / Completed Appointments (as requested by user)
+      const avgCAC = completedAppointments.length > 0 ? totalCampaignCost / completedAppointments.length : 0;
+
 
       // Taxa de conversão
       const totalLeads = leads?.length || 0;

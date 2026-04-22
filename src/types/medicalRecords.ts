@@ -249,6 +249,8 @@ export interface CreateMedicalRecordInput {
 export interface UpdatePatientMedicalInfoInput {
   birth_date?: string;
   blood_type?: string;
+  cpf?: string;
+  gender?: 'masculino' | 'feminino' | 'outro' | 'prefiro_nao_dizer';
   allergies?: string[];
   chronic_conditions?: string[];
   current_medications?: string[];

@@ -374,12 +374,15 @@ export function PipelineBoard({
 
   // Validação de dados para evitar crashes
   if (!deals || !Array.isArray(deals)) {
+    console.warn('⚠️ [PipelineBoard] Deals não é um array válido:', deals);
     return (
       <div className="flex items-center justify-center h-64 text-muted-foreground bg-card/50 rounded-xl border border-dashed">
         Aguardando carregamento dos dados do pipeline...
       </div>
     );
   }
+
+  console.log('📊 [PipelineBoard] Renderizando pipeline com', deals.length, 'deals');
 
   return (
     <DndContext
@@ -390,7 +393,7 @@ export function PipelineBoard({
       onDragEnd={handleDragEnd}
       measuring={measuringConfig}
     >
-      <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory px-4 md:px-0 scrollbar-hide">
+      <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory px-4 md:px-0 scrollbar-hide min-h-[500px]">
         {PIPELINE_STAGES.map((stage) => {
           const stageDeals = getDealsByStage(stage.value);
 
@@ -429,7 +432,7 @@ export function PipelineBoard({
                 </div>
               </CardHeader>
               <CardContent className="p-2 pt-0" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'visible' }}>
-                <ScrollArea className="h-[calc(100dvh-280px)] md:h-[calc(100vh-300px)] w-full" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+                <ScrollArea className="h-[600px] md:h-[calc(100vh-320px)] w-full min-h-[400px]" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
                   <SortableContext items={stageDeals.map(deal => deal.id)} strategy={verticalListSortingStrategy}>
                     <div className="space-y-3 w-full px-1" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'visible' }}>
                       {stageDeals.map((deal) => (

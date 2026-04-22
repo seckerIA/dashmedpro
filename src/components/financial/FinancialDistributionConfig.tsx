@@ -72,7 +72,7 @@ export function FinancialDistributionConfig({ open, onOpenChange }: FinancialDis
                         <AlertCircle className="h-4 w-4 text-primary" />
                         <AlertTitle className="text-primary font-medium">Como funciona?</AlertTitle>
                         <AlertDescription className="text-muted-foreground text-sm">
-                            Todos os pagamentos registrados no calendário médico (consultas finalizadas) e conversões de leads com pagamento adiantado serão lançados na conta selecionada abaixo.
+                            Todos os pagamentos registrados na agenda médica (consultas finalizadas) e conversões de leads com pagamento adiantado serão lançados na conta selecionada abaixo.
                         </AlertDescription>
                     </Alert>
 

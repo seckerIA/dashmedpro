@@ -150,7 +150,7 @@ export function UpcomingCallsWidget() {
                   variant="ghost" 
                   className="w-full justify-between mt-1 sm:mt-2 text-xs sm:text-sm"
                 >
-                  <span>Ver Calendário Completo</span>
+                  <span>Ver Agenda Completa</span>
                   <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
                 </Button>
               </Link>

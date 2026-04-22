@@ -41,6 +41,8 @@ export function PatientInfoTab({ patient, onUpdate, onNewRecord }: PatientInfoTa
   // Estados de edição
   const [birthDate, setBirthDate] = useState(patient.birth_date || '');
   const [bloodType, setBloodType] = useState(patient.blood_type || '');
+  const [cpf, setCpf] = useState(patient.cpf || '');
+  const [gender, setGender] = useState(patient.gender || '');
   const [allergies, setAllergies] = useState<string[]>(patient.allergies || []);
   const [chronicConditions, setChronicConditions] = useState<string[]>(patient.chronic_conditions || []);
   const [currentMedications, setCurrentMedications] = useState<string[]>(patient.current_medications || []);
@@ -66,6 +68,8 @@ export function PatientInfoTab({ patient, onUpdate, onNewRecord }: PatientInfoTa
     const updates: UpdatePatientMedicalInfoInput = {
       birth_date: birthDate || undefined,
       blood_type: bloodType || undefined,
+      cpf: cpf || undefined,
+      gender: (gender as any) || undefined,
       allergies,
       chronic_conditions: chronicConditions,
       current_medications: currentMedications,
@@ -87,6 +91,8 @@ export function PatientInfoTab({ patient, onUpdate, onNewRecord }: PatientInfoTa
     // Resetar para valores originais
     setBirthDate(patient.birth_date || '');
     setBloodType(patient.blood_type || '');
+    setCpf(patient.cpf || '');
+    setGender(patient.gender || '');
     setAllergies(patient.allergies || []);
     setChronicConditions(patient.chronic_conditions || []);
     setCurrentMedications(patient.current_medications || []);
@@ -164,10 +170,29 @@ export function PatientInfoTab({ patient, onUpdate, onNewRecord }: PatientInfoTa
 
           <div className="space-y-1">
             <Label className="text-muted-foreground text-xs">CPF</Label>
-            <p className="font-medium flex items-center gap-2">
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
-              {patient.cpf || 'Não informado'}
-            </p>
+            {isEditing ? (
+              <Input
+                placeholder="000.000.000-00"
+                value={cpf}
+                onChange={(e) => {
+                  let value = e.target.value.replace(/\D/g, '');
+                  if (value.length > 11) value = value.slice(0, 11);
+                  if (value.length > 9) {
+                    value = `${value.slice(0, 3)}.${value.slice(3, 6)}.${value.slice(6, 9)}-${value.slice(9)}`;
+                  } else if (value.length > 6) {
+                    value = `${value.slice(0, 3)}.${value.slice(3, 6)}.${value.slice(6)}`;
+                  } else if (value.length > 3) {
+                    value = `${value.slice(0, 3)}.${value.slice(3)}`;
+                  }
+                  setCpf(value);
+                }}
+              />
+            ) : (
+              <p className="font-medium flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-muted-foreground" />
+                {patient.cpf || 'Não informado'}
+              </p>
+            )}
           </div>
 
           <div className="space-y-1">
@@ -214,9 +239,23 @@ export function PatientInfoTab({ patient, onUpdate, onNewRecord }: PatientInfoTa
 
           <div className="space-y-1">
             <Label className="text-muted-foreground text-xs">Gênero</Label>
-            <p className="font-medium capitalize">
-              {patient.gender?.replace('_', ' ') || 'Não informado'}
-            </p>
+            {isEditing ? (
+              <Select value={gender} onValueChange={(v: any) => setGender(v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="masculino">Masculino</SelectItem>
+                  <SelectItem value="feminino">Feminino</SelectItem>
+                  <SelectItem value="outro">Outro</SelectItem>
+                  <SelectItem value="prefiro_nao_dizer">Prefiro não dizer</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : (
+              <p className="font-medium capitalize">
+                {patient.gender?.replace('_', ' ') || 'Não informado'}
+              </p>
+            )}
           </div>
 
           <div className="space-y-1">
