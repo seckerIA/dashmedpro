@@ -184,11 +184,42 @@ const deleteRecord = async (table: string, id: string) => {
   console.log(`✅ [deleteRecord] Deletado com sucesso ${table} id=${id}`);
 };
 
+import { useEffect } from 'react';
+
 export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = false) {
   const { user, loading } = useAuth();
   const { profile, isSecretaria, isLoading: isLoadingProfile } = useUserProfile();
   const { doctorIds, isLoading: isLoadingDoctors } = useSecretaryDoctors();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('crm-realtime-updates')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'crm_deals' },
+        () => {
+          console.log('🔄 [useCRM] Realtime update: crm_deals changed');
+          queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
+          queryClient.invalidateQueries({ queryKey: ['team-metrics'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'crm_contacts' },
+        () => {
+          console.log('🔄 [useCRM] Realtime update: crm_contacts changed');
+          queryClient.invalidateQueries({ queryKey: ['crm-contacts'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient]);
 
   // Se for secretaria, passamos doctorIds, mas AGORA vamos usar fetchAll=true também
   const doctorIdsToUse = isSecretaria ? doctorIds : [];
