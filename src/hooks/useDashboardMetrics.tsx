@@ -137,7 +137,7 @@ const fetchDashboardMetrics = async (
 
   // Calcular deals por estágio
   const dealsByStage: Record<string, { count: number; value: number }> = {};
-  const stages = ['lead_novo', 'qualificado', 'apresentacao', 'proposta', 'negociacao', 'fechado_ganho', 'fechado_perdido'];
+  const stages = ['lead_novo', 'em_contato', 'agendado', 'avaliacao', 'em_tratamento', 'aguardando_retorno', 'inadimplente', 'finalizado', 'qualificado', 'apresentacao', 'proposta', 'negociacao', 'fechado_ganho', 'fechado_perdido'];
 
   stages.forEach(stage => {
     const stageDeals = dealsData.filter(d => d.stage === stage);
@@ -178,7 +178,7 @@ const fetchDashboardMetrics = async (
     }, 0);
 
     const monthClosed = monthDeals
-      .filter(deal => deal.stage === 'fechado_ganho')
+      .filter(deal => deal.stage === 'fechado_ganho' || deal.stage === 'finalizado')
       .reduce((sum, deal) => {
         const value = typeof deal.value === 'string' ? parseFloat(deal.value) : deal.value;
         return sum + (value || 0);
@@ -253,7 +253,7 @@ const fetchDashboardMetrics = async (
   // Calcular conversão por estágio
   // A conversão representa: dos deals que entraram nesse estágio, quantos % passaram para o próximo
   const conversionByStage = [];
-  const stageOrder = ['lead_novo', 'qualificado', 'apresentacao', 'proposta', 'negociacao'];
+  const stageOrder = ['lead_novo', 'em_contato', 'agendado', 'avaliacao', 'em_tratamento'];
 
   for (let i = 0; i < stageOrder.length - 1; i++) {
     const currentStage = stageOrder[i];

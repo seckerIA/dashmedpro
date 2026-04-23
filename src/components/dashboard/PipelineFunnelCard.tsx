@@ -19,27 +19,27 @@ const stageConfig: Record<string, { variant: CardVariant; label: string; gradien
   lead_novo: {
     variant: 'cyan',
     label: 'Lead Novo',
-    gradient: 'from-purple-500/10 to-purple-600/5'
+    gradient: 'from-slate-500/10 to-slate-600/5'
   },
-  qualificado: {
+  em_contato: {
     variant: 'cyan',
-    label: 'Qualificado',
+    label: 'Em Contato',
     gradient: 'from-cyan-500/10 to-cyan-600/5'
   },
-  apresentacao: {
+  agendado: {
     variant: 'yellow',
-    label: 'Apresentação',
+    label: 'Agendado',
     gradient: 'from-yellow-500/10 to-yellow-600/5'
   },
-  fechado_ganho: {
+  avaliacao: {
     variant: 'green',
-    label: 'Cliente Fechado',
-    gradient: 'from-green-500/10 to-green-600/5'
+    label: 'Avaliação',
+    gradient: 'from-indigo-500/10 to-indigo-600/5'
   },
-  fechado_perdido: {
-    variant: 'red',
-    label: 'Cliente Perdido',
-    gradient: 'from-gray-500/10 to-gray-600/5'
+  em_tratamento: {
+    variant: 'green',
+    label: 'Em Tratamento',
+    gradient: 'from-green-500/10 to-green-600/5'
   }
 };
 

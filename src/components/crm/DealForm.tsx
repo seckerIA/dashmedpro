@@ -68,9 +68,13 @@ const dealSchema = z.object({
   }),
   stage: z.enum([
     "lead_novo",
+    "em_contato",
     "agendado",
+    "avaliacao",
     "em_tratamento",
+    "aguardando_retorno",
     "inadimplente",
+    "finalizado",
     "qualificado",
     "apresentacao",
     "proposta",

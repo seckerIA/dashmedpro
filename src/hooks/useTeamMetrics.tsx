@@ -148,8 +148,8 @@ const fetchSecretaryMetrics = async (
 
 // ── Fetch principal ───────────────────────────────────────────────────────────
 
-const ACTIVE_STAGES = ['lead_novo', 'em_contato', 'lead', 'qualificado', 'proposta', 'negociacao', 'agendado', 'em_tratamento', 'aguardando_retorno'];
-const WON_STAGES = ['fechado_ganho'];
+const ACTIVE_STAGES = ['lead_novo', 'em_contato', 'lead', 'qualificado', 'proposta', 'negociacao', 'agendado', 'avaliacao', 'em_tratamento', 'aguardando_retorno'];
+const WON_STAGES = ['fechado_ganho', 'finalizado'];
 const LOST_STAGES = ['fechado_perdido', 'inadimplente'];
 
 const fetchTeamMetrics = async (

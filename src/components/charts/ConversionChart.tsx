@@ -7,11 +7,10 @@ interface ConversionChartProps {
 
 const stageNames: Record<string, string> = {
   'lead_novo': 'Lead Novo',
-  'qualificado': 'Qualificado',
-  'apresentacao': 'Apresentação',
-  'proposta': 'Proposta',
-  'negociacao': 'Negociação',
-  'fechado_ganho': 'Fechado',
+  'em_contato': 'Em Contato',
+  'agendado': 'Agendado',
+  'avaliacao': 'Avaliação',
+  'em_tratamento': 'Em Tratamento',
 };
 
 const FUNNEL_COLORS = [

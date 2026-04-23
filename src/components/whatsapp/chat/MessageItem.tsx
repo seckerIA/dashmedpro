@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { MediaViewer } from './MediaViewer';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Tooltip,
@@ -48,6 +49,16 @@ export const MessageItem = memo(function MessageItem({
   showAvatar,
   onReply,
 }: MessageItemProps) {
+  const [mediaViewer, setMediaViewer] = useState<{
+    isOpen: boolean;
+    type: 'image' | 'video';
+    url: string;
+  }>({
+    isOpen: false,
+    type: 'image',
+    url: '',
+  });
+
   const isOutbound = message.direction === 'outbound';
   const time = message.sent_at
     ? format(new Date(message.sent_at), 'HH:mm')
@@ -116,7 +127,20 @@ export const MessageItem = memo(function MessageItem({
         )}
 
         {/* Conteúdo da mensagem */}
-        <MessageContent message={message} isOutbound={isOutbound} />
+        <MessageContent 
+          message={message} 
+          isOutbound={isOutbound} 
+          onOpenMedia={(type, url) => setMediaViewer({ isOpen: true, type, url })}
+        />
+
+        {/* Media Viewer Modal */}
+        <MediaViewer
+          isOpen={mediaViewer.isOpen}
+          onClose={() => setMediaViewer((prev) => ({ ...prev, isOpen: false }))}
+          type={mediaViewer.type}
+          url={mediaViewer.url}
+          fileName={message.media?.[0]?.file_name || undefined}
+        />
 
         {/* Footer: hora + status */}
         <div
@@ -163,9 +187,11 @@ export const MessageItem = memo(function MessageItem({
 function MessageContent({
   message,
   isOutbound,
+  onOpenMedia,
 }: {
   message: WhatsAppMessageWithRelations;
   isOutbound: boolean;
+  onOpenMedia: (type: 'image' | 'video', url: string) => void;
 }) {
   const type = message.message_type || 'text';
 
@@ -185,7 +211,8 @@ function MessageContent({
               src={message.media[0].media_url}
               alt="Imagem"
               loading="lazy"
-              className="rounded-lg max-w-full h-auto max-h-64 object-cover"
+              className="rounded-lg max-w-full h-auto max-h-64 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+              onClick={() => onOpenMedia('image', message.media![0].media_url!)}
             />
           ) : (
             <div
@@ -221,6 +248,11 @@ function MessageContent({
                 variant="ghost"
                 size="icon"
                 className="h-12 w-12 rounded-full bg-black/50 text-white hover:bg-black/70"
+                onClick={() => {
+                  if (message.media?.[0]?.media_url) {
+                    onOpenMedia('video', message.media[0].media_url);
+                  }
+                }}
               >
                 <Play className="h-6 w-6" />
               </Button>
