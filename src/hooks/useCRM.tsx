@@ -195,8 +195,10 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
   useEffect(() => {
     if (!user?.id) return;
 
+    // Usando nome único para evitar colisões entre instâncias ou re-renderizações rápidas
+    const channelName = `crm-realtime-${user.id}-${Math.random().toString(36).substring(7)}`;
     const channel = supabase
-      .channel('crm-realtime-updates')
+      .channel(channelName)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'crm_deals' },
@@ -214,9 +216,14 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
           queryClient.invalidateQueries({ queryKey: ['crm-contacts'] });
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log(`📡 [useCRM] Realtime subscribed: ${channelName}`);
+        }
+      });
 
     return () => {
+      console.log(`🔌 [useCRM] Cleaning up realtime: ${channelName}`);
       supabase.removeChannel(channel);
     };
   }, [user?.id, queryClient]);
