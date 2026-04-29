@@ -236,7 +236,10 @@ export default function Marketing() {
                 Campanhas sincronizadas das suas contas de anúncio ativas
               </p>
             </div>
-            <AdCampaignsList />
+            <AdCampaignsList
+              startDate={dateRange?.from}
+              endDate={dateRange?.to}
+            />
           </div>
         </TabsContent>
 

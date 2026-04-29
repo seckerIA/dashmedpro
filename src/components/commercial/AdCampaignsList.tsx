@@ -15,8 +15,14 @@ import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/currency";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useAdCampaignDailyMetrics, useHasDailyMetrics } from "@/hooks/useAdCampaignDailyMetrics";
 
-export function AdCampaignsList() {
+interface AdCampaignsListProps {
+  startDate?: Date;
+  endDate?: Date;
+}
+
+export function AdCampaignsList({ startDate, endDate }: AdCampaignsListProps) {
   const [platformFilter, setPlatformFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -28,9 +34,52 @@ export function AdCampaignsList() {
 
   const { data: campaigns, isLoading } = useAdCampaignsSync(filters);
   const { data: connections } = useAdPlatformConnections();
+  const { data: hasDailyMetrics = false } = useHasDailyMetrics();
   const pauseCampaign = usePauseAdCampaign();
   const activateCampaign = useActivateAdCampaign();
   const { toast } = useToast();
+
+  const effectiveStartDate = startDate || endDate;
+  const effectiveEndDate = endDate || startDate;
+  const periodStart = effectiveStartDate ? format(effectiveStartDate, 'yyyy-MM-dd') : null;
+  const periodEnd = effectiveEndDate ? format(effectiveEndDate, 'yyyy-MM-dd') : null;
+  const campaignIds = useMemo(() => (campaigns || []).map((c) => c.id), [campaigns]);
+
+  const { data: dailyMetrics = [] } = useAdCampaignDailyMetrics({
+    start_date: periodStart || format(new Date(), 'yyyy-MM-dd'),
+    end_date: periodEnd || format(new Date(), 'yyyy-MM-dd'),
+    campaign_sync_ids: campaignIds,
+  });
+
+  const metricsByCampaignId = useMemo(() => {
+    const grouped = new Map<string, {
+      spend: number;
+      impressions: number;
+      clicks: number;
+      conversions: number;
+      conversion_value: number;
+    }>();
+
+    dailyMetrics.forEach((row) => {
+      const current = grouped.get(row.campaign_sync_id) || {
+        spend: 0,
+        impressions: 0,
+        clicks: 0,
+        conversions: 0,
+        conversion_value: 0,
+      };
+
+      current.spend += Number(row.spend) || 0;
+      current.impressions += Number(row.impressions) || 0;
+      current.clicks += Number(row.clicks) || 0;
+      current.conversions += Number(row.conversions) || 0;
+      current.conversion_value += Number(row.conversion_value) || 0;
+
+      grouped.set(row.campaign_sync_id, current);
+    });
+
+    return grouped;
+  }, [dailyMetrics]);
 
   // Filtrar campanhas apenas de ad accounts ativas (category 'other')
   const activeAdAccountIds = useMemo(() => {
@@ -58,8 +107,51 @@ export function AdCampaignsList() {
       );
     }
 
+    // Se o sistema de métricas diárias estiver ativo, mostrar dados agregados no período selecionado.
+    if (hasDailyMetrics && periodStart && periodEnd) {
+      result = result.map((campaign) => {
+        const periodMetrics = metricsByCampaignId.get(campaign.id);
+
+        if (!periodMetrics) {
+          return {
+            ...campaign,
+            spend: 0,
+            impressions: 0,
+            clicks: 0,
+            conversions: 0,
+            conversion_value: 0,
+            ctr: 0,
+            cpa: 0,
+            roas: 0,
+          };
+        }
+
+        const ctr = periodMetrics.impressions > 0
+          ? (periodMetrics.clicks / periodMetrics.impressions) * 100
+          : 0;
+        const cpa = periodMetrics.conversions > 0
+          ? periodMetrics.spend / periodMetrics.conversions
+          : 0;
+        const roas = periodMetrics.spend > 0
+          ? periodMetrics.conversion_value / periodMetrics.spend
+          : 0;
+
+        return {
+          ...campaign,
+          spend: periodMetrics.spend,
+          impressions: periodMetrics.impressions,
+          clicks: periodMetrics.clicks,
+          conversions: periodMetrics.conversions,
+          conversion_value: periodMetrics.conversion_value,
+          ctr,
+          cpa,
+          roas,
+        };
+      });
+    }
+
     return result;
-  }, [campaigns, activeAdAccountIds, searchQuery]);
+  }, [campaigns, activeAdAccountIds, searchQuery, hasDailyMetrics, periodStart, periodEnd, metricsByCampaignId]);
 
   const handlePause = async (campaignId: string) => {
     try {

@@ -12,6 +12,10 @@ export function useAdCampaignDailyMetrics(filters: DailyMetricsFilters) {
   return useQuery({
     queryKey: ['ad-campaign-daily-metrics', filters],
     queryFn: async () => {
+      if (filters.campaign_sync_ids && filters.campaign_sync_ids.length === 0) {
+        return [];
+      }
+
       let query = (supabase
         .from('ad_campaign_daily_metrics' as any) as any)
         .select(`

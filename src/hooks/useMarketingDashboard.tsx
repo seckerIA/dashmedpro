@@ -118,22 +118,15 @@ export function useMarketingDashboard(filters?: { startDate?: Date; endDate?: Da
       const startDate = new Date(rangeStartISO);
       const endDate = new Date(rangeEndISO);
 
-      // Leads captados no período (volume de lead gen)
-      const leadsCaptured = (allLeads || []).filter(lead => {
-        const leadDate = new Date(lead.created_at);
-        return leadDate >= startDate && leadDate <= endDate;
-      });
-
-      // Pacientes novos: O usuário quer que o CAC seja calculado dividindo o gasto pelo TOTAL de agendamentos concluídos no período.
-      // Atualmente são 5 (conforme verificado pelo usuário).
+      // Agendamentos na agenda dentro do período do filtro (agenda médica)
       const { data: apptsInRange } = await supabase
         .from('medical_appointments')
         .select('id')
-        .eq('status', 'completed')
+        .in('status', ['scheduled', 'confirmed', 'in_progress', 'completed'])
         .gte('start_time', rangeStartISO)
         .lte('start_time', rangeEndISO);
       
-      const newPatients = apptsInRange?.length || 0;
+      const scheduledPatientsInRange = apptsInRange?.length || 0;
 
       // Usar métricas diárias APENAS se existem dados reais para o mês atual
       // Se daily metrics estão vazias para este mês, usar dados cumulativos (90d)
@@ -141,6 +134,7 @@ export function useMarketingDashboard(filters?: { startDate?: Date; endDate?: Da
       const useDailyData = monthlyDailyRows.length > 0;
 
       let totalSpend: number, totalRevenue: number, averageROAS: number;
+      let leadsGeneratedFromCampaigns: number;
       let googleAdsSpend: number, metaAdsSpend: number;
       let googleAdsRevenue: number, metaAdsRevenue: number;
 
@@ -152,6 +146,7 @@ export function useMarketingDashboard(filters?: { startDate?: Date; endDate?: Da
 
         totalSpend = agg.total_spend;
         totalRevenue = agg.total_conversion_value;
+        leadsGeneratedFromCampaigns = agg.total_conversions;
         averageROAS = totalSpend > 0 ? totalRevenue / totalSpend : 0;
 
         const googleRows = activeRows.filter(r => (r as any).campaign?.platform === 'google_ads');
@@ -175,6 +170,7 @@ export function useMarketingDashboard(filters?: { startDate?: Date; endDate?: Da
 
         totalSpend = campaignsData.reduce((sum, c) => sum + (Number(c.spend) || 0), 0);
         totalRevenue = campaignsData.reduce((sum, c) => sum + (Number(c.conversion_value) || 0), 0);
+        leadsGeneratedFromCampaigns = campaignsData.reduce((sum, c) => sum + (Number(c.conversions) || 0), 0);
         // ROAS = total revenue / total spend (não média de ROAS individuais)
         averageROAS = totalSpend > 0 ? totalRevenue / totalSpend : 0;
       }
@@ -301,10 +297,10 @@ export function useMarketingDashboard(filters?: { startDate?: Date; endDate?: Da
           return (monthA * 100 + dayA) - (monthB * 100 + dayB);
         });
 
-      const totalLeadsCount = leadsCaptured.length;
+      const totalLeadsCount = leadsGeneratedFromCampaigns;
       const cpl = totalLeadsCount > 0 ? totalSpend / totalLeadsCount : 0;
-      const cac = newPatients > 0 ? totalSpend / newPatients : 0;
-      const leadToPatientRate = totalLeadsCount > 0 ? (newPatients / totalLeadsCount) * 100 : 0;
+      const cac = scheduledPatientsInRange > 0 ? totalSpend / scheduledPatientsInRange : 0;
+      const leadToPatientRate = totalLeadsCount > 0 ? (scheduledPatientsInRange / totalLeadsCount) * 100 : 0;
 
       return {
         totalSpend,
@@ -314,7 +310,7 @@ export function useMarketingDashboard(filters?: { startDate?: Date; endDate?: Da
         cpl,
         cac,
         leadToPatientRate,
-        newPatients,
+        newPatients: scheduledPatientsInRange,
         googleAdsSpend,
         metaAdsSpend,
         googleAdsRevenue,
