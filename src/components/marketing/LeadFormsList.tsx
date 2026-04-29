@@ -581,23 +581,6 @@ export function LeadFormsList() {
         </Collapsible>
       ))}
 
-      {/* Páginas sem formulários */}
-      {pageGroups.filter((g) => g.forms.length === 0).length > 0 && totalForms > 0 && (
-        <div className="space-y-2">
-          <h3 className="text-sm font-medium text-muted-foreground">Páginas sem formulários</h3>
-          {pageGroups.filter((g) => g.forms.length === 0).map((group) => (
-            <Card key={group.pageId} className="bg-muted/30">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">{group.pageName || `Página ${group.pageId}`}</span>
-                </div>
-                <Badge variant="outline" className="text-xs">Sem formulários</Badge>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
