@@ -42,6 +42,10 @@ const fetchContacts = async (
   return (data as CRMContact[]) || [];
 };
 
+/**
+ * Deals visíveis conforme RLS. `fetchAll` (ex.: admin/dono/secretária em useCRM) não aplica filtro OR por utilizador;
+ * o limite alta evita cortar o quadro em clínicas com muitos cards (ordenado por `position`).
+ */
 // Fetch deals with contacts
 const fetchDeals = async (
   userId: string,
@@ -78,7 +82,7 @@ const fetchDeals = async (
   }
 
   const { data, error } = await supabaseQueryWithTimeout(
-    (queryPromise as any).order('position', { ascending: true }).limit(500),
+    (queryPromise as any).order('position', { ascending: true }).limit(2000),
     30000,
     signal
   );
@@ -96,7 +100,7 @@ const fetchDeals = async (
       fallbackQuery = (fallbackQuery as any).or(orCondition);
     }
 
-    const fallback = await supabaseQueryWithTimeout(fallbackQuery.limit(500) as any, 30000, signal);
+    const fallback = await supabaseQueryWithTimeout(fallbackQuery.limit(2000) as any, 30000, signal);
     if (fallback.error) throw new Error(`Erro ao buscar deals: ${fallback.error.message}`);
     return (fallback.data || []) as CRMDealWithContact[];
   }
@@ -300,7 +304,11 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
       }
 
       console.log('🚀 useCRM - Executando createContactMutation com payload:', payload);
-      return createRecord('crm_contacts', payload);
+      return createRecord('crm_contacts', {
+        ...payload,
+        first_touch_source: payload.first_touch_source ?? 'cadastro_manual',
+        first_touch_at: payload.first_touch_at ?? new Date().toISOString(),
+      });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['crm-contacts'] }),
     onError: (error) => console.error('❌ createContactMutation error:', error),

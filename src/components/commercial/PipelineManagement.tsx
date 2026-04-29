@@ -87,7 +87,8 @@ export function PipelineManagement() {
   const [showAppointmentForm, setShowAppointmentForm] = useState(false);
   const [dealForAppointment, setDealForAppointment] = useState<CRMDealWithContact | null>(null);
   const [tagFilter, setTagFilter] = useState<string>("all");
-  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("30d");
+  /** Default "all": não ocultar deals antigos em lead_novo (filtro por data de criação). */
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("all");
 
   const filteredDeals = useMemo(() => {
     return deals.filter(deal => {

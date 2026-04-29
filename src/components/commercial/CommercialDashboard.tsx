@@ -265,7 +265,7 @@ export function CommercialDashboard() {
           { title: "Receita Total", value: metrics?.totalRevenue || 0, icon: "dollar-sign" as const, format: "currency" as const },
           { title: "Receita Média", value: metrics?.averageRevenue || 0, icon: "bar-chart" as const, format: "currency" as const },
           { title: "Pacientes Novos", value: metrics?.newPatients || 0, icon: "user-plus" as const },
-          { title: "Procedimentos", value: metrics?.scheduledProcedures || 0, icon: "calendar" as const },
+          { title: "Procedimentos (agenda)", value: metrics?.scheduledProcedures || 0, icon: "calendar" as const },
         ].map((metric, index) => (
           <AnimatedWrapper key={metric.title} animationType="scale" delay={0.3 + index * 0.05}>
             <motion.div whileHover={{ y: -4 }} transition={{ duration: 0.2 }}>

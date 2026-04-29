@@ -212,7 +212,10 @@ export interface CommercialMetrics {
   totalRevenue?: number;
   averageRevenue?: number;
   newPatients?: number;
+  /** Consultas com tipo "procedure" no período selecionado (agenda). */
   scheduledProcedures?: number;
+  /** Itens ativos em commercial_procedures (catálogo); útil para comparar com o cartão da agenda. */
+  catalogProcedureCount?: number;
   funnelData?: Array<{ stage: string; count: number; percentage: number }>;
   revenueByProcedure?: Array<{ name: string; value: number }>;
   leadsTrend?: Array<{ name: string; value: number }>;

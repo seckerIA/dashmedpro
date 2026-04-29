@@ -118,7 +118,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       return viewAsUserIds;
     }
 
-    // Admin/Dono: ver dados de todos os usuários ativos
+    // Admin/Dono: ver dados de todos os usuários ativos (mesma regra que useMarketingLeads)
     if (isAdmin && allActiveUserIds.length > 0) {
       return allActiveUserIds;
     }
@@ -560,9 +560,18 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         l.status === 'finalizado'
       ).length || 0;
 
-      const leadsToAppointments = totalLeads > 0
-        ? (allScheduledAppointments.length / totalLeads) * 100
-        : 0;
+      // allScheduledAppointments já restringe a scheduled | confirmed | completed
+      const appointmentContactIdsInPeriod = new Set(
+        allScheduledAppointments.filter(a => a.contact_id).map(a => a.contact_id as string)
+      );
+
+      /** Leads criados no período cujo contact_id tem ≥1 consulta agendada/confirmada/concluída no mesmo período (cohorte alinhada). */
+      const leadsWithAppointmentMatch =
+        leads?.filter(l => l.contact_id && appointmentContactIdsInPeriod.has(l.contact_id)).length ?? 0;
+
+      /** % de leads do período que geraram ao menos uma consulta no período (mesmo eixo temporal que totalLeads). */
+      const leadsToAppointments =
+        totalLeads > 0 ? (leadsWithAppointmentMatch / totalLeads) * 100 : 0;
       const appointmentsToSales = allScheduledAppointments.length > 0
         ? ((sales?.length || 0) / allScheduledAppointments.length) * 100
         : 0;
@@ -576,22 +585,9 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         l.status === 'desqualificado'
       ).length || 0;
 
-      // Taxa de conversão: leads que viraram agendamento / total de leads
-      // Conta leads únicos que têm pelo menos 1 agendamento associado
-      const leadsWithAppointmentsSet = new Set(
-        allScheduledAppointments
-          ?.filter(a => a.contact_id)
-          .map(a => a.contact_id)
-      );
-      const leadsWithAppointmentsCount = leadsWithAppointmentsSet.size;
+      const overallConversion = leadsToAppointments;
 
-      // Se há leads, calcula % que viraram agendamento
-      // Se não há leads mas há agendamentos, considera 100% (agendamentos diretos)
-      const overallConversion = totalLeads > 0
-        ? (leadsWithAppointmentsCount / totalLeads) * 100
-        : (allScheduledAppointments.length > 0 ? 100 : 0);
-
-      // Buscar procedimentos do catálogo (total de procedimentos ativos cadastrados) - MOVER PARA ANTES DO LOG
+      // Buscar procedimentos do catálogo (total de procedimentos ativos cadastrados)
       const proceduresQuery = applyUserFilter(
         fromTable("commercial_procedures")
           .select("id, name"),
@@ -600,9 +596,16 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
 
       const proceduresResult = await supabaseQueryWithTimeout(proceduresQuery as any, 25000, signal);
       const { data: procedures, error: proceduresError } = proceduresResult as { data: any[], error: any };
+      if (proceduresError && import.meta.env.DEV) {
+        console.warn('[useCommercialMetrics] commercial_procedures:', proceduresError.message ?? proceduresError);
+      }
 
-      // Contar procedimentos ativos no catálogo
-      const scheduledProcedures = (procedures as any[])?.length || 0;
+      // Consultas tipo "procedure" no período (agenda), não o tamanho do catálogo
+      const procedureAppointmentsInPeriod = allScheduledAppointments.filter(
+        a => a.appointment_type === 'procedure'
+      ).length;
+      const catalogProcedureCount = (procedures as any[])?.length || 0;
+      const scheduledProcedures = procedureAppointmentsInPeriod;
 
       // console.log('📊 useCommercialMetrics - Métricas calculadas:', {
       //   totalLeads,
@@ -695,28 +698,25 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
 
       const newPatients = (newContacts as any[])?.length || 0;
 
-      // Preparar dados do funil - Fix: Handle when leads=0 but appointments exist
-      // If there are no formal leads but there are appointments, treat appointments as 100%
-      const funnelBaseCount = totalLeads > 0 ? totalLeads : completedAppointments.length;
+      const pctLeadsToConsultas = totalLeads > 0 ? Math.min(leadsToAppointments, 100) : 0;
+      const pctLeadsToVendas =
+        totalLeads > 0 ? Math.min(((sales?.length || 0) / totalLeads) * 100, 100) : 0;
+
       const funnelData = [
         {
           stage: 'Leads',
           count: totalLeads,
-          percentage: totalLeads > 0 ? 100 : 0
+          percentage: totalLeads > 0 ? 100 : 0,
         },
         {
           stage: 'Consultas',
           count: allScheduledAppointments.length,
-          percentage: funnelBaseCount > 0
-            ? Math.min((completedAppointments.length / funnelBaseCount) * 100, 100)
-            : (completedAppointments.length > 0 ? 100 : 0)
+          percentage: pctLeadsToConsultas,
         },
         {
           stage: 'Vendas',
           count: sales?.length || 0,
-          percentage: funnelBaseCount > 0
-            ? Math.min(((sales?.length || 0) / funnelBaseCount) * 100, 100)
-            : (sales?.length > 0 ? 100 : 0)
+          percentage: pctLeadsToVendas,
         },
       ];
 
@@ -786,6 +786,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         averageRevenue: avgTicketPerAppointment,
         newPatients,
         scheduledProcedures,
+        catalogProcedureCount,
         funnelData,
         revenueByProcedure,
         leadsTrend,
@@ -884,9 +885,13 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
             appointmentsToSales: appointmentsToSales,
             overall: overallConversion,
             funnel: [
-              { stage: 'Leads', count: totalLeads, percentage: 100 },
-              { stage: 'Consultas', count: allScheduledAppointments.length, percentage: leadsToAppointments },
-              { stage: 'Vendas', count: sales?.length || 0, percentage: overallConversion },
+              { stage: 'Leads', count: totalLeads, percentage: totalLeads > 0 ? 100 : 0 },
+              {
+                stage: 'Consultas',
+                count: allScheduledAppointments.length,
+                percentage: pctLeadsToConsultas,
+              },
+              { stage: 'Vendas', count: sales?.length || 0, percentage: pctLeadsToVendas },
             ],
           },
           occupancyRate: {
