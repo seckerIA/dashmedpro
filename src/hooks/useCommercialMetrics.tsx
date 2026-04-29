@@ -213,6 +213,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         appointmentsResult,
         transactionsResult,
         leadsResult,
+        formLeadsResult,
         campaignsResult
       ] = await Promise.all([
         // 1. Appointments
@@ -224,6 +225,18 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
           applyUserFilter(
             fromTable("commercial_leads")
               .select("*"),
+            targetUserIds
+          )
+            .gte("created_at", periodStartISO)
+            .lte("created_at", periodEndISO) as any,
+          25000,
+          signal
+        ),
+        // 3b. Leads de formulários de marketing no período
+        supabaseQueryWithTimeout(
+          applyUserFilter(
+            fromTable("lead_form_submissions")
+              .select("id, crm_contact_id, phone_number, created_at"),
             targetUserIds
           )
             .gte("created_at", periodStartISO)
@@ -246,11 +259,13 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       const { data: appointments, error: appointmentsError } = appointmentsResult as { data: any[], error: any };
       const { data: transactions, error: transactionsError } = transactionsResult as { data: any[], error: any };
       const { data: leads, error: leadsError } = leadsResult as { data: any[], error: any };
+      const { data: formLeads, error: formLeadsError } = formLeadsResult as { data: any[], error: any };
       const { data: campaigns, error: campaignsError } = campaignsResult as { data: any[], error: any };
 
       if (appointmentsError) throw appointmentsError;
       if (transactionsError) throw transactionsError;
       if (leadsError && !leadsError.message?.includes('AbortError')) console.error('❌ Erro leads:', leadsError);
+      if (formLeadsError) throw formLeadsError;
 
       // Preparar dados para próxima query
       const allTransactionIds = transactions?.map(t => t.id) || [];
@@ -375,9 +390,37 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         costsMap.set(cost.transaction_id, current + Number(cost.amount));
       });
 
+      const marketingOrigins = new Set(['google', 'facebook', 'instagram', 'website', 'indication', 'other', 'indicação']);
+      const marketingCommercialLeads = (leads || []).filter((lead: any) => marketingOrigins.has((lead.origin || '').toLowerCase()));
+
+      const digitsOnly = (value?: string | null) => (value || '').replace(/\D/g, '');
+      const phoneKeyLast10 = (value?: string | null) => {
+        const digits = digitsOnly(value);
+        return digits.length >= 10 ? digits.slice(-10) : '';
+      };
+
+      // Leads do mês alinhados ao Marketing (commercial leads + form submissions com deduplicação por contato/telefone)
+      const marketingLeadKeys = new Set<string>();
+      marketingCommercialLeads.forEach((lead: any) => {
+        const phoneKey = phoneKeyLast10(lead.phone);
+        const dedupKey = lead.contact_id ? `contact:${lead.contact_id}` : (phoneKey ? `phone:${phoneKey}` : `comm:${lead.id}`);
+        marketingLeadKeys.add(dedupKey);
+      });
+      (formLeads || []).forEach((lead: any) => {
+        const phoneKey = phoneKeyLast10(lead.phone_number);
+        const dedupKey = lead.crm_contact_id ? `contact:${lead.crm_contact_id}` : (phoneKey ? `phone:${phoneKey}` : `form:${lead.id}`);
+        marketingLeadKeys.add(dedupKey);
+      });
+      const totalMarketingLeads = marketingLeadKeys.size;
+
       // Custo por consulta - incluir TODAS as consultas completadas (com ou sem transação financeira)
       const completedAppointments = appointments?.filter(a =>
         a.status === 'completed'
+      ) || [];
+
+      // Base dos cards do CRM: consultas agendadas + comparecidas
+      const scheduledAndCompletedAppointments = appointments?.filter(a =>
+        a.status === 'scheduled' || a.status === 'completed'
       ) || [];
 
       const appointmentCosts = completedAppointments.map(apt => {
@@ -404,17 +447,11 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       // Receita de consultas completadas - usar estimated_value se não houver transação
       const appointmentsRevenue = appointmentCosts.reduce((sum, a) => sum + a.revenue, 0);
 
-      // Também incluir consultas agendadas/confirmadas que ainda não foram completadas mas têm valor estimado
-      const pendingAppointments = appointments?.filter(a =>
-        (a.status === 'scheduled' || a.status === 'confirmed') && a.estimated_value
-      ) || [];
-      const pendingRevenue = pendingAppointments.reduce((sum, apt) => sum + Number(apt.estimated_value || 0), 0);
-
-      // Receita de vendas comerciais
-      const salesRevenue = sales?.reduce((sum, s) => sum + Number(s.value || 0), 0) || 0;
-
-      // Receita total (consultas completadas + consultas agendadas com valor estimado + vendas)
-      const totalRevenue = appointmentsRevenue + pendingRevenue + salesRevenue;
+      // Receita total do card: valor somado da agenda (agendados + comparecidos)
+      const totalRevenue = scheduledAndCompletedAppointments.reduce(
+        (sum, apt) => sum + Number(apt.estimated_value || 0),
+        0
+      );
       const avgCostPerAppointment = completedAppointments.length > 0
         ? totalCosts / completedAppointments.length
         : 0;
@@ -497,7 +534,7 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       });
 
       // Ticket médio - usar total de appointments (completadas + agendadas) se houver receita
-      const totalAppointmentsForAverage = completedAppointments.length + pendingAppointments.length;
+      const totalAppointmentsForAverage = scheduledAndCompletedAppointments.length;
       const avgTicketPerAppointment = totalAppointmentsForAverage > 0
         ? totalRevenue / totalAppointmentsForAverage
         : 0;
@@ -543,13 +580,11 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
       const avgCAC = completedAppointments.length > 0 ? totalCampaignCost / completedAppointments.length : 0;
 
 
-      // Taxa de conversão
-      const totalLeads = leads?.length || 0;
+      // Taxa de conversão do card: pacientes / leads do mês
+      const totalLeads = totalMarketingLeads;
 
-      // Contar TODOS os agendamentos (não só os completed) para taxa de conversão lead -> consulta
-      const allScheduledAppointments = appointments?.filter(a =>
-        a.status === 'scheduled' || a.status === 'confirmed' || a.status === 'completed'
-      ) || [];
+      // Consultas consideradas no funil do card (agendadas + comparecidas)
+      const allScheduledAppointments = scheduledAndCompletedAppointments;
 
 
       const convertedLeadsCount = leads?.filter(l =>
@@ -600,8 +635,8 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         console.warn('[useCommercialMetrics] commercial_procedures:', proceduresError.message ?? proceduresError);
       }
 
-      // Consultas tipo "procedure" no período (agenda), não o tamanho do catálogo
-      const procedureAppointmentsInPeriod = allScheduledAppointments.filter(
+      // Consultas tipo "procedure" na agenda (agendadas + comparecidas)
+      const procedureAppointmentsInPeriod = scheduledAndCompletedAppointments.filter(
         a => a.appointment_type === 'procedure'
       ).length;
       const catalogProcedureCount = (procedures as any[])?.length || 0;
@@ -684,19 +719,11 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         ? ((completedAppointments.length - prevAppointmentsCount) / prevAppointmentsCount) * 100
         : 0;
 
-      // Calcular pacientes novos (contatos criados no período)
-      const newContactsQuery = applyUserFilter(
-        fromTable("crm_contacts")
-          .select("id"),
-        targetUserIds
-      )
-        .gte("created_at", periodStartISO)
-        .lte("created_at", periodEndISO);
-
-      const newContactsResult = await supabaseQueryWithTimeout(newContactsQuery as any, 25000, signal);
-      const { data: newContacts } = newContactsResult as { data: any[], error: any };
-
-      const newPatients = (newContacts as any[])?.length || 0;
+      // Pacientes novos do card: pacientes da agenda (agendados + comparecidos), únicos por contato
+      const patientKeys = new Set(
+        scheduledAndCompletedAppointments.map((apt: any) => apt.contact_id ? `contact:${apt.contact_id}` : `apt:${apt.id}`)
+      );
+      const newPatients = patientKeys.size;
 
       const pctLeadsToConsultas = totalLeads > 0 ? Math.min(leadsToAppointments, 100) : 0;
       const pctLeadsToVendas =

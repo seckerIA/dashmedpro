@@ -258,14 +258,13 @@ export function CommercialDashboard() {
       )}
 
       {/* Metrics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {[
           { title: "Leads do Mês", value: metrics?.totalLeads || 0, icon: "trending-up" as const },
           { title: "Taxa de Conversão", value: metrics?.conversionRate || 0, icon: "target" as const, format: "percentage" as const },
           { title: "Receita Total", value: metrics?.totalRevenue || 0, icon: "dollar-sign" as const, format: "currency" as const },
           { title: "Receita Média", value: metrics?.averageRevenue || 0, icon: "bar-chart" as const, format: "currency" as const },
           { title: "Pacientes Novos", value: metrics?.newPatients || 0, icon: "user-plus" as const },
-          { title: "Procedimentos (agenda)", value: metrics?.scheduledProcedures || 0, icon: "calendar" as const },
         ].map((metric, index) => (
           <AnimatedWrapper key={metric.title} animationType="scale" delay={0.3 + index * 0.05}>
             <motion.div whileHover={{ y: -4 }} transition={{ duration: 0.2 }}>

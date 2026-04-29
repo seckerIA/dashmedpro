@@ -104,7 +104,7 @@ export function AnimatedDealCard({
         width: '100%',
         maxWidth: '100%',
         boxSizing: 'border-box',
-        overflow: 'hidden',
+        overflow: 'visible',
         position: 'relative',
         zIndex: isHovered ? 100 : 1,
         transform: 'translateZ(0)', // GPU acceleration
@@ -143,6 +143,7 @@ export function AnimatedDealCard({
                 variant="ghost"
                 size="sm"
                 className="h-6 w-6 p-0 hover:bg-primary/20 hover:text-primary"
+                onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation();
                   onEdit(deal);
@@ -161,6 +162,7 @@ export function AnimatedDealCard({
                     size="sm"
                     className="h-6 w-6 p-0 hover:bg-destructive/20 hover:text-destructive"
                     disabled={isDeleting}
+                    onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <Trash2 className="w-3 h-3" />
@@ -337,7 +339,11 @@ export function AnimatedDealCard({
         )}
 
         {/* Follow-up Action */}
-        <div className="pt-2" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="pt-2"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
           <FollowUpAction
             dealId={deal.id}
             dealTitle={deal.title}

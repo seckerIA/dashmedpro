@@ -7,7 +7,6 @@ import { FollowUpSection } from "./FollowUpSection";
 import { CRMDealWithContact, PIPELINE_STAGES } from "@/types/crm";
 import { FollowUp } from "@/types/followUp";
 import { Plus, TrendingUp, Users } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { ContactActionSelector } from "./ContactActionSelector";
 import { formatCurrency } from "@/lib/currency";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -96,7 +95,7 @@ function SortableDealCard({
         maxWidth: '100%',
         boxSizing: 'border-box',
         overflow: 'visible',
-        touchAction: 'none', // Melhor suporte mobile para drag
+        touchAction: 'manipulation',
         margin: 0,
         position: 'relative',
         padding: '2px',
@@ -147,7 +146,7 @@ const DroppableColumn = ({ stage, children }: { stage: typeof PIPELINE_STAGES[0]
         maxWidth: widthStyle,
         minWidth: widthStyle,
         boxSizing: 'border-box',
-        overflow: 'hidden',
+        overflow: 'visible',
         transform: 'translateZ(0)', // GPU acceleration
         willChange: isOver ? 'transform, box-shadow' : 'auto',
       }}
@@ -206,12 +205,7 @@ export function PipelineBoard({
   const [activeDeal, setActiveDeal] = useState<CRMDealWithContact | null>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 3, // Mais responsivo
-        tolerance: 5,
-      },
-    }),
+    useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -431,10 +425,10 @@ export function PipelineBoard({
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="p-2 pt-0" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'visible' }}>
-                <ScrollArea className="h-[600px] md:h-[calc(100vh-320px)] w-full min-h-[400px]" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+              <CardContent className="p-3 pt-0" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'visible' }}>
+                <div className="h-[600px] md:h-[calc(100vh-320px)] w-full min-h-[400px] overflow-y-auto overflow-x-visible pr-1" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
                   <SortableContext items={stageDeals.map(deal => deal.id)} strategy={verticalListSortingStrategy}>
-                    <div className="space-y-3 w-full px-1" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'visible' }}>
+                    <div className="space-y-3 w-full px-0.5 pb-1" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'visible' }}>
                       {stageDeals.map((deal) => (
                         <SortableDealCard
                           key={deal.id}
@@ -458,7 +452,7 @@ export function PipelineBoard({
                       )}
                     </div>
                   </SortableContext>
-                </ScrollArea>
+                </div>
 
                 <ContactActionSelector
                   stage={stage.value}

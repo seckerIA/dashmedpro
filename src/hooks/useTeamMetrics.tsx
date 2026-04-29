@@ -204,15 +204,14 @@ const fetchTeamMetrics = async (
   const validFormIds: string[] = (syncedForms as any[] || []).map((f: any) => f.meta_form_id);
 
   // ── Queries paralelas ───────────────────────────────────────────────────
-  const monthStartDate = monthStart.split('T')[0]; // yyyy-MM-dd
-
   const [
     dealsResult,
     contactsResult,
-    leadsResult,
+    formLeadsResult,
+    marketingLeadsResult,
+    whatsappLeadsResult,
     profilesResult,
     appointmentsResult,
-    revenueResult,
   ] = await Promise.all([
     // 1. Deals (CRM)
     supabaseQueryWithTimeout(
@@ -227,49 +226,56 @@ const fetchTeamMetrics = async (
       supabase.from('crm_contacts').select('id, user_id').in('user_id', targetUserIds),
       25000, signal
     ),
-    // 3. Leads do mês — fonte: lead_form_submissions (formulários Facebook)
-    //    Filtra apenas por formulários de BMs sincronizadas (existentes em meta_lead_forms)
+    // 3. Leads de formulário no período (Meta forms sincronizados)
     supabaseQueryWithTimeout(
       validFormIds.length > 0
         ? (supabase.from('lead_form_submissions' as any) as any)
-            .select('id, user_id')
+            .select('id, user_id, phone_number')
             .in('user_id', targetUserIds)
             .in('form_id', validFormIds)
             .gte('created_at', monthStart)
             .lte('created_at', monthEnd)
         : (supabase.from('lead_form_submissions' as any) as any)
-            .select('id, user_id')
+            .select('id, user_id, phone_number')
             .in('user_id', targetUserIds)
             .gte('created_at', monthStart)
             .lte('created_at', monthEnd)
             .limit(0),
       25000, signal
     ),
-    // 4. Perfis
+    // 4. Leads de marketing no período (commercial_leads com origem de marketing)
+    supabaseQueryWithTimeout(
+      (supabase.from('commercial_leads' as any) as any)
+        .select('id, user_id, phone, origin')
+        .in('user_id', targetUserIds)
+        .gte('created_at', monthStart)
+        .lte('created_at', monthEnd),
+      25000, signal
+    ),
+    // 5. Leads do WhatsApp no período
+    supabaseQueryWithTimeout(
+      (supabase.from('whatsapp_conversations' as any) as any)
+        .select('id, user_id, phone_number')
+        .in('user_id', targetUserIds)
+        .gte('created_at', monthStart)
+        .lte('created_at', monthEnd),
+      25000, signal
+    ),
+    // 6. Perfis
     supabaseQueryWithTimeout(
       supabase.from('profiles')
         .select('id, email, full_name, role')
         .in('id', targetUserIds),
       25000, signal
     ),
-    // 5. Agendamentos do mês (numerador conversão)
+    // 7. Agendamentos do período + receita (agendados e comparecidos)
     supabaseQueryWithTimeout(
       supabase.from('medical_appointments')
-        .select('id, user_id')
+        .select('id, user_id, status, estimated_value')
         .in('user_id', targetUserIds)
-        .gte('created_at', monthStart)
-        .lte('created_at', monthEnd),
-      25000, signal
-    ),
-    // 6. Receita do mês — tipo 'entrada' (NÃO 'income'), status concluída
-    supabaseQueryWithTimeout(
-      supabase.from('financial_transactions')
-        .select('id, user_id, amount')
-        .in('user_id', targetUserIds)
-        .eq('type', 'entrada' as any)
-        .eq('status', 'concluida' as any)
-        .gte('transaction_date', monthStart.split('T')[0])
-        .lte('transaction_date', monthEnd.split('T')[0]),
+        .in('status', ['scheduled', 'completed'])
+        .gte('start_time', monthStart)
+        .lte('start_time', monthEnd),
       25000, signal
     ),
   ]);
@@ -278,10 +284,46 @@ const fetchTeamMetrics = async (
 
   const deals = (dealsResult.data || []) as any[];
   const contacts = (contactsResult.data || []) as any[];
-  const leads = (leadsResult.data || []) as any[];
+  const formLeads = (formLeadsResult.data || []) as any[];
+  const marketingLeadsRaw = (marketingLeadsResult.data || []) as any[];
+  const whatsappLeads = (whatsappLeadsResult.data || []) as any[];
   const profiles = (profilesResult.data || []) as any[];
   const appointments = (appointmentsResult.data || []) as any[];
-  const revenues = (revenueResult.data || []) as any[];
+
+  const marketingOrigins = new Set(['google', 'facebook', 'instagram', 'website', 'indication', 'other', 'indicação']);
+  const marketingLeads = marketingLeadsRaw.filter((lead: any) =>
+    marketingOrigins.has((lead.origin || '').toLowerCase())
+  );
+
+  const normalizePhone = (phone?: string | null) => (phone || '').replace(/\D/g, '');
+  const phoneKeyLast10 = (phone?: string | null) => {
+    const digits = normalizePhone(phone);
+    return digits.length >= 10 ? digits.slice(-10) : '';
+  };
+
+  const dedupLeadCountByUser = new Map<string, number>();
+  targetUserIds.forEach((uid) => dedupLeadCountByUser.set(uid, 0));
+
+  targetUserIds.forEach((uid) => {
+    const uniqueLeadKeys = new Set<string>();
+
+    formLeads.filter((lead: any) => lead.user_id === uid).forEach((lead: any) => {
+      const phoneKey = phoneKeyLast10(lead.phone_number);
+      uniqueLeadKeys.add(phoneKey ? `phone:${phoneKey}` : `form:${lead.id}`);
+    });
+
+    marketingLeads.filter((lead: any) => lead.user_id === uid).forEach((lead: any) => {
+      const phoneKey = phoneKeyLast10(lead.phone);
+      uniqueLeadKeys.add(phoneKey ? `phone:${phoneKey}` : `marketing:${lead.id}`);
+    });
+
+    whatsappLeads.filter((lead: any) => lead.user_id === uid).forEach((lead: any) => {
+      const phoneKey = phoneKeyLast10(lead.phone_number);
+      uniqueLeadKeys.add(phoneKey ? `phone:${phoneKey}` : `whatsapp:${lead.id}`);
+    });
+
+    dedupLeadCountByUser.set(uid, uniqueLeadKeys.size);
+  });
 
   const profilesMap = new Map(profiles.map((p: any) => [p.id, p]));
 
@@ -298,12 +340,10 @@ const fetchTeamMetrics = async (
       return sum + (parseFloat(d.value) || 0);
     }, 0);
 
-    const userLeadsCount = leads.filter(l => l.user_id === uid).length;
-    const userAppointmentsCount = appointments.filter(a => a.user_id === uid).length;
-
-    const totalRevenue = revenues
-      .filter(r => r.user_id === uid)
-      .reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
+    const userLeadsCount = dedupLeadCountByUser.get(uid) || 0;
+    const userAppointments = appointments.filter(a => a.user_id === uid);
+    const userAppointmentsCount = userAppointments.length;
+    const totalRevenue = userAppointments.reduce((sum, apt) => sum + (Number(apt.estimated_value) || 0), 0);
 
     const conversionRate = userLeadsCount > 0
       ? (userAppointmentsCount / userLeadsCount) * 100

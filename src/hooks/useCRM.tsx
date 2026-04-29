@@ -197,6 +197,164 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    if (!user?.id || !profile?.organization_id || loading || isLoadingProfile || isLoadingDoctors) return;
+
+    let cancelled = false;
+
+    const normalizePhone = (phone?: string | null) => (phone || '').replace(/\D/g, '');
+    const phoneKeyLast10 = (phone?: string | null) => {
+      const digits = normalizePhone(phone);
+      return digits.length >= 10 ? digits.slice(-10) : '';
+    };
+
+    const syncInboundLeadsToPipeline = async () => {
+      // Leads de formulário do Meta (novos)
+      const { data: formRows, error: formErr } = await ((supabase
+        .from('lead_form_submissions' as any) as any)
+        .select('id, user_id, crm_contact_id, full_name, email, phone_number, created_at')
+        .order('created_at', { ascending: false })
+        .limit(300));
+      if (formErr) {
+        console.warn('[useCRM] lead_form_submissions sync skipped:', formErr.message);
+      }
+
+      // Leads vindos do WhatsApp
+      const { data: waRows, error: waErr } = await ((supabase
+        .from('whatsapp_conversations' as any) as any)
+        .select('id, user_id, contact_name, phone_number, created_at')
+        .order('created_at', { ascending: false })
+        .limit(300));
+      if (waErr) {
+        console.warn('[useCRM] whatsapp_conversations sync skipped:', waErr.message);
+      }
+
+      const inboundRows = [
+        ...((formRows || []).map((r: any) => ({
+          source: 'form',
+          sourceId: r.id,
+          user_id: r.user_id || user.id,
+          crm_contact_id: r.crm_contact_id || null,
+          full_name: r.full_name || null,
+          email: r.email || null,
+          phone: r.phone_number || null,
+          created_at: r.created_at,
+        })) as any[]),
+        ...((waRows || []).map((r: any) => ({
+          source: 'whatsapp',
+          sourceId: r.id,
+          user_id: r.user_id || user.id,
+          crm_contact_id: null,
+          full_name: r.contact_name || null,
+          email: null,
+          phone: r.phone_number || null,
+          created_at: r.created_at,
+        })) as any[]),
+      ];
+
+      if (inboundRows.length === 0 || cancelled) return;
+
+      const { data: contactsData } = await (supabase
+        .from('crm_contacts')
+        .select('id, user_id, full_name, email, phone')
+        .eq('organization_id', profile.organization_id)
+        .limit(5000) as any);
+
+      const contacts = (contactsData || []) as any[];
+      const contactById = new Map<string, any>(contacts.map(c => [c.id, c]));
+      const contactByEmail = new Map<string, any>();
+      const contactByPhoneLast10 = new Map<string, any>();
+
+      contacts.forEach((c) => {
+        const email = (c.email || '').trim().toLowerCase();
+        const phoneKey = phoneKeyLast10(c.phone);
+        if (email) contactByEmail.set(email, c);
+        if (phoneKey) contactByPhoneLast10.set(phoneKey, c);
+      });
+
+      const { data: openDealsData } = await ((supabase
+        .from('crm_deals' as any) as any)
+        .select('id, contact_id')
+        .not('stage', 'in', '("fechado_ganho","fechado_perdido")')
+        .limit(5000));
+      const openDealContactIds = new Set((openDealsData || []).map((d: any) => d.contact_id).filter(Boolean));
+
+      for (const row of inboundRows) {
+        if (cancelled) break;
+
+        const rowEmail = (row.email || '').trim().toLowerCase();
+        const rowPhoneKey = phoneKeyLast10(row.phone);
+
+        let contact = row.crm_contact_id ? contactById.get(row.crm_contact_id) : null;
+        if (!contact && rowEmail) contact = contactByEmail.get(rowEmail) || null;
+        if (!contact && rowPhoneKey) contact = contactByPhoneLast10.get(rowPhoneKey) || null;
+
+        if (!contact) {
+          const { data: createdContact, error: createContactError } = await ((supabase
+            .from('crm_contacts' as any) as any)
+            .insert({
+              user_id: row.user_id || user.id,
+              organization_id: profile.organization_id,
+              full_name: row.full_name || (row.phone ? `Lead ${row.phone}` : 'Lead'),
+              email: row.email || null,
+              phone: row.phone || null,
+              first_touch_source: row.source === 'whatsapp' ? 'whatsapp_meta' : 'formulario_meta',
+              first_touch_at: row.created_at || new Date().toISOString(),
+            })
+            .select('id, user_id, full_name, email, phone')
+            .single());
+
+          if (createContactError || !createdContact) continue;
+          contact = createdContact;
+
+          contactById.set(contact.id, contact);
+          const cEmail = (contact.email || '').trim().toLowerCase();
+          const cPhoneKey = phoneKeyLast10(contact.phone);
+          if (cEmail) contactByEmail.set(cEmail, contact);
+          if (cPhoneKey) contactByPhoneLast10.set(cPhoneKey, contact);
+        }
+
+        if (openDealContactIds.has(contact.id)) {
+          continue;
+        }
+
+        const { data: createdDeal, error: createDealError } = await ((supabase
+          .from('crm_deals' as any) as any)
+          .insert({
+            user_id: contact.user_id || row.user_id || user.id,
+            organization_id: profile.organization_id,
+            contact_id: contact.id,
+            title: contact.full_name || row.full_name || 'Lead Novo',
+            stage: 'lead_novo',
+            value: null,
+            description: row.source === 'whatsapp' ? 'Lead automático via WhatsApp' : 'Lead automático via formulário',
+          })
+          .select('id, contact_id')
+          .single());
+
+        if (!createDealError && createdDeal?.contact_id) {
+          openDealContactIds.add(createdDeal.contact_id);
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
+      queryClient.invalidateQueries({ queryKey: ['crm-contacts'] });
+    };
+
+    syncInboundLeadsToPipeline();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    user?.id,
+    profile?.organization_id,
+    loading,
+    isLoadingProfile,
+    isLoadingDoctors,
+    queryClient,
+  ]);
+
+  useEffect(() => {
     if (!user?.id) return;
 
     // Usando nome único para evitar colisões entre instâncias ou re-renderizações rápidas
