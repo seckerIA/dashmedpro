@@ -11,6 +11,75 @@ var BRO = -3 * 60 * 60 * 1000;
 
 function sleep(ms: number): Promise<void> { return new Promise(function(r) { setTimeout(r, ms); }); }
 
+// =============================================
+// FERIADOS NACIONAIS (BR) — fixos + móveis (Páscoa)
+// =============================================
+function easterSunday(year: number): Date {
+  // Algoritmo de Gauss/Meeus
+  var a = year % 19;
+  var b = Math.floor(year / 100);
+  var c = year % 100;
+  var d = Math.floor(b / 4);
+  var e = b % 4;
+  var f = Math.floor((b + 8) / 25);
+  var g = Math.floor((b - f + 1) / 3);
+  var h = (19 * a + b - d - g + 15) % 30;
+  var i = Math.floor(c / 4);
+  var k = c % 4;
+  var L = (32 + 2 * e + 2 * i - h - k) % 7;
+  var m = Math.floor((a + 11 * h + 22 * L) / 451);
+  var month = Math.floor((h + L - 7 * m + 114) / 31); // 3=Mar, 4=Apr
+  var day = ((h + L - 7 * m + 114) % 31) + 1;
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function brHolidaysSet(year: number): Set<string> {
+  // Retorna chave 'YYYY-MM-DD' (em horário BRT) dos feriados nacionais oficiais
+  var fixed = [
+    [1, 1],   // Confraternização Universal
+    [4, 21],  // Tiradentes
+    [5, 1],   // Dia do Trabalho
+    [9, 7],   // Independência
+    [10, 12], // N. Sra. Aparecida
+    [11, 2],  // Finados
+    [11, 15], // Proclamação da República
+    [11, 20], // Consciência Negra (Lei 14.759/2023 — feriado nacional desde 2024)
+    [12, 25], // Natal
+  ];
+  var s = new Set<string>();
+  for (var i = 0; i < fixed.length; i++) {
+    var mo = fixed[i][0].toString().padStart(2, '0');
+    var dy = fixed[i][1].toString().padStart(2, '0');
+    s.add(year + '-' + mo + '-' + dy);
+  }
+  // Móveis baseados na Páscoa
+  var easter = easterSunday(year);
+  var carnavalTue = new Date(easter.getTime() - 47 * 86400000);
+  var carnavalMon = new Date(easter.getTime() - 48 * 86400000); // ponto facultativo, mas tratamos como feriado prático
+  var goodFriday = new Date(easter.getTime() - 2 * 86400000);
+  var corpusChristi = new Date(easter.getTime() + 60 * 86400000);
+  var addUTC = function (d: Date) {
+    var mo = (d.getUTCMonth() + 1).toString().padStart(2, '0');
+    var dy = d.getUTCDate().toString().padStart(2, '0');
+    s.add(d.getUTCFullYear() + '-' + mo + '-' + dy);
+  };
+  addUTC(carnavalMon);
+  addUTC(carnavalTue);
+  addUTC(goodFriday);
+  addUTC(corpusChristi);
+  return s;
+}
+
+function isHolidayBR(d: Date): { holiday: boolean; key: string } {
+  // d é UTC; convertemos para o dia em BRT (UTC-3)
+  var brt = new Date(d.getTime() + (-3 * 60 * 60 * 1000));
+  var year = brt.getUTCFullYear();
+  var mo = (brt.getUTCMonth() + 1).toString().padStart(2, '0');
+  var dy = brt.getUTCDate().toString().padStart(2, '0');
+  var key = year + '-' + mo + '-' + dy;
+  return { holiday: brHolidaysSet(year).has(key), key: key };
+}
+
 function buildAgentIdentity(c: any): any {
   const nonEmpty = (v: any, fallback: string) => (typeof v === 'string' && v.trim().length > 0 ? v.trim() : fallback);
   const optional = (v: any) => (typeof v === 'string' && v.trim().length > 0 ? v.trim() : undefined);
@@ -64,8 +133,21 @@ async function callGPT(sys: string, msgs: any[], conv: any): Promise<string> {
   return (d.choices && d.choices[0] && d.choices[0].message) ? d.choices[0].message.content : '';
 }
 
+function stripWrappingQuotes(s: string): string {
+  // Remove aspas envolventes (", ", ', ', `, ', ') que o GPT às vezes deixa nos exemplos do prompt
+  var t = s.trim();
+  // loop até estabilizar (caso tenha ""texto"")
+  for (var i = 0; i < 3; i++) {
+    var m = t.match(/^["'`\u201C\u201D\u2018\u2019]+(.*?)["'`\u201C\u201D\u2018\u2019]+$/s);
+    if (!m) break;
+    t = m[1].trim();
+  }
+  return t;
+}
+
 function postProcess(text: string): string[] {
-  var cleaned = text.replace(/^(Sofia|Assistente|IA|Bot)\s*:\s*/gim, '').trim();
+  var cleaned = text.replace(/^(Sofia|Jessica|Assistente|IA|Bot|Atendente|Secretaria|Secretária)\s*:\s*/gim, '').trim();
+  cleaned = stripWrappingQuotes(cleaned);
   var emojiRegex = /\p{Emoji_Presentation}/gu;
   var emojis = cleaned.match(emojiRegex) || [];
   if (emojis.length > 1) {
@@ -78,7 +160,7 @@ function postProcess(text: string): string[] {
   var rawParts = cleaned.split(/\[SPLIT\]/i);
   var trimmed: string[] = [];
   for (var i = 0; i < rawParts.length; i++) {
-    var t = rawParts[i].trim();
+    var t = stripWrappingQuotes(rawParts[i]);
     if (t.length > 0) trimmed.push(t);
   }
   var finalParts: string[] = [];
@@ -115,14 +197,175 @@ async function readingDelay(len: number): Promise<void> {
 }
 
 async function sendTyping(cfg: any, mid: string): Promise<void> {
-  if (cfg.provider === 'evolution') return; // Evolution handles presence via send options
+  // Marca a mensagem como lida (Meta only — funciona como "visto" mas nao mostra typing).
+  if (cfg.provider !== 'evolution') {
+    try {
+      await fetch('https://graph.facebook.com/v18.0/' + cfg.phone_number_id + '/messages', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + cfg.access_token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messaging_product: 'whatsapp', status: 'read', message_id: mid }),
+      });
+    } catch (_e) { /* ignore */ }
+  }
+}
+
+// Envia status de presenca ("digitando...", "gravando audio/video...", "online", "parado").
+// Evolution API v2: POST /chat/sendPresence/{instance}
+// presence: composing | recording | available | paused | unavailable
+async function sendPresence(cfg: any, to: string, presence: 'composing' | 'recording' | 'paused' | 'available', durationMs: number = 4000): Promise<void> {
   try {
-    await fetch('https://graph.facebook.com/v18.0/' + cfg.phone_number_id + '/messages', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + cfg.access_token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messaging_product: 'whatsapp', status: 'read', message_id: mid }),
-    });
-  } catch (_e) { /* ignore */ }
+    if (cfg.provider === 'evolution') {
+      var evoKey = cfg.evolution_instance_token && cfg.evolution_instance_token.length > 0
+        ? cfg.evolution_instance_token
+        : (Deno.env.get('EVOLUTION_GLOBAL_API_KEY') || '');
+      var cleanNumber = to.replace('+', '').trim();
+      await fetch(cfg.evolution_api_url.replace(/\/+$/, '') + '/chat/sendPresence/' + cfg.evolution_instance_name, {
+        method: 'POST',
+        headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          number: cleanNumber,
+          presence: presence,
+          delay: durationMs,
+        }),
+      });
+      return;
+    }
+    // Meta API: ainda nao oferece endpoint publico de typing indicator (apenas "read").
+    // Nao precisamos fazer nada aqui; quando ela liberar, expandimos.
+  } catch (_e) { /* ignore presence errors silently */ }
+}
+
+// Helper: dispara typing repetidamente em background ate o controlador parar.
+// Evolution mantem o status por durationMs, entao re-enviamos a cada 3s pra continuar visivel.
+function startTypingHeartbeat(cfg: any, to: string, presence: 'composing' | 'recording' = 'composing') {
+  var stopped = false;
+  (async function loop() {
+    while (!stopped) {
+      try { await sendPresence(cfg, to, presence, 4000); } catch (_e) { /* ignore */ }
+      // intervalo curto pra renovar o status (Evolution emite stop apos delay)
+      for (var t = 0; t < 30 && !stopped; t++) await sleep(100);
+    }
+  })();
+  return function stop() {
+    stopped = true;
+    // Sinaliza fim explicito da digitacao (opcional — alguns clients nao mostram)
+    sendPresence(cfg, to, 'paused', 500).catch(function() {});
+  };
+}
+
+async function sendVideoWA(cfg: any, to: string, videoUrl: string, caption: string, sb: any, cid: string, uid: string): Promise<boolean> {
+  var prov = cfg.provider || 'meta';
+  var ir = await sb.from('whatsapp_messages').insert({
+    user_id: uid, conversation_id: cid, phone_number: to,
+    content: caption || '[Vídeo de depoimento]', direction: 'outbound',
+    message_type: 'video', status: 'pending', sent_at: new Date().toISOString(),
+    provider: prov,
+    metadata: { auto_reply: true, ai_generated: true, agent: 'whatsapp-ai-agent', testimonial: true, media_url: videoUrl },
+  }).select('id').single();
+  var sm = ir.data;
+  try {
+    var wr: Response;
+    if (prov === 'evolution') {
+      var evoKey = cfg.evolution_instance_token && cfg.evolution_instance_token.length > 0
+        ? cfg.evolution_instance_token
+        : (Deno.env.get('EVOLUTION_GLOBAL_API_KEY') || '');
+      var cleanNumber = to.replace('+', '').trim();
+      // Evolution API v2 espera mediatype/media/caption NO NÍVEL RAIZ
+      // (não dentro de mediaMessage). Mantemos mediaMessage como fallback
+      // para versões antigas.
+      wr = await fetch(cfg.evolution_api_url.replace(/\/+$/, '') + '/message/sendMedia/' + cfg.evolution_instance_name, {
+        method: 'POST',
+        headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          number: cleanNumber,
+          mediatype: 'video',
+          media: videoUrl,
+          caption: caption || '',
+          mimetype: 'video/mp4',
+          delay: 1500,
+          mediaMessage: { mediatype: 'video', media: videoUrl, caption: caption || '' },
+          options: { delay: 1500 },
+        }),
+      });
+    } else {
+      wr = await fetch('https://graph.facebook.com/v18.0/' + cfg.phone_number_id + '/messages', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + cfg.access_token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messaging_product: 'whatsapp', to: to, type: 'video', video: { link: videoUrl, caption: caption || '' } }),
+      });
+    }
+    var rawBody = '';
+    try { rawBody = await wr.text(); } catch (_e) { rawBody = ''; }
+    var wd: any = null;
+    try { wd = rawBody ? JSON.parse(rawBody) : null; } catch (_e) { wd = null; }
+    await safeDebugLog(sb, 'sendVideoWA response', { cid, provider: prov, httpStatus: wr.status, ok: wr.ok, bodyPreview: rawBody.substring(0, 400) });
+    if (!sm) return wr.ok;
+    if (!wr.ok) {
+      await sb.from('whatsapp_messages').update({
+        status: 'failed',
+        error_message: (wd && (wd.message || wd.error)) || ('HTTP ' + wr.status + ': ' + rawBody.substring(0, 200)),
+      }).eq('id', sm.id);
+      return false;
+    }
+    var wid: string | null = null;
+    if (prov === 'evolution' && wd) {
+      wid = (wd.key && wd.key.id) || wd.id || wd.messageId || (wd.data && wd.data.id) || null;
+    } else if (wd) {
+      wid = (wd.messages && wd.messages[0] && wd.messages[0].id) || null;
+    }
+    await sb.from('whatsapp_messages').update({ status: 'sent', message_id: wid, sent_at: new Date().toISOString() }).eq('id', sm.id);
+    return true;
+  } catch (e) {
+    console.error('[Agent] Send video error:', e);
+    await safeDebugLog(sb, 'sendVideoWA exception', { cid, error: String(e) });
+    if (sm) await sb.from('whatsapp_messages').update({ status: 'failed', error_message: String(e) }).eq('id', sm.id);
+    return false;
+  }
+}
+
+async function getTestimonialVideoUrls(sb: any, uid: string): Promise<{ url: string; caption: string | null }[]> {
+  // Pega vídeos ativos do médico (e dos médicos linkados, no caso de secretárias)
+  var ids: string[] = [uid];
+  var lr = await sb.from('secretary_doctor_links').select('doctor_id').eq('secretary_id', uid).eq('is_active', true);
+  if (lr.data && lr.data.length > 0) for (var i = 0; i < lr.data.length; i++) ids.push(lr.data[i].doctor_id);
+  var vr = await sb.from('whatsapp_testimonial_videos').select('storage_path, caption, display_order, mime_type').in('user_id', ids).eq('is_active', true).order('display_order', { ascending: true }).limit(3);
+  if (!vr.data || vr.data.length === 0) return [];
+  var SUPABASE_URL_BASE = Deno.env.get('SUPABASE_URL') || '';
+  var out: { url: string; caption: string | null }[] = [];
+  for (var v = 0; v < vr.data.length; v++) {
+    var sp = vr.data[v].storage_path as string;
+    if (!sp) continue;
+    // Normaliza: aceita 'bucket/file' ou só 'file' (assume whatsapp-media)
+    var bucket = 'whatsapp-media';
+    var pathInBucket = sp;
+    if (sp.indexOf('/') !== -1) {
+      var firstSlash = sp.indexOf('/');
+      var maybeBucket = sp.substring(0, firstSlash);
+      // Se começar com bucket conhecido, separe
+      if (maybeBucket === 'whatsapp-media' || maybeBucket === 'whatsapp-testimonials') {
+        bucket = maybeBucket;
+        pathInBucket = sp.substring(firstSlash + 1);
+      }
+    }
+    var publicUrl = SUPABASE_URL_BASE + '/storage/v1/object/public/' + bucket + '/' + pathInBucket;
+    out.push({ url: publicUrl, caption: vr.data[v].caption || null });
+  }
+  return out;
+}
+
+function shouldSendTestimonialNow(phase: string, lim: string, leadData: any, outboundCount: number, videosAlreadySent: boolean): boolean {
+  // Disparar apenas:
+  // - na fase triagem (geração de valor) ou logo no início de agendamento
+  // - quando o paciente JÁ verbalizou dor/sintoma
+  // - vídeos ainda não enviados
+  // - houve pelo menos 2 trocas (não no primeiro "oi")
+  if (videosAlreadySent) return false;
+  if (outboundCount < 2) return false; // já tem ao menos 1 resposta nossa anterior
+  if (phase !== 'triagem' && phase !== 'agendamento') return false;
+  // Sinal de dor/queixa explícita do paciente OU lead já tem procedimento
+  var painSignal = /\b(dor|doi|trava|pesad|incomod|machucad|les[aã]o|artrose|tendin|bursit|fasc[ií]te|joelho|ombro|coluna|quadril|tornozelo|cirurgia|fisioterapia)\b/i;
+  var hasPain = painSignal.test(lim || '') || !!(leadData && leadData.procedimento_desejado);
+  return hasPain;
 }
 
 async function sendWA(cfg: any, to: string, text: string, sb: any, cid: string, uid: string): Promise<void> {
@@ -216,7 +459,14 @@ async function buildScheduleContext(sb: any, uid: string): Promise<string> {
     var dow = d.getUTCDay();
     var ds = d.getUTCDate().toString().padStart(2, '0') + '/' + (d.getUTCMonth() + 1).toString().padStart(2, '0');
     var wn = ['Domingo', 'Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta', 'Sabado'];
-    var dayOut = '\n[' + wn[dow] + ', ' + ds + ']';
+    // Verificar feriado nacional para o dia em BRT
+    var holidayInfo = isHolidayBR(new Date(ts));
+    var dayLabel = wn[dow] + ', ' + ds + (holidayInfo.holiday ? ' — FERIADO NACIONAL (sem atendimento)' : '');
+    var dayOut = '\n[' + dayLabel + ']';
+    if (holidayInfo.holiday) {
+      if (di < 3) dc.push(dayOut + '\n  (Sem atendimento — feriado)');
+      continue;
+    }
     var hs = false;
     for (var ui = 0; ui < tids.length; ui++) {
       var did = tids[ui];
@@ -312,12 +562,27 @@ async function extractLeadData(sb: any, cid: string, msgs: any[], conv: any, uid
       temperature: 0.1, max_tokens: 400, response_format: { type: 'json_object' },
     }),
   });
-  if (!res.ok) return;
+  if (!res.ok) {
+    await safeDebugLog(sb, 'extractLeadData GPT failed', { cid: cid, status: res.status });
+    return;
+  }
   var d = await res.json();
   var ct = (d.choices && d.choices[0] && d.choices[0].message) ? d.choices[0].message.content : null;
-  if (!ct) return;
+  if (!ct) {
+    await safeDebugLog(sb, 'extractLeadData empty response', { cid: cid });
+    return;
+  }
   try {
     var ex = JSON.parse(ct.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
+    await safeDebugLog(sb, 'extractLeadData parsed', {
+      cid: cid,
+      nome: ex.nome || null,
+      proc: ex.procedimento_desejado || null,
+      conv: ex.convenio || null,
+      temp: ex.temperatura_lead || null,
+      ag_confirmed: ex.agendamento_confirmado ? !!ex.agendamento_confirmado.is_confirmed : false,
+      ag_data: ex.agendamento_confirmado ? (ex.agendamento_confirmado.data_iso || null) : null,
+    });
     var lu: any = { conversation_id: cid, phone_number: conv.phone_number };
     if (ex.nome) lu.nome = ex.nome;
     if (ex.procedimento_desejado) lu.procedimento_desejado = ex.procedimento_desejado;
@@ -342,13 +607,30 @@ async function extractLeadData(sb: any, cid: string, msgs: any[], conv: any, uid
       }
     }
     var bcr = await sb.from('whatsapp_ai_config').select('auto_scheduling_enabled').eq('user_id', uid).maybeSingle();
-    if (bcr.data && bcr.data.auto_scheduling_enabled && ex.agendamento_confirmado && ex.agendamento_confirmado.is_confirmed && ex.agendamento_confirmado.data_iso) {
+    var canBook = bcr.data && bcr.data.auto_scheduling_enabled && ex.agendamento_confirmado && ex.agendamento_confirmado.is_confirmed && ex.agendamento_confirmado.data_iso;
+    if (!canBook) {
+      await safeDebugLog(sb, 'extractLeadData skip booking', {
+        cid: cid,
+        autoSchedEnabled: !!(bcr.data && bcr.data.auto_scheduling_enabled),
+        hasAgConfirmed: !!ex.agendamento_confirmado,
+        isConfirmed: ex.agendamento_confirmado ? !!ex.agendamento_confirmado.is_confirmed : false,
+        hasDataIso: ex.agendamento_confirmado ? !!ex.agendamento_confirmado.data_iso : false,
+      });
+    }
+    if (canBook) {
       // Ensure contact exists before booking
       await ensureCRMContact(sb, conv, cid);
       var bd2 = new Date(ex.agendamento_confirmado.data_iso);
+      if (isNaN(bd2.getTime())) {
+        await safeDebugLog(sb, 'extractLeadData invalid data_iso', { cid: cid, raw: ex.agendamento_confirmado.data_iso });
+        return;
+      }
       var ed2 = new Date(bd2.getTime() + 1800000);
       var did2 = ex.agendamento_confirmado.medico_id || conv.user_id;
       var cfr = await sb.from('medical_appointments').select('*', { count: 'exact', head: true }).eq('doctor_id', did2).neq('status', 'cancelled').lt('start_time', ed2.toISOString()).gt('end_time', bd2.toISOString());
+      if (cfr.count && cfr.count > 0) {
+        await safeDebugLog(sb, 'extractLeadData booking conflict', { cid: cid, did: did2, start: bd2.toISOString(), conflicts: cfr.count });
+      }
       if (!cfr.count || cfr.count === 0) {
         var prr = await sb.from('profiles').select('organization_id').eq('id', uid).single();
         var oid = prr.data ? prr.data.organization_id : null;
@@ -372,10 +654,15 @@ async function extractLeadData(sb: any, cid: string, msgs: any[], conv: any, uid
         if (!bkr.error) {
           if (conv.contact_id) await sb.from('crm_deals').update({ stage: 'agendado' }).eq('contact_id', conv.contact_id).not('stage', 'in', '("fechado_ganho","fechado_perdido")');
           await sb.from('whatsapp_lead_qualifications').upsert({ conversation_id: cid, phone_number: conv.phone_number, status: 'agendado', data_agendamento: bd2.toISOString() }, { onConflict: 'conversation_id' });
+          await safeDebugLog(sb, 'extractLeadData booking SUCCESS', { cid: cid, did: did2, start: bd2.toISOString() });
+        } else {
+          await safeDebugLog(sb, 'extractLeadData booking insert failed', { cid: cid, error: String(bkr.error.message || bkr.error) });
         }
       }
     }
-  } catch (_e) { /* ignore parse errors */ }
+  } catch (e) {
+    await safeDebugLog(sb, 'extractLeadData parse error', { cid: cid, error: String(e), preview: ct ? ct.substring(0, 300) : null });
+  }
 }
 
 async function ensureCRMContact(sb: any, conv: any, cid: string): Promise<void> {
@@ -511,9 +798,83 @@ async function handler(req: Request): Promise<Response> {
 
     // STEP 5: LOAD LEAD DATA
     var ldr = await sb.from('whatsapp_lead_qualifications').select('*').eq('conversation_id', cid).maybeSingle();
+    var leadRow: any = ldr.data || null;
+    var videosAlreadySent = !!(leadRow && leadRow.videos_sent_at);
 
     // STEP 6: DETECT PHASE
-    var phr = detectPhase(tic, ldr.data, lim);
+    var phr = detectPhase(tic, leadRow, lim);
+
+    // STEP 6b: AVALIAR ENVIO DE VÍDEO DE DEPOIMENTO (antes de gerar prompt)
+    var willSendVideo = shouldSendTestimonialNow(phr.phase, lim, leadRow, outb.length, videosAlreadySent);
+
+    // STEP 6c: SE FOR ENVIAR VÍDEO AGORA, FAZ O FLUXO DETERMINÍSTICO:
+    //   ancoragem (texto curto) -> 3 vídeos -> RETURN (sem chamar GPT).
+    //   Isso garante a ORDEM SAGRADA do PDF: vídeos ANTES do preço.
+    //   Na próxima inbound, GPT volta com videoSent=true e fala preço/CTA.
+    if (willSendVideo && wac) {
+      try {
+        var videosPre = await getTestimonialVideoUrls(sb, conv.user_id);
+        if (videosPre.length > 0) {
+          var firstName = (conv.contact_name || '').trim().split(/\s+/)[0] || '';
+          var anchorMsg1 = (firstName ? firstName + ', a' : 'A') + 'ntes de te falar sobre o investimento, quero te mostrar o relato de um paciente com um caso parecido com o seu 👇';
+          var anchorMsg2 = 'Olha os resultados:';
+
+          var preLimid = inb.length > 0 ? inb[0].message_id : null;
+          if (preLimid) await sendTyping(wac, preLimid);
+
+          // Inicia "digitando..." enquanto a IA "le" e "pensa"
+          var stopTypingV = startTypingHeartbeat(wac, conv.phone_number, 'composing');
+          try {
+            await readingDelay(lim.length);
+            await typingDelay(anchorMsg1);
+          } finally { stopTypingV(); }
+          await sendWA(wac, conv.phone_number, anchorMsg1, sb, cid, conv.user_id);
+
+          await sleep(800);
+          var stopTypingV2 = startTypingHeartbeat(wac, conv.phone_number, 'composing');
+          try { await typingDelay(anchorMsg2); } finally { stopTypingV2(); }
+          await sendWA(wac, conv.phone_number, anchorMsg2, sb, cid, conv.user_id);
+
+          await safeDebugLog(sb, 'Sending testimonial videos (deterministic)', { cid: cid, count: videosPre.length });
+          var anyOk = false;
+          for (var pvi = 0; pvi < videosPre.length; pvi++) {
+            // Mostra "gravando video..." entre cada envio (UX premium)
+            var stopRec = startTypingHeartbeat(wac, conv.phone_number, 'recording');
+            try { await sleep(1500); } finally { stopRec(); }
+            var okv = await sendVideoWA(wac, conv.phone_number, videosPre[pvi].url, videosPre[pvi].caption || '', sb, cid, conv.user_id);
+            if (okv) anyOk = true;
+            else await safeDebugLog(sb, 'Video send failed', { cid: cid, idx: pvi, url: videosPre[pvi].url });
+          }
+          if (anyOk) {
+            await sb.from('whatsapp_lead_qualifications').upsert({
+              conversation_id: cid,
+              phone_number: conv.phone_number,
+              videos_sent_at: new Date().toISOString(),
+            }, { onConflict: 'conversation_id' });
+          }
+
+          // Update analysis e libera lock
+          try {
+            await sb.from('whatsapp_conversation_analysis').upsert({
+              conversation_id: cid, user_id: conv.user_id, lead_status: 'morno',
+              last_analyzed_at: new Date().toISOString(), message_count_analyzed: msgs.length,
+              ai_model_used: 'agent (anchor+video, no GPT)', suggested_next_action: 'Aguardar reacao aos videos antes de falar preco',
+            }, { onConflict: 'conversation_id' });
+          } catch (_e) { /* ignore */ }
+          await safeReleaseLock(sb, cid);
+          return new Response(JSON.stringify({ status: 'success', mode: 'video-anchor', videos: videosPre.length }), {
+            status: 200, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+          });
+        } else {
+          await safeDebugLog(sb, 'Wanted to send video but none configured', { cid: cid, userId: conv.user_id });
+          // segue fluxo normal sem video
+          willSendVideo = false;
+        }
+      } catch (eVid) {
+        await safeDebugLog(sb, 'Video anchor flow failed', { cid: cid, error: String(eVid) });
+        willSendVideo = false;
+      }
+    }
 
     // STEP 6a: CREATE CRM CONTACT ONLY WHEN PATIENT SHOWS INTEREST
     if (phr.phase === 'agendamento' || phr.phase === 'pos_agendamento') {
@@ -524,16 +885,21 @@ async function handler(req: Request): Promise<Response> {
     if (phr.phase === 'handoff') {
       var hId = buildAgentIdentity(aic);
       var hPr = buildPhasePrompt('handoff', hId);
-      var hRes = await callGPT(hPr, msgs, conv);
+      // Mostra "digitando..." durante a chamada do GPT (handoff)
+      var stopHType = wac ? startTypingHeartbeat(wac, conv.phone_number, 'composing') : function(){};
+      var hRes = '';
+      try { hRes = await callGPT(hPr, msgs, conv); } finally { stopHType(); }
       if (hRes && wac) {
         var hmid = inb.length > 0 ? inb[0].message_id : null;
         if (hmid) await sendTyping(wac, hmid);
-        await readingDelay(lim.length);
+        var stopHRead = startTypingHeartbeat(wac, conv.phone_number, 'composing');
+        try { await readingDelay(lim.length); } finally { stopHRead(); }
         var hParts = postProcess(hRes);
         for (var hp = 0; hp < hParts.length; hp++) {
           if (hmid) await sendTyping(wac, hmid);
           if (hp > 0) await sleep(Math.min(Math.max(800, hParts[hp - 1].length * 25), 2000));
-          await typingDelay(hParts[hp]);
+          var stopHPart = startTypingHeartbeat(wac, conv.phone_number, 'composing');
+          try { await typingDelay(hParts[hp]); } finally { stopHPart(); }
           await sendWA(wac, conv.phone_number, hParts[hp], sb, cid, conv.user_id);
         }
       }
@@ -559,7 +925,7 @@ async function handler(req: Request): Promise<Response> {
 
     // STEP 9: BUILD PROMPT
     var ident = buildAgentIdentity(aic);
-    var sp = buildPhasePrompt(phr.phase, ident);
+    var sp = buildPhasePrompt(phr.phase, ident, { shouldSendVideoNow: willSendVideo, videoSent: videosAlreadySent });
     var ext = '';
 
     if (outb.length > 0) {
@@ -614,35 +980,46 @@ async function handler(req: Request): Promise<Response> {
     var fsp = sp + ext;
     await safeDebugLog(sb, 'Before GPT', { cid: cid, phase: phr.phase, promptLen: fsp.length, msgCount: msgs.length });
 
-    // STEP 10: CALL GPT
+    // STEP 10: CALL GPT (com indicador "digitando..." enquanto GPT processa)
     var aiText = '';
+    var stopGptType = wac ? startTypingHeartbeat(wac, conv.phone_number, 'composing') : function(){};
     try {
       aiText = await callGPT(fsp, msgs, conv);
     } catch (ge) {
+      stopGptType();
       console.error('[Agent] GPT failed:', ge);
       await safeDebugLog(sb, 'GPT Failed', { cid: cid, error: String(ge) });
       await safeReleaseLock(sb, cid);
       return new Response(JSON.stringify({ error: 'GPT failed' }), { status: 200, headers: CORS });
     }
+    stopGptType();
 
     if (!aiText) {
       await safeReleaseLock(sb, cid);
       return new Response(JSON.stringify({ status: 'empty_response' }), { status: 200, headers: CORS });
     }
 
-    // STEP 11: POST-PROCESS & SEND
+    // STEP 11: POST-PROCESS & SEND (com "digitando..." em cada split)
     var parts = postProcess(aiText);
     if (wac) {
       var limid = inb.length > 0 ? inb[0].message_id : null;
       if (limid) await sendTyping(wac, limid);
-      await readingDelay(lim.length);
+      // "Lendo" a mensagem
+      var stopReading = startTypingHeartbeat(wac, conv.phone_number, 'composing');
+      try { await readingDelay(lim.length); } finally { stopReading(); }
+
       for (var si = 0; si < parts.length; si++) {
         if (limid) await sendTyping(wac, limid);
         if (si > 0) await sleep(Math.min(Math.max(800, parts[si - 1].length * 25), 2000));
-        await typingDelay(parts[si]);
+        // "Digitando" enquanto simula tempo de digitacao da parte
+        var stopPart = startTypingHeartbeat(wac, conv.phone_number, 'composing');
+        try { await typingDelay(parts[si]); } finally { stopPart(); }
         await sendWA(wac, conv.phone_number, parts[si], sb, cid, conv.user_id);
       }
     }
+
+    // STEP 11b removido: envio de video agora ocorre no STEP 6c (deterministico)
+    //                    para garantir ORDEM SAGRADA (videos ANTES de preco).
 
     // STEP 12: BACKGROUND LEAD EXTRACTION
     extractLeadData(sb, cid, msgs, conv, conv.user_id).then(function() {}).catch(function(e: any) { console.warn('[Agent] Extract err:', e); });

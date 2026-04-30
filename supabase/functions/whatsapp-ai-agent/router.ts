@@ -91,13 +91,17 @@ export function detectPhase(
 
   // =====================
   // ABERTURA (1-3 msgs)
+  // RAG carrega quando há sinal de interesse explícito (preço, agendamento,
+  // convênio, dor) — sem isso, IA responde sem o protocolo do médico.
   // =====================
+  const interestSignalRegex = /\b(pre[çc]o|valor|custa|consulta|agendar|marcar|conv[eê]nio|particular|reembolso|amil|unimed|bradesco|sulam[eé]rica|hapvida|notredame|dor|machucad|lesao|les[ãa]o|artrose|tendin|bursit|fasc[ií]te|joelho|ombro|coluna|quadril|tornozelo)\b/i;
   if (messageCount <= 3) {
+    const hasInterestSignal = interestSignalRegex.test(msg);
     return {
       phase: 'abertura',
-      shouldLoadRAG: false,
+      shouldLoadRAG: hasInterestSignal,
       shouldLoadSchedule: false,
-      reason: `Início da conversa (${messageCount} msgs)`,
+      reason: `Início da conversa (${messageCount} msgs)${hasInterestSignal ? ' + sinal de interesse' : ''}`,
     };
   }
 

@@ -88,6 +88,23 @@ export function AppLayout({ children, hideSidebar = false, title: explicitTitle,
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
+  // Trava scroll da pagina quando estamos em rotas fullscreen-shell (ex: /whatsapp).
+  // Evita "pedaco preto" de overflow do body em desktop e mobile.
+  useEffect(() => {
+    if (!shouldNoScroll) return
+    const html = document.documentElement
+    const body = document.body
+    const root = document.getElementById('root')
+    html.classList.add('lock-scroll')
+    body.classList.add('lock-scroll')
+    root?.classList.add('lock-scroll')
+    return () => {
+      html.classList.remove('lock-scroll')
+      body.classList.remove('lock-scroll')
+      root?.classList.remove('lock-scroll')
+    }
+  }, [shouldNoScroll])
+
   const isDesktop = windowWidth >= 1024
   const isLargeDesktop = windowWidth >= 1280
 
@@ -277,8 +294,10 @@ export function AppLayout({ children, hideSidebar = false, title: explicitTitle,
               <main
                 id="main-content"
                 className={cn(
-                  "flex-1 bg-background",
-                  !shouldNoScroll && "p-4 md:p-6 pb-28 md:pb-6 overflow-auto"
+                  "flex-1 bg-background min-h-0",
+                  shouldNoScroll
+                    ? "overflow-hidden"
+                    : "p-4 md:p-6 pb-28 md:pb-6 overflow-auto"
                 )}
               >
                 {children}

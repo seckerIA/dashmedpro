@@ -110,6 +110,12 @@ export interface AIConfig {
   specialist_name?: string;
   doctor_info?: string;
 
+  // Follow-up automatico (re-engajamento de leads frios)
+  followup_enabled?: boolean;
+  followup_window_start_hour?: number; // 0-23 (BRT)
+  followup_window_end_hour?: number; // 0-23 (BRT)
+  followup_max_attempts?: number; // 1-5
+
   created_at: string;
   updated_at: string;
 }

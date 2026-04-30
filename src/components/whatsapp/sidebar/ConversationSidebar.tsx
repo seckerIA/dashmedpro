@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { ContactInfo } from './ContactInfo';
 import { ConversationNotes } from './ConversationNotes';
 import { LabelManager } from './LabelManager';
+import { FollowUpStatus } from './FollowUpStatus';
 import type { WhatsAppConversationWithRelations } from '@/types/whatsapp';
 
 interface ConversationSidebarProps {
@@ -55,6 +56,14 @@ export function ConversationSidebar({
             conversation={conversation}
             onEditContact={conversation.contact_id ? handleEditContact : undefined}
             onViewInCRM={conversation.contact_id ? handleViewInCRM : undefined}
+          />
+
+          {/* Status de Follow-up automatico (so aparece se ativado globalmente) */}
+          <FollowUpStatus
+            conversationId={conversation.id}
+            conversationOwnerId={conversation.user_id}
+            lastMessageAt={conversation.last_message_at}
+            lastMessageDirection={conversation.last_message_direction as 'inbound' | 'outbound' | null}
           />
 
           <Separator />

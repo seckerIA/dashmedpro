@@ -270,6 +270,20 @@ All colors MUST be HSL.
     scroll-behavior: smooth !important;
   }
 
+  /* Lock body scroll for fullscreen app shells (e.g. /whatsapp).
+     React adiciona/remove a classe via useEffect baseado na rota. */
+  body.lock-scroll,
+  html.lock-scroll {
+    overflow: hidden !important;
+    height: 100% !important;
+    overscroll-behavior: none;
+  }
+
+  #root.lock-scroll {
+    height: 100%;
+    overflow: hidden;
+  }
+
   /* Modern Scrollbar Styles - Light Theme */
   * {
     scrollbar-width: thin;

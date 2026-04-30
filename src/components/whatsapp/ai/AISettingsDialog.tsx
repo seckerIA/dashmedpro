@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Sparkles, Save, Info, Bot, ShieldCheck, User, Stethoscope } from 'lucide-react';
+import { Sparkles, Save, Info, Bot, ShieldCheck, User, Stethoscope, Film, Clock, MessageCircleReply } from 'lucide-react';
 import { useWhatsAppAI } from '@/hooks/useWhatsAppAI';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -23,6 +23,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import { TestimonialVideosManager } from './TestimonialVideosManager';
 
 interface AISettingsDialogProps {
     open: boolean;
@@ -68,7 +69,12 @@ export function AISettingsDialog({ open, onOpenChange, targetUserId, conversatio
         custom_prompt_instructions: '',
         auto_reply_enabled: false,
         auto_scheduling_enabled: false,
+        followup_enabled: false,
+        followup_window_start_hour: 8,
+        followup_window_end_hour: 21,
+        followup_max_attempts: 3,
     });
+    const [videosOpen, setVideosOpen] = useState(false);
 
     useEffect(() => {
         if (aiConfig) {
@@ -86,6 +92,10 @@ export function AISettingsDialog({ open, onOpenChange, targetUserId, conversatio
                     ? (conversationAI?.ai_autonomous_mode ?? false)
                     : (aiConfig.auto_reply_enabled || false),
                 auto_scheduling_enabled: aiConfig.auto_scheduling_enabled || false,
+                followup_enabled: (aiConfig as any).followup_enabled || false,
+                followup_window_start_hour: (aiConfig as any).followup_window_start_hour ?? 8,
+                followup_window_end_hour: (aiConfig as any).followup_window_end_hour ?? 21,
+                followup_max_attempts: (aiConfig as any).followup_max_attempts ?? 3,
             });
         }
     }, [aiConfig, conversationAI, conversationId]);
@@ -291,6 +301,111 @@ export function AISettingsDialog({ open, onOpenChange, targetUserId, conversatio
                             />
                         </div>
                     </div>
+                    {/* Vídeos de Depoimento */}
+                    <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5">
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="space-y-1 min-w-0">
+                                <Label className="text-sm font-bold flex items-center gap-2">
+                                    <Film className="h-4 w-4 text-amber-500" />
+                                    Vídeos de depoimento
+                                </Label>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    Até 3 vídeos curtos de pacientes — enviados automaticamente pelo agente após gerar valor e antes de falar de preço (ORDEM SAGRADA).
+                                </p>
+                            </div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setVideosOpen(true)}
+                                className="flex-shrink-0"
+                            >
+                                Gerenciar
+                            </Button>
+                        </div>
+                    </div>
+
+                    <TestimonialVideosManager
+                        open={videosOpen}
+                        onOpenChange={setVideosOpen}
+                        targetUserId={targetUserId}
+                    />
+
+                    {/* Follow-up Automatico (re-engajamento de leads frios) */}
+                    <div className={cn(
+                        "p-4 rounded-xl border transition-all duration-200",
+                        formData.followup_enabled
+                            ? "bg-blue-500/10 border-blue-500/20"
+                            : "bg-muted/30 border-border"
+                    )}>
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="space-y-1 min-w-0">
+                                <Label className="text-sm font-bold flex items-center gap-2">
+                                    <MessageCircleReply className="h-4 w-4 text-blue-500" />
+                                    Follow-up Automático
+                                    {formData.followup_enabled && (
+                                        <span className="text-[10px] bg-blue-500 text-white px-2 py-0.5 rounded-full font-bold">
+                                            ATIVO
+                                        </span>
+                                    )}
+                                </Label>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    Quando o paciente parar de responder, a IA volta sozinha em <b>3h</b>, <b>24h</b> e <b>72h</b> com mensagem contextual. No 3º silêncio, conversa é transferida automaticamente para humano.
+                                </p>
+                            </div>
+                            <Switch
+                                checked={formData.followup_enabled}
+                                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, followup_enabled: checked }))}
+                                className="data-[state=checked]:bg-blue-500"
+                                disabled={!formData.auto_reply_enabled}
+                            />
+                        </div>
+
+                        {formData.followup_enabled && (
+                            <div className="mt-4 grid grid-cols-3 gap-3 pt-4 border-t border-blue-500/20">
+                                <div className="space-y-1.5">
+                                    <Label className="text-[11px] text-muted-foreground flex items-center gap-1">
+                                        <Clock className="h-3 w-3" />
+                                        Início (BRT)
+                                    </Label>
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        max={23}
+                                        value={formData.followup_window_start_hour}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, followup_window_start_hour: Math.max(0, Math.min(23, parseInt(e.target.value) || 0)) }))}
+                                        className="h-8 text-sm bg-background"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-[11px] text-muted-foreground flex items-center gap-1">
+                                        <Clock className="h-3 w-3" />
+                                        Fim (BRT)
+                                    </Label>
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        max={23}
+                                        value={formData.followup_window_end_hour}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, followup_window_end_hour: Math.max(0, Math.min(23, parseInt(e.target.value) || 0)) }))}
+                                        className="h-8 text-sm bg-background"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-[11px] text-muted-foreground">Máx. tentativas</Label>
+                                    <Input
+                                        type="number"
+                                        min={1}
+                                        max={5}
+                                        value={formData.followup_max_attempts}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, followup_max_attempts: Math.max(1, Math.min(5, parseInt(e.target.value) || 3)) }))}
+                                        className="h-8 text-sm bg-background"
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
                     {/* Auto-Scheduling Switch */}
                     <div className={cn(
                         "p-4 rounded-xl border transition-all duration-200",
