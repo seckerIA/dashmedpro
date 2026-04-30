@@ -98,6 +98,11 @@ export interface AIConfig {
 
   // Personalização Avançada
   knowledge_base?: string;
+  pre_investment_videos?: string;
+  /** Espera mínima (segundos) antes da primeira resposta automática (humanizado). */
+  ai_reply_delay_min_seconds?: number;
+  /** Espera máxima (segundos) antes da primeira resposta automática (humanizado). */
+  ai_reply_delay_max_seconds?: number;
   already_known_info?: string;
   custom_prompt_instructions?: string;
   auto_reply_enabled: boolean;

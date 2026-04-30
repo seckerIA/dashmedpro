@@ -91,9 +91,22 @@ export function detectPhase(
 
   // =====================
   // ABERTURA (1-3 msgs)
-  // RAG carrega quando há sinal de interesse explícito (preço, agendamento,
-  // convênio, dor) — sem isso, IA responde sem o protocolo do médico.
+  // - Pedido explícito de agenda cedo → vai direto para triagem (carrega agenda)
+  // - Sinal de interesse (preço, dor, convênio) → ainda em abertura, mas carrega RAG
+  // - Sem nada disso → abertura simples, sem RAG
   // =====================
+  const strongBookingEarly =
+    /\b(quero\s+agendar|quero\s+marcar|marcar\s+consulta|agendar\s+consulta|tem\s+(vaga|hor[aá]rio)|hor[aá]rios?\s+dispon|ver\s+(a\s+)?agenda|consultar\s+agenda|disponibilidade|quais\s+hor[aá]rios)\b/i.test(
+      msg,
+    );
+  if (messageCount <= 3 && strongBookingEarly) {
+    return {
+      phase: 'triagem',
+      shouldLoadRAG: true,
+      shouldLoadSchedule: true,
+      reason: `Pedido de agenda no início (${messageCount} msgs)`,
+    };
+  }
   const interestSignalRegex = /\b(pre[çc]o|valor|custa|consulta|agendar|marcar|conv[eê]nio|particular|reembolso|amil|unimed|bradesco|sulam[eé]rica|hapvida|notredame|dor|machucad|lesao|les[ãa]o|artrose|tendin|bursit|fasc[ií]te|joelho|ombro|coluna|quadril|tornozelo)\b/i;
   if (messageCount <= 3) {
     const hasInterestSignal = interestSignalRegex.test(msg);

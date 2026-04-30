@@ -4173,6 +4173,9 @@ export type Database = {
           knowledge_base: string | null
           max_suggestions_per_conversation: number | null
           openai_api_key_encrypted: string | null
+          pre_investment_videos: string | null
+          ai_reply_delay_min_seconds: number
+          ai_reply_delay_max_seconds: number
           specialist_name: string | null
           suggestion_language: string | null
           suggestion_tone: string | null
@@ -4197,6 +4200,9 @@ export type Database = {
           knowledge_base?: string | null
           max_suggestions_per_conversation?: number | null
           openai_api_key_encrypted?: string | null
+          pre_investment_videos?: string | null
+          ai_reply_delay_min_seconds?: number
+          ai_reply_delay_max_seconds?: number
           specialist_name?: string | null
           suggestion_language?: string | null
           suggestion_tone?: string | null
@@ -4221,6 +4227,9 @@ export type Database = {
           knowledge_base?: string | null
           max_suggestions_per_conversation?: number | null
           openai_api_key_encrypted?: string | null
+          pre_investment_videos?: string | null
+          ai_reply_delay_min_seconds?: number
+          ai_reply_delay_max_seconds?: number
           specialist_name?: string | null
           suggestion_language?: string | null
           suggestion_tone?: string | null

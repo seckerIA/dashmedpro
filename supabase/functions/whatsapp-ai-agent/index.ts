@@ -88,10 +88,84 @@ function buildAgentIdentity(c: any): any {
     clinic_name: nonEmpty(c?.clinic_name, 'nossa clinica'),
     specialist_name: nonEmpty(c?.specialist_name, 'nossa equipe'),
     agent_greeting: optional(c?.agent_greeting),
+    knowledge_base: optional(c?.knowledge_base),
     custom_prompt_instructions: optional(c?.custom_prompt_instructions),
     already_known_info: optional(c?.already_known_info),
     doctor_info: optional(c?.doctor_info),
+    pre_investment_videos: optional(c?.pre_investment_videos),
   };
+}
+
+/** Preenche knowledge_base e blocos do prompt com a config do médico quando o dono da conversa (ex.: secretária) não tem texto no banco. */
+async function resolveConfigForPrompts(sb: any, conv: any, aic: any): Promise<any> {
+  if (aic && typeof aic.knowledge_base === 'string' && aic.knowledge_base.trim().length > 0) return aic;
+  var lr = await sb.from('secretary_doctor_links').select('doctor_id').eq('secretary_id', conv.user_id).eq('is_active', true).limit(1).maybeSingle();
+  var doctorId = lr.data ? lr.data.doctor_id : null;
+  var dr: any = null;
+  if (doctorId) {
+    var drr = await sb.from('whatsapp_ai_config').select('*').eq('user_id', doctorId).maybeSingle();
+    dr = drr.data;
+  }
+  if (!dr) return aic;
+  if (!aic) return dr;
+  var merged = Object.assign({}, dr, aic);
+  var fillKeys = ['knowledge_base', 'doctor_info', 'custom_prompt_instructions', 'already_known_info', 'agent_greeting', 'pre_investment_videos', 'clinic_name', 'specialist_name', 'agent_name'];
+  for (var fi = 0; fi < fillKeys.length; fi++) {
+    var k = fillKeys[fi];
+    var av = aic[k];
+    if ((typeof av !== 'string' || !String(av).trim()) && dr[k] != null) merged[k] = dr[k];
+  }
+  return merged;
+}
+
+function agendaListHasSlots(schCtx: string): boolean {
+  return /\d{1,2}:\d{2}/.test(schCtx || '');
+}
+
+function patientMessageSuggestsBooking(lim: string): boolean {
+  return /disponib|agendar|agenda|hor[aá]rio|consulta|marcar|vaga|dias?\s+diferentes|essa\s+semana|site\b/i.test(lim || '');
+}
+
+function modelInventsAvailabilityWhenNoSlots(text: string): boolean {
+  var t = (text || '').toLowerCase();
+  if (/sem\s+vagas|n[aã]o\s+(apareceu|tem)\s+(vaga|hor[aá]rio)|agenda\s+n[aã]o\s+mostrou|sem\s+hor[aá]rio\s+livre|n[aã]o\s+apareceu\s+nenhum/i.test(t)) return false;
+  return /temos\s+(hor[aá]rios|vagas)|(hor[aá]rios|vagas)\s+dispon|[ée]ssa\s+semana|nesta\s+semana|ainda\s+essa\s+semana|prefere\s+.*(segunda|ter[cç]a|quarta|quinta|sexta)/i.test(text || '');
+}
+
+function modelOffersDaysWithoutTimes(text: string, schHasSlots: boolean): boolean {
+  if (!schHasSlots) return false;
+  if (/\d{1,2}:\d{2}/.test(text || '')) return false;
+  return /\b(segunda|ter[cç]a-feira|ter[cç]a|quarta|quinta|sexta|s[aá]bado)\b/i.test(text || '');
+}
+
+var FALLBACK_NO_AGENDA_SLOTS = 'Consultei a agenda no sistema e não apareceu horário livre nos próximos dias. [SPLIT] Posso te encaminhar pro time da clínica pra confirmarem certinho, ou você me diz se prefere manhã ou tarde em geral?';
+
+/** Emergência: não aplicar atraso humanizado. */
+function emergencySkipDelay(text: string): boolean {
+  var t = (text || '').toLowerCase();
+  return /emerg[eê]ncia|urgente|urg[eê]ncia|samu|\bupa\b|pronto.?socorro|socorro|sangr|desmai|acidente|infarto|convuls[aã]o|n[aã]o consigo respirar|falta de ar/i.test(t);
+}
+
+/** Atraso aleatório entre min e max (segundos) configurável em whatsapp_ai_config. */
+function computeHumanReplyDelayMs(aic: any): number {
+  var minS = 120;
+  var maxS = 300;
+  if (aic) {
+    if (typeof aic.ai_reply_delay_min_seconds === 'number' && !isNaN(aic.ai_reply_delay_min_seconds)) {
+      minS = Math.max(0, Math.floor(aic.ai_reply_delay_min_seconds));
+    }
+    if (typeof aic.ai_reply_delay_max_seconds === 'number' && !isNaN(aic.ai_reply_delay_max_seconds)) {
+      maxS = Math.max(0, Math.floor(aic.ai_reply_delay_max_seconds));
+    }
+  }
+  if (maxS < minS) {
+    var tmp = minS;
+    minS = maxS;
+    maxS = tmp;
+  }
+  var span = maxS - minS;
+  var jitter = span <= 0 ? 0 : Math.floor(Math.random() * (span + 1));
+  return (minS + jitter) * 1000;
 }
 
 var WA_CFG_COLS = 'phone_number_id, access_token, provider, evolution_instance_name, evolution_instance_token, evolution_api_url';
@@ -110,7 +184,7 @@ async function getWAConfig(sb: any, uid: string): Promise<any> {
   return r4.data;
 }
 
-async function callGPT(sys: string, msgs: any[], conv: any): Promise<string> {
+async function callGPT(sys: string, msgs: any[], conv: any, temperature?: number): Promise<string> {
   var bt = new Date(Date.now() + BRO).toISOString().replace('T', ' ').substring(0, 16);
   var rev = msgs.slice().reverse();
   var lines: string[] = [];
@@ -119,11 +193,12 @@ async function callGPT(sys: string, msgs: any[], conv: any): Promise<string> {
     lines.push(prefix + ': ' + (rev[i].content || '[midia]'));
   }
   var mc = lines.join('\n');
-  var up = 'DATA E HORA ATUAL: ' + bt + ' (Horario de Brasilia)\n\nCONVERSA ATUAL:\n' + mc + '\n\nPACIENTE: ' + (conv.contact_name || 'Nome nao identificado') + '\nTELEFONE: ' + conv.phone_number + '\n\nResponda como a assistente da clinica. Use [SPLIT] para dividir em mensagens curtas.';
+  var up = 'DATA E HORA ATUAL: ' + bt + ' (Horario de Brasilia)\n\nCONVERSA ATUAL:\n' + mc + '\n\nPACIENTE: ' + (conv.contact_name || 'Nome nao identificado') + '\nTELEFONE: ' + conv.phone_number + '\n\nOBRIGATORIO: Cada fato na sua resposta deve estar no system prompt (blocos do banco) ou na AGENDA com HH:MM. Proibido inventar. Responda como a assistente. Use [SPLIT] para mensagens curtas.';
+  var temp = typeof temperature === 'number' && !isNaN(temperature) ? temperature : 0.2;
   var res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + OAI, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'gpt-4o', messages: [{ role: 'system', content: sys }, { role: 'user', content: up }], temperature: 0.75, max_tokens: 500 }),
+    body: JSON.stringify({ model: 'gpt-4o', messages: [{ role: 'system', content: sys }, { role: 'user', content: up }], temperature: temp, max_tokens: 500 }),
   });
   if (!res.ok) {
     var errData = await res.json();
@@ -434,6 +509,128 @@ async function sendWA(cfg: any, to: string, text: string, sb: any, cid: string, 
   }
 }
 
+async function sendWAVideo(cfg: any, to: string, mediaUrl: string, caption: string | undefined, sb: any, cid: string, uid: string): Promise<void> {
+  var prov = cfg.provider || 'meta';
+  var ir = await sb.from('whatsapp_messages').insert({
+    user_id: uid, conversation_id: cid, phone_number: to, content: caption || '[Vídeo]', direction: 'outbound',
+    message_type: 'video', status: 'pending', sent_at: new Date().toISOString(),
+    provider: prov,
+    metadata: { auto_reply: true, ai_generated: true, agent: 'whatsapp-ai-agent', pre_investment_video: true },
+  }).select('id').single();
+  var sm = ir.data;
+  if (!sm) return;
+
+  await sb.from('whatsapp_media').insert({
+    message_id: sm.id,
+    media_type: 'video',
+    media_url: mediaUrl,
+    file_name: 'pre-investment-video.mp4',
+    media_mime_type: 'video/mp4',
+  });
+
+  try {
+    var wr: Response;
+    if (prov === 'evolution') {
+      var evoKey = cfg.evolution_instance_token && cfg.evolution_instance_token.length > 0
+        ? cfg.evolution_instance_token
+        : (Deno.env.get('EVOLUTION_GLOBAL_API_KEY') || '');
+      var cleanNumber = to.replace('+', '').trim();
+      wr = await fetch(cfg.evolution_api_url.replace(/\/+$/, '') + '/message/sendMedia/' + cfg.evolution_instance_name, {
+        method: 'POST',
+        headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          number: cleanNumber,
+          mediaMessage: {
+            mediatype: 'video',
+            media: mediaUrl,
+            caption: caption || '',
+          },
+          options: { delay: 1200 },
+        }),
+      });
+    } else {
+      wr = await fetch('https://graph.facebook.com/v18.0/' + cfg.phone_number_id + '/messages', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + cfg.access_token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          to: to,
+          type: 'video',
+          video: {
+            link: mediaUrl,
+            caption: caption || '',
+          },
+        }),
+      });
+    }
+
+    var rawBody = '';
+    try { rawBody = await wr.text(); } catch (_e) { rawBody = ''; }
+    var wd: any = null;
+    try { wd = rawBody ? JSON.parse(rawBody) : null; } catch (_e) { wd = null; }
+
+    await safeDebugLog(sb, 'sendWAVideo response', {
+      cid, provider: prov, httpStatus: wr.status, ok: wr.ok, bodyPreview: rawBody.substring(0, 400),
+    });
+
+    if (!wr.ok) {
+      await sb.from('whatsapp_messages').update({
+        status: 'failed',
+        error_message: (wd && (wd.message || wd.error)) || ('HTTP ' + wr.status + ': ' + rawBody.substring(0, 200)),
+      }).eq('id', sm.id);
+      return;
+    }
+
+    var wid: string | null = null;
+    if (prov === 'evolution' && wd) {
+      wid = (wd.key && wd.key.id) || wd.id || wd.messageId || (wd.data && wd.data.id) || null;
+    } else if (wd) {
+      wid = (wd.messages && wd.messages[0] && wd.messages[0].id) || null;
+    }
+    await sb.from('whatsapp_messages').update({
+      status: 'sent',
+      message_id: wid,
+      sent_at: new Date().toISOString(),
+    }).eq('id', sm.id);
+  } catch (e) {
+    console.error('[Agent] Send video error:', e);
+    await safeDebugLog(sb, 'sendWAVideo exception', { cid, error: String(e) });
+    await sb.from('whatsapp_messages').update({ status: 'failed', error_message: String(e) }).eq('id', sm.id);
+  }
+}
+
+function parseVideoUrls(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  var lines = raw.split('\n');
+  var urls: string[] = [];
+  for (var i = 0; i < lines.length; i++) {
+    var u = lines[i].trim();
+    if (!u) continue;
+    if (/^https?:\/\//i.test(u)) urls.push(u);
+  }
+  var unique: string[] = [];
+  for (var j = 0; j < urls.length; j++) {
+    if (unique.indexOf(urls[j]) === -1) unique.push(urls[j]);
+  }
+  return unique;
+}
+
+function isInvestmentQuestion(text: string): boolean {
+  return /(pre[cç]o|valor|investimento|quanto\s+(custa|fica)|condi[cç][oõ]es|parcel|pagamento)/i.test(text || '');
+}
+
+async function hasSentAnyVideoFromList(sb: any, cid: string, videoUrls: string[]): Promise<boolean> {
+  if (videoUrls.length === 0) return false;
+  var mr = await sb.from('whatsapp_messages').select('id').eq('conversation_id', cid).eq('direction', 'outbound').eq('message_type', 'video').limit(50);
+  var mids: string[] = [];
+  if (mr.data) {
+    for (var i = 0; i < mr.data.length; i++) mids.push(mr.data[i].id);
+  }
+  if (mids.length === 0) return false;
+  var wr = await sb.from('whatsapp_media').select('media_url').in('message_id', mids).in('media_url', videoUrls).limit(1);
+  return !!(wr.data && wr.data.length > 0);
+}
+
 async function buildScheduleContext(sb: any, uid: string): Promise<string> {
   var tids = [uid];
   var lr = await sb.from('secretary_doctor_links').select('doctor_id').eq('secretary_id', uid);
@@ -710,6 +907,36 @@ async function safeReleaseLock(sb: any, cid: string): Promise<void> {
   try { await sb.rpc('release_ai_lock', { p_conversation_id: cid }); } catch (_e) { /* ignore */ }
 }
 
+async function runHandoffAndReturn(
+  sb: any,
+  wac: any,
+  conv: any,
+  cid: string,
+  msgs: any[],
+  inb: any[],
+  lim: string,
+  aic: any,
+): Promise<Response> {
+  var hId = buildAgentIdentity(aic || {});
+  var hPr = buildPhasePrompt('handoff', hId);
+  var hRes = await callGPT(hPr, msgs, conv, 0.4);
+  if (hRes && wac) {
+    var hmid = inb.length > 0 ? inb[0].message_id : null;
+    if (hmid) await sendTyping(wac, hmid);
+    await readingDelay(lim.length);
+    var hParts = postProcess(hRes);
+    for (var hp = 0; hp < hParts.length; hp++) {
+      if (hmid) await sendTyping(wac, hmid);
+      if (hp > 0) await sleep(Math.min(Math.max(800, hParts[hp - 1].length * 25), 2000));
+      await typingDelay(hParts[hp]);
+      await sendWA(wac, conv.phone_number, hParts[hp], sb, cid, conv.user_id);
+    }
+  }
+  await sb.from('whatsapp_conversations').update({ ai_autonomous_mode: false, priority: 'high', status: 'open' }).eq('id', cid);
+  await safeReleaseLock(sb, cid);
+  return new Response(JSON.stringify({ status: 'handoff' }), { status: 200, headers: CORS });
+}
+
 // =============================================
 // MAIN HANDLER
 // =============================================
@@ -731,7 +958,8 @@ async function handler(req: Request): Promise<Response> {
     }
 
     // STEP 1: LOCK
-    var lr = await sb.rpc('try_acquire_ai_lock', { p_conversation_id: cid, p_lock_seconds: 60 });
+    // Lock longo o bastante para atraso humanizado (até ~5 min) + GPT + envio
+    var lr = await sb.rpc('try_acquire_ai_lock', { p_conversation_id: cid, p_lock_seconds: 540 });
     if (!lr.data) {
       await safeDebugLog(sb, 'Lock FAILED', { cid: cid, lockData: lr.data, lockError: lr.error ? String(lr.error.message) : null });
       return new Response(JSON.stringify({ status: 'locked' }), { status: 200, headers: CORS });
@@ -757,6 +985,7 @@ async function handler(req: Request): Promise<Response> {
 
     var cfr = await sb.from('whatsapp_ai_config').select('*').eq('user_id', conv.user_id).maybeSingle();
     var aic = cfr.data;
+    var aicForPrompt = await resolveConfigForPrompts(sb, conv, aic);
     var localOn = conv.ai_autonomous_mode === true;
     var localOff = conv.ai_autonomous_mode === false;
     var globalOn = aic ? aic.auto_reply_enabled === true : false;
@@ -794,7 +1023,8 @@ async function handler(req: Request): Promise<Response> {
       else outb.push(msgs[mi]);
     }
     var lim = (inb.length > 0 && inb[0].content) ? inb[0].content : '';
-    var tic = inb.length;
+    var inbCountR = await sb.from('whatsapp_messages').select('*', { count: 'exact', head: true }).eq('conversation_id', cid).eq('direction', 'inbound');
+    var userTurnCount = inbCountR.count || 0;
 
     // STEP 5: LOAD LEAD DATA
     var ldr = await sb.from('whatsapp_lead_qualifications').select('*').eq('conversation_id', cid).maybeSingle();
@@ -802,7 +1032,48 @@ async function handler(req: Request): Promise<Response> {
     var videosAlreadySent = !!(leadRow && leadRow.videos_sent_at);
 
     // STEP 6: DETECT PHASE
-    var phr = detectPhase(tic, leadRow, lim);
+    var phr = detectPhase(userTurnCount, leadRow, lim);
+
+    // STEP 6a: CREATE CRM CONTACT ONLY WHEN PATIENT SHOWS INTEREST
+    if (phr.phase === 'agendamento' || phr.phase === 'pos_agendamento') {
+      await ensureCRMContact(sb, conv, cid);
+    }
+
+    // HANDOFF (imediato — sem atraso humanizado)
+    if (phr.phase === 'handoff') {
+      return await runHandoffAndReturn(sb, wac, conv, cid, msgs, inb, lim, aicForPrompt || aic);
+    }
+
+    // Atraso humanizado antes de responder (padrão 2–5 min; desliga só em palavras de emergência)
+    if (!emergencySkipDelay(lim)) {
+      var delayMs = computeHumanReplyDelayMs(aic);
+      await safeDebugLog(sb, 'Human reply delay', { cid: cid, delayMs: delayMs });
+      await sleep(delayMs);
+
+      // Recarregar mensagens após o delay (paciente pode ter mandado mais)
+      var msr2 = await sb.from('whatsapp_messages').select('id, message_id, direction, content, message_type, sent_at').eq('conversation_id', cid).order('sent_at', { ascending: false }).limit(20);
+      msgs = msr2.data || [];
+      inb = [];
+      outb = [];
+      for (var rmi = 0; rmi < msgs.length; rmi++) {
+        if (msgs[rmi].direction === 'inbound') inb.push(msgs[rmi]);
+        else outb.push(msgs[rmi]);
+      }
+      lim = (inb.length > 0 && inb[0].content) ? inb[0].content : '';
+      var inbCountR2 = await sb.from('whatsapp_messages').select('*', { count: 'exact', head: true }).eq('conversation_id', cid).eq('direction', 'inbound');
+      userTurnCount = inbCountR2.count || 0;
+      var ldr2 = await sb.from('whatsapp_lead_qualifications').select('*').eq('conversation_id', cid).maybeSingle();
+      ldr = ldr2;
+      leadRow = ldr.data || null;
+      videosAlreadySent = !!(leadRow && leadRow.videos_sent_at);
+      phr = detectPhase(userTurnCount, leadRow, lim);
+      if (phr.phase === 'agendamento' || phr.phase === 'pos_agendamento') {
+        await ensureCRMContact(sb, conv, cid);
+      }
+      if (phr.phase === 'handoff') {
+        return await runHandoffAndReturn(sb, wac, conv, cid, msgs, inb, lim, aicForPrompt || aic);
+      }
+    }
 
     // STEP 6b: AVALIAR ENVIO DE VÍDEO DE DEPOIMENTO (antes de gerar prompt)
     var willSendVideo = shouldSendTestimonialNow(phr.phase, lim, leadRow, outb.length, videosAlreadySent);
@@ -876,38 +1147,6 @@ async function handler(req: Request): Promise<Response> {
       }
     }
 
-    // STEP 6a: CREATE CRM CONTACT ONLY WHEN PATIENT SHOWS INTEREST
-    if (phr.phase === 'agendamento' || phr.phase === 'pos_agendamento') {
-      await ensureCRMContact(sb, conv, cid);
-    }
-
-    // HANDOFF
-    if (phr.phase === 'handoff') {
-      var hId = buildAgentIdentity(aic);
-      var hPr = buildPhasePrompt('handoff', hId);
-      // Mostra "digitando..." durante a chamada do GPT (handoff)
-      var stopHType = wac ? startTypingHeartbeat(wac, conv.phone_number, 'composing') : function(){};
-      var hRes = '';
-      try { hRes = await callGPT(hPr, msgs, conv); } finally { stopHType(); }
-      if (hRes && wac) {
-        var hmid = inb.length > 0 ? inb[0].message_id : null;
-        if (hmid) await sendTyping(wac, hmid);
-        var stopHRead = startTypingHeartbeat(wac, conv.phone_number, 'composing');
-        try { await readingDelay(lim.length); } finally { stopHRead(); }
-        var hParts = postProcess(hRes);
-        for (var hp = 0; hp < hParts.length; hp++) {
-          if (hmid) await sendTyping(wac, hmid);
-          if (hp > 0) await sleep(Math.min(Math.max(800, hParts[hp - 1].length * 25), 2000));
-          var stopHPart = startTypingHeartbeat(wac, conv.phone_number, 'composing');
-          try { await typingDelay(hParts[hp]); } finally { stopHPart(); }
-          await sendWA(wac, conv.phone_number, hParts[hp], sb, cid, conv.user_id);
-        }
-      }
-      await sb.from('whatsapp_conversations').update({ ai_autonomous_mode: false, priority: 'high', status: 'open' }).eq('id', cid);
-      await safeReleaseLock(sb, cid);
-      return new Response(JSON.stringify({ status: 'handoff' }), { status: 200, headers: CORS });
-    }
-
     // STEP 7: SCHEDULE
     var schCtx = '';
     var schRx = /disponib|agendar|agenda|horario|consulta|dia\s+\d|segunda|ter[cç]a|quarta|quinta|sexta|\d{1,2}[h:]\d{0,2}|\d{1,2}\s*(horas|hrs|da\s*manh|da\s*tarde)/i;
@@ -920,11 +1159,12 @@ async function handler(req: Request): Promise<Response> {
     // STEP 8: RAG
     var ragCtx = '';
     if (phr.shouldLoadRAG) {
-      ragCtx = await searchKB(sb, conv.user_id, lim, aic ? aic.knowledge_base : undefined);
+      var kbForRag = (aicForPrompt && aicForPrompt.knowledge_base) ? aicForPrompt.knowledge_base : (aic ? aic.knowledge_base : undefined);
+      ragCtx = await searchKB(sb, conv.user_id, lim, kbForRag);
     }
 
     // STEP 9: BUILD PROMPT
-    var ident = buildAgentIdentity(aic);
+    var ident = buildAgentIdentity(aicForPrompt || aic || {});
     var sp = buildPhasePrompt(phr.phase, ident, { shouldSendVideoNow: willSendVideo, videoSent: videosAlreadySent });
     var ext = '';
 
@@ -932,10 +1172,10 @@ async function handler(req: Request): Promise<Response> {
       ext = ext + '\n\nINSTRUCAO OBRIGATORIA: Voce JA SE APRESENTOU nesta conversa (' + outb.length + ' msgs anteriores). NAO se apresente novamente. Comece DIRETO com a resposta.\n';
     }
     if (schCtx) {
-      ext = ext + '\n\nAGENDA DE HORARIOS DISPONIVEIS:\n' + schCtx + '\n\nREGRAS DE HORARIOS (OBRIGATORIO):\n- SOMENTE ofereca horarios que aparecem EXPLICITAMENTE na lista acima.\n- Se o paciente pedir um horario que NAO esta na lista, diga que nao esta disponivel.\n- PROIBIDO deduzir que um horario esta livre. Se nao esta listado, NAO esta disponivel.\n';
+      ext = ext + '\n\nAGENDA DE HORARIOS DISPONIVEIS (resultado da consulta automatica a agenda do sistema — horarios ocupados e expediente do medico ja descontados):\n' + schCtx + '\n\nREGRAS DE HORARIOS (OBRIGATORIO):\n- SOMENTE ofereca horarios que aparecem EXPLICITAMENTE na lista acima (formato HH:MM).\n- Se NAO houver nenhum HH:MM na lista acima, e PROIBIDO dizer que tem vaga ou perguntar "prefere quinta ou sexta?" — diga que a agenda nao mostrou horario livre e ofereca encaminhar ao time.\n- Se o paciente pedir um horario que NAO esta na lista, diga que nao esta disponivel e ofereca alternativas que ESTEJAM na lista.\n- PROIBIDO deduzir que um horario esta livre. Se nao esta listado, NAO esta disponivel.\n- Ao oferecer marcacao com vagas na lista, cada opcao DEVE trazer dia + horario HH:MM copiados da lista (nao apenas o nome do dia).\n- Ao fechar horario com dados completos e confirmacao do paciente, o sistema pode gravar o agendamento automaticamente na agenda (se habilitado na clinica).\n';
     }
     if (ragCtx) {
-      ext = ext + '\n\nBASE DE CONHECIMENTO:\n' + ragCtx + '\n';
+      ext = ext + '\n\nBASE DE CONHECIMENTO COMPLEMENTAR (RAG — use junto com a configuração fixa acima):\n' + ragCtx + '\n';
     }
 
     // PROCEDURES
@@ -984,7 +1224,7 @@ async function handler(req: Request): Promise<Response> {
     var aiText = '';
     var stopGptType = wac ? startTypingHeartbeat(wac, conv.phone_number, 'composing') : function(){};
     try {
-      aiText = await callGPT(fsp, msgs, conv);
+      aiText = await callGPT(fsp, msgs, conv, 0.2);
     } catch (ge) {
       stopGptType();
       console.error('[Agent] GPT failed:', ge);
@@ -997,6 +1237,17 @@ async function handler(req: Request): Promise<Response> {
     if (!aiText) {
       await safeReleaseLock(sb, cid);
       return new Response(JSON.stringify({ status: 'empty_response' }), { status: 200, headers: CORS });
+    }
+
+    // STEP 10b: AGENDA GUARD — bloqueia inventário e força lista real quando faltarem HH:MM
+    var schHas = agendaListHasSlots(schCtx);
+    var bookingLim = patientMessageSuggestsBooking(lim);
+    if (bookingLim && !schHas && modelInventsAvailabilityWhenNoSlots(aiText)) {
+      await safeDebugLog(sb, 'Agenda guard: bloqueou inventario sem slots', { cid: cid });
+      aiText = FALLBACK_NO_AGENDA_SLOTS;
+    } else if (bookingLim && schHas && modelOffersDaysWithoutTimes(aiText, true)) {
+      await safeDebugLog(sb, 'Agenda guard: resposta sem HH:MM — injeta lista', { cid: cid });
+      aiText = 'Olhei a agenda agora, esses sao os horarios livres no sistema:' + '\n\n' + schCtx + '\n\n[SPLIT]Me diz qual voce prefere que eu sigo com voce.';
     }
 
     // STEP 11: POST-PROCESS & SEND (com "digitando..." em cada split)

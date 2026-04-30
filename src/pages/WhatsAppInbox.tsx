@@ -17,7 +17,9 @@ import { AISettingsToggle } from '@/components/whatsapp/ai/AISettingsToggle';
 import { useWhatsAppConfig } from '@/hooks/useWhatsAppConfig';
 import { useWhatsAppConversations } from '@/hooks/useWhatsAppConversations';
 import { useDoctorSecretaries } from '@/hooks/useDoctorSecretaries';
+import { useSecretaryDoctors } from '@/hooks/useSecretaryDoctors';
 import { useWhatsAppRealtime } from '@/hooks/useWhatsAppRealtime';
+import { useAuth } from '@/hooks/useAuth';
 import type {
   WhatsAppConversationWithRelations,
   WhatsAppConversationFilters,
@@ -26,6 +28,8 @@ import type {
 export default function WhatsAppInbox() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { user } = useAuth();
+  const { doctorIds } = useSecretaryDoctors();
 
   // Config check
   const { isConfigured, isActive, isLoading: isLoadingConfig } = useWhatsAppConfig();
@@ -55,6 +59,14 @@ export default function WhatsAppInbox() {
   const selectedConversation = useMemo(() =>
     conversations.find(c => c.id === selectedId) || null
     , [conversations, selectedId]);
+
+  /** Dono da instância WhatsApp / linha da `whatsapp_ai_config` que o agente usa (`conv.user_id`). */
+  const aiConfigOwnerId = useMemo(() => {
+    if (selectedConversation?.user_id) return selectedConversation.user_id;
+    if (doctorIds && doctorIds.length === 1) return doctorIds[0];
+    return user?.id;
+  }, [selectedConversation?.user_id, doctorIds, user?.id]);
+
   const [showSidebar, setShowSidebar] = useState(false);
 
   // Realtime subscription (global)
@@ -225,7 +237,7 @@ export default function WhatsAppInbox() {
 
       {/* AI Toggle for Secretaries/Owners */}
       <div className="p-2 border-b">
-        <AISettingsToggle />
+        <AISettingsToggle configUserId={aiConfigOwnerId || undefined} />
       </div>
 
       {/* Filtros */}

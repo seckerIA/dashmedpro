@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Sparkles, Save, Info, Bot, ShieldCheck, User, Stethoscope, Film, Clock, MessageCircleReply } from 'lucide-react';
+import { Sparkles, Save, Info, Bot, ShieldCheck, User, Stethoscope, Film, Clock, MessageCircleReply, Upload, Video, Trash2 } from 'lucide-react';
 import { useWhatsAppAI } from '@/hooks/useWhatsAppAI';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -24,6 +24,7 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { TestimonialVideosManager } from './TestimonialVideosManager';
+import type { AIConfig } from '@/types/whatsappAI';
 
 interface AISettingsDialogProps {
     open: boolean;
@@ -39,6 +40,8 @@ interface AISettingsDialogProps {
 }
 
 export function AISettingsDialog({ open, onOpenChange, targetUserId, conversationId }: AISettingsDialogProps) {
+    const preInvestmentInputRef = useRef<HTMLInputElement>(null);
+    const [isUploadingPreInvestmentVideos, setIsUploadingPreInvestmentVideos] = useState(false);
     // Passa o targetUserId para garantir que estamos editando a config do médico correto
     const { aiConfig, updateAIConfig, isUpdatingConfig } = useWhatsAppAI({ targetUserId });
     const queryClient = useQueryClient();
@@ -65,8 +68,12 @@ export function AISettingsDialog({ open, onOpenChange, targetUserId, conversatio
         agent_greeting: '',
         doctor_info: '',
         knowledge_base: '',
+        pre_investment_videos: '',
         already_known_info: '',
         custom_prompt_instructions: '',
+        /** Minutos (UI); persistido em segundos no banco */
+        reply_delay_min_minutes: 2,
+        reply_delay_max_minutes: 5,
         auto_reply_enabled: false,
         auto_scheduling_enabled: false,
         followup_enabled: false,
@@ -85,8 +92,17 @@ export function AISettingsDialog({ open, onOpenChange, targetUserId, conversatio
                 agent_greeting: aiConfig.agent_greeting || '',
                 doctor_info: aiConfig.doctor_info || '',
                 knowledge_base: aiConfig.knowledge_base || '',
+                pre_investment_videos: aiConfig.pre_investment_videos || '',
                 already_known_info: aiConfig.already_known_info || '',
                 custom_prompt_instructions: aiConfig.custom_prompt_instructions || '',
+                reply_delay_min_minutes: Math.max(
+                    0,
+                    Math.round((aiConfig.ai_reply_delay_min_seconds ?? 120) / 60)
+                ),
+                reply_delay_max_minutes: Math.max(
+                    0,
+                    Math.round((aiConfig.ai_reply_delay_max_seconds ?? 300) / 60)
+                ),
                 // Se estamos em modo per-conversa, o toggle reflete a conversa
                 auto_reply_enabled: conversationId
                     ? (conversationAI?.ai_autonomous_mode ?? false)
@@ -100,11 +116,113 @@ export function AISettingsDialog({ open, onOpenChange, targetUserId, conversatio
         }
     }, [aiConfig, conversationAI, conversationId]);
 
+    const preInvestmentVideoUrls = useMemo(
+        () =>
+            formData.pre_investment_videos
+                .split('\n')
+                .map((line) => line.trim())
+                .filter(Boolean),
+        [formData.pre_investment_videos]
+    );
+
+    const handleUploadPreInvestmentVideos = async (files: FileList | null) => {
+        if (!files || files.length === 0) return;
+
+        setIsUploadingPreInvestmentVideos(true);
+        try {
+            const uploadedUrls: string[] = [];
+            const ownerId = targetUserId || aiConfig?.user_id || 'current-user';
+
+            for (const file of Array.from(files)) {
+                if (!file.type.startsWith('video/')) {
+                    throw new Error(`O arquivo "${file.name}" não é um vídeo válido.`);
+                }
+
+                const ext = file.name.split('.').pop() || 'mp4';
+                const safeBaseName = file.name
+                    .replace(/\.[^/.]+$/, '')
+                    .replace(/[^a-zA-Z0-9_-]/g, '_')
+                    .slice(0, 50);
+                const filePath = `ai-pre-investment-videos/${ownerId}/${Date.now()}_${safeBaseName}.${ext}`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from('whatsapp-media')
+                    .upload(filePath, file, { contentType: file.type, upsert: false });
+
+                if (uploadError) throw uploadError;
+
+                const { data: publicUrlData } = supabase.storage
+                    .from('whatsapp-media')
+                    .getPublicUrl(filePath);
+
+                if (!publicUrlData?.publicUrl) {
+                    throw new Error(`Falha ao gerar URL do vídeo "${file.name}".`);
+                }
+
+                uploadedUrls.push(publicUrlData.publicUrl);
+            }
+
+            if (uploadedUrls.length > 0) {
+                const merged = Array.from(new Set([...preInvestmentVideoUrls, ...uploadedUrls]));
+                setFormData((prev) => ({ ...prev, pre_investment_videos: merged.join('\n') }));
+            }
+
+            toast({
+                title: 'Vídeos enviados',
+                description: `${uploadedUrls.length} vídeo(s) pronto(s) para uso pela IA.`,
+            });
+        } catch (error: any) {
+            toast({
+                title: 'Erro no upload de vídeo',
+                description: error?.message || 'Não foi possível enviar o vídeo.',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsUploadingPreInvestmentVideos(false);
+            if (preInvestmentInputRef.current) {
+                preInvestmentInputRef.current.value = '';
+            }
+        }
+    };
+
+    const handleRemovePreInvestmentVideo = (urlToRemove: string) => {
+        const updated = preInvestmentVideoUrls.filter((url) => url !== urlToRemove);
+        setFormData((prev) => ({ ...prev, pre_investment_videos: updated.join('\n') }));
+    };
+
+    const buildAiConfigPayload = (): Partial<AIConfig> => {
+        const minM = Number(formData.reply_delay_min_minutes);
+        const maxM = Number(formData.reply_delay_max_minutes);
+        let minSec = Math.round((Number.isFinite(minM) ? minM : 2) * 60);
+        let maxSec = Math.round((Number.isFinite(maxM) ? maxM : 5) * 60);
+        if (minSec < 0) minSec = 0;
+        if (maxSec < 0) maxSec = 0;
+        if (maxSec < minSec) {
+            const t = minSec;
+            minSec = maxSec;
+            maxSec = t;
+        }
+        return {
+            agent_name: formData.agent_name,
+            clinic_name: formData.clinic_name,
+            specialist_name: formData.specialist_name,
+            agent_greeting: formData.agent_greeting,
+            doctor_info: formData.doctor_info,
+            knowledge_base: formData.knowledge_base,
+            pre_investment_videos: formData.pre_investment_videos,
+            already_known_info: formData.already_known_info,
+            custom_prompt_instructions: formData.custom_prompt_instructions,
+            auto_scheduling_enabled: formData.auto_scheduling_enabled,
+            ai_reply_delay_min_seconds: minSec,
+            ai_reply_delay_max_seconds: maxSec,
+        };
+    };
+
     const handleSave = async () => {
         // Se per-conversa: salvar toggle separadamente em whatsapp_conversations
         if (conversationId) {
-            const { auto_reply_enabled, ...globalFields } = formData;
-            await updateAIConfig(globalFields);
+            const { auto_reply_enabled } = formData;
+            await updateAIConfig(buildAiConfigPayload());
             const { error: convErr } = await (supabase as any)
                 .from('whatsapp_conversations')
                 .update({ ai_autonomous_mode: auto_reply_enabled })
@@ -116,7 +234,10 @@ export function AISettingsDialog({ open, onOpenChange, targetUserId, conversatio
                 queryClient.invalidateQueries({ queryKey: ['whatsapp-conversations'] });
             }
         } else {
-            await updateAIConfig(formData);
+            await updateAIConfig({
+                ...buildAiConfigPayload(),
+                auto_reply_enabled: formData.auto_reply_enabled,
+            });
         }
         onOpenChange(false);
     };
@@ -234,7 +355,103 @@ export function AISettingsDialog({ open, onOpenChange, targetUserId, conversatio
                             onChange={(e) => setFormData(prev => ({ ...prev, knowledge_base: e.target.value }))}
                         />
                         <p className="text-[11px] text-muted-foreground">
-                            Dê contexto sobre sua clínica, médicos, horários e diferenciais.
+                            Dê contexto sobre sua clínica, médicos, horários e diferenciais. A IA usa este texto em toda resposta (junto com identidade e médico).
+                        </p>
+                    </div>
+
+                    {/* Atraso humanizado */}
+                    <div className="space-y-3 p-4 rounded-xl border border-amber-500/20 bg-amber-500/5">
+                        <Label className="text-sm font-bold">Tempo antes de responder (humanizado)</Label>
+                        <p className="text-[11px] text-muted-foreground">
+                            Após uma mensagem do lead, a IA espera um intervalo aleatório entre esses limites antes de enviar a resposta (padrão 2 a 5 minutos). Em mensagens com palavras de emergência, responde sem esperar.
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="reply_delay_min" className="text-xs text-muted-foreground">Mínimo (min)</Label>
+                                <Input
+                                    id="reply_delay_min"
+                                    type="number"
+                                    min={0}
+                                    max={60}
+                                    className="h-9 text-sm bg-background"
+                                    value={formData.reply_delay_min_minutes}
+                                    onChange={(e) => setFormData((prev) => ({
+                                        ...prev,
+                                        reply_delay_min_minutes: Number(e.target.value),
+                                    }))}
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="reply_delay_max" className="text-xs text-muted-foreground">Máximo (min)</Label>
+                                <Input
+                                    id="reply_delay_max"
+                                    type="number"
+                                    min={0}
+                                    max={60}
+                                    className="h-9 text-sm bg-background"
+                                    value={formData.reply_delay_max_minutes}
+                                    onChange={(e) => setFormData((prev) => ({
+                                        ...prev,
+                                        reply_delay_max_minutes: Number(e.target.value),
+                                    }))}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Videos antes de investimento */}
+                    <div className="space-y-3 p-4 rounded-xl border border-violet-500/20 bg-violet-500/5">
+                        <div className="flex items-center justify-between gap-2">
+                            <Label className="text-sm font-bold">
+                                Videos para enviar antes de falar de investimento
+                            </Label>
+                            <input
+                                ref={preInvestmentInputRef}
+                                type="file"
+                                accept="video/*"
+                                multiple
+                                className="hidden"
+                                onChange={(e) => handleUploadPreInvestmentVideos(e.target.files)}
+                            />
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1"
+                                disabled={isUploadingPreInvestmentVideos}
+                                onClick={() => preInvestmentInputRef.current?.click()}
+                            >
+                                <Upload className="h-3.5 w-3.5" />
+                                {isUploadingPreInvestmentVideos ? 'Enviando...' : 'Upload de vídeo'}
+                            </Button>
+                        </div>
+                        <div className="space-y-2">
+                            {preInvestmentVideoUrls.length === 0 ? (
+                                <div className="text-xs text-muted-foreground border border-dashed rounded-md p-3 bg-background/60">
+                                    Nenhum vídeo enviado ainda.
+                                </div>
+                            ) : (
+                                preInvestmentVideoUrls.map((url, index) => (
+                                    <div key={`${url}-${index}`} className="flex items-center justify-between gap-2 rounded-md border p-2 bg-background">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <Video className="h-4 w-4 text-violet-500 shrink-0" />
+                                            <span className="text-xs truncate">{url}</span>
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7 shrink-0"
+                                            onClick={() => handleRemovePreInvestmentVideo(url)}
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                            A IA envia esses vídeos primeiro para gerar valor antes de entrar no investimento da consulta.
                         </p>
                     </div>
 

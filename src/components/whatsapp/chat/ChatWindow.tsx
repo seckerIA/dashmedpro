@@ -125,7 +125,7 @@ export function ChatWindow({
   // ======================================================
   // Lógica de detecção do indicador "IA pensando"
   // Ativa quando: mensagem inbound recente + auto_reply ativo
-  // Desativa quando: mensagem outbound chega OU timeout de 25s
+  // Desativa quando: mensagem outbound chega OU timeout (considera atraso humanizado da IA)
   // ======================================================
   const [aiProcessingStartTime, setAiProcessingStartTime] = useState<string | null>(null);
 
@@ -161,9 +161,13 @@ export function ChatWindow({
     const now = Date.now();
     const secondsSinceMessage = (now - msgTime) / 1000;
 
-    // Mostrar indicador por até 25 segundos após mensagem do paciente
-    // (15s debounce + ~10s para GPT processar)
-    const INDICATOR_TIMEOUT_SECONDS = 25;
+    // Indicador "IA pensando": cobrir debounce + atraso humanizado (até ~5 min) + GPT
+    const maxDelaySec =
+      typeof aiConfig?.ai_reply_delay_max_seconds === 'number' &&
+      !Number.isNaN(aiConfig.ai_reply_delay_max_seconds)
+        ? aiConfig.ai_reply_delay_max_seconds
+        : 300;
+    const INDICATOR_TIMEOUT_SECONDS = Math.min(660, Math.max(35, maxDelaySec + 120));
 
     if (secondsSinceMessage < INDICATOR_TIMEOUT_SECONDS) {
       setIsAIProcessing(true);
@@ -187,7 +191,7 @@ export function ChatWindow({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [messages, aiConfig?.auto_reply_enabled]);
+  }, [messages, aiConfig?.auto_reply_enabled, aiConfig?.ai_reply_delay_max_seconds]);
 
   // Conversation actions
   const {
