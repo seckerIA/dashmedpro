@@ -171,10 +171,20 @@ function emergencySkipDelay(text: string): boolean {
   return /emerg[eê]ncia|urgente|urg[eê]ncia|samu|\bupa\b|pronto.?socorro|socorro|sangr|desmai|acidente|infarto|convuls[aã]o|n[aã]o consigo respirar|falta de ar/i.test(t);
 }
 
-/** Atraso aleatório entre min e max (segundos) configurável em whatsapp_ai_config. */
+/**
+ * Atraso aleatório entre min e max (segundos) configurável em whatsapp_ai_config.
+ *
+ * IMPORTANTE: Supabase Edge Functions tem wall-clock máximo (~150s). Se o sleep
+ * ultrapassar esse limite a função morre antes de gerar/enviar a resposta e o
+ * lock fica preso por minutos, bloqueando inbound subsequente. Por isso aplicamos
+ * um cap rígido em 110s (margem segura) sobre min/max — ainda preserva o "ar
+ * humano" sem comprometer a entrega.
+ */
+var AI_DELAY_HARD_CAP_S = 110;
+
 function computeHumanReplyDelayMs(aic: any): number {
-  var minS = 120;
-  var maxS = 300;
+  var minS = 30;
+  var maxS = 90;
   if (aic) {
     if (typeof aic.ai_reply_delay_min_seconds === 'number' && !isNaN(aic.ai_reply_delay_min_seconds)) {
       minS = Math.max(0, Math.floor(aic.ai_reply_delay_min_seconds));
@@ -183,6 +193,8 @@ function computeHumanReplyDelayMs(aic: any): number {
       maxS = Math.max(0, Math.floor(aic.ai_reply_delay_max_seconds));
     }
   }
+  if (minS > AI_DELAY_HARD_CAP_S) minS = AI_DELAY_HARD_CAP_S;
+  if (maxS > AI_DELAY_HARD_CAP_S) maxS = AI_DELAY_HARD_CAP_S;
   if (maxS < minS) {
     var tmp = minS;
     minS = maxS;
@@ -194,6 +206,31 @@ function computeHumanReplyDelayMs(aic: any): number {
 }
 
 var WA_CFG_COLS = 'phone_number_id, access_token, provider, evolution_instance_name, evolution_instance_token, evolution_api_url';
+
+/**
+ * Baixa um arquivo HTTP e devolve em base64 (raw, sem prefixo data:).
+ * Usado para enviar videos como MP4 nativo no Evolution/WhatsApp em vez
+ * de "link clicavel" — assim o cliente WhatsApp renderiza o player de video
+ * e nao um preview de URL.
+ */
+async function fetchAsBase64(url: string): Promise<{ base64: string; mimeType: string; bytes: number } | null> {
+  try {
+    var res = await fetch(url);
+    if (!res.ok) return null;
+    var mimeType = res.headers.get('content-type') || 'video/mp4';
+    var buf = await res.arrayBuffer();
+    var bytes = new Uint8Array(buf);
+    var binary = '';
+    var chunkSize = 0x8000;
+    for (var i = 0; i < bytes.length; i += chunkSize) {
+      var slice = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+      binary += String.fromCharCode.apply(null, Array.from(slice) as any);
+    }
+    return { base64: btoa(binary), mimeType: mimeType, bytes: bytes.length };
+  } catch (_e) {
+    return null;
+  }
+}
 
 async function getWAConfig(sb: any, uid: string): Promise<any> {
   var r = await sb.from('whatsapp_config').select(WA_CFG_COLS).eq('user_id', uid).eq('is_active', true).maybeSingle();
@@ -370,20 +407,27 @@ async function sendVideoWA(cfg: any, to: string, videoUrl: string, caption: stri
         ? cfg.evolution_instance_token
         : (Deno.env.get('EVOLUTION_GLOBAL_API_KEY') || '');
       var cleanNumber = to.replace('+', '').trim();
-      // Evolution API v2 espera mediatype/media/caption NO NÍVEL RAIZ
-      // (não dentro de mediaMessage). Mantemos mediaMessage como fallback
-      // para versões antigas.
+      // Baixa o video e envia como base64 (MP4 nativo) — garante que o WhatsApp
+      // renderize o player de video em vez de um preview de URL/link.
+      var dlV = await fetchAsBase64(videoUrl);
+      var mediaPayloadV: string = dlV ? dlV.base64 : videoUrl;
+      var mimeV: string = (dlV && dlV.mimeType) || 'video/mp4';
+      await safeDebugLog(sb, 'sendVideoWA media prep', {
+        cid, mode: dlV ? 'base64' : 'url-fallback', bytes: dlV ? dlV.bytes : null, mime: mimeV,
+      });
+      // Evolution API v2 espera mediatype/media/caption NO NÍVEL RAIZ.
+      // Mantemos mediaMessage como fallback para versões antigas.
       wr = await fetch(cfg.evolution_api_url.replace(/\/+$/, '') + '/message/sendMedia/' + cfg.evolution_instance_name, {
         method: 'POST',
         headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           number: cleanNumber,
           mediatype: 'video',
-          media: videoUrl,
+          media: mediaPayloadV,
           caption: caption || '',
-          mimetype: 'video/mp4',
+          mimetype: mimeV,
           delay: 1500,
-          mediaMessage: { mediatype: 'video', media: videoUrl, caption: caption || '' },
+          mediaMessage: { mediatype: 'video', media: mediaPayloadV, caption: caption || '' },
           options: { delay: 1500 },
         }),
       });
@@ -563,16 +607,25 @@ async function sendWAVideo(cfg: any, to: string, mediaUrl: string, caption: stri
         ? cfg.evolution_instance_token
         : (Deno.env.get('EVOLUTION_GLOBAL_API_KEY') || '');
       var cleanNumber = to.replace('+', '').trim();
+      // Baixa o video e envia como base64 (MP4 nativo) — mesmo motivo de
+      // sendVideoWA: garantir player de video no WhatsApp em vez de link.
+      var dlPV = await fetchAsBase64(mediaUrl);
+      var mediaPayloadPV: string = dlPV ? dlPV.base64 : mediaUrl;
+      var mimePV: string = (dlPV && dlPV.mimeType) || 'video/mp4';
+      await safeDebugLog(sb, 'sendWAVideo media prep', {
+        cid, mode: dlPV ? 'base64' : 'url-fallback', bytes: dlPV ? dlPV.bytes : null, mime: mimePV,
+      });
       wr = await fetch(cfg.evolution_api_url.replace(/\/+$/, '') + '/message/sendMedia/' + cfg.evolution_instance_name, {
         method: 'POST',
         headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           number: cleanNumber,
-          mediaMessage: {
-            mediatype: 'video',
-            media: mediaUrl,
-            caption: caption || '',
-          },
+          mediatype: 'video',
+          media: mediaPayloadPV,
+          caption: caption || '',
+          mimetype: mimePV,
+          delay: 1200,
+          mediaMessage: { mediatype: 'video', media: mediaPayloadPV, caption: caption || '' },
           options: { delay: 1200 },
         }),
       });
@@ -1096,7 +1149,9 @@ async function handler(req: Request): Promise<Response> {
     if (!emergencySkipDelay(lim) && !softCloseSignal) {
       var delayMs = computeHumanReplyDelayMs(aic);
       await safeDebugLog(sb, 'Human reply delay', { cid: cid, delayMs: delayMs });
+      var delayStartedAt = Date.now();
       await sleep(delayMs);
+      await safeDebugLog(sb, 'Resumed after delay', { cid: cid, requestedMs: delayMs, actualMs: Date.now() - delayStartedAt });
 
       // Recarregar mensagens após o delay (paciente pode ter mandado mais)
       var msr2 = await sb.from('whatsapp_messages').select('id, message_id, direction, content, message_type, sent_at').eq('conversation_id', cid).order('sent_at', { ascending: false }).limit(20);
