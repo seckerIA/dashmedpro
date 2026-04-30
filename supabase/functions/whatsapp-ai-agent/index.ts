@@ -140,6 +140,31 @@ function modelOffersDaysWithoutTimes(text: string, schHasSlots: boolean): boolea
 
 var FALLBACK_NO_AGENDA_SLOTS = 'Consultei a agenda no sistema e não apareceu horário livre nos próximos dias. [SPLIT] Posso te encaminhar pro time da clínica pra confirmarem certinho, ou você me diz se prefere manhã ou tarde em geral?';
 
+/** Detecta despedida pura ("obrigado", "tchau", "ate mais", "valeu") sem outras perguntas. */
+function patientFarewell(text: string): boolean {
+  var t = (text || '').trim().toLowerCase();
+  if (t.length === 0) return false;
+  // Se tem '?' ou pede algo, nao e so despedida
+  if (/\?/.test(t)) return false;
+  // Frase muito longa raramente e despedida pura
+  if (t.length > 60) return false;
+  return /^(\s*(muit[oa]\s+)?obrigad[oa]|\s*valeu|\s*vlw|\s*tchau|\s*at[eé]\s+(mais|logo|breve|j[áa])|\s*abra[çc]o|\s*abs|\s*beij[oa]s?|\s*bj[s]?|\s*ok\s*$|\s*okay\s*$|\s*beleza\s*$|\s*blz\s*$|\s*combinado\s*$|\s*perfeito\s*$|\s*entendi\s*$|\s*bom\s+(dia|tarde|noite)|\s*boa\s+(tarde|noite)|\s*bom\s+fim\s+de\s+semana)[\s.!,👍🙏❤️😊🤗👋✨🌟💕]*$/i.test(t);
+}
+
+/** Detecta sinal de desengajamento: "vou pensar", "te chamo depois", "agendo em breve", "nao posso agora". */
+function patientDisengaging(text: string): boolean {
+  var t = (text || '').toLowerCase();
+  if (t.length === 0) return false;
+  return /(\bn[aã]o\s+(quero|posso|tenho|consigo|vou)\s+(agora|no\s+momento|hoje|por\s+enquanto)\b|\bn[aã]o\s+pode\s+ser\s+agora\b|\bsem\s+condi[cç][oõ]es\s+(agora|no\s+momento)\b|\bdepois\s+(eu\s+)?(volto|falo|chamo|aviso|entro\s+em\s+contato|retorno|te\s+chamo|te\s+falo)\b|\bentrarei\s+em\s+contato\b|\bt[ee]\s+aviso\b|\bt[ee]\s+chamo\s+(depois|mais\s+tarde|amanh[aã])\b|\bvou\s+(pensar|ver|conversar\s+com|me\s+organizar|analisar|avaliar)\b|\bfica\s+pra\s+(depois|outro\s+dia|semana\s+que\s+vem|mais\s+tarde)\b|\bqualquer\s+coisa\s+(eu\s+)?(falo|chamo|retorno|aviso)\b|\bagend[oa]\s+(em\s+breve|outra\s+hora|depois|mais\s+tarde|amanh[aã])\b|\bligo\s+(em\s+breve|depois|mais\s+tarde|amanh[aã])\b|\bvolto\s+(a\s+)?(falar|te\s+falar|te\s+chamar)\b|\bpreciso\s+(me\s+organizar|ver\s+com|conversar\s+com|pensar)\b|\bdeixa\s+eu\s+(pensar|ver)\b|\bqd\s+(eu\s+)?(puder|tiver\s+tempo)\b|\bquando\s+(eu\s+)?(puder|tiver\s+tempo|me\s+organizar)\b)/i.test(t);
+}
+
+/** Verifica se a ultima mensagem nossa ja foi um fechamento educado — pra nao mandar outro "imagina!" em loop. */
+function lastOutboundIsClosing(content: string): boolean {
+  var t = (content || '').toLowerCase();
+  if (t.length === 0) return false;
+  return /(qualquer\s+(d[uú]vida|coisa)\s+(me\s+)?(chama|fala|avisa)|estou\s+aqui|estamos\s+aqui|fico\s+(aqui|por\s+aqui|a\s+disposi[cç][aã]o)|t[oô]\s+por\s+aqui|cuide-?se|abra[çc]o|at[eé]\s+(j[áa]|breve|mais|logo)|imagina|fico\s+feliz|bom\s+te\s+conhecer|tranquil[oa]|sem\s+problema|combinado|t[ée]\s+(aguardo|espero)\s+(quando|qd))/i.test(t);
+}
+
 /** Emergência: não aplicar atraso humanizado. */
 function emergencySkipDelay(text: string): boolean {
   var t = (text || '').toLowerCase();
@@ -434,9 +459,12 @@ function shouldSendTestimonialNow(phase: string, lim: string, leadData: any, out
   // - quando o paciente JÁ verbalizou dor/sintoma
   // - vídeos ainda não enviados
   // - houve pelo menos 2 trocas (não no primeiro "oi")
+  // - paciente NAO esta desengajando ou se despedindo (bug Fabio)
   if (videosAlreadySent) return false;
   if (outboundCount < 2) return false; // já tem ao menos 1 resposta nossa anterior
   if (phase !== 'triagem' && phase !== 'agendamento') return false;
+  // FREIO: paciente sinalizou que quer pausar/pensar/sair — nao bombardear com videos
+  if (patientFarewell(lim) || patientDisengaging(lim)) return false;
   // Sinal de dor/queixa explícita do paciente OU lead já tem procedimento
   var painSignal = /\b(dor|doi|trava|pesad|incomod|machucad|les[aã]o|artrose|tendin|bursit|fasc[ií]te|joelho|ombro|coluna|quadril|tornozelo|cirurgia|fisioterapia)\b/i;
   var hasPain = painSignal.test(lim || '') || !!(leadData && leadData.procedimento_desejado);
@@ -1044,8 +1072,28 @@ async function handler(req: Request): Promise<Response> {
       return await runHandoffAndReturn(sb, wac, conv, cid, msgs, inb, lim, aicForPrompt || aic);
     }
 
-    // Atraso humanizado antes de responder (padrão 2–5 min; desliga só em palavras de emergência)
-    if (!emergencySkipDelay(lim)) {
+    // STEP 6.5: ENCERRAMENTO EDUCADO
+    // Se o paciente apenas se despediu E nossa ultima mensagem ja foi um fechamento educado,
+    // o sistema NAO responde mais — evita ping-pong eterno de "imagina!" / "obrigado!".
+    var lastOutboundContent = (outb.length > 0 && outb[0].content) ? outb[0].content : '';
+    if (patientFarewell(lim) && lastOutboundIsClosing(lastOutboundContent)) {
+      await safeDebugLog(sb, 'Conversation closed (farewell after closing)', {
+        cid: cid, lastInbound: lim.substring(0, 80), lastOutbound: lastOutboundContent.substring(0, 80),
+      });
+      try { await sb.from('whatsapp_conversations').update({ status: 'closed' }).eq('id', cid); } catch (_e) { /* ignore */ }
+      await safeReleaseLock(sb, cid);
+      return new Response(JSON.stringify({ status: 'farewell_no_reply' }), { status: 200, headers: CORS });
+    }
+
+    // Detecta desengajamento ("vou pensar", "te chamo depois", "agendo em breve") OU despedida
+    // pura (mesmo sem fechamento previo — ex: paciente comeca dizendo "Obrigado, depois te chamo").
+    // Em ambos os casos, prompta o GPT pra responder UMA vez de forma curta e educada,
+    // sem oferecer agenda nem mandar video.
+    var softCloseSignal = patientDisengaging(lim) || patientFarewell(lim);
+
+    // Atraso humanizado antes de responder (padrão 2–5 min; desliga só em palavras de emergência
+    // ou quando o paciente apenas se despediu — fechamento curto deve sair rapido)
+    if (!emergencySkipDelay(lim) && !softCloseSignal) {
       var delayMs = computeHumanReplyDelayMs(aic);
       await safeDebugLog(sb, 'Human reply delay', { cid: cid, delayMs: delayMs });
       await sleep(delayMs);
@@ -1165,7 +1213,11 @@ async function handler(req: Request): Promise<Response> {
 
     // STEP 9: BUILD PROMPT
     var ident = buildAgentIdentity(aicForPrompt || aic || {});
-    var sp = buildPhasePrompt(phr.phase, ident, { shouldSendVideoNow: willSendVideo, videoSent: videosAlreadySent });
+    var sp = buildPhasePrompt(phr.phase, ident, {
+      shouldSendVideoNow: willSendVideo,
+      videoSent: videosAlreadySent,
+      softClose: softCloseSignal,
+    });
     var ext = '';
 
     if (outb.length > 0) {

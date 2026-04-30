@@ -24,6 +24,7 @@ export interface PhaseExtras {
   hasPainSignaled?: boolean;     // paciente ja verbalizou dor/sintoma
   videoSent?: boolean;           // video de depoimento ja enviado
   shouldSendVideoNow?: boolean;  // disparar envio de video nesta resposta
+  softClose?: boolean;           // paciente desengajou ("nao posso agora", "vou pensar", "te chamo depois") — encerrar com educacao
 }
 
 // =============================================
@@ -275,6 +276,13 @@ REGRAS ABSOLUTAS:
 14. ANTI-LOOP DE PROMESSA: NUNCA mande mais de 1 mensagem dizendo "vou verificar" / "um instante" / "deixa eu ver" sem efetivamente entregar a info. Se voce nao tem como verificar (sem AGENDA no contexto), em vez de prometer 3 vezes, diga: "Vou pedir pra equipe te enviar os horarios disponiveis em instantes" e PARE.
 15. ANTI-REPETICAO LEXICAL: PROIBIDO comecar 2 respostas seguidas com a mesma palavra ("Claro!", "Entendi!", "Perfeito!"). VARIE: "Claro", "Vou sim", "Pode deixar", "Anotado", "Otimo", "Beleza", "Sem problema", "Ja vi aqui", "Confere".
 16. RESPONDA TODAS AS PERGUNTAS DO PACIENTE: se ele perguntou 2 coisas na mesma mensagem (ex: "qual o valor + aceita plano?"), responda AS DUAS. Ignorar uma pergunta e o erro mais grave que voce pode cometer.
+17. ENCERRAMENTO EDUCADO — quando o paciente sinalizar que NAO QUER AGENDAR AGORA, vai pensar, vai ligar/agendar em breve, vai se organizar, ou simplesmente se despedir ("obrigado", "tchau", "valeu", "ate mais", "ate breve"):
+    a) NAO insista. NAO ofereca horario. NAO peca email. NAO mande video.
+    b) Responda em 1-2 mensagens curtas (max 1 [SPLIT]).
+    c) Valide a decisao com empatia + deixe a porta aberta + se despeca.
+    d) Exemplos: "Tranquilo! Quando voce tiver pronto, e so me chamar 😊", "Sem problema, fico por aqui. Te aguardo quando puder!", "Combinado! Qualquer duvida e so chamar.".
+    e) NAO mande mais mensagem se o paciente apenas confirmar a despedida ("ok", "obrigada", "tchau" depois do seu fechamento). O sistema corta automaticamente nessa situacao.
+    f) NUNCA prometa "vou te ligar amanha" ou "te aviso em X dias" — quem decide o follow-up e a equipe humana.
 
 FRASES PROIBIDAS (NUNCA escreva isso):
 - "Tudo bem, qualquer coisa me chama"
@@ -496,9 +504,31 @@ export function buildPhasePrompt(phase: ConversationPhase, identity: AgentIdenti
     .replace(/\{clinic_name\}/g, identity.clinic_name)
     .replace(/\{specialist_name\}/g, identity.specialist_name || 'a equipe');
 
-  // Bloco extra: instrucao explicita sobre video
+  // Bloco extra: instrucao explicita sobre video / encerramento
   let extrasBlock = '';
-  if (extras?.shouldSendVideoNow) {
+  if (extras?.softClose) {
+    extrasBlock = `
+
+ATENCAO — ENCERRAMENTO EDUCADO (PACIENTE DESENGAJOU OU SE DESPEDIU):
+A ultima mensagem do paciente sinaliza que ele NAO QUER continuar agora ("vou pensar", "te aviso", "ligo depois", "agendo em breve", "obrigado", "tchau", "ate mais", "ja te falo", "preciso me organizar", etc.).
+
+REGRAS OBRIGATORIAS PARA ESTA RESPOSTA:
+- Responda em 1-2 mensagens CURTAS (max 1 [SPLIT]).
+- Valide a decisao SEM PRESSAO + deixe a porta aberta + se despeca com leveza.
+- NAO ofereca horario. NAO mostre preco. NAO mande video. NAO peca email/nome. NAO faca pergunta nova.
+- NAO prometa "vou te ligar amanha" / "te aviso em 3 dias" — quem decide retomar e o paciente ou a equipe.
+- Se o paciente acabou de mandar "obrigado/tchau/valeu/ate mais", responda apenas algo como "Imagina! Qualquer coisa estou aqui 😊" e PARE.
+
+EXEMPLOS DE TOM CORRETO:
+- "Tranquilo! Quando voce tiver pronto, e so me chamar 😊"
+- "Sem problema, fico por aqui. Te aguardo quando puder!"
+- "Combinado! Qualquer duvida e so chamar."
+- "Imagina, fico a disposicao quando precisar."
+- "Ok! Bom te conhecer, ate breve."
+
+NAO escreva mais nada alem desse fechamento.
+`;
+  } else if (extras?.shouldSendVideoNow) {
     extrasBlock = `
 
 ALERTA — SISTEMA VAI ENVIAR VIDEO DE DEPOIMENTO LOGO APOS SUA RESPOSTA:
