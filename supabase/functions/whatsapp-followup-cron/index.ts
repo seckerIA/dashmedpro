@@ -10,11 +10,18 @@
 //  - Apenas conversas com auto_reply_enabled E ai_autonomous_mode != false
 //  - Pula conversas resolved/spam/handoff
 //  - Pula conversas com followup_disabled=true
+//  - Pula conversas em que a ultima outbound foi humana (humano cuidando)
+//  - Pula leads que ja recusaram (financeiro / plano sem reembolso / agradecimento de fechamento)
 //
-// Mensagens contextualizadas conforme fase em que parou.
+// Mensagens contextualizadas conforme fase em que parou E se o lead chegou
+// a responder ou nao (1o contato vs re-engajamento).
 
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import {
+  lastOutboundWasAiGenerated,
+  declinedFurtherContactInbound as inboundSuggestsClosedLead,
+} from '../_shared/whatsapp-ai-rules.ts';
 
 const SU = Deno.env.get('SUPABASE_URL') || '';
 const SK = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -30,12 +37,48 @@ function sleep(ms: number): Promise<void> {
 }
 
 // ============================================================
-// MENSAGENS CONTEXTUAIS por (attempt, phase)
+// MENSAGENS CONTEXTUAIS por (attempt, phase, neverReplied)
+// neverReplied=true: lead que NUNCA respondeu (1o contato outbound, sem inbound).
+//   Tom: primeiro contato gentil, NUNCA "ultima tentativa" — soa errado.
+// neverReplied=false: lead engajou em algum momento e parou.
+//   Tom: re-engajamento progressivo (curiosidade -> oferta -> handoff humano).
 // ============================================================
-function buildFollowupMessage(attempt: number, phase: string, firstName: string, hasPainQueixa: boolean): string[] {
+function buildFollowupMessage(
+  attempt: number,
+  phase: string,
+  firstName: string,
+  hasPainQueixa: boolean,
+  neverReplied: boolean,
+): string[] {
   const fn = firstName ? firstName : '';
   const greet = fn ? fn + ', ' : '';
 
+  // ============================================
+  // CAMINHO 1: lead nunca respondeu (1o contato)
+  // ============================================
+  if (neverReplied) {
+    if (attempt === 1) {
+      return [
+        (fn ? 'Oi, ' + fn + '! ' : 'Oi! ') + 'Aqui é a Jessica, do consultório.',
+        'Vi que você demonstrou interesse em uma consulta — tá tudo certo por aí?',
+        'Se quiser, posso te explicar como funciona a avaliação. 😊',
+      ];
+    }
+    if (attempt === 2) {
+      return [
+        greet + 'imagino que você tá com a rotina cheia.',
+        'Se ainda fizer sentido, posso te mandar 2-3 horários pra você só me dizer qual prefere — sem compromisso.',
+      ];
+    }
+    return [
+      greet + 'vou parar de te mandar mensagem aqui pra não atrapalhar 🙏',
+      'Quando puder, é só me chamar — combinado?',
+    ];
+  }
+
+  // ============================================
+  // CAMINHO 2: lead engajou e parou (re-engajamento)
+  // ============================================
   if (attempt === 1) {
     if (phase === 'agendamento') {
       return [
@@ -77,8 +120,8 @@ function buildFollowupMessage(attempt: number, phase: string, firstName: string,
 
   // attempt 3 — handoff humano
   return [
-    greet + 'última tentativa por aqui 🙏',
-    'Caso queira retomar, é só me chamar. Vou deixar registrado pra equipe te dar atenção especial quando você responder. Cuide-se!',
+    greet + 'vou pausar por aqui 🙏',
+    'Caso queira retomar, é só me chamar. Vou deixar registrado pra equipe te dar atenção quando você responder. Cuide-se!',
   ];
 }
 
@@ -203,6 +246,8 @@ serve(async (req: Request) => {
     skipped_disabled: 0,
     skipped_max: 0,
     skipped_no_outbound: 0,
+    skipped_human_last_out: 0,
+    skipped_closed_lead_inbound: 0,
     handoffs: 0,
     errors: 0,
     details: [] as any[],
@@ -230,7 +275,7 @@ serve(async (req: Request) => {
       .eq('last_message_direction', 'outbound')
       .eq('followup_disabled', false)
       .lte('last_message_at', cutoff3h)
-      .not('status', 'in', '(resolved,spam)');
+      .not('status', 'in', '(resolved,spam,closed)');
 
     const convs = (convRes.data || []) as any[];
     summary.candidates_checked = convs.length;
@@ -261,6 +306,21 @@ serve(async (req: Request) => {
       const attempt = pickAttempt(hoursSince, conv.followup_attempts || 0, maxAtt);
       if (attempt === null) continue;
 
+      // Skip se a ultima outbound foi humana (humano esta cuidando da conversa)
+      const { data: lastOutMsg } = await sb
+        .from('whatsapp_messages')
+        .select('metadata')
+        .eq('conversation_id', conv.id)
+        .eq('direction', 'outbound')
+        .order('sent_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!lastOutboundWasAiGenerated(lastOutMsg?.metadata as Record<string, unknown> | null)) {
+        summary.skipped_human_last_out++;
+        continue;
+      }
+
       // Cooldown: nao enviar dois follow-ups dentro de 1h
       if (conv.last_followup_at) {
         const sinceFu = (Date.now() - new Date(conv.last_followup_at).getTime()) / 3_600_000;
@@ -277,8 +337,20 @@ serve(async (req: Request) => {
       const lastInbRes = await sb.from('whatsapp_messages').select('content').eq('conversation_id', conv.id).eq('direction', 'inbound').order('created_at', { ascending: false }).limit(1).maybeSingle();
       const lastInb = (lastInbRes.data && lastInbRes.data.content) || '';
 
+      if (inboundSuggestsClosedLead(lastInb)) {
+        summary.skipped_closed_lead_inbound++;
+        if (!dryRun) {
+          await sb.from('whatsapp_conversations').update({ followup_disabled: true }).eq('id', conv.id);
+        }
+        continue;
+      }
+
       const totalMsgsRes = await sb.from('whatsapp_messages').select('id', { count: 'exact', head: true }).eq('conversation_id', conv.id);
       const totalMsgs = totalMsgsRes.count || 0;
+
+      // Lead nunca respondeu? (1o contato — clinica enviou outbound, mas lead nunca veio)
+      const inbCountRes = await sb.from('whatsapp_messages').select('id', { count: 'exact', head: true }).eq('conversation_id', conv.id).eq('direction', 'inbound');
+      const neverReplied = (inbCountRes.count || 0) === 0;
 
       const phase = detectPhaseHeuristic(totalMsgs, hasPain, lastInb);
 
@@ -289,9 +361,9 @@ serve(async (req: Request) => {
 
       // 5. Compoe e envia
       const firstName = (conv.contact_name || '').trim().split(/\s+/)[0] || '';
-      const parts = buildFollowupMessage(attempt, phase, firstName, hasPain);
+      const parts = buildFollowupMessage(attempt, phase, firstName, hasPain, neverReplied);
 
-      const detail: any = { cid: conv.id, name: firstName, phase, attempt, hoursSince: Math.round(hoursSince), parts };
+      const detail: any = { cid: conv.id, name: firstName, phase, attempt, hoursSince: Math.round(hoursSince), neverReplied, parts };
 
       if (dryRun) {
         summary.details.push({ ...detail, dry: true });

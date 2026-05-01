@@ -155,7 +155,13 @@ function patientFarewell(text: string): boolean {
 function patientDisengaging(text: string): boolean {
   var t = (text || '').toLowerCase();
   if (t.length === 0) return false;
-  return /(\bn[aã]o\s+(quero|posso|tenho|consigo|vou)\s+(agora|no\s+momento|hoje|por\s+enquanto)\b|\bn[aã]o\s+pode\s+ser\s+agora\b|\bsem\s+condi[cç][oõ]es\s+(agora|no\s+momento)\b|\bdepois\s+(eu\s+)?(volto|falo|chamo|aviso|entro\s+em\s+contato|retorno|te\s+chamo|te\s+falo)\b|\bentrarei\s+em\s+contato\b|\bt[ee]\s+aviso\b|\bt[ee]\s+chamo\s+(depois|mais\s+tarde|amanh[aã])\b|\bvou\s+(pensar|ver|conversar\s+com|me\s+organizar|analisar|avaliar)\b|\bfica\s+pra\s+(depois|outro\s+dia|semana\s+que\s+vem|mais\s+tarde)\b|\bqualquer\s+coisa\s+(eu\s+)?(falo|chamo|retorno|aviso)\b|\bagend[oa]\s+(em\s+breve|outra\s+hora|depois|mais\s+tarde|amanh[aã])\b|\bligo\s+(em\s+breve|depois|mais\s+tarde|amanh[aã])\b|\bvolto\s+(a\s+)?(falar|te\s+falar|te\s+chamar)\b|\bpreciso\s+(me\s+organizar|ver\s+com|conversar\s+com|pensar)\b|\bdeixa\s+eu\s+(pensar|ver)\b|\bqd\s+(eu\s+)?(puder|tiver\s+tempo)\b|\bquando\s+(eu\s+)?(puder|tiver\s+tempo|me\s+organizar)\b)/i.test(t);
+  return /(\bn[aã]o\s+(quero|posso|tenho|consigo|vou)\s+(agora|no\s+momento|hoje|por\s+enquanto)\b|\bn[aã]o\s+pode\s+ser\s+agora\b|\bsem\s+condi[cç][oõ]es\s+(agora|no\s+momento)\b|\b(esta|t[áa])\s+fora\s+do\s+(meu\s+)?or[cç]amento\b|\bfora\s+do\s+or[cç]amento\b|\bn[aã]o\s+cabe\s+no\s+(meu\s+)?or[cç]amento\b|\bn[aã]o\s+tenho\s+(esse\s+)?(dinheiro|valor|grana)\b|\bsem\s+grana\b|\bmuito\s+(caro|salgado|alto)\b|\b[eé]\s+caro\b|\bt[áa]\s+caro\b|\bca[ií]ssimo\b|\bn[aã]o\s+(cabe|d[áa])\s+no\s+momento\b|\bdepois\s+(eu\s+)?(volto|falo|chamo|aviso|entro\s+em\s+contato|retorno|te\s+chamo|te\s+falo)\b|\bentrarei\s+em\s+contato\b|\bt[ee]\s+aviso\b|\bt[ee]\s+chamo\s+(depois|mais\s+tarde|amanh[aã])\b|\bvou\s+(pensar|ver|conversar\s+com|me\s+organizar|analisar|avaliar)\b|\bfica\s+pra\s+(depois|outro\s+dia|semana\s+que\s+vem|mais\s+tarde)\b|\bqualquer\s+coisa\s+(eu\s+)?(falo|chamo|retorno|aviso)\b|\bagend[oa]\s+(em\s+breve|outra\s+hora|depois|mais\s+tarde|amanh[aã])\b|\bligo\s+(em\s+breve|depois|mais\s+tarde|amanh[aã])\b|\bvolto\s+(a\s+)?(falar|te\s+falar|te\s+chamar)\b|\bpreciso\s+(me\s+organizar|ver\s+com|conversar\s+com|pensar)\b|\bdeixa\s+eu\s+(pensar|ver)\b|\bqd\s+(eu\s+)?(puder|tiver\s+tempo)\b|\bquando\s+(eu\s+)?(puder|tiver\s+tempo|me\s+organizar)\b)/i.test(t);
+}
+
+/** Paciente indica que ja recebeu o material e nao quer repeticao (evita 2o bloco de depoimentos). */
+function patientRejectRepeatContent(text: string): boolean {
+  var t = (text || '').toLowerCase();
+  return /j[aá]\s+(vi|assist(iu)?|recebi)|voc[eê]\s+j[aá]\s+(mandou|enviou)|j[aá]\s+me\s+enviou|de\s+novo\s+n[aã]o|n[aã]o\s+(precisa|preciso)\s+mandar\s+de\s+novo|voc[eê]\s+repetiu|(\b|^)eu\s+vi\s+voce\b/i.test(t);
 }
 
 /** Verifica se a ultima mensagem nossa ja foi um fechamento educado — pra nao mandar outro "imagina!" em loop. */
@@ -282,8 +288,61 @@ function stripWrappingQuotes(s: string): string {
   return t;
 }
 
+/**
+ * Sanitizacao de texto antes de partir em mensagens:
+ *  - Remove URLs do bucket "whatsapp-media" coladas pelo GPT (videos sao enviados
+ *    via API, nao como link cru no texto — caso Sandra/Joao Paulo).
+ *  - Remove placeholders "[Video de depoimento]" / "[Audio]" / "[Imagem]".
+ */
+function sanitizeAIText(text: string): string {
+  if (!text) return '';
+  var t = text;
+  t = t.replace(/https?:\/\/[^\s<>"']*\/storage\/v1\/object\/public\/whatsapp-(?:media|testimonials)\/[^\s<>"']+/gi, '');
+  t = t.replace(/\[\s*(?:v[ií]deo(?:\s+de\s+depoimento)?|video[\s-]?testemunho|audio|imagem|foto|file|midia|media)\s*\]/gi, '');
+  t = t.replace(/[ \t]+/g, ' ');
+  t = t.replace(/\n{3,}/g, '\n\n');
+  return t.trim();
+}
+
+/**
+ * Split inteligente em sentencas que NAO quebra em abreviacoes comuns
+ * ("Av.", "Dr.", "Sra.", "Ex.", iniciais). Evita o caso real de
+ * "A clinica do Dr. Rafael..." sair em 2 baloes ("...do Dr." | "Rafael...").
+ */
+function splitIntoSentences(text: string): string[] {
+  var ABREV = /(?:av|dr|dra|sr|sra|sras|drs|prof|profa|exmo|exma|ex|n|no|p|pg|pag|fl|cap|art|ed|jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez|seg|ter|qua|qui|sex|sab|dom|tel|cel|cep|ltda|s\.?\s*a)$/i;
+  var out: string[] = [];
+  var current = '';
+  var i = 0;
+  while (i < text.length) {
+    current += text[i];
+    if (/[.!?]/.test(text[i])) {
+      var rest = text.substring(i + 1);
+      var nextChar = rest.match(/^\s+/);
+      if (nextChar && nextChar[0].length > 0) {
+        var lookbackMatch = current.match(/(\S+)$/);
+        var lastToken = lookbackMatch ? lookbackMatch[1].replace(/[.!?]+$/, '') : '';
+        var followsCapital = /^\s+["'(]?[A-ZÁÉÍÓÚÂÊÔÃÕÇ]/.test(rest);
+        var prevIsAbbrev = ABREV.test(lastToken) || /^[A-Z]$/.test(lastToken);
+        if (followsCapital && !prevIsAbbrev) {
+          out.push(current.trim());
+          current = '';
+          i += 1 + nextChar[0].length;
+          continue;
+        }
+      }
+    }
+    i++;
+  }
+  if (current.trim()) out.push(current.trim());
+  return out;
+}
+
+var MAX_PARTS_PER_TURN = 3;
+
 function postProcess(text: string): string[] {
   var cleaned = text.replace(/^(Sofia|Jessica|Assistente|IA|Bot|Atendente|Secretaria|Secretária)\s*:\s*/gim, '').trim();
+  cleaned = sanitizeAIText(cleaned);
   cleaned = stripWrappingQuotes(cleaned);
   var emojiRegex = /\p{Emoji_Presentation}/gu;
   var emojis = cleaned.match(emojiRegex) || [];
@@ -297,29 +356,36 @@ function postProcess(text: string): string[] {
   var rawParts = cleaned.split(/\[SPLIT\]/i);
   var trimmed: string[] = [];
   for (var i = 0; i < rawParts.length; i++) {
-    var t = stripWrappingQuotes(rawParts[i]);
+    var t = stripWrappingQuotes(rawParts[i]).trim();
     if (t.length > 0) trimmed.push(t);
   }
   var finalParts: string[] = [];
   for (var j = 0; j < trimmed.length; j++) {
     var part = trimmed[j];
-    if (part.length <= 120) {
+    if (part.length <= 160) {
       finalParts.push(part);
-    } else {
-      var sentences = part.split(/(?<=[.!?])\s+/);
-      var current = '';
-      for (var k = 0; k < sentences.length; k++) {
-        if ((current + ' ' + sentences[k]).trim().length > 120 && current) {
-          finalParts.push(current.trim());
-          current = sentences[k];
-        } else {
-          current = current ? current + ' ' + sentences[k] : sentences[k];
-        }
-      }
-      if (current.trim()) finalParts.push(current.trim());
+      continue;
     }
+    var sentences = splitIntoSentences(part);
+    var current = '';
+    for (var k = 0; k < sentences.length; k++) {
+      var combined = current ? current + ' ' + sentences[k] : sentences[k];
+      if (combined.length > 160 && current) {
+        finalParts.push(current.trim());
+        current = sentences[k];
+      } else {
+        current = combined;
+      }
+    }
+    if (current.trim()) finalParts.push(current.trim());
   }
   if (finalParts.length === 0) finalParts.push(cleaned || 'Ola! Como posso te ajudar?');
+  if (finalParts.length > MAX_PARTS_PER_TURN) {
+    var head = finalParts.slice(0, MAX_PARTS_PER_TURN - 1);
+    var tail = finalParts.slice(MAX_PARTS_PER_TURN - 1).join(' ').trim();
+    if (tail) head.push(tail);
+    finalParts = head;
+  }
   return finalParts;
 }
 
@@ -497,22 +563,53 @@ async function getTestimonialVideoUrls(sb: any, uid: string): Promise<{ url: str
   return out;
 }
 
-function shouldSendTestimonialNow(phase: string, lim: string, leadData: any, outboundCount: number, videosAlreadySent: boolean): boolean {
-  // Disparar apenas:
-  // - na fase triagem (geração de valor) ou logo no início de agendamento
-  // - quando o paciente JÁ verbalizou dor/sintoma
-  // - vídeos ainda não enviados
-  // - houve pelo menos 2 trocas (não no primeiro "oi")
-  // - paciente NAO esta desengajando ou se despedindo (bug Fabio)
+/**
+ * GATE de envio do bloco "valor antes do investimento" (3 vídeos de depoimento).
+ *
+ * REGRAS DE OURO (todas precisam ser TRUE para disparar):
+ *  1. Vídeos ainda nao foram enviados nesta conversa.
+ *  2. Estamos em triagem ou agendamento (nunca em abertura).
+ *  3. Paciente ja teve pelo menos 2 turnos (>= 2 inbounds), pra garantir que ele
+ *     nao recebeu o pitch logo apos um simples "oi"/"boa tarde".
+ *  4. A IA ja teve pelo menos 1 outbound de qualificacao (apresentacao+pergunta).
+ *  5. O paciente verbalizou queixa CLINICA explicita em qualquer mensagem da
+ *     historia inbound (nao basta um "consulta") OU `lead.procedimento_desejado`
+ *     ja foi extraido com algo especifico (nao "consulta" generica).
+ *  6. Paciente nao esta se despedindo nem desengajando agora.
+ *
+ * Casos reais que essa regra fecha:
+ *  - Jessica Carvalho ("oii"+"boa tarde" -> pitch imediato): bloqueado por (3) e (5).
+ *  - Sandra perguntando "Sera q doi mt?" depois de ja ter recebido pitch: bloqueado por (1).
+ *  - Joao Paulo ja recebeu pitch, depois pergunta valor e recebe pitch DE NOVO: bloqueado por (1).
+ */
+function shouldSendTestimonialNow(
+  phase: string,
+  lim: string,
+  leadData: any,
+  outboundCount: number,
+  videosAlreadySent: boolean,
+  inboundCount: number,
+  inboundHistory: string,
+): boolean {
   if (videosAlreadySent) return false;
-  if (outboundCount < 2) return false; // já tem ao menos 1 resposta nossa anterior
   if (phase !== 'triagem' && phase !== 'agendamento') return false;
-  // FREIO: paciente sinalizou que quer pausar/pensar/sair — nao bombardear com videos
+
+  if (inboundCount < 2) return false;
+  if (outboundCount < 1) return false;
+
   if (patientFarewell(lim) || patientDisengaging(lim)) return false;
-  // Sinal de dor/queixa explícita do paciente OU lead já tem procedimento
-  var painSignal = /\b(dor|doi|trava|pesad|incomod|machucad|les[aã]o|artrose|tendin|bursit|fasc[ií]te|joelho|ombro|coluna|quadril|tornozelo|cirurgia|fisioterapia)\b/i;
-  var hasPain = painSignal.test(lim || '') || !!(leadData && leadData.procedimento_desejado);
-  return hasPain;
+  if (patientRejectRepeatContent(lim) || patientRejectRepeatContent(inboundHistory || '')) return false;
+
+  var painRegex = /\b(dor|d[oó]i|trava|pesad|incomod|machucad|les[aã]o|artrose|artrite|tendin|bursit|fasc[ií]te|joelho|ombro|coluna|cervic|lombar|quadril|tornozelo|punho|cotovelo|coxa|nervo|h[eé]rnia|protese|infiltra[cç][aã]o|cisto|menisc|ligament|cirurgia|fisioterapia|inflama)\b/i;
+  var historyHasPain = painRegex.test(inboundHistory || '');
+
+  var procStr = (leadData && typeof leadData.procedimento_desejado === 'string')
+    ? leadData.procedimento_desejado.toLowerCase().trim()
+    : '';
+  var procIsSpecific = procStr.length > 0 && procStr !== 'consulta' && procStr !== 'avaliacao' && procStr !== 'avaliação';
+
+  if (!historyHasPain && !procIsSpecific) return false;
+  return true;
 }
 
 async function sendWA(cfg: any, to: string, text: string, sb: any, cid: string, uid: string): Promise<void> {
@@ -988,6 +1085,19 @@ async function safeReleaseLock(sb: any, cid: string): Promise<void> {
   try { await sb.rpc('release_ai_lock', { p_conversation_id: cid }); } catch (_e) { /* ignore */ }
 }
 
+/** Outbound humano ou legado recente — evita corrida IA x secretaria. */
+async function recentHumanOutbound(sb: any, cid: string, withinMinutes: number): Promise<boolean> {
+  var sinceIso = new Date(Date.now() - withinMinutes * 60 * 1000).toISOString();
+  var r = await sb.from('whatsapp_messages').select('id, metadata').eq('conversation_id', cid).eq('direction', 'outbound').gte('sent_at', sinceIso).order('sent_at', { ascending: false }).limit(8);
+  var rows = r.data || [];
+  for (var i = 0; i < rows.length; i++) {
+    var m = rows[i].metadata as any;
+    if (m && m.ai_generated === true) continue;
+    return true;
+  }
+  return false;
+}
+
 async function runHandoffAndReturn(
   sb: any,
   wac: any,
@@ -1047,6 +1157,13 @@ async function handler(req: Request): Promise<Response> {
     }
     await safeDebugLog(sb, 'Lock OK', { cid: cid });
 
+    // Humano ativo nesta conversa nos ultimos minutos -> nao competir com a equipe
+    if (await recentHumanOutbound(sb, cid, 10)) {
+      await safeDebugLog(sb, 'Skip: recent human outbound (pre-debounce)', { cid: cid });
+      await safeReleaseLock(sb, cid);
+      return new Response(JSON.stringify({ status: 'skipped_human_active' }), { status: 200, headers: CORS });
+    }
+
     // STEP 2: SMART DEBOUNCE
     var cr0 = await sb.from('whatsapp_messages').select('*', { count: 'exact', head: true }).eq('conversation_id', cid).eq('direction', 'inbound');
     var lkc = cr0.count || 0;
@@ -1077,6 +1194,13 @@ async function handler(req: Request): Promise<Response> {
     }
     await safeDebugLog(sb, 'Auto-reply ON', { cid: cid, localOn: localOn, globalOn: globalOn });
 
+    // Humano respondeu nos ultimos minutos -> nao competir com a secretaria
+    if (await recentHumanOutbound(sb, cid, 10)) {
+      await safeDebugLog(sb, 'Skipped: recent human outbound', { cid: cid });
+      await safeReleaseLock(sb, cid);
+      return new Response(JSON.stringify({ status: 'human_active_skip' }), { status: 200, headers: CORS });
+    }
+
     // STEP 3b: MARK AS READ
     var wac = await getWAConfig(sb, conv.user_id);
     if (wac) {
@@ -1093,7 +1217,7 @@ async function handler(req: Request): Promise<Response> {
     }
 
     // STEP 4: LOAD HISTORY
-    var msr = await sb.from('whatsapp_messages').select('id, message_id, direction, content, message_type, sent_at').eq('conversation_id', cid).order('sent_at', { ascending: false }).limit(20);
+    var msr = await sb.from('whatsapp_messages').select('id, message_id, direction, content, message_type, sent_at, metadata').eq('conversation_id', cid).order('sent_at', { ascending: false }).limit(20);
     var msgs = msr.data || [];
     if (msgs.length === 0) throw new Error('No messages found');
 
@@ -1154,7 +1278,7 @@ async function handler(req: Request): Promise<Response> {
       await safeDebugLog(sb, 'Resumed after delay', { cid: cid, requestedMs: delayMs, actualMs: Date.now() - delayStartedAt });
 
       // Recarregar mensagens após o delay (paciente pode ter mandado mais)
-      var msr2 = await sb.from('whatsapp_messages').select('id, message_id, direction, content, message_type, sent_at').eq('conversation_id', cid).order('sent_at', { ascending: false }).limit(20);
+      var msr2 = await sb.from('whatsapp_messages').select('id, message_id, direction, content, message_type, sent_at, metadata').eq('conversation_id', cid).order('sent_at', { ascending: false }).limit(20);
       msgs = msr2.data || [];
       inb = [];
       outb = [];
@@ -1170,6 +1294,48 @@ async function handler(req: Request): Promise<Response> {
       leadRow = ldr.data || null;
       videosAlreadySent = !!(leadRow && leadRow.videos_sent_at);
       phr = detectPhase(userTurnCount, leadRow, lim);
+
+      // RE-CHECK 1: ai_autonomous_mode pode ter sido desativado durante o delay
+      // (caso Sandra: humana clica em "desativar IA" no inbox enquanto o agent estava
+      // dormindo; sem este re-check a IA acordava e respondia mesmo assim).
+      var rcr = await sb.from('whatsapp_conversations')
+        .select('ai_autonomous_mode, status')
+        .eq('id', cid).single();
+      if (rcr.data) {
+        if (rcr.data.ai_autonomous_mode === false) {
+          await safeDebugLog(sb, 'Aborting after delay: ai_autonomous_mode=false', { cid: cid });
+          await safeReleaseLock(sb, cid);
+          return new Response(JSON.stringify({ status: 'auto_reply_disabled_after_delay' }), { status: 200, headers: CORS });
+        }
+        if (rcr.data.status === 'closed' || rcr.data.status === 'resolved') {
+          await safeDebugLog(sb, 'Aborting after delay: conversation closed', { cid: cid, status: rcr.data.status });
+          await safeReleaseLock(sb, cid);
+          return new Response(JSON.stringify({ status: 'conversation_closed' }), { status: 200, headers: CORS });
+        }
+      }
+
+      // RE-CHECK 2: humano respondeu durante o delay -> pausa a IA
+      // (evita corrida IA/humano - caso Andrea: IA dizendo "vou verificar"
+      // enquanto humana ja mandava os horarios reais).
+      var humanIntervened = false;
+      var humanWindowMs = 5 * 60 * 1000; // 5 minutos
+      var nowTs = Date.now();
+      for (var ohi = 0; ohi < outb.length; ohi++) {
+        var om = outb[ohi];
+        var sentTs = om.sent_at ? new Date(om.sent_at).getTime() : 0;
+        if (nowTs - sentTs > humanWindowMs) break;
+        var meta = om.metadata || {};
+        var isAi = meta.ai_generated === true || meta.agent === 'whatsapp-ai-agent' || meta.agent === 'whatsapp-followup-cron';
+        if (!isAi) { humanIntervened = true; break; }
+      }
+      if (humanIntervened) {
+        await safeDebugLog(sb, 'Aborting after delay: human intervention detected', { cid: cid });
+        // Desliga a IA pra essa conversa (humano pegou o caso)
+        try { await sb.from('whatsapp_conversations').update({ ai_autonomous_mode: false, priority: 'high' }).eq('id', cid); } catch (_e) { /* ignore */ }
+        await safeReleaseLock(sb, cid);
+        return new Response(JSON.stringify({ status: 'human_intervened' }), { status: 200, headers: CORS });
+      }
+
       if (phr.phase === 'agendamento' || phr.phase === 'pos_agendamento') {
         await ensureCRMContact(sb, conv, cid);
       }
@@ -1178,8 +1344,20 @@ async function handler(req: Request): Promise<Response> {
       }
     }
 
+    // Se ancoragem de video foi enviada mas nenhum MP4 entregou, o GPT precisa recuperar o fio
+    var videoAnchorsButSendFailed = false;
+
     // STEP 6b: AVALIAR ENVIO DE VÍDEO DE DEPOIMENTO (antes de gerar prompt)
-    var willSendVideo = shouldSendTestimonialNow(phr.phase, lim, leadRow, outb.length, videosAlreadySent);
+    var inboundHistoryText = inb.map(function(m: any) { return m.content || ''; }).join('\n');
+    var willSendVideo = shouldSendTestimonialNow(
+      phr.phase,
+      lim,
+      leadRow,
+      outb.length,
+      videosAlreadySent,
+      userTurnCount,
+      inboundHistoryText,
+    );
 
     // STEP 6c: SE FOR ENVIAR VÍDEO AGORA, FAZ O FLUXO DETERMINÍSTICO:
     //   ancoragem (texto curto) -> 3 vídeos -> RETURN (sem chamar GPT).
@@ -1225,20 +1403,26 @@ async function handler(req: Request): Promise<Response> {
               phone_number: conv.phone_number,
               videos_sent_at: new Date().toISOString(),
             }, { onConflict: 'conversation_id' });
+            videosAlreadySent = true;
+          } else {
+            await safeDebugLog(sb, 'All video sends failed after anchor — falling through to GPT', { cid: cid });
+            videoAnchorsButSendFailed = true;
           }
 
-          // Update analysis e libera lock
-          try {
-            await sb.from('whatsapp_conversation_analysis').upsert({
-              conversation_id: cid, user_id: conv.user_id, lead_status: 'morno',
-              last_analyzed_at: new Date().toISOString(), message_count_analyzed: msgs.length,
-              ai_model_used: 'agent (anchor+video, no GPT)', suggested_next_action: 'Aguardar reacao aos videos antes de falar preco',
-            }, { onConflict: 'conversation_id' });
-          } catch (_e) { /* ignore */ }
-          await safeReleaseLock(sb, cid);
-          return new Response(JSON.stringify({ status: 'success', mode: 'video-anchor', videos: videosPre.length }), {
-            status: 200, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-          });
+          if (anyOk) {
+            try {
+              await sb.from('whatsapp_conversation_analysis').upsert({
+                conversation_id: cid, user_id: conv.user_id, lead_status: 'morno',
+                last_analyzed_at: new Date().toISOString(), message_count_analyzed: msgs.length,
+                ai_model_used: 'agent (anchor+video, no GPT)', suggested_next_action: 'Aguardar reacao aos videos antes de falar preco',
+              }, { onConflict: 'conversation_id' });
+            } catch (_e) { /* ignore */ }
+            await safeReleaseLock(sb, cid);
+            return new Response(JSON.stringify({ status: 'success', mode: 'video-anchor', videos: videosPre.length }), {
+              status: 200, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            });
+          }
+          willSendVideo = false;
         } else {
           await safeDebugLog(sb, 'Wanted to send video but none configured', { cid: cid, userId: conv.user_id });
           // segue fluxo normal sem video
@@ -1253,7 +1437,7 @@ async function handler(req: Request): Promise<Response> {
     // STEP 7: SCHEDULE
     var schCtx = '';
     var schRx = /disponib|agendar|agenda|horario|consulta|dia\s+\d|segunda|ter[cç]a|quarta|quinta|sexta|\d{1,2}[h:]\d{0,2}|\d{1,2}\s*(horas|hrs|da\s*manh|da\s*tarde)/i;
-    if (phr.shouldLoadSchedule || schRx.test(lim)) {
+    if (phr.shouldLoadSchedule || phr.phase === 'agendamento' || schRx.test(lim)) {
       try { schCtx = await buildScheduleContext(sb, conv.user_id); }
       catch (se) { console.error('[Agent] Sched err:', se); schCtx = '(Erro ao carregar agenda)'; }
       await safeDebugLog(sb, 'Schedule', { cid: cid, ctx: schCtx.substring(0, 2000), phase: phr.phase });
@@ -1277,6 +1461,12 @@ async function handler(req: Request): Promise<Response> {
 
     if (outb.length > 0) {
       ext = ext + '\n\nINSTRUCAO OBRIGATORIA: Voce JA SE APRESENTOU nesta conversa (' + outb.length + ' msgs anteriores). NAO se apresente novamente. Comece DIRETO com a resposta.\n';
+    }
+    if (videosAlreadySent) {
+      ext = ext + '\n\nCONTEXTO CRITICO — VIDEOS JA ENVIADOS NESTA CONVERSA:\n- PROIBIDO iniciar de novo com \"antes de te falar sobre o investimento\" / \"quero te mostrar o relato\" ou qualquer frase equivalente ao primeiro envio.\n- PROIBIDO sugerir reenviar depoimentos se o paciente disse \"ja vi\" / \"ja mandou\" — reconheça e siga em frente (duvidas objetivas sobre consulta ou encerramento educado).\n- Responda somente a ultima pergunta do paciente usando a BASE DE CONHECIMENTO.\n';
+    }
+    if (videoAnchorsButSendFailed) {
+      ext = ext + '\n\nCONTEXTO URGENTE — FALHA TECNICA NO ENVIO DOS VIDEOS:\nVoce (sistema) acabou de prometer enviar videos de depoimento, mas o envio tecnico pelo WhatsApp falhou.\n- Peca desculpas em UMA linha, sem drama.\n- NAO cole links de arquivo nem URLs do storage.\n- Se o paciente estava esperando valor/investimento, pode apresentar o valor conforme BASE DE CONHECIMENTO (ordem sagrada preservada).\n';
     }
     if (schCtx) {
       ext = ext + '\n\nAGENDA DE HORARIOS DISPONIVEIS (resultado da consulta automatica a agenda do sistema — horarios ocupados e expediente do medico ja descontados):\n' + schCtx + '\n\nREGRAS DE HORARIOS (OBRIGATORIO):\n- SOMENTE ofereca horarios que aparecem EXPLICITAMENTE na lista acima (formato HH:MM).\n- Se NAO houver nenhum HH:MM na lista acima, e PROIBIDO dizer que tem vaga ou perguntar "prefere quinta ou sexta?" — diga que a agenda nao mostrou horario livre e ofereca encaminhar ao time.\n- Se o paciente pedir um horario que NAO esta na lista, diga que nao esta disponivel e ofereca alternativas que ESTEJAM na lista.\n- PROIBIDO deduzir que um horario esta livre. Se nao esta listado, NAO esta disponivel.\n- Ao oferecer marcacao com vagas na lista, cada opcao DEVE trazer dia + horario HH:MM copiados da lista (nao apenas o nome do dia).\n- Ao fechar horario com dados completos e confirmacao do paciente, o sistema pode gravar o agendamento automaticamente na agenda (se habilitado na clinica).\n';

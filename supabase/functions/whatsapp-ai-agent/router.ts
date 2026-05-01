@@ -138,7 +138,7 @@ export function detectPhase(
     'quando posso', 'pode ser', 'qual horario', 'qual horário',
     'tem vaga', 'tem espaço', 'vaga para', 'espaço para',
     'disponibilidade', 'disponivel', 'disponível',
-    'agendar', 'agenda', 'consulta',
+    // Evita falsos positivos ("oi, consulta?") antes da triagem terminar — nao usar 'consulta', 'agendar', 'agenda' isolados aqui.
     'dia da semana', 'semana que vem', 'proxima semana', 'próxima semana',
     'segunda', 'terca', 'terça', 'quarta', 'quinta', 'sexta', 'sabado', 'sábado',
     'de manha', 'da manha', 'da manhã', 'de manhã',
