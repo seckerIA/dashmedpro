@@ -93,7 +93,8 @@ function SortableDealCard({
         width: '100%',
         maxWidth: '100%',
         boxSizing: 'border-box',
-        overflow: 'visible',
+        overflow: 'hidden',
+        minWidth: 0,
         touchAction: 'manipulation',
         margin: 0,
         position: 'relative',
@@ -136,7 +137,7 @@ const DroppableColumn = ({ stage, children }: { stage: typeof PIPELINE_STAGES[0]
   return (
     <Card
       ref={setNodeRef}
-      className={`flex-shrink-0 w-[85vw] md:w-80 bg-gradient-to-br from-card to-card/50 border-2 shadow-card transition-all duration-100 ease-out snap-center ${isOver
+      className={`flex h-full min-h-[500px] shrink-0 flex-col overflow-hidden w-[85vw] md:w-80 bg-gradient-to-br from-card to-card/50 border-2 shadow-card transition-all duration-100 ease-out snap-center ${isOver
         ? 'border-primary shadow-glow ring-2 ring-primary/20 scale-[1.01]'
         : 'border-border hover:shadow-lg'
         }`}
@@ -145,8 +146,6 @@ const DroppableColumn = ({ stage, children }: { stage: typeof PIPELINE_STAGES[0]
         maxWidth: widthStyle,
         minWidth: widthStyle,
         boxSizing: 'border-box',
-        overflow: 'visible',
-        transform: 'translateZ(0)', // GPU acceleration
         willChange: isOver ? 'transform, box-shadow' : 'auto',
       }}
     >
@@ -392,13 +391,13 @@ export function PipelineBoard({
       onDragEnd={handleDragEnd}
       measuring={measuringConfig}
     >
-      <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory px-4 md:px-0 scrollbar-hide min-h-[500px]">
+      <div className="flex min-h-[500px] min-w-0 max-w-full items-stretch gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain px-4 pb-4 snap-x snap-mandatory scrollbar-hide md:px-0">
         {PIPELINE_STAGES.map((stage) => {
           const stageDeals = getDealsByStage(stage.value);
 
           return (
             <DroppableColumn key={stage.value} stage={stage}>
-              <CardHeader className="pb-3 bg-gradient-to-r from-transparent to-primary/5 rounded-t-lg space-y-0">
+              <CardHeader className="shrink-0 pb-3 bg-gradient-to-r from-transparent to-primary/5 rounded-t-lg space-y-0">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className={`flex items-center justify-center w-12 h-12 rounded-xl ${stage.bgColor} border border-border/50 shadow-sm shrink-0`}>
@@ -469,10 +468,13 @@ export function PipelineBoard({
                     </Button>
                   )}
               </CardHeader>
-              <CardContent className="p-3 pt-0" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'visible' }}>
-                <div className="h-[600px] md:h-[calc(100vh-320px)] w-full min-h-[400px] overflow-y-auto overflow-x-visible pr-1" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+              <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-3 pt-0">
+                <div
+                  className="relative min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain pr-1 [-webkit-overflow-scrolling:touch]"
+                  style={{ boxSizing: 'border-box' }}
+                >
                   <SortableContext items={stageDeals.map(deal => deal.id)} strategy={verticalListSortingStrategy}>
-                    <div className="space-y-3 w-full px-0.5 pb-1" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'visible' }}>
+                    <div className="w-full min-w-0 space-y-3 px-0.5 pb-1" style={{ boxSizing: 'border-box' }}>
                       {stageDeals.map((deal) => (
                         <SortableDealCard
                           key={deal.id}

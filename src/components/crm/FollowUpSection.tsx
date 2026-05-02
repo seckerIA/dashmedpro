@@ -1,11 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { FollowUpCard } from "./FollowUpCard";
 import { CRMDealWithContact } from "@/types/crm";
 import { FollowUp } from "@/types/followUp";
 import { Clock, AlertTriangle } from "lucide-react";
-import { parseISO, isBefore, isToday } from "date-fns";
+import { isBefore, isToday } from "date-fns";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface FollowUpSectionProps {
   deals: CRMDealWithContact[];
@@ -22,6 +22,9 @@ export function FollowUpSection({
   onCompleteFollowUp,
   onEditFollowUp,
 }: FollowUpSectionProps) {
+  const isMobile = useIsMobile();
+  const colWidth = isMobile ? "85vw" : "320px";
+
   // Filtrar follow-ups pendentes (não concluídos)
   const pendingFollowUps = followUps.filter(fu => !fu.completed);
 
@@ -46,9 +49,15 @@ export function FollowUpSection({
 
   return (
     <Card
-      className="flex-shrink-0 w-80 bg-gradient-to-br from-card to-card/50 border border-border shadow-card"
+      className="flex h-full min-h-[500px] shrink-0 snap-center flex-col overflow-hidden border border-border bg-gradient-to-br from-card to-card/50 shadow-card w-[85vw] md:w-80"
+      style={{
+        width: colWidth,
+        maxWidth: colWidth,
+        minWidth: colWidth,
+        boxSizing: "border-box",
+      }}
     >
-      <CardHeader className="pb-3 bg-gradient-to-r from-transparent to-orange-500/5 rounded-t-lg">
+      <CardHeader className="shrink-0 pb-3 bg-gradient-to-r from-transparent to-orange-500/5 rounded-t-lg">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-orange-500/10 border border-border/50 shadow-sm">
@@ -83,8 +92,8 @@ export function FollowUpSection({
         </div>
       </CardHeader>
 
-      <CardContent className="p-3 pt-0">
-        <ScrollArea className="h-[calc(100vh-300px)]">
+      <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-3 pt-0">
+        <div className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain pr-1 [-webkit-overflow-scrolling:touch]">
           <div className="space-y-2 pr-2">
             {followUpDeals.sort((a, b) => {
               const aFollowUp = followUpsByDealId.get(a.id);
@@ -130,7 +139,7 @@ export function FollowUpSection({
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
       </CardContent>
     </Card>
   );
