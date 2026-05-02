@@ -22,6 +22,67 @@ interface DashboardMetrics {
   recentDeals: Array<any>;
 }
 
+/** Limite de UUIDs por `.in()` — URLs longas demais geram 400 no PostgREST */
+const CRM_CONTACT_ID_CHUNK = 100;
+
+async function loadCrmContactsForDashboard(
+  userId: string,
+  isAdminOrDono: boolean,
+  doctorIds: string[] | undefined,
+  dealsData: any[],
+  signal?: AbortSignal
+): Promise<any[]> {
+  if (isAdminOrDono) {
+    const contactsResult = await supabaseQueryWithTimeout(
+      supabase.from('crm_contacts').select('*').limit(2000) as any,
+      20000,
+      signal
+    );
+    const { data: contacts, error: contactsError } = contactsResult as { data: any[]; error: any };
+    if (contactsError) throw new Error(`Erro ao buscar contatos: ${contactsError.message}`);
+    return contacts || [];
+  }
+
+  if (doctorIds && doctorIds.length > 0) {
+    const contactsResult = await supabaseQueryWithTimeout(
+      supabase.from('crm_contacts').select('*').in('user_id', doctorIds).limit(2000) as any,
+      20000,
+      signal
+    );
+    const { data: contacts, error: contactsError } = contactsResult as { data: any[]; error: any };
+    if (contactsError) throw new Error(`Erro ao buscar contatos: ${contactsError.message}`);
+    return contacts || [];
+  }
+
+  const contactIdsFromDeals = dealsData.map((d: any) => d.contact_id).filter(Boolean);
+  const uniqueContactIds = [...new Set(contactIdsFromDeals)] as string[];
+
+  const byId = new Map<string, any>();
+
+  const ownResult = await supabaseQueryWithTimeout(
+    supabase.from('crm_contacts').select('*').eq('user_id', userId).limit(2000) as any,
+    20000,
+    signal
+  );
+  const { data: ownRows, error: ownErr } = ownResult as { data: any[]; error: any };
+  if (ownErr) throw new Error(`Erro ao buscar contatos: ${ownErr.message}`);
+  for (const row of ownRows || []) byId.set(row.id, row);
+
+  for (let i = 0; i < uniqueContactIds.length; i += CRM_CONTACT_ID_CHUNK) {
+    const chunk = uniqueContactIds.slice(i, i + CRM_CONTACT_ID_CHUNK);
+    const linkedResult = await supabaseQueryWithTimeout(
+      supabase.from('crm_contacts').select('*').in('id', chunk) as any,
+      20000,
+      signal
+    );
+    const { data: linkedRows, error: linkedErr } = linkedResult as { data: any[]; error: any };
+    if (linkedErr) throw new Error(`Erro ao buscar contatos: ${linkedErr.message}`);
+    for (const row of linkedRows || []) byId.set(row.id, row);
+  }
+
+  return Array.from(byId.values());
+}
+
 const fetchDashboardMetrics = async (
   userId: string,
   isAdminOrDono: boolean,
@@ -60,48 +121,13 @@ const fetchDashboardMetrics = async (
 
   const dealsData = (deals || []) as any[];
 
-  // Buscar contatos
-  let contactsQuery = supabase
-    .from('crm_contacts')
-    .select('*')
-    .limit(2000);
-
-  // Aplicar filtros baseados no papel do usuário
-  if (!isAdminOrDono) {
-    if (doctorIds && doctorIds.length > 0) {
-      // Secretária: ver contatos dos médicos vinculados
-      contactsQuery = contactsQuery.in('user_id', doctorIds);
-    } else {
-      // Outros usuários (Médicos/Vendedores): ver seus próprios contatos E contatos de deals atribuídos a eles
-
-      // Coletar IDs de contatos dos deals já buscados (que já respeitam assigned_to)
-      const contactIdsFromDeals = dealsData
-        .map((d: any) => d.contact_id)
-        .filter(Boolean);
-
-      // Criar filtro OR: user_id = userId OU id IN (contactIdsFromDeals)
-      let orFilter = `user_id.eq.${userId}`;
-
-      // Adicionar IDs dos deals se houver (limitando para evitar URL muito longa, embora POST resolva a maioria)
-      // Se houver muitos, o ideal seria uma view ou RPC, mas aqui resolvemos o caso comum
-      if (contactIdsFromDeals.length > 0) {
-        // Remover duplicatas
-        const uniqueContactIds = [...new Set(contactIdsFromDeals)];
-        orFilter += `,id.in.(${uniqueContactIds.join(',')})`;
-      }
-
-      contactsQuery = contactsQuery.or(orFilter);
-    }
-  }
-  // Admin/Dono: ver todos os contatos (sem filtro)
-
-  // Passar o query builder (não executado) para permitir abortSignal (timeout: 20s)
-  const contactsResult = await supabaseQueryWithTimeout(contactsQuery as any, 20000, signal);
-  const { data: contacts, error: contactsError } = contactsResult as { data: any[], error: any };
-
-  if (contactsError) throw new Error(`Erro ao buscar contatos: ${contactsError.message}`);
-
-  const contactsData = (contacts || []) as any[];
+  const contactsData = await loadCrmContactsForDashboard(
+    userId,
+    isAdminOrDono,
+    doctorIds,
+    dealsData,
+    signal
+  );
 
   // Calcular métricas básicas
   const totalPipelineValue = dealsData.reduce((sum: number, deal: any) => {

@@ -39,24 +39,30 @@ const fetchEnhancedMetrics = async (
   signal?: AbortSignal,
   doctorIds?: string[]
 ): Promise<EnhancedMetrics> => {
-  // IDs para filtro
-  const targetIds = (doctorIds && doctorIds.length > 0) ? doctorIds : [userId];
-  const idsString = `(${targetIds.join(',')})`;
+  const targetIds = doctorIds && doctorIds.length > 0 ? doctorIds : [userId];
 
-  // 1. Buscar deals com tratamento defensivo
+  // 1. Buscar deals com tratamento defensivo (escopo alinhado ao dashboard principal)
   let dealsData: any[] = [];
   try {
-    // RLS handles organization filtering automatically
-    const dealsQuery = supabase
+    let dealsQuery = supabase
       .from('crm_deals')
       .select('*, contact:crm_contacts(id, full_name, email, phone)')
       .limit(2000);
+
+    if (!isAdminOrDono) {
+      const orClause = targetIds.flatMap(id => [`user_id.eq.${id}`, `assigned_to.eq.${id}`]).join(',');
+      dealsQuery = dealsQuery.or(orClause);
+    }
 
     const dealsResult = await supabaseQueryWithTimeout(dealsQuery as any, 30000, signal);
     dealsData = (dealsResult.data || []) as any[];
   } catch (err) {
     console.error('Erro ao buscar deals no dashboard:', err);
-    const fallbackQuery = supabase.from('crm_deals').select('*').limit(2000);
+    let fallbackQuery = supabase.from('crm_deals').select('*').limit(2000);
+    if (!isAdminOrDono) {
+      const orClause = targetIds.flatMap(id => [`user_id.eq.${id}`, `assigned_to.eq.${id}`]).join(',');
+      fallbackQuery = fallbackQuery.or(orClause);
+    }
     const fallbackResult = await supabaseQueryWithTimeout(fallbackQuery as any, 30000, signal);
     dealsData = (fallbackResult.data || []) as any[];
   }
@@ -113,11 +119,15 @@ const fetchEnhancedMetrics = async (
   let appointmentsData: any[] = [];
   try {
     // RLS handles organization filtering
-    const appointmentsQuery = supabase
+    let appointmentsQuery = supabase
       .from('medical_appointments')
       .select('id, status')
       .gte('start_time', currentMonth.toISOString())
       .limit(1000);
+
+    if (!isAdminOrDono) {
+      appointmentsQuery = appointmentsQuery.in('doctor_id', targetIds);
+    }
 
     const appointmentsResult = await supabaseQueryWithTimeout(appointmentsQuery as any, 30000, signal);
     appointmentsData = (appointmentsResult.data || []) as any[];

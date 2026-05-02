@@ -239,7 +239,7 @@ export function MarketingDashboard({ startDate, endDate }: { startDate?: Date; e
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {dashboardData.newPatients > 0
-                ? `${dashboardData.newPatients} novos pacientes`
+                ? `${dashboardData.newPatients} consultas concluídas`
                 : 'Lead → Paciente'}
             </p>
           </CardContent>
