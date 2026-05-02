@@ -47,6 +47,7 @@ import {
   parsePhoneToNumber,
   formatPhone,
 } from "@/lib/phone";
+import { getSupabaseErrorMessage } from "@/lib/supabaseErrors";
 import {
   Select,
   SelectContent,
@@ -584,7 +585,7 @@ export function ContactForm({ contact, trigger, initialStage, onSuccess, onConta
       toast({
         variant: "destructive",
         title: "Erro ao salvar",
-        description: error instanceof Error ? error.message : "Erro inesperado ao salvar contato",
+        description: getSupabaseErrorMessage(error, "Erro inesperado ao salvar contato"),
       });
 
       // NÃO resetar nem fechar o formulário em caso de erro para permitir que o usuário veja os dados e tente novamente

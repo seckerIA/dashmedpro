@@ -10,6 +10,7 @@ import { useAuth } from './useAuth';
 import { useUserProfile } from './useUserProfile';
 import { useSecretaryDoctors } from './useSecretaryDoctors';
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
+import { getSupabaseErrorMessage } from '@/lib/supabaseErrors';
 
 // Fetch contacts
 const fetchContacts = async (
@@ -124,9 +125,9 @@ const fetchDeals = async (
 const createRecord = async (table: string, payload: any) => {
   console.log(`📥 [createRecord] Inserindo em ${table}:`, payload);
 
-  const insertPromise = (supabase.from(table as any).insert(payload) as any).select().single();
+  // Sem .single(): após INSERT o PostgREST pode devolver 0 linhas no SELECT (RLS) e .single() falha com 406/PGRST116
+  const insertPromise = (supabase.from(table as any).insert(payload) as any).select();
 
-  // Timeout de 60 segundos para evitar travamento (aumentado devido a fila do navegador)
   const timeoutPromise = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error(`Timeout ao inserir em ${table} (60s) - Fila do navegador possivelmente cheia`)), 60000)
   );
@@ -136,17 +137,25 @@ const createRecord = async (table: string, payload: any) => {
     result = await Promise.race([insertPromise, timeoutPromise]);
   } catch (err) {
     console.error(`❌ [createRecord] Exceção fatal no Promise.race para ${table}:`, err);
-    throw err;
+    throw err instanceof Error ? err : new Error(getSupabaseErrorMessage(err, 'Erro ao inserir'));
   }
 
   const { data, error } = result as any;
 
   if (error) {
     console.error(`❌ [createRecord] Erro retornado pelo Supabase em ${table}:`, error);
-    throw error;
+    throw new Error(getSupabaseErrorMessage(error, `Erro ao inserir em ${table}`));
   }
-  console.log(`✅ [createRecord] Inserido com sucesso em ${table}:`, data);
-  return data;
+
+  const rows = (data || []) as any[];
+  if (rows.length === 0) {
+    throw new Error(
+      'Cadastro não foi confirmado pelo servidor (sem linha retornada). Verifique se sua conta está vinculada a uma organização/clínica ou contate o suporte.'
+    );
+  }
+
+  console.log(`✅ [createRecord] Inserido com sucesso em ${table}:`, rows[0]);
+  return rows[0];
 };
 
 const updateRecord = async (table: string, id: string, payload: any) => {
@@ -423,6 +432,12 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
         user_id: user?.id,
         organization_id: profile?.organization_id
       };
+
+      if (!payload.organization_id) {
+        throw new Error(
+          'Sua conta precisa estar vinculada a uma organização (clínica) para cadastrar pacientes. Peça ao administrador para concluir o vínculo ou atualize o cadastro da equipe.'
+        );
+      }
 
       // Dedup: procurar contato existente por telefone (ignorando formatação) ou email
       const digitsOnly = (s?: string) => (s || '').replace(/\D/g, '');
