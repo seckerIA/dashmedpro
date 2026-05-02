@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { CRMDealWithContact } from "@/types/crm";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { User, Calendar, Edit, Trash2, TrendingUp, Clock, Mail, Phone, Building2, Stethoscope, AlertTriangle } from "lucide-react";
+import { User, Calendar, Edit, Trash2, Clock, Mail, Phone, Building2, Stethoscope, AlertTriangle, GripVertical } from "lucide-react";
 import { FollowUpAction } from "./FollowUpAction";
 import {
   AlertDialog,
@@ -27,6 +27,8 @@ import { MessageSquare } from "lucide-react";
 
 interface AnimatedDealCardProps {
   deal: CRMDealWithContact;
+  /** Somente no kanban: listeners do dnd-kit no ícone de arrastar (evita conflito com editar/excluir). */
+  dragHandleListeners?: Record<string, unknown>;
   onClick?: () => void;
   onEdit?: (deal: CRMDealWithContact) => void;
   onDelete?: (dealId: string) => void;
@@ -40,6 +42,7 @@ interface AnimatedDealCardProps {
 
 export function AnimatedDealCard({
   deal,
+  dragHandleListeners,
   onClick,
   onEdit,
   onDelete,
@@ -68,7 +71,7 @@ export function AnimatedDealCard({
   };
 
   const cardClasses = `
-    relative overflow-visible transition-all duration-100 ease-out cursor-pointer border-2
+    relative overflow-visible transition-all duration-100 ease-out ${dragHandleListeners ? 'cursor-default' : 'cursor-pointer'} border-2
     ${isHovered ? 'shadow-glow scale-[1.01] -translate-y-0.5 border-primary/60' : 'shadow-card hover:shadow-lg border-border/40'}
     ${isHighlighted ? 'ring-2 ring-primary shadow-glow scale-[1.01] -translate-y-0.5 bg-gradient-to-br from-primary/10 to-primary/5' : 'bg-gradient-to-br from-card/80 to-card/40'}
     ${getStageColor(deal.stage)}
@@ -130,8 +133,18 @@ export function AnimatedDealCard({
 
         {/* Header: Title and Actions */}
         <div className="flex items-start justify-between gap-2 min-w-0">
-          <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-sm text-foreground line-clamp-2 mb-1 group-hover:text-primary transition-colors">
+          <div className="flex items-start gap-1 flex-1 min-w-0">
+            {dragHandleListeners && (
+              <button
+                type="button"
+                className="touch-none mt-0.5 shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground cursor-grab active:cursor-grabbing"
+                aria-label="Arrastar card"
+                {...dragHandleListeners}
+              >
+                <GripVertical className="w-4 h-4" />
+              </button>
+            )}
+            <h4 className="font-semibold text-sm text-foreground line-clamp-2 mb-1 group-hover:text-primary transition-colors flex-1 min-w-0">
               {deal.title || 'Sem título'}
             </h4>
           </div>

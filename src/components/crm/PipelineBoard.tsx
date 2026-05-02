@@ -6,7 +6,7 @@ import { AnimatedDealCard } from "./AnimatedDealCard";
 import { FollowUpSection } from "./FollowUpSection";
 import { CRMDealWithContact, PIPELINE_STAGES } from "@/types/crm";
 import { FollowUp } from "@/types/followUp";
-import { Plus, TrendingUp, Users, Trash2 } from "lucide-react";
+import { Users, Trash2 } from "lucide-react";
 import { ContactActionSelector } from "./ContactActionSelector";
 import { formatCurrency } from "@/lib/currency";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -60,7 +60,7 @@ function SortableDealCard({
   isHighlighted,
   onToggleFollowUp,
   showOwnerBadge,
-  followUp
+  followUp,
 }: SortableDealCardProps) {
   const {
     attributes,
@@ -74,14 +74,13 @@ function SortableDealCard({
     data: {
       type: 'deal',
       deal,
-    }
+    },
   });
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition: isDragging ? 'none' : (transition || 'transform 80ms ease-out'),
+    transition: isDragging ? 'none' : transition || 'transform 80ms ease-out',
     opacity: isDragging ? 0.5 : 1,
-    cursor: isDragging ? 'grabbing' : 'grab',
     zIndex: isDragging ? 1000 : 'auto',
     willChange: isDragging ? 'transform' : 'auto',
   };
@@ -101,11 +100,11 @@ function SortableDealCard({
         padding: '2px',
       }}
       {...attributes}
-      {...listeners}
     >
       <AnimatedDealCard
         deal={deal}
-        followUp={followUp} // Passar follow-up prop
+        followUp={followUp}
+        dragHandleListeners={listeners}
         onClick={onClick}
         onEdit={onEdit}
         onDelete={onDelete}
@@ -205,10 +204,13 @@ export function PipelineBoard({
   onClearLeadNovoColumn
 }: PipelineBoardProps) {
   const { isSecretaria } = useUserProfile();
+  const isMobile = useIsMobile();
   const [activeDeal, setActiveDeal] = useState<CRMDealWithContact | null>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -396,14 +398,14 @@ export function PipelineBoard({
 
           return (
             <DroppableColumn key={stage.value} stage={stage}>
-              <CardHeader className="pb-3 bg-gradient-to-r from-transparent to-primary/5 rounded-t-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+              <CardHeader className="pb-3 bg-gradient-to-r from-transparent to-primary/5 rounded-t-lg space-y-0">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className={`flex items-center justify-center w-12 h-12 rounded-xl ${stage.bgColor} border border-border/50 shadow-sm shrink-0`}>
                       <stage.icon className={`w-6 h-6 ${stage.textColor}`} />
                     </div>
                     <div className="min-w-0">
-                      <CardTitle className="text-base font-semibold text-foreground h-12 flex items-center leading-tight truncate">
+                      <CardTitle className="text-base font-semibold text-foreground min-h-12 flex items-center leading-tight truncate">
                         {stage.label}
                       </CardTitle>
                       {/* Valor total do estágio - oculto para secretária */}
@@ -420,7 +422,7 @@ export function PipelineBoard({
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex items-center gap-1 shrink-0 pt-0.5">
                     {stage.value === 'lead_novo' &&
                       onClearLeadNovoColumn &&
                       stageDeals.length > 0 && (
@@ -428,7 +430,7 @@ export function PipelineBoard({
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          className="hidden md:inline-flex h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                           title="Excluir todos os negócios desta coluna"
                           onClick={(e) => {
                             e.preventDefault();
@@ -447,6 +449,25 @@ export function PipelineBoard({
                     </Badge>
                   </div>
                 </div>
+                {stage.value === 'lead_novo' &&
+                  onClearLeadNovoColumn &&
+                  stageDeals.length > 0 &&
+                  isMobile && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 w-full border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onClearLeadNovoColumn();
+                      }}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4 shrink-0" />
+                      Excluir todos os negócios desta coluna
+                    </Button>
+                  )}
               </CardHeader>
               <CardContent className="p-3 pt-0" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'visible' }}>
                 <div className="h-[600px] md:h-[calc(100vh-320px)] w-full min-h-[400px] overflow-y-auto overflow-x-visible pr-1" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>

@@ -466,7 +466,9 @@ const Financial = () => {
                     </p>
                     <div className="flex items-center gap-1">
                       <TrendingUp className="w-3 h-3 text-purple-500" />
-                      <span className="text-xs text-muted-foreground">Inclui Marketing</span>
+                      <span className="text-xs text-muted-foreground">
+                        Assessoria + mídia + tributos (planejado)
+                      </span>
                     </div>
                   </CardContent>
                 </Card>

@@ -227,19 +227,9 @@ export function DetailedDashboard({ viewMode, onViewModeChange }: ViewModeProps)
                 </div>
             </AnimatedWrapper>
 
-            {/* Secondary Analysis Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Secondary Analysis */}
+            <div className="grid grid-cols-1 gap-6">
                 <AnimatedWrapper animationType="slideUp" delay={0.3}>
-                    {/* This space is for future drilling down, e.g. "Marketing ROI" or "Team Performance" */}
-                    <div className="bg-muted/10 rounded-xl p-6 border border-dashed border-muted-foreground/20 flex flex-col items-center justify-center text-center h-[300px]">
-                        <p className="text-muted-foreground font-medium">Análise de Marketing (Em Breve)</p>
-                        <p className="text-xs text-muted-foreground/60 max-w-xs mt-2">
-                            Visualização detalhada de ROI por canal e custo de aquisição (CAC).
-                        </p>
-                    </div>
-                </AnimatedWrapper>
-
-                <AnimatedWrapper animationType="slideUp" delay={0.4}>
                     <div className="bg-muted/10 rounded-xl p-6 border border-dashed border-muted-foreground/20 flex flex-col items-center justify-center text-center h-[300px]">
                         <p className="text-muted-foreground font-medium">Performance da Equipe (Em Breve)</p>
                         <p className="text-xs text-muted-foreground/60 max-w-xs mt-2">

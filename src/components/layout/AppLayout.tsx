@@ -150,11 +150,11 @@ export function AppLayout({ children, hideSidebar = false, title: explicitTitle,
             <>
               <ResizablePanel
                 ref={sidebarRef}
-                defaultSize={16}
+                defaultSize={20}
                 collapsedSize={5}
                 collapsible={true}
-                minSize={13}
-                maxSize={22}
+                minSize={17}
+                maxSize={30}
                 onCollapse={() => {
                   setIsCollapsed(true)
                   document.cookie = `react-resizable-panels:collapsed=${JSON.stringify(true)}`
@@ -163,7 +163,10 @@ export function AppLayout({ children, hideSidebar = false, title: explicitTitle,
                   setIsCollapsed(false)
                   document.cookie = `react-resizable-panels:collapsed=${JSON.stringify(false)}`
                 }}
-                className="transition-all duration-300 ease-in-out border-r border-border bg-sidebar"
+                className={cn(
+                  "transition-all duration-300 ease-in-out border-r border-border bg-sidebar overflow-hidden",
+                  isCollapsed ? "min-w-[3.75rem] max-w-[3.75rem]" : "min-w-[272px] max-w-[360px]"
+                )}
               >
                 <AppSidebar isCollapsed={isCollapsed} />
               </ResizablePanel>
@@ -189,7 +192,7 @@ export function AppLayout({ children, hideSidebar = false, title: explicitTitle,
                           <Menu className="h-5 w-5" />
                         </Button>
                       </SheetTrigger>
-                      <SheetContent side="left" className="p-0 w-72 border-none">
+                      <SheetContent side="left" className="p-0 w-[min(20rem,calc(100vw-1rem))] min-w-[260px] border-none">
                         <SheetTitle className="sr-only">Menu de Navegação</SheetTitle>
                         <SheetDescription className="sr-only">
                           Acesse as principais seções do sistema DashMed Pro.
@@ -278,11 +281,14 @@ export function AppLayout({ children, hideSidebar = false, title: explicitTitle,
                         {initials}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="hidden md:flex flex-col">
-                      <span className="text-sm font-medium text-foreground leading-tight">
+                    <div className="hidden md:flex flex-col min-w-0 max-w-[min(280px,26vw)]">
+                      <span
+                        className="text-sm font-medium text-foreground leading-snug line-clamp-2 break-words"
+                        title={displayName}
+                      >
                         {displayName}
                       </span>
-                      <span className="text-xs text-muted-foreground leading-tight">
+                      <span className="text-xs text-muted-foreground leading-tight truncate" title={displayRole}>
                         Cargo: {displayRole}
                       </span>
                     </div>

@@ -1,18 +1,13 @@
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { HeroMetrics } from "./HeroMetrics";
 import { SmartAlerts } from "./SmartAlerts";
 import { QuickActionCard } from "./MetricCard";
-import { TodayTasksWidget } from "@/components/tasks/TodayTasksWidget";
 import { UpcomingCallsWidget } from "@/components/calendar/UpcomingCallsWidget";
 import { AnimatedWrapper } from "@/components/shared/AnimatedWrapper";
 import {
     Users,
-    Target,
     Calendar as CalendarIcon,
-    TrendingUp,
-    ArrowRight,
     Activity,
     DollarSign
 } from "lucide-react";
@@ -79,24 +74,6 @@ export function SummaryDashboard() {
                                 onClick={() => navigate('/whatsapp')}
                             />
                         </div>
-                    </AnimatedWrapper>
-
-                    {/* Today's Tasks - Expanded for Clarity */}
-                    <AnimatedWrapper animationType="slideUp" delay={0.3}>
-                        <Card className="border-none shadow-md bg-gradient-to-br from-card to-muted/20">
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle className="text-lg flex items-center gap-2">
-                                    <Target className="h-5 w-5 text-primary" />
-                                    Foco do Dia
-                                </CardTitle>
-                                <Button variant="ghost" size="sm" onClick={() => navigate('/tarefas')}>
-                                    Ver todas <ArrowRight className="ml-2 h-4 w-4" />
-                                </Button>
-                            </CardHeader>
-                            <CardContent>
-                                <TodayTasksWidget />
-                            </CardContent>
-                        </Card>
                     </AnimatedWrapper>
                 </div>
 

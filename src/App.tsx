@@ -70,7 +70,6 @@ const PrivacyPolicy = React.lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = React.lazy(() => import("./pages/TermsOfService"));
 const TeamManagement = React.lazy(() => import("./pages/TeamManagement"));
 const Procedimentos = React.lazy(() => import("./pages/Procedimentos"));
-const Tasks = React.lazy(() => import("./pages/Tasks"));
 const CRM = React.lazy(() => import("./pages/CRM"));
 const MedicalCalendar = React.lazy(() => import("./pages/MedicalCalendar"));
 const Financial = React.lazy(() => import("./pages/Financial"));
@@ -87,7 +86,6 @@ const ProspectingGuide = React.lazy(() => import("./pages/ProspectingGuide"));
 const Commercial = React.lazy(() => import("./pages/Commercial"));
 const FollowUpPage = React.lazy(() => import("./pages/FollowUpPage"));
 const FollowUps = React.lazy(() => import("./pages/FollowUps"));
-const Marketing = React.lazy(() => import("./pages/Marketing"));
 const MedicalRecords = React.lazy(() => import("./pages/MedicalRecords"));
 const Prontuario = React.lazy(() => import("./pages/Prontuario"));
 const WhatsAppInbox = React.lazy(() => import("./pages/WhatsAppInbox"));
@@ -548,15 +546,8 @@ const AppRoutes = () => {
               </RoleProtectedRoute>
             }
           />
-          <Route path="/tarefas" element={<Tasks />} />
-          <Route
-            path="/marketing"
-            element={
-              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'vendedor', 'gestor_trafego', 'medico']}>
-                <Marketing />
-              </RoleProtectedRoute>
-            }
-          />
+          <Route path="/tarefas" element={<Navigate to="/" replace />} />
+          <Route path="/marketing" element={<Navigate to="/comercial?tab=campaigns" replace />} />
           <Route path="/comercial" element={<Commercial />} />
           <Route
             path="/financeiro"

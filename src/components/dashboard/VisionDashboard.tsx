@@ -2,13 +2,12 @@ import { VisionHeroMetrics } from "./vision/VisionHeroMetrics";
 import { VisionCard } from "./vision/VisionCard";
 import { UnifiedChart } from "./UnifiedChart";
 import { SmartAlerts } from "./SmartAlerts";
-import { TodayTasksWidget } from "@/components/tasks/TodayTasksWidget";
 import { UpcomingCallsWidget } from "@/components/calendar/UpcomingCallsWidget";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Calendar as CalendarIcon, Filter, Search, Users, Target } from "lucide-react";
+import { Calendar as CalendarIcon, Filter, Search, Users, MessageCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { PipelineFunnelCard } from "./PipelineFunnelCard";
 import { formatCurrency } from "@/lib/currency";
@@ -165,10 +164,9 @@ export default function VisionDashboard({ viewMode, onViewModeChange }: ViewMode
             </div>
 
             {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-200">
+            <div className="grid grid-cols-1 gap-6 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-200">
 
-                {/* Left Column - Charts & Analysis */}
-                <div className="lg:col-span-2 space-y-6">
+                <div className="space-y-6">
                     {isVendedor ? (
                         // Vendedor View
                         <>
@@ -186,9 +184,9 @@ export default function VisionDashboard({ viewMode, onViewModeChange }: ViewMode
                                             <Users className="h-6 w-6 text-primary" />
                                             CRM
                                         </Button>
-                                        <Button variant="outline" className="h-full py-4 flex flex-col items-center justify-center gap-2 border-border/50 hover:border-warning/50 hover:bg-warning/5 text-muted-foreground hover:text-warning transition-all" onClick={() => navigate('/tarefas')}>
-                                            <Target className="h-6 w-6 text-warning" />
-                                            Tarefas
+                                        <Button variant="outline" className="h-full py-4 flex flex-col items-center justify-center gap-2 border-border/50 hover:border-emerald-500/50 hover:bg-emerald-500/5 text-muted-foreground hover:text-emerald-600 transition-all" onClick={() => navigate('/whatsapp')}>
+                                            <MessageCircle className="h-6 w-6 text-emerald-600" />
+                                            WhatsApp
                                         </Button>
                                     </div>
                                 </VisionCard>
@@ -208,15 +206,6 @@ export default function VisionDashboard({ viewMode, onViewModeChange }: ViewMode
                             </VisionCard>
                         </>
                     )}
-                </div>
-
-                {/* Right Column - Tasks & Calendar */}
-                <div className="space-y-6">
-
-
-                    <VisionCard title="Tarefas Prioritárias">
-                        <TodayTasksWidget />
-                    </VisionCard>
                 </div>
 
             </div>

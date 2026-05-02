@@ -170,14 +170,24 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
     }
   }, [selectedContact]);
 
-  // Abrir modal automaticamente quando um deal é passado para edição
+  // Abrir e preencher formulário quando o deal de edição mudar (evita estado velho no modal)
   useEffect(() => {
-    if (deal) {
-      setOpen(true);
-    } else {
-      setOpen(false);
-    }
-  }, [deal]);
+    if (!deal?.id) return;
+    setOpen(true);
+    form.reset({
+      title: deal.title || "",
+      description: deal.description || "",
+      value: deal.value ? formatCurrency(deal.value) : ("" as any),
+      stage: (deal.stage || "lead_novo") as any,
+      expected_close_date: deal.expected_close_date
+        ? new Date(deal.expected_close_date).toISOString().split("T")[0]
+        : "",
+      contact_id: (deal as any)?.contact_id || contact?.id || "none",
+      tags: deal.tags || [],
+      is_in_treatment: (deal as any)?.is_in_treatment || false,
+      is_defaulting: (deal as any)?.is_defaulting || false,
+    });
+  }, [deal?.id]);
 
   // Função para fechar o modal
   const handleClose = () => {
@@ -387,20 +397,28 @@ export function DealForm({ deal, contact, trigger, onSuccess, onClose }: DealFor
   const isLoading = false;
 
   return (
-    <Dialog open={open || !!deal} onOpenChange={(newOpen) => {
-      setOpen(newOpen);
-      if (!newOpen && deal) {
-        onSuccess?.();
-      }
-    }}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <Button>
-            <HandCoins className="w-4 h-4 mr-2" />
-            {deal ? "Editar Contrato" : "Novo Contrato"}
-          </Button>
-        )}
-      </DialogTrigger>
+    <Dialog
+      open={open}
+      onOpenChange={(newOpen) => {
+        setOpen(newOpen);
+        if (!newOpen) {
+          if (deal) {
+            onSuccess?.();
+            onClose?.();
+          }
+        }
+      }}
+    >
+      {!deal && (
+        <DialogTrigger asChild>
+          {trigger ?? (
+            <Button>
+              <HandCoins className="w-4 h-4 mr-2" />
+              Novo Contrato
+            </Button>
+          )}
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto p-6">
         <DialogHeader>
           <div className="flex items-center justify-between">

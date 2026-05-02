@@ -12,29 +12,7 @@ import type {
 import { startOfDay, endOfDay } from "date-fns";
 import { useCostsBreakdown } from "./useTransactionCosts";
 import { startOfMonth, endOfMonth, subMonths, format, addMonths } from "date-fns";
-
-const AD_SYNC_CHUNK = 80;
-
-async function sumAdCampaignDailySpend(
-  campaignSyncIds: string[],
-  startStr: string,
-  endStr: string
-): Promise<number> {
-  if (campaignSyncIds.length === 0) return 0;
-  let total = 0;
-  for (let i = 0; i < campaignSyncIds.length; i += AD_SYNC_CHUNK) {
-    const chunk = campaignSyncIds.slice(i, i + AD_SYNC_CHUNK);
-    const { data, error } = await supabase
-      .from("ad_campaign_daily_metrics")
-      .select("spend")
-      .gte("metric_date", startStr)
-      .lte("metric_date", endStr)
-      .in("campaign_sync_id", chunk);
-    if (error) throw error;
-    total += (data || []).reduce((sum: number, r: { spend?: number }) => sum + (Number(r.spend) || 0), 0);
-  }
-  return total;
-}
+import { getMonthlyMarketingFixedCostsTotalBrl } from "@/constants/monthlyMarketingFixedCosts";
 
 export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date }) => {
   const { user } = useAuth();
@@ -102,31 +80,8 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
       const todayData = (todayTransactions || []) as Array<{ type: string; amount: number }>;
       const todayRevenue = todayData.reduce((sum, t) => sum + (t.amount || 0), 0);
 
-      // 3. Gasto em anúncios no período — mesma base do Marketing (contas ativas tipo Ad Account)
-      const startStr = format(currentMonthStart, "yyyy-MM-dd");
-      const endStr = format(currentMonthEnd, "yyyy-MM-dd");
-
-      const { data: activeAdConns } = await supabase
-        .from("ad_platform_connections" as any)
-        .select("id")
-        .eq("is_active", true)
-        .eq("account_category", "other");
-
-      const connIds = ((activeAdConns || []) as { id: string }[]).map(c => c.id);
-
-      let campaignSyncIds: string[] = [];
-      if (connIds.length > 0) {
-        for (let i = 0; i < connIds.length; i += AD_SYNC_CHUNK) {
-          const chunk = connIds.slice(i, i + AD_SYNC_CHUNK);
-          const { data: camps } = await supabase
-            .from("ad_campaigns_sync" as any)
-            .select("id")
-            .in("connection_id", chunk);
-          campaignSyncIds.push(...((camps || []) as { id: string }[]).map(c => c.id));
-        }
-      }
-
-      const totalMarketingSpend = await sumAdCampaignDailySpend(campaignSyncIds, startStr, endStr);
+      // 3. Marketing mensal planejado: assessoria + investimento em mídia + % sobre mídia (tributos)
+      const totalMarketingSpend = getMonthlyMarketingFixedCostsTotalBrl();
 
       // 4. Buscar despesas fixas (através de categorias marcadas como is_fixed)
       const { data: fixedCategoryTransactions } = await supabase

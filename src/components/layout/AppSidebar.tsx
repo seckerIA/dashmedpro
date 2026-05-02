@@ -13,7 +13,6 @@ import {
   Settings,
   UserPlus,
   LogOut,
-  CheckSquare2,
   Sparkles,
   Compass,
   Calendar,
@@ -54,6 +53,7 @@ import { useUserProfile } from "@/hooks/useUserProfile"
 const dashmedLogo = '/dashmed-logo.png'
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { useInventoryAlerts } from "@/hooks/useInventoryAlerts"
+import { cn } from "@/lib/utils"
 
 type NavigationItem = {
   title: string;
@@ -79,14 +79,12 @@ const navigationGroups: Array<{
       label: "Principal",
       items: [
         { title: "Dashboard", url: "/", icon: Home },
-        { title: "Tarefas", url: "/tarefas", icon: CheckSquare2 },
         { title: "Estoque", url: "/inventory", icon: Package, alertBadge: true },
       ]
     },
     {
-      label: "Vendas & Marketing",
+      label: "Vendas",
       items: [
-        { title: "Marketing", url: "/marketing", icon: TrendingUp },
         {
           title: "CRM",
           url: "/comercial",
@@ -228,29 +226,38 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
 
   return (
     <TooltipProvider delayDuration={0}>
-      <div className={`flex h-full flex-col bg-sidebar text-sidebar-foreground font-sans ${isCollapsed ? 'w-full' : ''}`}>
-        <ScrollArea className="flex-1">
+      <div
+        className={cn(
+          "flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground font-sans",
+          isCollapsed ? "w-full min-w-0" : "w-full min-w-[260px]"
+        )}
+      >
+        <ScrollArea className="flex-1 min-h-0">
           <div className={`${isCollapsed ? 'p-1.5 space-y-3' : 'p-3 space-y-3'}`}>
             {/* Logo Section - DashMed Pro */}
             <div
-              className={`
-                flex items-center
-                ${isCollapsed ? 'justify-center px-1 py-2' : 'gap-3 px-3 py-2'}
-                rounded-2xl bg-white/5 shadow-sm
-                transition-all duration-300
-              `}
+              className={cn(
+                "flex rounded-2xl bg-white/5 shadow-sm transition-all duration-300",
+                isCollapsed ? "items-center justify-center px-1 py-2" : "items-start gap-3 px-3 py-2.5"
+              )}
             >
               <img
                 src={dashmedLogo}
                 alt="DashMed Pro"
-                className={`${isCollapsed ? 'h-9 w-auto' : 'h-10 w-auto'} transition-smooth`}
+                className={cn(
+                  "shrink-0 object-contain transition-smooth",
+                  isCollapsed ? "h-9 w-auto" : "h-10 w-auto mt-0.5"
+                )}
               />
               {!isCollapsed && (
-                <div className="flex flex-col">
-                  <span className="text-foreground font-semibold text-base tracking-wide whitespace-nowrap overflow-hidden">
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span
+                    className="text-foreground font-semibold text-sm leading-snug tracking-tight break-words [overflow-wrap:anywhere]"
+                    title={organization?.name || "DASHMED PRO"}
+                  >
                     {organization?.name || "DASHMED PRO"}
                   </span>
-                  <span className="text-muted-foreground text-xs whitespace-nowrap overflow-hidden">
+                  <span className="text-muted-foreground text-xs leading-snug break-words [overflow-wrap:anywhere]">
                     {organization ? "DASHMED PRO" : "Dashboard"}
                   </span>
                 </div>
@@ -323,8 +330,6 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                     if (item.url === '/financeiro') return false;
                     // - Relatórios (dados sensíveis)
                     if (item.url === '/relatorios') return false;
-                    // - Marketing completo
-                    if (item.url === '/marketing') return false;
                   }
 
                   // Gestor de Tráfego NÃO pode ver:
@@ -337,8 +342,6 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
 
                   // Secretaria NÃO pode ver:
                   if (isSecretaria) {
-                    // - Marketing
-                    if (item.url === '/marketing') return false;
                     // - Página Financeiro
                     if (item.url === '/financeiro') return false;
                     // - Estoque
@@ -357,11 +360,9 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                   <div key={group.label} className="space-y-1">
                     {/* Group Label */}
                     {!isCollapsed && (
-                      <div className="px-3 mb-1.5">
-                        <span className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-[0.18em] whitespace-nowrap overflow-hidden text-ellipsis">
+                        <span className="block px-3 mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground/70 leading-tight break-words">
                           {group.label}
                         </span>
-                      </div>
                     )}
 
                     {/* Separator for collapsed state */}
@@ -395,12 +396,12 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                                   <img
                                     src={item.iconImage}
                                     alt={item.title}
-                                    className="w-5 h-5 object-contain transition-transform duration-200 group-hover:scale-110"
+                                    className="h-5 w-5 shrink-0 object-contain transition-transform duration-200 group-hover:scale-110"
                                   />
                                 ) : (
                                   <item.icon
                                     className={`
-                                      w-5 h-5 transition-all duration-200
+                                      h-5 w-5 shrink-0 transition-all duration-200
                                       ${active
                                         ? 'text-primary'
                                         : 'text-muted-foreground group-hover:text-primary'
@@ -413,7 +414,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                             <PopoverContent
                               side="right"
                               align="start"
-                              className="w-56 p-2 bg-sidebar border-white/10"
+                              className="w-64 max-w-[min(18rem,calc(100vw-2rem))] p-2 bg-sidebar border-white/10"
                             >
                               <div className="space-y-1">
                                 <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
@@ -433,7 +434,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                                         to={subItem.url}
                                         onClick={() => onNavigate?.()}
                                         className={`
-                                        flex items-center gap-3 px-3 py-2 rounded-xl
+                                        flex min-w-0 items-center gap-3 px-3 py-2 rounded-xl
                                         text-sm font-medium transition-all duration-200
                                         ${subActive
                                             ? 'bg-primary text-primary-foreground'
@@ -441,8 +442,8 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                                           }
                                       `}
                                       >
-                                        <subItem.icon className="w-4 h-4" />
-                                        {subItem.title}
+                                        <subItem.icon className="h-4 w-4 shrink-0" />
+                                        <span className="min-w-0 flex-1 leading-snug break-words [overflow-wrap:anywhere]">{subItem.title}</span>
                                       </NavLink>
                                     )
                                   })}
@@ -463,9 +464,9 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                                   toggleExpanded(item.title);
                                 }
                               }}
+                              type="button"
                               className={`
-                                group relative w-full flex items-center justify-between
-                                px-3 py-2 rounded-2xl text-sm font-medium
+                                group relative flex w-full min-w-0 items-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium
                                 transition-all duration-200
                                 ${active
                                   ? 'bg-primary/15 text-primary border border-primary/20 shadow-[0_0_15px_rgba(37,99,235,0.15)]'
@@ -473,39 +474,46 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                                 }
                               `}
                             >
-                              <div className="flex items-center gap-3">
+                              <div className="flex min-w-0 flex-1 items-center gap-3">
                                 {item.iconImage ? (
                                   <img
                                     src={item.iconImage}
                                     alt={item.title}
-                                    className="w-5 h-5 object-contain transition-transform duration-200 group-hover:scale-110"
+                                    className="h-5 w-5 shrink-0 object-contain transition-transform duration-200 group-hover:scale-110"
                                   />
                                 ) : (
                                   <item.icon
-                                    className={`
-                                      w-5 h-5 transition-all duration-200
-                                      ${active
-                                        ? 'text-primary'
-                                        : 'text-muted-foreground group-hover:text-primary'
-                                      }
-                                    `}
+                                    className={cn(
+                                      "h-5 w-5 shrink-0 transition-all duration-200",
+                                      active
+                                        ? "text-primary"
+                                        : "text-muted-foreground group-hover:text-primary"
+                                    )}
                                   />
                                 )}
                                 <span
-                                  className={`
-                                    text-sm font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden
-                                    ${active ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}
-                                  `}
+                                  className={cn(
+                                    "min-w-0 flex-1 text-sm font-medium leading-snug transition-colors duration-200 break-words [overflow-wrap:anywhere]",
+                                    active ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+                                  )}
                                 >
                                   {item.title}
                                 </span>
                               </div>
                               <div
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    toggleExpanded(item.title);
+                                  }
+                                }}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   toggleExpanded(item.title);
                                 }}
-                                className="p-1 hover:bg-white/10 rounded-lg"
+                                className="shrink-0 p-1 hover:bg-white/10 rounded-lg"
                               >
                                 {expanded ? (
                                   <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform duration-200" />
@@ -537,7 +545,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                                         to={subItem.url}
                                         onClick={() => onNavigate?.()}
                                         className={`
-                                        group flex items-center gap-3 px-4 py-2 rounded-xl
+                                        group flex min-w-0 items-center gap-3 px-4 py-2 rounded-xl
                                         text-sm font-medium transition-all duration-200
                                         ${subActive
                                             ? 'bg-primary text-primary-foreground shadow-sm'
@@ -547,11 +555,11 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                                       >
                                         <subItem.icon
                                           className={`
-                                          w-4 h-4 transition-all duration-200
+                                          h-4 w-4 shrink-0 transition-all duration-200
                                           ${subActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-accent-foreground'}
                                         `}
                                         />
-                                        <span className="whitespace-nowrap overflow-hidden text-ellipsis">{subItem.title}</span>
+                                        <span className="min-w-0 flex-1 leading-snug break-words [overflow-wrap:anywhere]">{subItem.title}</span>
                                       </NavLink>
                                     )
                                   })}
@@ -563,31 +571,40 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
 
                       // Item normal sem sub-itens
                       const linkContent = (
-                        <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} w-full`}>
-                          <div className={`flex items-center ${isCollapsed ? '' : 'gap-3'}`}>
+                        <div
+                          className={cn(
+                            "flex w-full min-w-0 items-center",
+                            isCollapsed ? "justify-center" : "justify-between gap-2"
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "flex min-w-0 items-center",
+                              isCollapsed ? "" : "flex-1 gap-3"
+                            )}
+                          >
                             {item.iconImage ? (
                               <img
                                 src={item.iconImage}
                                 alt={item.title}
-                                className="w-5 h-5 object-contain transition-transform duration-200 group-hover:scale-110"
+                                className="h-5 w-5 shrink-0 object-contain transition-transform duration-200 group-hover:scale-110"
                               />
                             ) : (
                               <item.icon
-                                className={`
-                                  w-5 h-5 transition-all duration-200
-                                  ${active
-                                    ? 'text-primary'
-                                    : 'text-muted-foreground group-hover:text-primary'
-                                  }
-                                `}
+                                className={cn(
+                                  "h-5 w-5 shrink-0 transition-all duration-200",
+                                  active
+                                    ? "text-primary"
+                                    : "text-muted-foreground group-hover:text-primary"
+                                )}
                               />
                             )}
                             {!isCollapsed && (
                               <span
-                                className={`
-                                  text-sm font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden
-                                  ${active ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}
-                                `}
+                                className={cn(
+                                  "min-w-0 flex-1 text-sm font-medium leading-snug transition-colors duration-200 break-words [overflow-wrap:anywhere]",
+                                  active ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+                                )}
                               >
                                 {item.title}
                               </span>
@@ -596,13 +613,12 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                           {!isCollapsed && item.badge && (
                             <Badge
                               variant={item.variant === 'new' ? 'default' : 'secondary'}
-                              className={`
-                                text-[9px] px-1.5 h-4 rounded-full border
-                                ${item.variant === 'new'
+                              className={cn(
+                                "shrink-0 text-[9px] px-1.5 h-4 rounded-full border",
+                                item.variant === 'new'
                                   ? 'bg-primary/15 text-primary border-primary/30'
                                   : 'bg-accent/50 text-foreground border-border'
-                                }
-                              `}
+                              )}
                             >
                               {item.badge}
                             </Badge>
@@ -611,13 +627,12 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                           {!isCollapsed && item.alertBadge && totalCount > 0 && (
                             <Badge
                               variant="destructive"
-                              className={`
-                                text-[10px] px-2 h-5 rounded-full font-bold
-                                ${hasCritical
-                                  ? 'bg-red-500 text-white animate-pulse'
-                                  : 'bg-orange-500 text-white'
-                                }
-                              `}
+                              className={cn(
+                                "shrink-0 text-[10px] px-2 h-5 rounded-full font-bold",
+                                hasCritical
+                                  ? "bg-red-500 text-white animate-pulse"
+                                  : "bg-orange-500 text-white"
+                              )}
                             >
                               {totalCount}
                             </Badge>
@@ -636,7 +651,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                                 onNavigate?.();
                               }}
                               className={`
-                                group relative w-full block
+                                group relative block w-full min-w-0
                                 ${isCollapsed ? 'p-2' : 'px-3 py-2'}
                                 rounded-2xl text-sm font-medium
                                 transition-all duration-200
@@ -680,20 +695,20 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
           {(() => {
             const active = isActive('/configuracoes');
             const linkContent = (
-              <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} w-full`}>
-                <div className={`flex items-center ${isCollapsed ? '' : 'gap-3'}`}>
+              <div className={cn("flex w-full min-w-0 items-center", isCollapsed ? "justify-center" : "justify-between")}>
+                <div className={cn("flex min-w-0 items-center", isCollapsed ? "" : "gap-3 flex-1")}>
                   <Settings
-                    className={`
-                      w-5 h-5 transition-all duration-200
-                      ${active ? 'text-primary' : 'text-muted-foreground group-hover:text-primary'}
-                    `}
+                    className={cn(
+                      "h-5 w-5 shrink-0 transition-all duration-200",
+                      active ? "text-primary" : "text-muted-foreground group-hover:text-primary"
+                    )}
                   />
                   {!isCollapsed && (
                     <span
-                      className={`
-                        text-sm font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden
-                        ${active ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}
-                      `}
+                      className={cn(
+                        "min-w-0 flex-1 text-sm font-medium leading-snug transition-colors duration-200 break-words [overflow-wrap:anywhere]",
+                        active ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+                      )}
                     >
                       Configurações
                     </span>
@@ -709,7 +724,7 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                     to="/configuracoes"
                     onClick={() => onNavigate?.()}
                     className={`
-                      group relative w-full block
+                      group relative block w-full min-w-0
                       ${isCollapsed ? 'p-2' : 'px-3 py-2'}
                       rounded-2xl text-sm font-medium
                       transition-all duration-200
@@ -734,7 +749,10 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
           {/* User info and logout */}
           {!isCollapsed && (
             <div className="mt-3 px-3 py-2.5 bg-white/5 rounded-2xl">
-              <div className="text-sm text-muted-foreground mb-2 truncate">
+              <div
+                className="mb-2 break-all text-sm leading-snug text-muted-foreground [overflow-wrap:anywhere]"
+                title={user?.email ?? undefined}
+              >
                 {user?.email}
               </div>
               <Button

@@ -39,7 +39,7 @@ export function useMarketingAlerts() {
               campaignId: campaign.id,
               campaignName: campaign.platform_campaign_name,
               actionLabel: 'Ver campanha',
-              actionUrl: `/marketing?tab=campaigns&campaign=${campaign.id}`,
+              actionUrl: `/comercial?tab=campaigns&campaign=${campaign.id}`,
             });
           } else if (campaign.roas < 2) {
             alerts.push({
@@ -49,7 +49,7 @@ export function useMarketingAlerts() {
               campaignId: campaign.id,
               campaignName: campaign.platform_campaign_name,
               actionLabel: 'Ver campanha',
-              actionUrl: `/marketing?tab=campaigns&campaign=${campaign.id}`,
+              actionUrl: `/comercial?tab=campaigns&campaign=${campaign.id}`,
             });
           }
         }
@@ -67,7 +67,7 @@ export function useMarketingAlerts() {
               campaignId: campaign.id,
               campaignName: campaign.platform_campaign_name,
               actionLabel: 'Ver campanha',
-              actionUrl: `/marketing?tab=campaigns&campaign=${campaign.id}`,
+              actionUrl: `/comercial?tab=campaigns&campaign=${campaign.id}`,
             });
           }
         }
@@ -88,7 +88,7 @@ export function useMarketingAlerts() {
               campaignId: campaign.id,
               campaignName: campaign.platform_campaign_name,
               actionLabel: 'Ver campanha',
-              actionUrl: `/marketing?tab=campaigns&campaign=${campaign.id}`,
+              actionUrl: `/comercial?tab=campaigns&campaign=${campaign.id}`,
             });
           }
         }
@@ -103,7 +103,7 @@ export function useMarketingAlerts() {
             message: `Erro ao sincronizar conexão "${connection.account_name}". ${connection.error_message || 'Verifique as configurações.'}`,
             connectionId: connection.id,
             actionLabel: 'Configurar',
-            actionUrl: `/marketing?tab=integrations`,
+            actionUrl: `/comercial?tab=campaigns`,
           });
         }
       });
@@ -118,7 +118,7 @@ export function useMarketingAlerts() {
             campaignId: campaign.id,
             campaignName: campaign.platform_campaign_name,
             actionLabel: 'Ver campanha',
-            actionUrl: `/marketing?tab=campaigns&campaign=${campaign.id}`,
+            actionUrl: `/comercial?tab=campaigns&campaign=${campaign.id}`,
           });
         }
       });
