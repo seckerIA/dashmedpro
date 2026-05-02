@@ -10,6 +10,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useCRM } from '@/hooks/useCRM';
+import { isPlaceholderCrmContact } from '@/lib/crm-placeholder-contact';
 import { useAuth } from '@/hooks/useAuth';
 import { useAvailability } from '@/hooks/useAvailability';
 import { useCommercialProcedures } from '@/hooks/useCommercialProcedures';
@@ -672,14 +673,14 @@ export function AppointmentForm({
   // NOTA: setValue, watch e setEstimatedValueDisplay são funções estáveis do react-hook-form
   // mas não devem estar nas dependências para evitar loop infinito de re-renders
 
-  // Filtrar contatos pela busca do usuário
-  // NOTA: Ordenação alfabética já é feita no backend. Aqui filtramos por texto de busca.
+  // Filtrar placeholders de teste (ex.: Meta sandbox) e depois pela busca
   const filteredContacts = React.useMemo(() => {
+    const real = contacts.filter((c) => !isPlaceholderCrmContact(c));
     if (!patientSearchTerm.trim()) {
-      return contacts;
+      return real;
     }
     const searchLower = patientSearchTerm.toLowerCase().trim();
-    return contacts.filter(contact => {
+    return real.filter(contact => {
       const name = (contact.full_name || '').toLowerCase();
       const phone = (contact.phone || '').toLowerCase();
       const email = (contact.email || '').toLowerCase();

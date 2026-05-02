@@ -11,6 +11,7 @@ import { useUserProfile } from './useUserProfile';
 import { useSecretaryDoctors } from './useSecretaryDoctors';
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
 import { getSupabaseErrorMessage } from '@/lib/supabaseErrors';
+import { excludePlaceholderContactsQuery, isPlaceholderCrmContact } from '@/lib/crm-placeholder-contact';
 
 // Fetch contacts
 const fetchContacts = async (
@@ -33,9 +34,14 @@ const fetchContacts = async (
     }
   }
 
-  // Ordenar por nome alfabeticamente
+  queryPromise = excludePlaceholderContactsQuery(queryPromise as any) as typeof queryPromise;
+
+  // Agendamento e CRM: sem limite baixo para não “perder” pacientes reais atrás de lixo
+  // ordenado por nome (placeholders já excluídos na query).
+  const limit = fetchAll ? 8000 : 3000;
+
   const { data, error } = await supabaseQueryWithTimeout(
-    (queryPromise as any).order('full_name', { ascending: true }).limit(1000),
+    (queryPromise as any).order('full_name', { ascending: true, nullsFirst: false }).limit(limit),
     30000,
     signal
   );
@@ -289,6 +295,16 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
 
       for (const row of inboundRows) {
         if (cancelled) break;
+
+        if (
+          isPlaceholderCrmContact({
+            full_name: row.full_name,
+            phone: row.phone,
+            email: row.email,
+          })
+        ) {
+          continue;
+        }
 
         const rowEmail = (row.email || '').trim().toLowerCase();
         const rowPhoneKey = phoneKeyLast10(row.phone);

@@ -6,6 +6,7 @@ import { useUserProfile } from './useUserProfile';
 import { useSecretaryDoctors } from './useSecretaryDoctors';
 import { Patient, UpdatePatientMedicalInfoInput, EmergencyContact } from '@/types/medicalRecords';
 import { useToast } from '@/hooks/use-toast';
+import { excludePlaceholderContactsQuery, isPlaceholderCrmContact } from '@/lib/crm-placeholder-contact';
 
 // =====================================================
 // HOOK: usePatients
@@ -73,16 +74,9 @@ export function usePatients() {
         if (contactIds.length === 0) return [];
 
         // 3. Buscar informações dos contatos que têm consultas
-        const query = supabase
-          .from('crm_contacts')
-          .select(`
-            *
-          `)
-          .in('id', contactIds)
-          .order('full_name', { ascending: true })
-          .limit(500);
-
-        const { data, error } = await query;
+        let query = supabase.from('crm_contacts').select('*').in('id', contactIds);
+        query = excludePlaceholderContactsQuery(query);
+        const { data, error } = await query.order('full_name', { ascending: true }).limit(500);
 
         if (error) {
           console.error('Erro ao buscar pacientes:', error);
@@ -107,14 +101,16 @@ export function usePatients() {
         });
 
         // 5. Adicionar estatísticas aos pacientes
-        return (data || []).map((patient: any) => {
-          const stats = appointmentsMap.get(patient.id);
-          return {
-            ...patient,
-            total_appointments: stats?.count || 0,
-            last_appointment: stats?.lastDate || null,
-          } as Patient;
-        });
+        return (data || [])
+          .filter((patient: any) => !isPlaceholderCrmContact(patient))
+          .map((patient: any) => {
+            const stats = appointmentsMap.get(patient.id);
+            return {
+              ...patient,
+              total_appointments: stats?.count || 0,
+              last_appointment: stats?.lastDate || null,
+            } as Patient;
+          });
       } catch (error) {
         console.error('Erro ao buscar pacientes com consultas:', error);
         throw error;
@@ -272,16 +268,17 @@ export function usePatients() {
     // Filtrar localmente se já temos os dados
     if (patients && patients.length > 0) {
       return patients.filter(patient =>
-        patient.full_name?.toLowerCase().includes(term) ||
+        !isPlaceholderCrmContact(patient) &&
+        (patient.full_name?.toLowerCase().includes(term) ||
         patient.phone?.includes(term) ||
-        patient.email?.toLowerCase().includes(term)
+        patient.email?.toLowerCase().includes(term))
       );
     }
 
     // Buscar do banco se não temos dados locais
-    const { data, error } = await supabase
-      .from('crm_contacts')
-      .select('*')
+    let contactQuery = supabase.from('crm_contacts').select('*');
+    contactQuery = excludePlaceholderContactsQuery(contactQuery);
+    const { data, error } = await contactQuery
       .or(`full_name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
       .order('full_name', { ascending: true })
       .limit(50);
@@ -291,7 +288,7 @@ export function usePatients() {
       return [];
     }
 
-    return (data || []) as Patient[];
+    return ((data || []) as Patient[]).filter((p) => !isPlaceholderCrmContact(p));
   };
 
   return {
