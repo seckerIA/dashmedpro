@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAdCampaignsSync } from './useAdCampaignsSync';
 import { useAdPlatformConnections } from './useAdPlatformConnections';
-import { useAdCampaignDailyMetrics, aggregateDailyMetrics } from './useAdCampaignDailyMetrics';
-import { useMarketingLeads } from './useMarketingLeads';
-import { subDays, startOfMonth, endOfMonth, format } from 'date-fns';
+import { useAdCampaignDailyMetrics, aggregateDailyMetrics, useHasDailyMetrics } from './useAdCampaignDailyMetrics';
+import { subDays, startOfMonth, endOfMonth, format, startOfDay, endOfDay } from 'date-fns';
 import { supabase } from "@/integrations/supabase/client";
+import type { AdCampaignDailyMetricWithCampaign } from "@/types/adPlatforms";
 
 export interface ActiveAccountInfo {
   id: string;
@@ -19,6 +19,10 @@ export interface MarketingDashboardData {
   totalRevenue: number;
   averageROAS: number;
   totalLeads: number;
+  /** Conversões atribuídas a campanhas (métricas Meta/Google) no período */
+  leadsFromAds: number;
+  /** Novas conversas no WhatsApp no período (telefones únicos) */
+  leadsFromWhatsApp: number;
 
   // KPIs de lead gen (essenciais para clínica médica)
   cpl: number; // Custo por Lead
@@ -70,16 +74,24 @@ export interface MarketingDashboardData {
   hasConnections: boolean;
 }
 
+function phoneKeyLast10(phone: string | null | undefined): string {
+  const d = (phone || '').replace(/\D/g, '');
+  return d.length >= 10 ? d.slice(-10) : '';
+}
+
 export function useMarketingDashboard(filters?: { startDate?: Date; endDate?: Date }) {
-  // Buscar dados baseados no filtro ou mês atual
   const now = new Date();
-  const startOfRange = filters?.startDate || startOfMonth(now);
-  const endOfRange = filters?.endDate || endOfMonth(now);
-  
-  const rangeStartISO = startOfRange.toISOString();
-  const rangeEndISO = endOfRange.toISOString();
-  const startDateStr = format(startOfRange, 'yyyy-MM-dd');
-  const endDateStr = format(endOfRange, 'yyyy-MM-dd');
+  const todayStart = startOfDay(now);
+  let rangeStart = startOfDay(filters?.startDate ?? startOfMonth(now));
+  let rangeEnd = startOfDay(filters?.endDate ?? endOfMonth(now));
+  if (rangeEnd > todayStart) rangeEnd = todayStart;
+  if (rangeStart > todayStart) rangeStart = todayStart;
+  if (rangeStart > rangeEnd) rangeEnd = rangeStart;
+
+  const rangeStartISO = rangeStart.toISOString();
+  const rangeEndISO = endOfDay(rangeEnd).toISOString();
+  const startDateStr = format(rangeStart, 'yyyy-MM-dd');
+  const endDateStr = format(rangeEnd, 'yyyy-MM-dd');
 
   const { data: campaigns } = useAdCampaignsSync();
   const { data: connections } = useAdPlatformConnections();
@@ -89,16 +101,10 @@ export function useMarketingDashboard(filters?: { startDate?: Date; endDate?: Da
     start_date: startDateStr,
     end_date: endDateStr,
   });
-
-  // Buscar leads de formulários (lead_form_submissions + commercial_leads marketing) filtrados por data
-  const { data: allLeads } = useMarketingLeads({
-    start_date: rangeStartISO,
-    end_date: rangeEndISO,
-    include_conversions_in_range: true
-  });
+  const { data: hasDailyMetrics = false } = useHasDailyMetrics();
 
   return useQuery({
-    queryKey: ['marketing-dashboard', campaigns, connections, allLeads, dailyMetrics, startDateStr, endDateStr],
+    queryKey: ['marketing-dashboard', campaigns, connections, dailyMetrics, hasDailyMetrics, startDateStr, endDateStr],
     staleTime: 5 * 60 * 1000, // 5 minutos de cache
     queryFn: async (): Promise<MarketingDashboardData> => {
       const connectionsData = connections || [];
@@ -115,42 +121,61 @@ export function useMarketingDashboard(filters?: { startDate?: Date; endDate?: Da
         ? allCampaigns.filter(c => activeConnIds.has(c.connection_id))
         : [];
 
-      const startDate = new Date(rangeStartISO);
-      const endDate = new Date(rangeEndISO);
-
       // Agendamentos na agenda dentro do período do filtro (agenda médica)
-      const { data: apptsInRange } = await supabase
-        .from('medical_appointments')
-        .select('id')
-        .in('status', ['scheduled', 'confirmed', 'in_progress', 'completed'])
-        .gte('start_time', rangeStartISO)
-        .lte('start_time', rangeEndISO);
-      
+      const [
+        { data: apptsInRange, error: apptsErr },
+        { data: waRows, error: waErr },
+      ] = await Promise.all([
+        supabase
+          .from('medical_appointments')
+          .select('id')
+          .in('status', ['scheduled', 'confirmed', 'in_progress', 'completed'])
+          .gte('start_time', rangeStartISO)
+          .lte('start_time', rangeEndISO),
+        supabase
+          .from('whatsapp_conversations')
+          .select('id, phone_number')
+          .gte('created_at', rangeStartISO)
+          .lte('created_at', rangeEndISO),
+      ]);
+
+      if (apptsErr) console.error('marketing-dashboard appointments:', apptsErr);
+      if (waErr) console.error('marketing-dashboard whatsapp_conversations:', waErr);
+
       const scheduledPatientsInRange = apptsInRange?.length || 0;
 
-      // Usar métricas diárias APENAS se existem dados reais para o mês atual
-      // Se daily metrics estão vazias para este mês, usar dados cumulativos (90d)
+      const waPhones = new Set<string>();
+      (waRows || []).forEach((row: { id: string; phone_number: string }) => {
+        const k = phoneKeyLast10(row.phone_number);
+        waPhones.add(k || `wa:${row.id}`);
+      });
+      const leadsFromWhatsApp = waPhones.size;
+
+      // Com sync diário ativo: sempre somar só linhas do período (período sem dados = R$ 0).
+      // Sem sync diário (legado): fallback aos totais cumulativos em ad_campaigns_sync.
       const monthlyDailyRows = dailyMetrics || [];
-      const useDailyData = monthlyDailyRows.length > 0;
 
       let totalSpend: number, totalRevenue: number, averageROAS: number;
-      let leadsGeneratedFromCampaigns: number;
+      let leadsFromAds: number;
       let googleAdsSpend: number, metaAdsSpend: number;
       let googleAdsRevenue: number, metaAdsRevenue: number;
 
-      if (useDailyData) {
-        // Filtrar daily rows pelas contas ativas
+      if (hasDailyMetrics) {
         const activeCampaignIds = new Set(campaignsData.map(c => c.id));
         const activeRows = monthlyDailyRows.filter(r => activeCampaignIds.has(r.campaign_sync_id));
         const agg = aggregateDailyMetrics(activeRows);
 
         totalSpend = agg.total_spend;
         totalRevenue = agg.total_conversion_value;
-        leadsGeneratedFromCampaigns = agg.total_conversions;
+        leadsFromAds = agg.total_conversions;
         averageROAS = totalSpend > 0 ? totalRevenue / totalSpend : 0;
 
-        const googleRows = activeRows.filter(r => (r as any).campaign?.platform === 'google_ads');
-        const metaRows = activeRows.filter(r => (r as any).campaign?.platform === 'meta_ads');
+        const googleRows = activeRows.filter(
+          (r: AdCampaignDailyMetricWithCampaign) => r.campaign?.platform === 'google_ads'
+        );
+        const metaRows = activeRows.filter(
+          (r: AdCampaignDailyMetricWithCampaign) => r.campaign?.platform === 'meta_ads'
+        );
         const googleAgg = aggregateDailyMetrics(googleRows);
         const metaAgg = aggregateDailyMetrics(metaRows);
 
@@ -159,7 +184,6 @@ export function useMarketingDashboard(filters?: { startDate?: Date; endDate?: Da
         googleAdsRevenue = googleAgg.total_conversion_value;
         metaAdsRevenue = metaAgg.total_conversion_value;
       } else {
-        // Fallback: dados cumulativos (90 dias)
         const googleCampaigns = campaignsData.filter(c => c.platform === 'google_ads');
         const metaCampaigns = campaignsData.filter(c => c.platform === 'meta_ads');
 
@@ -170,8 +194,7 @@ export function useMarketingDashboard(filters?: { startDate?: Date; endDate?: Da
 
         totalSpend = campaignsData.reduce((sum, c) => sum + (Number(c.spend) || 0), 0);
         totalRevenue = campaignsData.reduce((sum, c) => sum + (Number(c.conversion_value) || 0), 0);
-        leadsGeneratedFromCampaigns = campaignsData.reduce((sum, c) => sum + (Number(c.conversions) || 0), 0);
-        // ROAS = total revenue / total spend (não média de ROAS individuais)
+        leadsFromAds = campaignsData.reduce((sum, c) => sum + (Number(c.conversions) || 0), 0);
         averageROAS = totalSpend > 0 ? totalRevenue / totalSpend : 0;
       }
 
@@ -297,8 +320,9 @@ export function useMarketingDashboard(filters?: { startDate?: Date; endDate?: Da
           return (monthA * 100 + dayA) - (monthB * 100 + dayB);
         });
 
-      const totalLeadsCount = leadsGeneratedFromCampaigns;
-      const cpl = totalLeadsCount > 0 ? totalSpend / totalLeadsCount : 0;
+      const totalLeadsCount = leadsFromAds + leadsFromWhatsApp;
+      // CPL só sobre leads pagos (anúncios); WhatsApp orgânico não dilui o custo
+      const cpl = leadsFromAds > 0 ? totalSpend / leadsFromAds : 0;
       const cac = scheduledPatientsInRange > 0 ? totalSpend / scheduledPatientsInRange : 0;
       const leadToPatientRate = totalLeadsCount > 0 ? (scheduledPatientsInRange / totalLeadsCount) * 100 : 0;
 
@@ -307,6 +331,8 @@ export function useMarketingDashboard(filters?: { startDate?: Date; endDate?: Da
         totalRevenue,
         averageROAS,
         totalLeads: totalLeadsCount,
+        leadsFromAds,
+        leadsFromWhatsApp,
         cpl,
         cac,
         leadToPatientRate,

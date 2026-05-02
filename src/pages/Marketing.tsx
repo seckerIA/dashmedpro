@@ -8,25 +8,46 @@ import { AdCampaignsList } from "@/components/commercial/AdCampaignsList";
 import { LeadFormsList } from "@/components/marketing/LeadFormsList";
 import { MarketingLeadsConversions } from "@/components/marketing/MarketingLeadsConversions";
 import { MarketingReports } from "@/components/marketing/MarketingReports";
-import { MarketingOnboarding, MarketingHelpCard } from "@/components/marketing/MarketingOnboarding";
+import { MarketingOnboarding } from "@/components/marketing/MarketingOnboarding";
 import { MetaConnectionGate } from "@/components/marketing/MetaConnectionGate";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { format, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear } from "date-fns";
+import { format, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear, startOfDay, isAfter } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DateRange } from "react-day-picker";
+
+function clampDateToToday(d: Date): Date {
+  const today = startOfDay(new Date());
+  const day = startOfDay(d);
+  return isAfter(day, today) ? today : day;
+}
+
+/** Período de marketing não pode incluir dias futuros (métricas reais só até hoje). */
+function clampMarketingDateRange(range: DateRange | undefined): DateRange | undefined {
+  if (!range?.from) return range;
+  const from = clampDateToToday(range.from);
+  // Preserva seleção em dois passos (intervalo): primeiro clique só define `from`.
+  if (range.to === undefined) {
+    return { from, to: undefined };
+  }
+  let to = clampDateToToday(range.to);
+  if (startOfDay(from) > startOfDay(to)) to = from;
+  return { from, to };
+}
 
 export default function Marketing() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get("tab") || "dashboard";
   const [activeTab, setActiveTab] = useState(tabFromUrl);
-  
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date()),
-  });
+
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() =>
+    clampMarketingDateRange({
+      from: startOfMonth(new Date()),
+      to: endOfMonth(new Date()),
+    })
+  );
 
   useEffect(() => {
     if (tabFromUrl) {
@@ -90,10 +111,13 @@ export default function Marketing() {
                       variant="ghost"
                       size="sm"
                       className="justify-start text-xs font-normal"
-                      onClick={() => setDateRange({
-                        from: startOfMonth(new Date()),
-                        to: endOfMonth(new Date())
-                      })}
+                      onClick={() =>
+                        setDateRange(
+                          clampMarketingDateRange({
+                            from: startOfMonth(new Date()),
+                            to: endOfMonth(new Date()),
+                          })
+                        )}
                     >
                       Este mês
                     </Button>
@@ -101,10 +125,13 @@ export default function Marketing() {
                       variant="ghost"
                       size="sm"
                       className="justify-start text-xs font-normal"
-                      onClick={() => setDateRange({
-                        from: startOfMonth(subMonths(new Date(), 1)),
-                        to: endOfMonth(subMonths(new Date(), 1))
-                      })}
+                      onClick={() =>
+                        setDateRange(
+                          clampMarketingDateRange({
+                            from: startOfMonth(subMonths(new Date(), 1)),
+                            to: endOfMonth(subMonths(new Date(), 1)),
+                          })
+                        )}
                     >
                       Mês passado
                     </Button>
@@ -112,10 +139,13 @@ export default function Marketing() {
                       variant="ghost"
                       size="sm"
                       className="justify-start text-xs font-normal"
-                      onClick={() => setDateRange({
-                        from: startOfMonth(subMonths(new Date(), 3)),
-                        to: endOfMonth(new Date())
-                      })}
+                      onClick={() =>
+                        setDateRange(
+                          clampMarketingDateRange({
+                            from: startOfMonth(subMonths(new Date(), 3)),
+                            to: new Date(),
+                          })
+                        )}
                     >
                       Últimos 3 meses
                     </Button>
@@ -123,10 +153,13 @@ export default function Marketing() {
                       variant="ghost"
                       size="sm"
                       className="justify-start text-xs font-normal"
-                      onClick={() => setDateRange({
-                        from: startOfMonth(subMonths(new Date(), 6)),
-                        to: endOfMonth(new Date())
-                      })}
+                      onClick={() =>
+                        setDateRange(
+                          clampMarketingDateRange({
+                            from: startOfMonth(subMonths(new Date(), 6)),
+                            to: new Date(),
+                          })
+                        )}
                     >
                       Últimos 6 meses
                     </Button>
@@ -134,10 +167,13 @@ export default function Marketing() {
                       variant="ghost"
                       size="sm"
                       className="justify-start text-xs font-normal"
-                      onClick={() => setDateRange({
-                        from: startOfMonth(subMonths(new Date(), 12)),
-                        to: endOfMonth(new Date())
-                      })}
+                      onClick={() =>
+                        setDateRange(
+                          clampMarketingDateRange({
+                            from: startOfMonth(subMonths(new Date(), 12)),
+                            to: new Date(),
+                          })
+                        )}
                     >
                       Últimos 12 meses
                     </Button>
@@ -145,10 +181,13 @@ export default function Marketing() {
                       variant="ghost"
                       size="sm"
                       className="justify-start text-xs font-normal"
-                      onClick={() => setDateRange({
-                        from: startOfYear(new Date()),
-                        to: endOfYear(new Date())
-                      })}
+                      onClick={() =>
+                        setDateRange(
+                          clampMarketingDateRange({
+                            from: startOfYear(new Date()),
+                            to: endOfYear(new Date()),
+                          })
+                        )}
                     >
                       Este ano
                     </Button>
@@ -159,10 +198,12 @@ export default function Marketing() {
                       mode="range"
                       defaultMonth={dateRange?.from}
                       selected={dateRange}
-                      onSelect={setDateRange}
+                      onSelect={(r) => setDateRange(clampMarketingDateRange(r))}
+                      disabled={(date) => isAfter(startOfDay(date), startOfDay(new Date()))}
                       numberOfMonths={2}
                       locale={ptBR}
                       className="p-3"
+                      toYear={new Date().getFullYear()}
                     />
                   </div>
                 </div>
@@ -224,7 +265,7 @@ export default function Marketing() {
         <TabsContent value="dashboard" className="mt-6 outline-none">
           <MarketingDashboard 
             startDate={dateRange?.from} 
-            endDate={dateRange?.to} 
+            endDate={dateRange?.to ?? dateRange?.from} 
           />
         </TabsContent>
 
@@ -238,7 +279,7 @@ export default function Marketing() {
             </div>
             <AdCampaignsList
               startDate={dateRange?.from}
-              endDate={dateRange?.to}
+              endDate={dateRange?.to ?? dateRange?.from}
             />
           </div>
         </TabsContent>

@@ -719,10 +719,12 @@ export function useCommercialMetrics(filter: PeriodFilter = 'month', customRange
         ? ((completedAppointments.length - prevAppointmentsCount) / prevAppointmentsCount) * 100
         : 0;
 
-      // Pacientes novos do card: pacientes da agenda (agendados + comparecidos), únicos por contato
-      const patientKeys = new Set(
-        scheduledAndCompletedAppointments.map((apt: any) => apt.contact_id ? `contact:${apt.contact_id}` : `apt:${apt.id}`)
-      );
+      // Pacientes novos: apenas consultas concluídas (comparecimento), únicos por contato no período
+      const patientKeys = new Set<string>();
+      completedAppointments.forEach((apt) => {
+        const key = apt.contact_id ? `contact:${apt.contact_id}` : `apt:${apt.id}`;
+        patientKeys.add(key);
+      });
       const newPatients = patientKeys.size;
 
       const pctLeadsToConsultas = totalLeads > 0 ? Math.min(leadsToAppointments, 100) : 0;

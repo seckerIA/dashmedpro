@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MetricCard } from "./MetricCard";
@@ -18,6 +19,9 @@ import { getScoreLevel } from "@/types/leadScoring";
 import { TeamMemberSelector } from "@/components/crm/TeamMemberSelector";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { MonthPicker } from "@/components/ui/month-picker";
+import type { PeriodRange } from "@/types/metrics";
+import { useMarketingDashboard } from "@/hooks/useMarketingDashboard";
 
 export function CommercialDashboard() {
   const navigate = useNavigate();
@@ -34,6 +38,27 @@ export function CommercialDashboard() {
   });
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [showAllBottlenecks, setShowAllBottlenecks] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    try {
+      const saved = localStorage.getItem("commercial_dashboard_month");
+      if (saved && /^\d{4}-\d{2}$/.test(saved)) return saved;
+    } catch {
+      /* ignore */
+    }
+    return format(new Date(), "yyyy-MM");
+  });
+
+  const commercialPeriod = useMemo((): PeriodRange => {
+    const base = parseISO(`${selectedMonth}-01`);
+    return {
+      start: startOfMonth(base),
+      end: endOfMonth(base),
+    };
+  }, [selectedMonth]);
+
+  useEffect(() => {
+    localStorage.setItem("commercial_dashboard_month", selectedMonth);
+  }, [selectedMonth]);
 
   // Carregar estado do localStorage detalhado
   useEffect(() => {
@@ -57,7 +82,11 @@ export function CommercialDashboard() {
 
   const viewAsUserIds = viewAllMode && selectedUserIds.length > 0 ? selectedUserIds : undefined;
 
-  const { metrics, isLoading, error } = useCommercialMetrics('month', undefined, viewAsUserIds);
+  const { metrics, isLoading, error } = useCommercialMetrics("custom", commercialPeriod, viewAsUserIds);
+  const { data: marketingDashboard, isLoading: isLoadingMarketingLeads } = useMarketingDashboard({
+    startDate: commercialPeriod.start,
+    endDate: commercialPeriod.end,
+  });
   const { data: bottlenecks, isLoading: isLoadingBottlenecks } = useBottleneckMetrics();
   // Passar viewAsUserIds para useCommercialLeads também para filtrar os leads prioritários
   const { leads } = useCommercialLeads(undefined, viewAsUserIds);
@@ -76,6 +105,22 @@ export function CommercialDashboard() {
     navigate("/comercial?tab=dashboard&action=new");
   };
 
+  const leadsGeradosHint = useMemo(() => {
+    const d = marketingDashboard;
+    if (!d) return undefined;
+    if (d.leadsFromAds <= 0 && d.leadsFromWhatsApp <= 0) {
+      return "Igual ao Marketing: período sem leads rastreados";
+    }
+    if (d.leadsFromWhatsApp > 0 && d.leadsFromAds > 0) {
+      return `${d.leadsFromAds} anúncios · ${d.leadsFromWhatsApp} WhatsApp (mesma base do Marketing)`;
+    }
+    if (d.leadsFromWhatsApp > 0) {
+      return `${d.leadsFromWhatsApp} WhatsApp (mesma base do Marketing)`;
+    }
+    return `${d.leadsFromAds} via anúncios (mesma base do Marketing)`;
+  }, [marketingDashboard]);
+
+  const metricsLoading = isLoading || isLoadingMarketingLeads;
 
   return (
     <div className="space-y-6">
@@ -104,24 +149,27 @@ export function CommercialDashboard() {
         </div>
       </AnimatedWrapper>
 
-      {/* Team Filter for Admin */}
-      <TeamMemberSelector
-        viewAllMode={viewAllMode}
-        selectedUserIds={selectedUserIds}
-        currentUserId={user?.id || ''}
-        onViewAllModeChange={(enabled) => {
-          setViewAllMode(enabled);
-          localStorage.setItem('commercial_dashboard_view_all_mode', JSON.stringify(enabled));
-        }}
-        onSelectedUserIdsChange={(ids) => {
-          setSelectedUserIds(ids);
-          if (ids.length > 0) {
-            localStorage.setItem('commercial_dashboard_selected_user_ids', JSON.stringify(ids));
-          } else {
-            localStorage.removeItem('commercial_dashboard_selected_user_ids');
-          }
-        }}
-      />
+      {/* Filtro de mês + equipe */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+        <TeamMemberSelector
+          viewAllMode={viewAllMode}
+          selectedUserIds={selectedUserIds}
+          currentUserId={user?.id || ''}
+          onViewAllModeChange={(enabled) => {
+            setViewAllMode(enabled);
+            localStorage.setItem('commercial_dashboard_view_all_mode', JSON.stringify(enabled));
+          }}
+          onSelectedUserIdsChange={(ids) => {
+            setSelectedUserIds(ids);
+            if (ids.length > 0) {
+              localStorage.setItem('commercial_dashboard_selected_user_ids', JSON.stringify(ids));
+            } else {
+              localStorage.removeItem('commercial_dashboard_selected_user_ids');
+            }
+          }}
+        />
+        <MonthPicker value={selectedMonth} onChange={setSelectedMonth} className="sm:self-center" />
+      </div>
 
       {/* Leads Prioritários */}
       {priorityLeads.length > 0 && (
@@ -257,23 +305,35 @@ export function CommercialDashboard() {
         </AnimatedWrapper>
       )}
 
-      {/* Metrics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        {[
-          { title: "Leads do Mês", value: metrics?.totalLeads || 0, icon: "trending-up" as const },
-          { title: "Taxa de Conversão", value: metrics?.conversionRate || 0, icon: "target" as const, format: "percentage" as const },
-          { title: "Receita Total", value: metrics?.totalRevenue || 0, icon: "dollar-sign" as const, format: "currency" as const },
-          { title: "Receita Média", value: metrics?.averageRevenue || 0, icon: "bar-chart" as const, format: "currency" as const },
-          { title: "Pacientes Novos", value: metrics?.newPatients || 0, icon: "user-plus" as const },
-        ].map((metric, index) => (
+      {/* Metrics Cards — Leads Gerados alinhado ao hook do Marketing */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4">
+        {(
+          [
+            {
+              title: "Leads Gerados",
+              value: marketingDashboard?.totalLeads ?? 0,
+              icon: "trending-up" as const,
+              hint: leadsGeradosHint,
+            },
+            { title: "Taxa de Conversão", value: metrics?.conversionRate || 0, icon: "target" as const, format: "percentage" as const },
+            { title: "Receita Total", value: metrics?.totalRevenue || 0, icon: "dollar-sign" as const, format: "currency" as const },
+            {
+              title: "Pacientes Novos",
+              value: metrics?.newPatients || 0,
+              icon: "user-plus" as const,
+              hint: "Contagem após comparecimento (consulta concluída)",
+            },
+          ] as const
+        ).map((metric, index) => (
           <AnimatedWrapper key={metric.title} animationType="scale" delay={0.3 + index * 0.05}>
             <motion.div whileHover={{ y: -4 }} transition={{ duration: 0.2 }}>
               <MetricCard
                 title={metric.title}
                 value={metric.value}
                 icon={metric.icon}
-                format={metric.format}
-                isLoading={isLoading}
+                format={"format" in metric ? metric.format : undefined}
+                hint={"hint" in metric ? metric.hint : undefined}
+                isLoading={metricsLoading}
               />
             </motion.div>
           </AnimatedWrapper>

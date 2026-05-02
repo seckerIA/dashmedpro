@@ -37,6 +37,8 @@ interface MetricCardProps {
   icon: IconType;
   format?: "currency" | "number" | "percentage";
   isLoading?: boolean;
+  /** Legenda curta abaixo do valor (ex.: critério da métrica) */
+  hint?: string;
   comparison?: {
     value: number;
     label: string;
@@ -57,7 +59,7 @@ const iconMap: Record<IconType, LucideIcon> = {
   "zap": Zap,
 };
 
-export function MetricCard({ title, value, icon, format = "number", isLoading, comparison }: MetricCardProps) {
+export function MetricCard({ title, value, icon, format = "number", isLoading, hint, comparison }: MetricCardProps) {
   const Icon = iconMap[icon] || DollarSign;
 
   const formatValue = (val: string | number | undefined | null): string => {
@@ -97,6 +99,9 @@ export function MetricCard({ title, value, icon, format = "number", isLoading, c
                 <span className="inline-block w-24 h-8 animate-pulse bg-muted rounded" />
               ) : formatValue(value)}
             </motion.p>
+            {hint && !isLoading && (
+              <p className="text-xs text-muted-foreground line-clamp-2">{hint}</p>
+            )}
             {comparison && comparison.value !== 0 && (
               <p className={cn(
                 "text-xs",

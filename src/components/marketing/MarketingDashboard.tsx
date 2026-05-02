@@ -78,11 +78,12 @@ export function MarketingDashboard({ startDate, endDate }: { startDate?: Date; e
         title: 'Sincronização iniciada',
         description: `Sincronizando ${activeConnections.length} conexão(ões)...`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Erro ao sincronizar campanhas.';
       toast({
         variant: 'destructive',
         title: 'Erro',
-        description: error.message || 'Erro ao sincronizar campanhas.',
+        description: message,
       });
     }
   };
@@ -182,7 +183,15 @@ export function MarketingDashboard({ startDate, endDate }: { startDate?: Date; e
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{dashboardData.totalLeads}</div>
-            <p className="text-xs text-muted-foreground mt-1">do período</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {dashboardData.leadsFromAds <= 0 && dashboardData.leadsFromWhatsApp <= 0
+                ? 'do período'
+                : dashboardData.leadsFromWhatsApp > 0 && dashboardData.leadsFromAds > 0
+                  ? `${dashboardData.leadsFromAds} anúncios · ${dashboardData.leadsFromWhatsApp} WhatsApp`
+                  : dashboardData.leadsFromWhatsApp > 0
+                    ? `${dashboardData.leadsFromWhatsApp} novos no WhatsApp`
+                    : `${dashboardData.leadsFromAds} via anúncios`}
+            </p>
           </CardContent>
         </Card>
 
