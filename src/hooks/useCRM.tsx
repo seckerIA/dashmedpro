@@ -306,8 +306,10 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
               full_name: row.full_name || (row.phone ? `Lead ${row.phone}` : 'Lead'),
               email: row.email || null,
               phone: row.phone || null,
-              first_touch_source: row.source === 'whatsapp' ? 'whatsapp_meta' : 'formulario_meta',
-              first_touch_at: row.created_at || new Date().toISOString(),
+              custom_fields: {
+                first_touch_source: row.source === 'whatsapp' ? 'whatsapp_meta' : 'formulario_meta',
+                first_touch_at: row.created_at || new Date().toISOString(),
+              },
             })
             .select('id, user_id, full_name, email, phone')
             .single());
@@ -477,10 +479,22 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
       }
 
       console.log('🚀 useCRM - Executando createContactMutation com payload:', payload);
+      // first_touch_* não são colunas em crm_contacts (schema real); persistir em custom_fields (Json)
+      const incomingCf = payload.custom_fields;
+      const baseCf: Record<string, unknown> =
+        incomingCf && typeof incomingCf === 'object' && !Array.isArray(incomingCf)
+          ? { ...(incomingCf as Record<string, unknown>) }
+          : {};
+      baseCf.first_touch_source =
+        (payload as any).first_touch_source ?? baseCf.first_touch_source ?? 'cadastro_manual';
+      baseCf.first_touch_at =
+        (payload as any).first_touch_at ?? baseCf.first_touch_at ?? new Date().toISOString();
+
+      const { first_touch_source: _fts, first_touch_at: _fta, ...payloadWithoutTouchCols } = payload as any;
+
       return createRecord('crm_contacts', {
-        ...payload,
-        first_touch_source: payload.first_touch_source ?? 'cadastro_manual',
-        first_touch_at: payload.first_touch_at ?? new Date().toISOString(),
+        ...payloadWithoutTouchCols,
+        custom_fields: baseCf,
       });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['crm-contacts'] }),

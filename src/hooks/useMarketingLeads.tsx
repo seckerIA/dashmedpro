@@ -281,10 +281,17 @@ export function useMarketingLeads(filters?: {
       if (enrichIds.length > 0) {
         const { data: touches } = await supabase
           .from('crm_contacts')
-          .select('id, first_touch_source')
+          .select('id, custom_fields')
           .in('id', enrichIds);
-        (touches || []).forEach((t: any) => {
-          touchById.set(t.id, { first_touch_source: t.first_touch_source });
+        (touches || []).forEach((t: { id: string; custom_fields: unknown }) => {
+          const cf =
+            t.custom_fields && typeof t.custom_fields === 'object' && !Array.isArray(t.custom_fields)
+              ? (t.custom_fields as Record<string, unknown>)
+              : {};
+          const fts = cf.first_touch_source;
+          touchById.set(t.id, {
+            first_touch_source: typeof fts === 'string' ? fts : null,
+          });
         });
       }
 
