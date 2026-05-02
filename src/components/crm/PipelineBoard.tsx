@@ -6,7 +6,7 @@ import { AnimatedDealCard } from "./AnimatedDealCard";
 import { FollowUpSection } from "./FollowUpSection";
 import { CRMDealWithContact, PIPELINE_STAGES } from "@/types/crm";
 import { FollowUp } from "@/types/followUp";
-import { Plus, TrendingUp, Users } from "lucide-react";
+import { Plus, TrendingUp, Users, Trash2 } from "lucide-react";
 import { ContactActionSelector } from "./ContactActionSelector";
 import { formatCurrency } from "@/lib/currency";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -177,6 +177,8 @@ export interface PipelineBoardProps {
   onEditFollowUp?: (followUp: FollowUp) => void;
   showOwnerBadge?: boolean;
   onDealMovedToAgendado?: (deal: CRMDealWithContact) => void;
+  /** Ex.: limpar coluna “Lead Novo” (só o estágio lead_novo renderiza o botão) */
+  onClearLeadNovoColumn?: () => void;
 }
 
 export function PipelineBoard({
@@ -199,7 +201,8 @@ export function PipelineBoard({
   onCompleteFollowUp,
   onEditFollowUp,
   showOwnerBadge,
-  onDealMovedToAgendado
+  onDealMovedToAgendado,
+  onClearLeadNovoColumn
 }: PipelineBoardProps) {
   const { isSecretaria } = useUserProfile();
   const [activeDeal, setActiveDeal] = useState<CRMDealWithContact | null>(null);
@@ -417,12 +420,32 @@ export function PipelineBoard({
                       </div>
                     </div>
                   </div>
-                  <Badge
-                    variant="secondary"
-                    className={`text-sm ${stage.bgColor} ${stage.textColor} border-0 font-semibold px-3 py-1.5 rounded-lg shrink-0`}
-                  >
-                    {stageDeals.length}
-                  </Badge>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {stage.value === 'lead_novo' &&
+                      onClearLeadNovoColumn &&
+                      stageDeals.length > 0 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          title="Excluir todos os negócios desta coluna"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onClearLeadNovoColumn();
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    <Badge
+                      variant="secondary"
+                      className={`text-sm ${stage.bgColor} ${stage.textColor} border-0 font-semibold px-3 py-1.5 rounded-lg shrink-0`}
+                    >
+                      {stageDeals.length}
+                    </Badge>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="p-3 pt-0" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'visible' }}>

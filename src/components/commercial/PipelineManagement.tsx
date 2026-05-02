@@ -17,7 +17,7 @@ import { useMedicalAppointments } from "@/hooks/useMedicalAppointments";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { FollowUp } from "@/types/followUp";
-import { Filter, Calendar } from "lucide-react";
+import { Filter, Calendar, Loader2 } from "lucide-react";
 import { type PeriodFilter, PERIOD_FILTER_OPTIONS, isWithinPeriod } from "@/lib/periodFilter";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -25,10 +25,20 @@ import { CRMDealWithContact } from "@/types/crm";
 import { format } from "date-fns";
 import { PipelineHelp } from "@/components/crm/PipelineHelp";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function PipelineManagement() {
   const { user } = useAuth();
-  const { isAdmin } = useUserProfile();
+  const { isAdmin, isSecretaria } = useUserProfile();
 
   // Admin/Dono inicia com viewAllMode=true por padrão
   const [viewAllMode, setViewAllMode] = useState(() => {
@@ -89,6 +99,8 @@ export function PipelineManagement() {
   const [tagFilter, setTagFilter] = useState<string>("all");
   /** Default "all": não ocultar deals antigos em lead_novo (filtro por data de criação). */
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("all");
+  const [clearLeadNovoDialogOpen, setClearLeadNovoDialogOpen] = useState(false);
+  const [isBulkDeletingLeadNovo, setIsBulkDeletingLeadNovo] = useState(false);
 
   const filteredDeals = useMemo(() => {
     return deals.filter(deal => {
@@ -109,7 +121,12 @@ export function PipelineManagement() {
     });
   }, [deals, tagFilter, periodFilter]);
 
-  const handleReorderDealsInStage = async (stage: string, dealIds: string[]) => {
+  const leadNovoDealIds = useMemo(
+    () => filteredDeals.filter(d => d.stage === 'lead_novo').map(d => d.id),
+    [filteredDeals]
+  );
+
+  const handleReorderDealsInStage = async (_stage: string, dealIds: string[]) => {
     try {
       const updates = dealIds.map((dealId, index) => ({
         id: dealId,
@@ -130,6 +147,37 @@ export function PipelineManagement() {
         title: "Erro",
         description: "Não foi possível reordenar os contatos.",
       });
+    }
+  };
+
+  const executeClearLeadNovoColumn = async () => {
+    if (leadNovoDealIds.length === 0) {
+      setClearLeadNovoDialogOpen(false);
+      return;
+    }
+    setIsBulkDeletingLeadNovo(true);
+    const BATCH = 5;
+    let deleted = 0;
+    try {
+      for (let i = 0; i < leadNovoDealIds.length; i += BATCH) {
+        const chunk = leadNovoDealIds.slice(i, i + BATCH);
+        await Promise.all(chunk.map((id) => deleteDeal(id)));
+        deleted += chunk.length;
+      }
+      toast({
+        title: "Coluna Lead Novo esvaziada",
+        description: `${deleted} negócio(s) excluído(s). Os contatos permanecem no cadastro.`,
+      });
+      setClearLeadNovoDialogOpen(false);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Alguns itens podem não ter sido removidos (permissão).";
+      toast({
+        variant: "destructive",
+        title: "Erro ao excluir",
+        description: msg,
+      });
+    } finally {
+      setIsBulkDeletingLeadNovo(false);
     }
   };
 
@@ -475,7 +523,38 @@ export function PipelineManagement() {
             });
           }
         }}
+        onClearLeadNovoColumn={
+          isSecretaria ? undefined : () => setClearLeadNovoDialogOpen(true)
+        }
       />
+
+      <AlertDialog open={clearLeadNovoDialogOpen} onOpenChange={setClearLeadNovoDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir todos na coluna Lead Novo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Isso remove {leadNovoDealIds.length} negócio(s) visível(is) nesta coluna (respeitando filtros de período e origem). Os cadastros de contato não são apagados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isBulkDeletingLeadNovo}>Cancelar</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={isBulkDeletingLeadNovo || leadNovoDealIds.length === 0}
+              onClick={() => void executeClearLeadNovoColumn()}
+            >
+              {isBulkDeletingLeadNovo ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Excluindo...
+                </>
+              ) : (
+                "Excluir todos"
+              )}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Modal de Edição de Deal */}
       <DealForm
