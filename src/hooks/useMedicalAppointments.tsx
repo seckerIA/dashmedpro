@@ -315,6 +315,8 @@ interface UseMedicalAppointmentsFilters {
   contactId?: string;
   isSecretaria?: boolean; // Se true, busca TODOS os agendamentos (de todos os médicos)
   doctorIds?: string[]; // IDs dos médicos para filtrar explicitamente
+  /** Quando true, não executa a query (ex.: checagem de disponibilidade antes de escolher médico) */
+  skipQuery?: boolean;
 }
 
 // Tipos de estágio do pipeline para clínica médica
@@ -705,7 +707,7 @@ const createAppointment = async (
     throw new Error('duration_minutes é obrigatório');
   }
 
-  const { data, error } = await supabase
+  const { data: insertedRows, error } = await supabase
     .from('medical_appointments')
     .insert({
       ...appointmentData,
@@ -716,13 +718,19 @@ const createAppointment = async (
       *,
       contact:crm_contacts!medical_appointments_contact_id_fkey(*),
       financial_transaction:financial_transactions(id, description, amount, type)
-    `)
-    .single();
+    `);
 
   if (error) {
     console.error('Erro ao criar consulta:', error);
     console.error('Dados enviados:', appointmentData);
     throw new Error(`Erro ao criar consulta: ${error.message}`);
+  }
+
+  const data = insertedRows?.[0];
+  if (!data) {
+    throw new Error(
+      'Consulta pode ter sido criada, mas não foi possível carregar os dados (permissão ou rede). Atualize a agenda.'
+    );
   }
 
   // Se payment_status = 'paid', criar transação financeira IMEDIATAMENTE
@@ -1010,6 +1018,7 @@ const serializeFilters = (filters?: UseMedicalAppointmentsFilters): string => {
   if (filters.contactId) parts.push(`contact:${filters.contactId}`);
   if (filters.isSecretaria) parts.push('secretaria:true');
   if (filters.doctorIds && filters.doctorIds.length > 0) parts.push(`doctors:${filters.doctorIds.join(',')}`);
+  if (filters.skipQuery) parts.push('skip:true');
 
   return parts.length > 0 ? parts.join('|') : 'no-filters';
 };
@@ -1058,7 +1067,13 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
       doctorIdsToUse.length > 0 ? doctorIdsToUse : undefined,
       canViewAll // Passando a flag correta
     ),
-    enabled: !!user?.id && !!profile && !authLoading && !isLoadingProfile && (!isSecretaria || !isLoadingDoctors),
+    enabled:
+      !filters?.skipQuery &&
+      !!user?.id &&
+      !!profile &&
+      !authLoading &&
+      !isLoadingProfile &&
+      (!isSecretaria || !isLoadingDoctors),
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
     refetchOnMount: false,

@@ -497,7 +497,10 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
         custom_fields: baseCf,
       });
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['crm-contacts'] }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['crm-contacts'], exact: false });
+      await queryClient.refetchQueries({ queryKey: ['crm-contacts'], exact: false, type: 'active' });
+    },
     onError: (error) => console.error('❌ createContactMutation error:', error),
   });
 

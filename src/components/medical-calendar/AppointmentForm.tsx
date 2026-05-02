@@ -43,7 +43,7 @@ import { StockUsageSelector, StockUsageItem } from '@/components/inventory/Stock
 // Ensure ptBR is available (defensive check)
 const locale = ptBR || undefined;
 import { cn } from '@/lib/utils';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { parseISO } from 'date-fns';
 import { formatCurrencyInput, parseCurrencyToNumber, formatCurrency } from '@/lib/currency';
 
@@ -64,6 +64,13 @@ const appointmentSchema = z.object({
 });
 
 type AppointmentFormData = z.infer<typeof appointmentSchema>;
+
+function slotDurationMinutes(start?: Date, end?: Date): number | null {
+  if (!start || !end || end <= start) return null;
+  const d = Math.round((end.getTime() - start.getTime()) / 60000);
+  if (d < 15 || d > 480) return null;
+  return d;
+}
 
 interface AppointmentFormProps {
   open: boolean;
@@ -92,11 +99,27 @@ export function AppointmentForm({
 }: AppointmentFormProps) {
   const { user } = useAuth();
   const { contacts, isLoadingContacts, refetchContacts } = useCRM(undefined, true); // true = buscar todos os contatos
-  const { checkAvailability } = useAvailability();
   const { procedures, isLoading: isLoadingProcedures } = useCommercialProcedures();
   const { doctors, isLoading: isLoadingDoctors } = useDoctors();
   const { canScheduleForOthers, profile } = useUserProfile();
   const queryClient = useQueryClient();
+
+  const appointmentSchemaResolved = useMemo(
+    () =>
+      appointmentSchema.superRefine((data, ctx) => {
+        if (
+          canScheduleForOthers &&
+          (!data.doctor_id || String(data.doctor_id).trim() === '')
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Selecione o médico responsável',
+            path: ['doctor_id'],
+          });
+        }
+      }),
+    [canScheduleForOthers]
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [estimatedValueDisplay, setEstimatedValueDisplay] = useState<string>('');
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
@@ -150,8 +173,7 @@ export function AppointmentForm({
   // Invalidar cache quando o formulário abrir para garantir dados frescos
   useEffect(() => {
     if (open && user?.id && !isLoadingContacts) {
-      // Apenas invalidar o cache, não remover completamente
-      queryClient.invalidateQueries({ queryKey: ['crm-contacts', user.id] });
+      queryClient.invalidateQueries({ queryKey: ['crm-contacts'], exact: false });
 
       // Se não há contatos carregados, forçar refetch
       if (contacts.length === 0 && refetchContacts) {
@@ -224,7 +246,7 @@ export function AppointmentForm({
     formState: { errors },
     reset,
   } = useForm<AppointmentFormData>({
-    resolver: zodResolver(appointmentSchema),
+    resolver: zodResolver(appointmentSchemaResolved),
     defaultValues: {
       appointment_type: 'first_visit',
       status: 'scheduled',
@@ -234,6 +256,14 @@ export function AppointmentForm({
       start_time: prefilledStart ? format(prefilledStart, 'HH:mm') : '09:00',
     },
   });
+
+  const watchedDoctorId = watch('doctor_id');
+  const { checkAvailability } = useAvailability(
+    undefined,
+    undefined,
+    watchedDoctorId?.trim() ? watchedDoctorId : undefined,
+    canScheduleForOthers
+  );
 
   const handleFormSubmit = async (data: AppointmentFormData) => {
     setIsSubmitting(true);
@@ -247,6 +277,12 @@ export function AppointmentForm({
 
       // Calculate end time
       const endDateTime = new Date(startDateTime.getTime() + data.duration_minutes * 60000);
+
+      if (data.appointment_type === 'procedure' && !selectedProcedureId && !appointment) {
+        setAvailabilityError('Selecione o procedimento cadastrado para este médico.');
+        setIsSubmitting(false);
+        return;
+      }
 
       // Check availability (exclude current appointment if editing)
       const availability = checkAvailability(
@@ -348,7 +384,7 @@ export function AppointmentForm({
       }
     } catch (error) {
       console.error('Error submitting appointment:', error);
-      setAvailabilityError('Erro ao salvar consulta. Tente novamente.');
+      // Toast de erro já é exibido pela mutation em useMedicalAppointments
     } finally {
       setIsSubmitting(false);
     }
@@ -382,6 +418,23 @@ export function AppointmentForm({
         setSinalReceiptUrl(appointment.sinal_receipt_url);
         setSinalPaid(appointment.sinal_paid);
       }
+      if (appointment.appointment_type === 'procedure') {
+        const rawCf = (appointment as any).contact?.custom_fields;
+        let cf: Record<string, unknown> = {};
+        if (typeof rawCf === 'string') {
+          try {
+            cf = JSON.parse(rawCf) as Record<string, unknown>;
+          } catch {
+            cf = {};
+          }
+        } else if (rawCf && typeof rawCf === 'object') {
+          cf = rawCf as Record<string, unknown>;
+        }
+        const pid = cf.procedure_id as string | undefined;
+        setSelectedProcedureId(pid || null);
+      } else {
+        setSelectedProcedureId(null);
+      }
     } else if (!appointment && open) {
       // Reset to defaults for new appointment
       const isConversion = conversionData && conversionData.contactId;
@@ -390,11 +443,12 @@ export function AppointmentForm({
         : '';
 
       setEstimatedValueDisplay(estimatedValueFormatted);
+      const fromSlot = slotDurationMinutes(prefilledStart, prefilledEnd);
       reset({
         doctor_id: undefined,
         appointment_type: 'first_visit',
         status: 'scheduled',
-        duration_minutes: 30,
+        duration_minutes: fromSlot ?? 30,
         payment_status: isConversion && conversionData.paidInAdvance ? 'paid' : 'pending',
         start_date: prefilledStart || new Date(),
         start_time: prefilledStart ? format(prefilledStart, 'HH:mm') : '09:00',
@@ -411,7 +465,7 @@ export function AppointmentForm({
       // Reset flag quando fechar o formulário
       setFormInitialized(false);
     }
-  }, [appointment, open, prefilledStart, reset, conversionData]);
+  }, [appointment, open, prefilledStart, prefilledEnd, reset, conversionData]);
 
   const selectedContactId = watch('contact_id');
   const selectedType = watch('appointment_type');
@@ -1236,15 +1290,17 @@ export function AppointmentForm({
         <ContactForm
           forceOpen={true}
           onContactCreated={async (contactId) => {
-            // Invalidar a lista de contatos para garantir que o novo paciente apareça
-            queryClient.invalidateQueries({ queryKey: ['crm-contacts', user?.id] });
-            setValue('contact_id', contactId);
+            await queryClient.invalidateQueries({ queryKey: ['crm-contacts'], exact: false });
+            await refetchContacts();
+            setPatientSearchTerm('');
+            setValue('contact_id', contactId, { shouldValidate: true });
+            hasAutoFilledRef.current = null;
             setShowNewContactForm(false);
           }}
           onCancel={() => setShowNewContactForm(false)}
           onSuccess={() => {
-            // Invalidar a lista de contatos
-            queryClient.invalidateQueries({ queryKey: ['crm-contacts', user?.id] });
+            queryClient.invalidateQueries({ queryKey: ['crm-contacts'], exact: false });
+            void refetchContacts();
             setShowNewContactForm(false);
           }}
         />

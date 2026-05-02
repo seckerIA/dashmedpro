@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { format, parseISO, isSameDay, addMinutes, setHours, setMinutes } from 'date-fns';
+import { format, parseISO, addMinutes, setHours, setMinutes } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
+import { cn, isLocalCalendarDayEqual } from '@/lib/utils';
 import { MedicalAppointmentWithRelations, APPOINTMENT_TYPE_LABELS, APPOINTMENT_STATUS_LABELS } from '@/types/medicalAppointments';
 import { GeneralMeeting, MEETING_TYPE_LABELS, MEETING_STATUS_LABELS } from '@/types/generalMeetings';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
@@ -69,7 +69,8 @@ export function TimeGridView({
   const dayEvents = useMemo(() => {
     const dayAppointments = appointments.filter((appt) => {
       try {
-        return isSameDay(parseISO(appt.start_time), selectedDate);
+        if (!appt.start_time) return false;
+        return isLocalCalendarDayEqual(appt.start_time, selectedDate);
       } catch {
         return false;
       }
@@ -77,7 +78,8 @@ export function TimeGridView({
 
     const dayMeetings = meetings.filter((meeting) => {
       try {
-        return isSameDay(parseISO(meeting.start_time), selectedDate);
+        if (!meeting.start_time) return false;
+        return isLocalCalendarDayEqual(meeting.start_time, selectedDate);
       } catch {
         return false;
       }

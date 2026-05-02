@@ -1,9 +1,8 @@
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { useAuth } from './useAuth';
 import { useMedicalAppointments } from './useMedicalAppointments';
 import { useGeneralMeetings } from './useGeneralMeetings';
-import { startOfMonth, endOfMonth, isWithinInterval, parseISO } from 'date-fns';
+import { startOfMonth, endOfMonth, parseISO } from 'date-fns';
 
 export interface Conflict {
   type: 'appointment' | 'meeting';
@@ -21,10 +20,27 @@ export interface AvailabilityCheck {
 /**
  * Hook para verificar disponibilidade de horários
  * Verifica conflitos entre consultas médicas e reuniões com is_busy = true
+ *
+ * @param doctorId — Médico cuja agenda deve ser cruzada (obrigatório para secretária quando deferBusyCheckUntilDoctor=false incompleto)
+ * @param deferBusyCheckUntilDoctor — Secretária/admin: se true e doctorId vazio, não busca consultas (evita falso "livre" com filtro errado)
  */
-export function useAvailability(startDate?: Date, endDate?: Date, targetUserId?: string) {
+export function useAvailability(
+  startDate?: Date,
+  endDate?: Date,
+  doctorId?: string,
+  deferBusyCheckUntilDoctor = false
+) {
   const { user } = useAuth();
-  const userIdToUse = targetUserId || user?.id;
+
+  const skipAppointmentFetch = deferBusyCheckUntilDoctor && !doctorId;
+
+  const resolvedDoctorIds: string[] | undefined = skipAppointmentFetch
+    ? undefined
+    : doctorId
+      ? [doctorId]
+      : user?.id
+        ? [user.id]
+        : undefined;
 
   // Calcular range do mês se não fornecido
   const monthStart = startDate ? startOfMonth(startDate) : startOfMonth(new Date());
@@ -34,8 +50,11 @@ export function useAvailability(startDate?: Date, endDate?: Date, targetUserId?:
   const { appointments = [], isLoading: isLoadingAppointments } = useMedicalAppointments({
     startDate: monthStart,
     endDate: monthEnd,
-    doctorIds: userIdToUse ? [userIdToUse] : undefined,
+    doctorIds: resolvedDoctorIds && resolvedDoctorIds.length > 0 ? resolvedDoctorIds : undefined,
+    skipQuery: skipAppointmentFetch,
   });
+
+  const targetUserForMeetings = skipAppointmentFetch ? undefined : (doctorId || user?.id);
 
   // Buscar reuniões ocupadas do período
   const { busyPeriods = [], isLoading: isLoadingMeetings } = useGeneralMeetings({
@@ -43,7 +62,8 @@ export function useAvailability(startDate?: Date, endDate?: Date, targetUserId?:
     endDate: monthEnd,
     isBusy: true,
     status: 'scheduled',
-    viewAsUserIds: userIdToUse ? [userIdToUse] : undefined,
+    viewAsUserIds: targetUserForMeetings ? [targetUserForMeetings] : undefined,
+    skipQuery: skipAppointmentFetch,
   });
 
   // Cache de períodos ocupados
@@ -145,4 +165,3 @@ export function useAvailability(startDate?: Date, endDate?: Date, targetUserId?:
     isLoading: isLoadingAppointments || isLoadingMeetings,
   };
 }
-

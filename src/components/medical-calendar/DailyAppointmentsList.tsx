@@ -1,10 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { format, isSameDay, parseISO } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { MedicalAppointmentWithRelations } from '@/types/medicalAppointments';
 import { AppointmentCard } from './AppointmentCard';
 import { Calendar } from 'lucide-react';
+import { isLocalCalendarDayEqual } from '@/lib/utils';
 
 interface DailyAppointmentsListProps {
   selectedDate: Date;
@@ -33,8 +34,8 @@ export function DailyAppointmentsList({
   // Filtrar consultas do dia selecionado
   const dailyAppointments = appointments.filter(appt => {
     try {
-      const apptDate = parseISO(appt.start_time);
-      return isSameDay(apptDate, selectedDate);
+      if (!appt.start_time) return false;
+      return isLocalCalendarDayEqual(appt.start_time, selectedDate);
     } catch {
       return false;
     }

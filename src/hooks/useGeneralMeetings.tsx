@@ -18,6 +18,8 @@ interface UseGeneralMeetingsFilters {
   status?: MeetingStatus | 'all';
   isBusy?: boolean | 'all';
   viewAsUserIds?: string[];
+  /** Quando true, não executa a query (ex.: disponibilidade antes de escolher médico) */
+  skipQuery?: boolean;
 }
 
 // Fetch meetings
@@ -117,6 +119,7 @@ const serializeFilters = (filters?: UseGeneralMeetingsFilters): string => {
   if (filters.status && filters.status !== 'all') parts.push(`status:${filters.status}`);
   if (filters.isBusy !== undefined && filters.isBusy !== 'all') parts.push(`busy:${filters.isBusy}`);
   if (filters.viewAsUserIds && filters.viewAsUserIds.length > 0) parts.push(`viewUsers:${filters.viewAsUserIds.join(',')}`);
+  if (filters.skipQuery) parts.push('skip:true');
 
   return parts.length > 0 ? parts.join('|') : 'no-filters';
 };
@@ -138,7 +141,7 @@ export function useGeneralMeetings(filters?: UseGeneralMeetingsFilters) {
   } = useQuery({
     queryKey,
     queryFn: ({ signal }) => fetchMeetings(user?.id || '', filters, signal),
-    enabled: !!user?.id,
+    enabled: !!user?.id && !filters?.skipQuery,
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
     refetchOnMount: false,

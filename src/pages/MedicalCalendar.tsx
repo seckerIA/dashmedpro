@@ -507,6 +507,10 @@ export default function MedicalCalendar() {
 
   const handleDetailsMarkCompleted = async () => {
     if (selectedAppointment) {
+      if (!isSecretaria && accounts && accounts.length === 0) {
+        setShowFinancialRequirement(true);
+        return;
+      }
       // Fechar modal de detalhes e abrir modal de confirmação de pagamento
       setShowAppointmentDetails(false);
       setAppointmentForPayment(selectedAppointment);

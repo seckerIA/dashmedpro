@@ -6,11 +6,11 @@ import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, XCircle, ChevronDown, ChevronUp, Clock, User, Phone } from 'lucide-react';
 import { useMedicalAppointments } from '@/hooks/useMedicalAppointments';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { format, isSameDay, parseISO, isToday } from 'date-fns';
+import { format, parseISO, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { MedicalAppointmentWithRelations } from '@/types/medicalAppointments';
-import { cn } from '@/lib/utils';
+import { cn, isLocalCalendarDayEqual } from '@/lib/utils';
 
 interface DailyAttendanceChecklistProps {
   selectedDate: Date;
@@ -29,9 +29,9 @@ export function DailyAttendanceChecklist({ selectedDate }: DailyAttendanceCheckl
     
     return appointments.filter((apt) => {
       try {
-        const aptDate = parseISO(apt.start_time);
+        if (!apt.start_time) return false;
         return (
-          isSameDay(aptDate, selectedDate) &&
+          isLocalCalendarDayEqual(apt.start_time, selectedDate) &&
           apt.status !== 'completed' &&
           apt.status !== 'no_show' &&
           apt.status !== 'cancelled'
