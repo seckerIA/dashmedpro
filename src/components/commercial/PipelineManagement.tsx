@@ -17,9 +17,8 @@ import { useMedicalAppointments } from "@/hooks/useMedicalAppointments";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { FollowUp } from "@/types/followUp";
-import { Calendar, Loader2, Eraser } from "lucide-react";
+import { Calendar, Loader2 } from "lucide-react";
 import { type PeriodFilter, PERIOD_FILTER_OPTIONS, isWithinPeriod } from "@/lib/periodFilter";
-import { collectLeadNovoGarbageAndDuplicateDealIds } from "@/lib/crm-lead-cleanup";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { CRMDealWithContact } from "@/types/crm";
@@ -101,8 +100,6 @@ export function PipelineManagement() {
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("all");
   const [clearLeadNovoDialogOpen, setClearLeadNovoDialogOpen] = useState(false);
   const [isBulkDeletingLeadNovo, setIsBulkDeletingLeadNovo] = useState(false);
-  const [garbageCleanupDialogOpen, setGarbageCleanupDialogOpen] = useState(false);
-  const [isGarbageCleanupRunning, setIsGarbageCleanupRunning] = useState(false);
 
   const filteredDeals = useMemo(() => {
     return deals.filter(deal => {
@@ -126,12 +123,6 @@ export function PipelineManagement() {
   const leadNovoDealIds = useMemo(
     () => filteredDeals.filter(d => d.stage === 'lead_novo').map(d => d.id),
     [filteredDeals]
-  );
-
-  /** Toda a coluna Lead Novo no escopo carregado (não só filtros de tag/período): testes + duplicados telefone+nome. */
-  const garbageLeadNovoDealIds = useMemo(
-    () => collectLeadNovoGarbageAndDuplicateDealIds(deals),
-    [deals]
   );
 
   const handleReorderDealsInStage = async (_stage: string, dealIds: string[]) => {
@@ -201,43 +192,6 @@ export function PipelineManagement() {
       });
     } finally {
       setIsBulkDeletingLeadNovo(false);
-    }
-  };
-
-  const executeGarbageLeadNovoCleanup = async () => {
-    if (garbageLeadNovoDealIds.length === 0) {
-      setGarbageCleanupDialogOpen(false);
-      return;
-    }
-    setIsGarbageCleanupRunning(true);
-    const BATCH = 5;
-    let deleted = 0;
-    let failed = 0;
-    try {
-      for (let i = 0; i < garbageLeadNovoDealIds.length; i += BATCH) {
-        const chunk = garbageLeadNovoDealIds.slice(i, i + BATCH);
-        const results = await Promise.allSettled(chunk.map((id) => deleteDeal(id)));
-        for (const r of results) {
-          if (r.status === "fulfilled") deleted++;
-          else failed++;
-        }
-      }
-      toast({
-        title: "Limpeza concluída",
-        description:
-          failed === 0
-            ? `${deleted} negócio(s) removido(s) em Lead Novo (testes/placeholder ou duplicados mesmo telefone e nome). Contatos não foram apagados.`
-            : `${deleted} removido(s), ${failed} falhou(aram).`,
-      });
-      setGarbageCleanupDialogOpen(false);
-    } catch (e: unknown) {
-      toast({
-        variant: "destructive",
-        title: "Erro na limpeza",
-        description: e instanceof Error ? e.message : "Falha inesperada.",
-      });
-    } finally {
-      setIsGarbageCleanupRunning(false);
     }
   };
 
@@ -507,18 +461,6 @@ export function PipelineManagement() {
             <SelectItem value="ambos">Tráfego + Indicações</SelectItem>
           </SelectContent>
         </Select>
-        {!isSecretaria && garbageLeadNovoDealIds.length > 0 && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="shrink-0 border-destructive/30 text-destructive hover:bg-destructive/10"
-            onClick={() => setGarbageCleanupDialogOpen(true)}
-          >
-            <Eraser className="h-4 w-4 mr-2" />
-            Limpar testes e duplicados ({garbageLeadNovoDealIds.length})
-          </Button>
-        )}
       </div>
 
       {/* Team Member Selector - Apenas para Admin/Dono */}
@@ -605,7 +547,7 @@ export function PipelineManagement() {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir todos na coluna Lead Novo?</AlertDialogTitle>
             <AlertDialogDescription>
-              Remove os negócios (cards) visíveis nesta coluna — inclusive testes e duplicados de pipeline — respeitando filtros de período e origem. Os cadastros de contato não são apagados; vários cards podem apontar para o mesmo telefone/nome até você unificar ou excluir contatos na lista de leads.
+              Remove os negócios (cards) visíveis nesta coluna, respeitando filtros de período e origem. Os cadastros de contato não são apagados.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -622,34 +564,6 @@ export function PipelineManagement() {
                 </>
               ) : (
                 "Excluir todos"
-              )}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={garbageCleanupDialogOpen} onOpenChange={setGarbageCleanupDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Limpar Lead Novo (testes e duplicados)?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Serão excluídos {garbageLeadNovoDealIds.length} negócio(s) neste estágio: placeholders de teste (ex.: dummy data), e duplicados com o mesmo telefone e o mesmo nome — mantém apenas o registro mais antigo em cada grupo. Filtros de período/tags não aplicam; usa todos os deals em Lead Novo carregados nesta visão. Contatos no CRM não são removidos.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isGarbageCleanupRunning}>Cancelar</AlertDialogCancel>
-            <Button
-              variant="destructive"
-              disabled={isGarbageCleanupRunning || garbageLeadNovoDealIds.length === 0}
-              onClick={() => void executeGarbageLeadNovoCleanup()}
-            >
-              {isGarbageCleanupRunning ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Removendo...
-                </>
-              ) : (
-                "Remover agora"
               )}
             </Button>
           </AlertDialogFooter>

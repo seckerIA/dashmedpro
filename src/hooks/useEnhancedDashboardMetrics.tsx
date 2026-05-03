@@ -27,6 +27,8 @@ interface EnhancedMetrics {
   pendingFollowUps: number;
   appointmentsThisMonth: number;
   completedAppointmentsThisMonth: number;
+  /** Pacientes únicos com consulta concluída (compareceu) no mês — métrica de “novos/atendidos” no dashboard */
+  uniquePatientsCompletedThisMonth: number;
   appointmentCompletionRate: number;
   averageTicketByProcedure: Array<{ procedure: string; avgTicket: number; count: number }>;
   treatmentEvolution: TreatmentEvolutionData[];
@@ -121,9 +123,9 @@ const fetchEnhancedMetrics = async (
     // RLS handles organization filtering
     let appointmentsQuery = supabase
       .from('medical_appointments')
-      .select('id, status')
+      .select('id, status, contact_id')
       .gte('start_time', currentMonth.toISOString())
-      .limit(1000);
+      .limit(5000);
 
     if (!isAdminOrDono) {
       appointmentsQuery = appointmentsQuery.in('doctor_id', targetIds);
@@ -136,7 +138,12 @@ const fetchEnhancedMetrics = async (
   }
 
   const appointmentsThisMonth = appointmentsData.length;
-  const completedAppointmentsThisMonth = appointmentsData.filter((a: any) => a.status === 'completed').length;
+  const completedRows = appointmentsData.filter((a: any) => a.status === 'completed');
+  const completedAppointmentsThisMonth = completedRows.length;
+  const uniqueContactCompleted = new Set(
+    completedRows.map((a: any) => a.contact_id).filter(Boolean)
+  );
+  const uniquePatientsCompletedThisMonth = uniqueContactCompleted.size;
   const appointmentCompletionRate = appointmentsThisMonth > 0
     ? (completedAppointmentsThisMonth / appointmentsThisMonth) * 100
     : 0;
@@ -238,6 +245,7 @@ const fetchEnhancedMetrics = async (
     pendingFollowUps,
     appointmentsThisMonth,
     completedAppointmentsThisMonth,
+    uniquePatientsCompletedThisMonth,
     appointmentCompletionRate,
     averageTicketByProcedure,
     treatmentEvolution,

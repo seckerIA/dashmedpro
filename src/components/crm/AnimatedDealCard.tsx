@@ -3,9 +3,9 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CRMDealWithContact } from "@/types/crm";
-import { formatDistanceToNow } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { User, Calendar, Edit, Trash2, Clock, Mail, Phone, Building2, Stethoscope, AlertTriangle, GripVertical } from "lucide-react";
+import { Edit, Trash2, Phone, Stethoscope, AlertTriangle, GripVertical, MessageSquare, Copy } from "lucide-react";
 import { FollowUpAction } from "./FollowUpAction";
 import {
   AlertDialog,
@@ -20,10 +20,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { formatCurrency } from "@/lib/currency";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import { getContactService } from "@/lib/crm";
-import { getServiceConfig } from "@/constants/services";
 import { useNavigate } from "react-router-dom";
-import { MessageSquare } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface AnimatedDealCardProps {
   deal: CRMDealWithContact;
@@ -37,7 +36,25 @@ interface AnimatedDealCardProps {
   isHighlighted?: boolean;
   onToggleFollowUp?: (dealId: string, needsFollowUp: boolean) => void;
   showOwnerBadge?: boolean;
-  followUp?: any;
+  followUp?: unknown;
+}
+
+function stageAccentClass(stage: string): string {
+  const map: Record<string, string> = {
+    lead_novo: "border-l-primary/70",
+    em_contato: "border-l-cyan-500/80",
+    agendado: "border-l-blue-500/80",
+    avaliacao: "border-l-indigo-500/80",
+    em_tratamento: "border-l-emerald-500/80",
+    aguardando_retorno: "border-l-amber-500/80",
+    fechado_ganho: "border-l-green-600/80",
+    fechado_perdido: "border-l-red-500/70",
+    qualificado: "border-l-sky-500/80",
+    apresentacao: "border-l-violet-500/80",
+    proposta: "border-l-orange-500/80",
+    negociacao: "border-l-yellow-500/80",
+  };
+  return map[stage] || "border-l-muted-foreground/40";
 }
 
 export function AnimatedDealCard({
@@ -46,147 +63,143 @@ export function AnimatedDealCard({
   onClick,
   onEdit,
   onDelete,
-  onScheduleCall,
+  onScheduleCall: _onScheduleCall,
   isDeleting,
   isHighlighted,
-  onToggleFollowUp,
+  onToggleFollowUp: _onToggleFollowUp,
   showOwnerBadge,
-  followUp
+  followUp,
 }: AnimatedDealCardProps) {
+  void _onScheduleCall;
+  void _onToggleFollowUp;
   const { isSecretaria } = useUserProfile();
   const [isHovered, setIsHovered] = useState(false);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
-  const getStageColor = (stage: string) => {
-    const colors = {
-      'lead_novo': 'from-slate-500/10 to-slate-600/5 border-slate-500/20',
-      'qualificado': 'from-blue-500/10 to-blue-600/5 border-blue-500/20',
-      'apresentacao': 'from-purple-500/10 to-purple-600/5 border-purple-500/20',
-      'proposta': 'from-orange-500/10 to-orange-600/5 border-orange-500/20',
-      'negociacao': 'from-yellow-500/10 to-yellow-600/5 border-yellow-500/20',
-      'fechado_ganho': 'from-green-500/10 to-green-600/5 border-green-500/20',
-      'fechado_perdido': 'from-red-500/10 to-red-600/5 border-red-500/20',
-    };
-    return colors[stage as keyof typeof colors] || 'from-gray-500/10 to-gray-600/5 border-gray-500/20';
+  const displayName =
+    deal.contact?.full_name?.trim() ||
+    deal.title?.trim() ||
+    "Sem nome";
+
+  const createdRaw = deal.created_at;
+  const createdDate =
+    createdRaw != null
+      ? typeof createdRaw === "string"
+        ? parseISO(createdRaw)
+        : new Date(createdRaw as Date)
+      : null;
+  const createdLabel =
+    createdDate && !Number.isNaN(createdDate.getTime())
+      ? format(createdDate, "dd/MM/yyyy HH:mm", { locale: ptBR })
+      : null;
+
+  const phoneRaw = deal.contact?.phone?.trim() || "";
+  const phoneDigits = phoneRaw.replace(/\D/g, "");
+
+  const contactServiceValue = (deal.contact as { service_value?: number } | null)?.service_value;
+  const displayedServiceValue = contactServiceValue ?? deal.value ?? null;
+
+  const ownerName =
+    deal.owner_profile?.full_name ||
+    deal.owner_profile?.email?.split("@")[0] ||
+    null;
+  const ownerShort =
+    ownerName
+      ?.split(" ")
+      .map((n) => n[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || null;
+
+  const copyPhone = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!phoneRaw) return;
+    void navigator.clipboard.writeText(phoneRaw);
+    toast({ title: "Telefone copiado", description: phoneRaw });
   };
 
-  const cardClasses = `
-    relative overflow-visible transition-all duration-100 ease-out ${dragHandleListeners ? 'cursor-default' : 'cursor-pointer'} border-2
-    ${isHovered ? 'shadow-glow scale-[1.01] -translate-y-0.5 border-primary/60' : 'shadow-card hover:shadow-lg border-border/40'}
-    ${isHighlighted ? 'ring-2 ring-primary shadow-glow scale-[1.01] -translate-y-0.5 bg-gradient-to-br from-primary/10 to-primary/5' : 'bg-gradient-to-br from-card/80 to-card/40'}
-    ${getStageColor(deal.stage)}
-    backdrop-blur-sm
-    group
-  `.trim();
-
-  // Service value vem do contato (se existir) ou do deal
-  const contactServiceValue = (deal.contact as any)?.service_value;
-  const displayedServiceValue = contactServiceValue ?? deal.value ?? null;
-  const hasDifferentValue = deal.value != null && deal.value !== displayedServiceValue;
-
-  const ownerName = deal.owner_profile?.full_name || deal.owner_profile?.email?.split('@')[0] || 'Desconhecido';
-  const ownerInitials = ownerName
-    .split(' ')
-    .map(n => n[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-
-  // Service pode estar no custom_fields do contato como procedure_id
-  const contactService = getContactService(deal.contact);
-  const serviceConfig = contactService ? getServiceConfig(contactService) : null;
+  const openWhatsApp = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!phoneDigits) return;
+    navigate(`/whatsapp?phone=${phoneDigits}`);
+  };
 
   return (
     <Card
-      className={cardClasses}
+      className={cn(
+        "relative w-full max-w-full overflow-hidden rounded-xl border bg-card text-card-foreground shadow-sm transition-shadow duration-200",
+        "border-l-[3px]",
+        stageAccentClass(deal.stage || ""),
+        dragHandleListeners ? "cursor-default" : "cursor-pointer",
+        isHovered && "shadow-md ring-1 ring-border/60",
+        isHighlighted && "ring-2 ring-primary/50 bg-primary/[0.04]"
+      )}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={onClick}
-      style={{
-        width: '100%',
-        maxWidth: '100%',
-        boxSizing: 'border-box',
-        overflow: 'visible',
-        position: 'relative',
-        zIndex: isHovered ? 100 : 1,
-        transform: 'translateZ(0)', // GPU acceleration
-        willChange: isHovered ? 'transform, box-shadow' : 'auto',
-        backfaceVisibility: 'hidden',
-      }}
+      style={{ boxSizing: "border-box" }}
     >
-      {/* Animated background gradient */}
-      <div
-        className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent transform -skew-x-12 -z-10"
-        style={{
-          transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-          transform: isHovered ? 'translateX(100%)' : 'translateX(-100%)',
-          willChange: 'transform',
-        }}
-      />
-
-      {/* Glass effect overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-transparent to-primary/5 -z-10" />
-
-      {/* Card Content */}
-      <div className="relative p-3 space-y-3" style={{ width: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
-
-        {/* Header: Title and Actions */}
-        <div className="flex items-start justify-between gap-2 min-w-0">
-          <div className="flex items-start gap-1 flex-1 min-w-0">
-            {dragHandleListeners && (
+      <div className="px-3 py-2.5 space-y-2.5">
+        {/* Top: arrastar + data + ações */}
+        <div className="flex items-center justify-between gap-2 min-w-0">
+          <div className="flex items-center min-w-0">
+            {dragHandleListeners ? (
               <button
                 type="button"
-                className="touch-none mt-0.5 shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground cursor-grab active:cursor-grabbing"
+                className="touch-none shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground cursor-grab active:cursor-grabbing"
                 aria-label="Arrastar card"
                 {...dragHandleListeners}
               >
-                <GripVertical className="w-4 h-4" />
+                <GripVertical className="w-3.5 h-3.5" />
               </button>
-            )}
-            <h4 className="font-semibold text-sm text-foreground line-clamp-2 mb-1 group-hover:text-primary transition-colors flex-1 min-w-0">
-              {deal.title || 'Sem título'}
-            </h4>
+            ) : null}
           </div>
-
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {/* Edit Button */}
-            {onEdit && (
+          <div className="flex items-center gap-0.5 shrink-0 min-w-0">
+            {createdLabel ? (
+              <span
+                className="text-[10px] sm:text-[11px] tabular-nums text-muted-foreground whitespace-nowrap mr-1"
+                title="Data de criação do negócio"
+              >
+                {createdLabel}
+              </span>
+            ) : null}
+            {onEdit ? (
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0 hover:bg-primary/20 hover:text-primary"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-foreground"
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation();
                   onEdit(deal);
                 }}
+                aria-label="Editar"
               >
-                <Edit className="w-3 h-3" />
+                <Edit className="w-3.5 h-3.5" />
               </Button>
-            )}
-
-            {/* Delete Button */}
-            {onDelete && (
+            ) : null}
+            {onDelete ? (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
                     variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 hover:bg-destructive/20 hover:text-destructive"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
                     disabled={isDeleting}
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => e.stopPropagation()}
+                    aria-label="Excluir"
                   >
-                    <Trash2 className="w-3 h-3" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent className="backdrop-blur-xl bg-background/95">
+                <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Excluir Contrato</AlertDialogTitle>
+                    <AlertDialogTitle>Excluir contrato</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Tem certeza que deseja excluir o contrato "{deal.title}"?
-                      Esta ação não pode ser desfeita.
+                      Excluir o negócio de <strong>{displayName}</strong>? Esta ação não pode ser desfeita.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -200,183 +213,106 @@ export function AnimatedDealCard({
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
-            )}
+            ) : null}
           </div>
         </div>
 
-        {/* Badges Row: Status, Follow-up and Owner */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Badge de Em Tratamento */}
-          {deal.is_in_treatment && (
-            <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-green-500/10 text-green-600 border-green-500/20">
-              <Stethoscope className="w-3 h-3 mr-1" />
-              Em Tratamento
-            </Badge>
-          )}
-          {/* Badge de Inadimplente */}
-          {deal.is_defaulting && (
-            <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-red-500/10 text-red-600 border-red-500/20">
-              <AlertTriangle className="w-3 h-3 mr-1" />
-              Inadimplente
-            </Badge>
-          )}
-          {/* Badge de Follow-up */}
-          {followUp && (
-            <Badge
-              variant="secondary"
-              className={`text-xs px-2 py-0.5 border-blue-400/20 ${new Date(followUp.scheduled_date) < new Date()
-                ? 'bg-red-500/10 text-red-600'
-                : 'bg-blue-500/10 text-blue-600'
-                }`}
-              title={`Agendado para: ${new Date(followUp.scheduled_date).toLocaleString()}`}
+        {/* Nome (informação principal) */}
+        <h3 className="font-semibold text-[15px] leading-snug text-foreground tracking-tight line-clamp-2 pr-0.5">
+          {displayName}
+        </h3>
+
+        {/* Telefone */}
+        {phoneRaw ? (
+          <div className="flex items-center gap-2 min-w-0 rounded-lg bg-muted/50 px-2 py-1.5 border border-border/50">
+            <Phone className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+            <span className="text-sm font-medium tabular-nums tracking-wide text-foreground truncate flex-1 min-w-0">
+              {phoneRaw}
+            </span>
+            <div
+              className={cn(
+                "flex items-center gap-0 shrink-0",
+                isHovered ? "opacity-100" : "opacity-0 sm:opacity-100"
+              )}
             >
-              <Clock className="w-3 h-3 mr-1" />
-              Follow-up {new Date(followUp.scheduled_date) < new Date() ? 'Atrasado' : 'Agendado'}
-            </Badge>
-          )}
-          {showOwnerBadge && deal.owner_profile && (
-            <Badge
-              variant="outline"
-              className="text-xs px-2 py-0.5 bg-primary/5 border-primary/20 text-primary"
-              title={`Responsável: ${ownerName}`}
-            >
-              {ownerName}
-            </Badge>
-          )}
-        </div>
-
-        {/* Contact Information */}
-        {deal.contact && (
-          <div className="space-y-2 border-t border-border/50 pt-2">
-            {/* Contact Name */}
-            {deal.contact.full_name && (
-              <div className="flex items-center gap-2 text-sm">
-                <User className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                <span className="font-medium text-foreground truncate">{deal.contact.full_name}</span>
-              </div>
-            )}
-
-            {/* Company */}
-            {deal.contact.company && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
-                <span className="truncate">{deal.contact.company}</span>
-              </div>
-            )}
-
-            {/* Email */}
-            {deal.contact.email && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Mail className="w-3.5 h-3.5 flex-shrink-0" />
-                <span className="truncate">{deal.contact.email}</span>
-              </div>
-            )}
-
-            {/* Phone */}
-            {deal.contact.phone && (
-              <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                <div className="flex items-center gap-2 truncate">
-                  <Phone className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span className="truncate">{deal.contact.phone}</span>
-                </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 hover:bg-primary/20 hover:text-primary"
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const cleanPhone = deal.contact!.phone!.replace(/\D/g, '');
-                      navigate(`/whatsapp?phone=${cleanPhone}`);
-                    }}
-                  >
-                    <Phone className="w-3 h-3" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 hover:bg-green-500/20 hover:text-green-600"
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const cleanPhone = deal.contact!.phone!.replace(/\D/g, '');
-                      navigate(`/whatsapp?phone=${cleanPhone}`);
-                    }}
-                  >
-                    <MessageSquare className="w-3 h-3" />
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Service Badge */}
-            {serviceConfig && (
-              <div className="flex items-center gap-2">
-                <Badge
-                  variant="secondary"
-                  className={`text-xs px-2 py-0.5 ${serviceConfig.bgColor} ${serviceConfig.textColor} border-0 font-medium`}
-                >
-                  {serviceConfig.label}
-                </Badge>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Service Value - Highlighted - oculto para secretária */}
-        {!isSecretaria && displayedServiceValue !== null && (
-          <div
-            className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-200/50 rounded-lg p-2.5"
-            style={{ width: '100%', boxSizing: 'border-box', overflow: 'hidden' }}
-          >
-            <div className="flex items-center justify-between gap-2 min-w-0">
-              <span className="text-xs font-medium text-green-600 uppercase tracking-wide whitespace-nowrap flex-shrink-0">
-                Valor do Serviço
-              </span>
-              <span className="text-lg font-bold text-green-700 tabular-nums truncate">
-                {formatCurrency(displayedServiceValue)}
-              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                aria-label="Copiar telefone"
+                onClick={copyPhone}
+              >
+                <Copy className="w-3.5 h-3.5" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-500/10"
+                aria-label="Abrir WhatsApp"
+                onClick={openWhatsApp}
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+              </Button>
             </div>
           </div>
+        ) : (
+          <p className="text-[11px] text-muted-foreground italic">Sem telefone cadastrado</p>
         )}
 
-        {/* Deal Value (if different from service value) - oculto para secretária */}
-        {!isSecretaria && hasDifferentValue && (
-          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <span className="text-xs">Valor do Negócio:</span>
-            <span className="font-semibold text-foreground tabular-nums">
-              {formatCurrency(deal.value)}
-            </span>
+        {/* Badges compactos (só quando importa clinicamente) */}
+        {(deal.is_in_treatment || deal.is_defaulting || followUp || (showOwnerBadge && ownerShort)) ? (
+          <div className="flex flex-wrap items-center gap-1">
+            {deal.is_in_treatment ? (
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5 font-normal bg-emerald-500/10 text-emerald-700 border-emerald-500/20">
+                <Stethoscope className="w-2.5 h-2.5 mr-0.5" />
+                Tratamento
+              </Badge>
+            ) : null}
+            {deal.is_defaulting ? (
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5 font-normal bg-red-500/10 text-red-700 border-red-500/20">
+                <AlertTriangle className="w-2.5 h-2.5 mr-0.5" />
+                Inadimplente
+              </Badge>
+            ) : null}
+            {followUp ? (
+              <Badge
+                variant="secondary"
+                className={cn(
+                  "text-[10px] px-1.5 py-0 h-5 font-normal border",
+                  new Date((followUp as { scheduled_date: string }).scheduled_date) < new Date()
+                    ? "bg-red-500/10 text-red-700 border-red-500/20"
+                    : "bg-blue-500/10 text-blue-700 border-blue-500/20"
+                )}
+              >
+                Follow-up
+              </Badge>
+            ) : null}
+            {showOwnerBadge && ownerShort ? (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 font-normal text-muted-foreground" title={ownerName || undefined}>
+                {ownerShort}
+              </Badge>
+            ) : null}
           </div>
-        )}
+        ) : null}
 
-        {/* Follow-up Action */}
+        {/* Valor (uma linha) */}
+        {!isSecretaria && displayedServiceValue !== null && displayedServiceValue !== undefined ? (
+          <p className="text-xs text-muted-foreground tabular-nums">
+            <span className="text-[10px] uppercase tracking-wider mr-1">Valor</span>
+            <span className="font-semibold text-foreground">{formatCurrency(Number(displayedServiceValue))}</span>
+          </p>
+        ) : null}
+
         <div
-          className="pt-2"
+          className="pt-0.5 border-t border-border/40"
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
-          <FollowUpAction
-            dealId={deal.id}
-            dealTitle={deal.title}
-          />
+          <FollowUpAction dealId={deal.id} dealTitle={displayName} compact />
         </div>
-
-        {/* Footer: Expected Close Date */}
-        {deal.expected_close_date && (
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1 border-t border-border/50">
-            <Calendar className="w-3 h-3 flex-shrink-0" />
-            <span>
-              {formatDistanceToNow(new Date(deal.expected_close_date), {
-                addSuffix: true,
-                locale: ptBR
-              })}
-            </span>
-          </div>
-        )}
       </div>
-
     </Card>
   );
 }

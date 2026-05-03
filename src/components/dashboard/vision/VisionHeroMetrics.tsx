@@ -98,7 +98,8 @@ export function VisionHeroMetrics() {
 
     // Admin/Dono (Default)
     const monthProfit = financialMetrics?.monthNetProfit || 0;
-    const newPatients = enhancedMetrics?.appointmentsThisMonth || 0;
+    const newPatientsAttended = enhancedMetrics?.uniquePatientsCompletedThisMonth ?? 0;
+    const appointmentsMonth = enhancedMetrics?.appointmentsThisMonth ?? 0;
     const conversion = dashboardMetrics?.conversionRate || 0;
 
     return (
@@ -116,11 +117,15 @@ export function VisionHeroMetrics() {
             />
 
             <VisionMetricCard
-                title="Novos Pacientes"
-                value={newPatients}
+                title="Novos pacientes"
+                value={newPatientsAttended}
                 icon={Users}
                 variant="blue"
-                description={`${dashboardMetrics?.totalContacts || 0} total de leads`}
+                description={
+                    appointmentsMonth > 0
+                        ? `${appointmentsMonth} agendamento(s) no mês — contados após “Compareceu” na agenda`
+                        : "Contados após marcar consulta como concluída na agenda"
+                }
             />
 
             <VisionMetricCard

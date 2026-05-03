@@ -152,7 +152,8 @@ export function HeroMetrics({ className }: HeroMetricsProps) {
         const todayRevenue = financialMetrics?.todayRevenue || 0;
         const monthProfit = financialMetrics?.monthNetProfit || 0;
         const profitTrend = financialMetrics?.netProfitMargin || 0;
-        const newPatients = enhancedMetrics?.appointmentsThisMonth || 0;
+        const newPatientsAttended = enhancedMetrics?.uniquePatientsCompletedThisMonth ?? 0;
+        const appointmentsMonth = enhancedMetrics?.appointmentsThisMonth ?? 0;
 
         return [
             {
@@ -187,18 +188,18 @@ export function HeroMetrics({ className }: HeroMetricsProps) {
             },
             {
                 id: "patients",
-                title: "Novos Pacientes",
-                value: newPatients,
-                status: newPatients > 10 ? "success" : newPatients > 0 ? "neutral" : "warning",
+                title: "Novos pacientes",
+                value: newPatientsAttended,
+                status: newPatientsAttended > 10 ? "success" : newPatientsAttended > 0 ? "neutral" : "warning",
                 icon: Users,
                 trend: {
-                    direction: newPatients > 5 ? "up" : "stable",
-                    value: `${dashboardMetrics?.totalContacts || 0}`,
-                    label: "total de contatos"
+                    direction: newPatientsAttended > 5 ? "up" : "stable",
+                    value: `${appointmentsMonth}`,
+                    label: "agendamentos no mês"
                 },
-                insight: newPatients > 0
-                    ? `${newPatients} consultas agendadas este mês`
-                    : "Considere ações de captação"
+                insight: newPatientsAttended > 0
+                    ? `${newPatientsAttended} paciente(s) único(s) após “Compareceu” este mês`
+                    : "Nenhum atendimento concluído no mês — confira a agenda"
             }
         ];
     };

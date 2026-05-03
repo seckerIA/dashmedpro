@@ -137,7 +137,7 @@ const DroppableColumn = ({ stage, children }: { stage: typeof PIPELINE_STAGES[0]
   return (
     <Card
       ref={setNodeRef}
-      className={`flex h-full min-h-[500px] shrink-0 flex-col overflow-hidden w-[85vw] md:w-80 bg-gradient-to-br from-card to-card/50 border-2 shadow-card transition-all duration-100 ease-out snap-center ${isOver
+      className={`group/column flex h-full min-h-0 max-h-full shrink-0 flex-col overflow-hidden w-[85vw] md:w-80 bg-gradient-to-br from-card to-card/50 border-2 shadow-card transition-all duration-100 ease-out snap-center ${isOver
         ? 'border-primary shadow-glow ring-2 ring-primary/20 scale-[1.01]'
         : 'border-border hover:shadow-lg'
         }`}
@@ -200,12 +200,11 @@ export function PipelineBoard({
   onEditFollowUp,
   showOwnerBadge,
   onDealMovedToAgendado,
-  onClearLeadNovoColumn
+  onClearLeadNovoColumn,
 }: PipelineBoardProps) {
   const { isSecretaria } = useUserProfile();
   const isMobile = useIsMobile();
   const [activeDeal, setActiveDeal] = useState<CRMDealWithContact | null>(null);
-
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 8 },
@@ -222,36 +221,30 @@ export function PipelineBoard({
     },
   };
 
-  // Memoizar deals por stage para evitar recálculos
-  // Memoizar deals e follow-ups por stage para evitar recalculos
-  const { dealsByStage, followUpMap } = useMemo(() => {
+  const dealsByStage = useMemo(() => {
     const grouped: Record<string, CRMDealWithContact[]> = {};
-    const fuMap = new Map<string, FollowUp>();
-
     PIPELINE_STAGES.forEach(stage => {
       grouped[stage.value] = [];
     });
-
     deals.forEach(deal => {
       if (grouped[deal.stage]) {
         grouped[deal.stage].push(deal);
       }
     });
-
-    // Mapear follow-ups por deal_id (apenas pendentes)
-    followUps.filter(fu => !fu.completed).forEach(fu => {
-      fuMap.set(fu.deal_id, fu);
-    });
-
-    // Ordenar cada grupo por position
     Object.keys(grouped).forEach(stage => {
       grouped[stage].sort((a, b) => (a.position || 0) - (b.position || 0));
     });
+    return grouped;
+  }, [deals]);
 
-    return { dealsByStage: grouped, followUpMap: fuMap };
-  }, [deals, followUps]);
+  const followUpMap = useMemo(() => {
+    const fuMap = new Map<string, FollowUp>();
+    followUps.filter(fu => !fu.completed).forEach(fu => {
+      fuMap.set(fu.deal_id, fu);
+    });
+    return fuMap;
+  }, [followUps]);
 
-  // Memoizar totais por stage
   const totalsByStage = useMemo(() => {
     const totals: Record<string, string> = {};
     PIPELINE_STAGES.forEach(stage => {
@@ -265,7 +258,6 @@ export function PipelineBoard({
     return totals;
   }, [dealsByStage]);
 
-  // Memoizar contatos únicos por stage
   const uniqueContactsByStage = useMemo(() => {
     const counts: Record<string, number> = {};
     PIPELINE_STAGES.forEach(stage => {
@@ -380,8 +372,6 @@ export function PipelineBoard({
     );
   }
 
-  console.log('📊 [PipelineBoard] Renderizando pipeline com', deals.length, 'deals');
-
   return (
     <DndContext
       sensors={sensors}
@@ -391,20 +381,20 @@ export function PipelineBoard({
       onDragEnd={handleDragEnd}
       measuring={measuringConfig}
     >
-      <div className="flex min-h-[500px] min-w-0 max-w-full items-stretch gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain px-4 pb-4 snap-x snap-mandatory scrollbar-hide md:px-0">
+      <div className="flex h-[min(calc(100dvh-6rem),1600px)] min-h-[560px] min-w-0 max-w-full items-stretch gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain px-4 pb-4 snap-x snap-mandatory scrollbar-hide md:px-0">
         {PIPELINE_STAGES.map((stage) => {
           const stageDeals = getDealsByStage(stage.value);
 
           return (
             <DroppableColumn key={stage.value} stage={stage}>
-              <CardHeader className="shrink-0 pb-3 bg-gradient-to-r from-transparent to-primary/5 rounded-t-lg space-y-0">
+              <CardHeader className="shrink-0 pb-2 bg-gradient-to-r from-transparent to-primary/5 rounded-t-lg space-y-0">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className={`flex items-center justify-center w-12 h-12 rounded-xl ${stage.bgColor} border border-border/50 shadow-sm shrink-0`}>
                       <stage.icon className={`w-6 h-6 ${stage.textColor}`} />
                     </div>
                     <div className="min-w-0">
-                      <CardTitle className="text-base font-semibold text-foreground min-h-12 flex items-center leading-tight truncate">
+                      <CardTitle className="text-base font-semibold text-foreground min-h-10 flex items-center leading-tight truncate">
                         {stage.label}
                       </CardTitle>
                       {/* Valor total do estágio - oculto para secretária */}
@@ -443,6 +433,7 @@ export function PipelineBoard({
                     <Badge
                       variant="secondary"
                       className={`text-sm ${stage.bgColor} ${stage.textColor} border-0 font-semibold px-3 py-1.5 rounded-lg shrink-0`}
+                      title={stageDeals.length > 0 ? 'Todos os leads desta etapa — role a lista abaixo' : undefined}
                     >
                       {stageDeals.length}
                     </Badge>
@@ -470,8 +461,9 @@ export function PipelineBoard({
               </CardHeader>
               <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-3 pt-0">
                 <div
-                  className="relative min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain pr-1 [-webkit-overflow-scrolling:touch]"
+                  className="relative min-h-0 w-full min-w-0 flex-1 basis-0 overflow-y-auto overflow-x-hidden overscroll-y-contain pr-1 [-webkit-overflow-scrolling:touch] rounded-md transition-shadow group-hover/column:ring-1 group-hover/column:ring-primary/20"
                   style={{ boxSizing: 'border-box' }}
+                  title="Role para ver todos os cards desta etapa"
                 >
                   <SortableContext items={stageDeals.map(deal => deal.id)} strategy={verticalListSortingStrategy}>
                     <div className="w-full min-w-0 space-y-3 px-0.5 pb-1" style={{ boxSizing: 'border-box' }}>

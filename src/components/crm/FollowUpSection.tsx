@@ -49,7 +49,7 @@ export function FollowUpSection({
 
   return (
     <Card
-      className="flex h-full min-h-[500px] shrink-0 snap-center flex-col overflow-hidden border border-border bg-gradient-to-br from-card to-card/50 shadow-card w-[85vw] md:w-80"
+      className="flex h-full min-h-0 shrink-0 snap-center flex-col overflow-hidden border border-border bg-gradient-to-br from-card to-card/50 shadow-card w-[85vw] md:w-80"
       style={{
         width: colWidth,
         maxWidth: colWidth,
@@ -93,7 +93,7 @@ export function FollowUpSection({
       </CardHeader>
 
       <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-3 pt-0">
-        <div className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain pr-1 [-webkit-overflow-scrolling:touch]">
+        <div className="relative min-h-0 flex-1 basis-0 overflow-y-auto overflow-x-hidden overscroll-y-contain pr-1 [-webkit-overflow-scrolling:touch]">
           <div className="space-y-2 pr-2">
             {followUpDeals.sort((a, b) => {
               const aFollowUp = followUpsByDealId.get(a.id);
