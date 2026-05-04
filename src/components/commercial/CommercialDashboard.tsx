@@ -120,6 +120,37 @@ export function CommercialDashboard() {
     return `${d.leadsFromAds} via anúncios (mesma base do Marketing)`;
   }, [marketingDashboard]);
 
+  /** Primeira etapa do funil = mesmo total do card (anúncios + WhatsApp); %s relativas a esse total. */
+  const conversionFunnelData = useMemo(() => {
+    const rows = metrics?.funnelData;
+    if (!rows?.length) return [];
+    const marketingTotal = marketingDashboard?.totalLeads;
+    const leadsTop =
+      marketingDashboard != null && marketingTotal != null && marketingTotal >= 0
+        ? marketingTotal
+        : rows[0].count;
+    const consultas = rows[1]?.count ?? 0;
+    const vendas = rows[2]?.count ?? 0;
+    const pct = (n: number) => (leadsTop > 0 ? Math.min((n / leadsTop) * 100, 100) : 0);
+    return [
+      { stage: rows[0].stage, count: leadsTop, percentage: leadsTop > 0 ? 100 : 0 },
+      { stage: rows[1].stage, count: consultas, percentage: pct(consultas) },
+      { stage: rows[2].stage, count: vendas, percentage: pct(vendas) },
+    ];
+  }, [metrics?.funnelData, marketingDashboard]);
+
+  /** (Nº de consultas no período ÷ leads gerados) × 100 — consultas = etapa “Consultas” do funil; leads = card ao lado. */
+  const taxaConversaoVsLeadsMarketing = useMemo(() => {
+    const consultas =
+      metrics?.funnelData?.find((s) => s.stage === "Consultas")?.count ?? 0;
+    const leads = marketingDashboard?.totalLeads;
+    if (marketingDashboard == null) {
+      return metrics?.conversionRate ?? 0;
+    }
+    if (leads == null || leads <= 0) return 0;
+    return (consultas / leads) * 100;
+  }, [marketingDashboard, metrics?.funnelData, metrics?.conversionRate]);
+
   const metricsLoading = isLoading || isLoadingMarketingLeads;
 
   return (
@@ -315,7 +346,16 @@ export function CommercialDashboard() {
               icon: "trending-up" as const,
               hint: leadsGeradosHint,
             },
-            { title: "Taxa de Conversão", value: metrics?.conversionRate || 0, icon: "target" as const, format: "percentage" as const },
+            {
+              title: "Taxa de Conversão",
+              value: taxaConversaoVsLeadsMarketing,
+              icon: "target" as const,
+              format: "percentage" as const,
+              hint:
+                marketingDashboard != null
+                  ? "Consultas no período ÷ leads gerados × 100 (mesma base do card ao lado)"
+                  : undefined,
+            },
             { title: "Receita Total", value: metrics?.totalRevenue || 0, icon: "dollar-sign" as const, format: "currency" as const },
             {
               title: "Pacientes Novos",
@@ -347,7 +387,7 @@ export function CommercialDashboard() {
             <Card className="bg-gradient-card shadow-card border-border transition-all">
               <CardContent className="p-6">
                 <h3 className="text-lg font-semibold mb-4">Funil de Conversão</h3>
-                <ConversionFunnel data={metrics?.funnelData || []} />
+                <ConversionFunnel data={conversionFunnelData} />
               </CardContent>
             </Card>
           </motion.div>
