@@ -114,6 +114,8 @@ export interface FinancialMetrics {
   netProfitMargin: number;
   todayRevenue: number;
   totalMarketingSpend?: number;
+  /** Receita no mesmo recorte MTD do mês anterior (para comparação no card). */
+  monthRevenuePreviousPeriod?: number;
 }
 
 export interface MonthlyData {

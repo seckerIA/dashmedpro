@@ -7,29 +7,59 @@ import type {
   MonthlyData,
   CategoryExpense,
   CashFlowProjection,
-  CostBreakdown
 } from "@/types/financial";
-import { startOfDay, endOfDay } from "date-fns";
-import { useCostsBreakdown } from "./useTransactionCosts";
-import { startOfMonth, endOfMonth, subMonths, format, addMonths } from "date-fns";
+import { startOfDay, endOfDay, isSameMonth, subMonths, startOfMonth, endOfMonth, format, addMonths } from "date-fns";
 import { getMonthlyMarketingFixedCostsTotalBrl } from "@/constants/monthlyMarketingFixedCosts";
+import { useCostsBreakdown } from "./useTransactionCosts";
+import { useMemo } from "react";
+
+/**
+ * Intervalo efetivo das métricas: no mesmo mês civil, soma do dia 1 até a data final (MTD);
+ * em intervalos que cruzam meses, usa exatamente [from, to] ordenado.
+ */
+function resolveDashboardTransactionBounds(filters?: { startDate?: Date; endDate?: Date }) {
+  const now = new Date();
+  let rawFrom = filters?.startDate;
+  let rawTo = filters?.endDate ?? filters?.startDate;
+  if (!rawFrom && !rawTo) {
+    rawFrom = startOfMonth(now);
+    rawTo = endOfMonth(now);
+  } else if (!rawFrom) {
+    rawFrom = rawTo!;
+  } else if (!rawTo) {
+    rawTo = rawFrom;
+  }
+
+  let rangeStart = rawFrom <= rawTo ? rawFrom : rawTo;
+  let rangeEnd = rawFrom <= rawTo ? rawTo : rawFrom;
+
+  if (isSameMonth(rangeStart, rangeEnd)) {
+    rangeStart = startOfMonth(rangeEnd);
+  }
+
+  return {
+    rangeStart: startOfDay(rangeStart),
+    rangeEnd: startOfDay(rangeEnd),
+    keyFrom: format(startOfDay(rangeStart), "yyyy-MM-dd"),
+    keyTo: format(startOfDay(rangeEnd), "yyyy-MM-dd"),
+  };
+}
 
 export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date }) => {
   const { user } = useAuth();
   const { profile } = useUserProfile();
 
-  const now = new Date();
-  const currentMonthStart = filters?.startDate || startOfMonth(now);
-  const currentMonthEnd = filters?.endDate || endOfMonth(now);
-
-  // Buscar breakdown de custos do período selecionado
-  const { data: costsBreakdown } = useCostsBreakdown(
-    format(currentMonthStart, "yyyy-MM-dd"),
-    format(currentMonthEnd, "yyyy-MM-dd")
+  const bounds = useMemo(
+    () => resolveDashboardTransactionBounds(filters),
+    [filters?.startDate?.valueOf() ?? 0, filters?.endDate?.valueOf() ?? 0]
   );
+  const { rangeStart, rangeEnd, keyFrom, keyTo } = bounds;
+
+  // Buscar breakdown de custos do período selecionado (alinha ao mesmo intervalo do dashboard)
+  const { data: costsBreakdown } = useCostsBreakdown(keyFrom, keyTo);
 
   const { data: metrics, isLoading, error } = useQuery({
-    queryKey: ["financial-metrics", user?.id, profile?.role, filters?.startDate, filters?.endDate],
+    queryKey: ["financial-metrics", user?.id, profile?.role, keyFrom, keyTo],
     queryFn: async () => {
       if (!user) throw new Error("Usuário não autenticado");
 
@@ -42,32 +72,68 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
       const accountsData = (accounts || []) as Array<{ current_balance: number }>;
       const totalBalance = accountsData.reduce((sum, acc) => sum + (acc.current_balance || 0), 0);
 
-      // 2. Buscar transações do mês atual (com custos) - RLS handles organization filtering
+      const rangeFromStr = format(rangeStart, "yyyy-MM-dd");
+      const rangeToStr = format(rangeEnd, "yyyy-MM-dd");
+
+      // 2. Transações no período efetivo (MTD no mesmo mês ou intervalo escolhido)
       const { data: currentMonthTransactions } = await supabase
         .from("financial_transactions")
-        .select("type, amount, status, total_costs, has_costs")
+        .select(`
+          type,
+          amount,
+          status,
+          total_costs,
+          has_costs,
+          category:financial_categories(is_fixed)
+        `)
         .eq("status", "concluida")
-        .gte("transaction_date", format(currentMonthStart, "yyyy-MM-dd"))
-        .lte("transaction_date", format(currentMonthEnd, "yyyy-MM-dd"));
+        .gte("transaction_date", rangeFromStr)
+        .lte("transaction_date", rangeToStr);
 
       const transactionsData = (currentMonthTransactions || []) as Array<{
         type: string;
         amount: number;
         has_costs?: boolean;
         total_costs?: number;
+        category?: { is_fixed: boolean | null } | null;
       }>;
 
       const monthRevenue = transactionsData
         .filter(t => t.type === "entrada")
         .reduce((sum, t) => sum + (t.amount || 0), 0);
 
+      const isFixedSaida = (t: (typeof transactionsData)[0]) =>
+        t.type === "saida" && t.category?.is_fixed === true;
+
       const monthExpenses = transactionsData
-        .filter(t => t.type === "saida")
+        .filter(t => t.type === "saida" && !isFixedSaida(t))
         .reduce((sum, t) => sum + (t.amount || 0), 0);
 
+      const calMonthStart = startOfMonth(rangeEnd);
+      const calMonthEnd = endOfMonth(rangeEnd);
+
+      // Custos fixos cadastrados (categoria is_fixed) — mês civil inteiro da data final do filtro
+      const { data: fixedCategoryFullMonth } = await supabase
+        .from("financial_transactions")
+        .select(`
+          amount,
+          category:financial_categories!inner(is_fixed)
+        `)
+        .eq("type", "saida")
+        .eq("status", "concluida")
+        .eq("financial_categories.is_fixed", true)
+        .gte("transaction_date", format(calMonthStart, "yyyy-MM-dd"))
+        .lte("transaction_date", format(calMonthEnd, "yyyy-MM-dd"));
+
+      const monthFixedCategoryTotal = (fixedCategoryFullMonth || []).reduce(
+        (sum, t: any) => sum + (t.amount || 0),
+        0
+      );
+
       // 2.1 Buscar transações de HOJE para receita do dia
-      const todayStart = format(startOfDay(now), "yyyy-MM-dd");
-      const todayEnd = format(endOfDay(now), "yyyy-MM-dd");
+      const today = new Date();
+      const todayStart = format(startOfDay(today), "yyyy-MM-dd");
+      const todayEnd = format(endOfDay(today), "yyyy-MM-dd");
 
       const { data: todayTransactions } = await supabase
         .from("financial_transactions")
@@ -80,43 +146,45 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
       const todayData = (todayTransactions || []) as Array<{ type: string; amount: number }>;
       const todayRevenue = todayData.reduce((sum, t) => sum + (t.amount || 0), 0);
 
-      // 3. Marketing mensal planejado: assessoria + investimento em mídia + % sobre mídia (tributos)
+      // 3. Marketing mensal planejado (valor fixo do mês)
       const totalMarketingSpend = getMonthlyMarketingFixedCostsTotalBrl();
-
-      // 4. Buscar despesas fixas (através de categorias marcadas como is_fixed)
-      const { data: fixedCategoryTransactions } = await supabase
-        .from("financial_transactions")
-        .select(`
-          amount,
-          category:financial_categories!inner(is_fixed)
-        `)
-        .eq("type", "saida")
-        .eq("status", "concluida")
-        .eq("financial_categories.is_fixed", true)
-        .gte("transaction_date", format(currentMonthStart, "yyyy-MM-dd"))
-        .lte("transaction_date", format(currentMonthEnd, "yyyy-MM-dd"));
-
-      const monthFixedTransactionsTotal = (fixedCategoryTransactions || []).reduce(
-        (sum, t: any) => sum + (t.amount || 0),
-        0
-      );
 
       // Calcular custos totais (apenas de entradas - custos variáveis diretos)
       const monthTotalCosts = transactionsData
         .filter(t => t.type === "entrada" && t.has_costs)
         .reduce((sum, t) => sum + (t.total_costs || 0), 0);
 
-      // Lucro bruto (receitas - despesas variáveis/saídas comuns)
+      // Lucro após despesas variáveis (antes de fixos planejados e custos de entrada)
       const monthProfit = monthRevenue - monthExpenses;
 
-      // Custos fixos totais = Transações fixas + Marketing
-      const monthFixedCosts = monthFixedTransactionsTotal + totalMarketingSpend;
+      // Custos fixos exibidos: despesas fixas do mês civil + planejamento de marketing
+      const monthFixedCosts = monthFixedCategoryTotal + totalMarketingSpend;
 
-      // Lucro líquido (receitas - todas as saídas - custos variáveis - marketing)
-      const monthNetProfit = monthRevenue - monthExpenses - monthTotalCosts - totalMarketingSpend;
+      // Lucro líquido = receita no período − despesas variáveis − custos nas entradas − custos fixos mensais
+      const monthNetProfit = monthRevenue - monthExpenses - monthTotalCosts - monthFixedCosts;
 
       const profitMargin = monthRevenue > 0 ? (monthProfit / monthRevenue) * 100 : 0;
       const netProfitMargin = monthRevenue > 0 ? (monthNetProfit / monthRevenue) * 100 : 0;
+
+      // Receita no mesmo recorte do mês anterior (MTD espelhado)
+      let monthRevenuePreviousPeriod = 0;
+      const prevMonthEnd = subMonths(rangeEnd, 1);
+      const prevMonthStart = startOfMonth(prevMonthEnd);
+      if (rangeFromStr === format(startOfMonth(rangeEnd), "yyyy-MM-dd")) {
+        const prevFromStr = format(prevMonthStart, "yyyy-MM-dd");
+        const prevToStr = format(prevMonthEnd, "yyyy-MM-dd");
+        const { data: prevRows } = await supabase
+          .from("financial_transactions")
+          .select("type, amount")
+          .eq("status", "concluida")
+          .eq("type", "entrada")
+          .gte("transaction_date", prevFromStr)
+          .lte("transaction_date", prevToStr);
+        monthRevenuePreviousPeriod = (prevRows || []).reduce(
+          (sum, t: { amount?: number }) => sum + (t.amount || 0),
+          0
+        );
+      }
 
       // 5. Contar transações ativas
       const { count: activeTransactions } = await supabase
@@ -138,6 +206,7 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
         netProfitMargin,
         todayRevenue,
         totalMarketingSpend,
+        monthRevenuePreviousPeriod,
       };
 
       return metricsData;
@@ -200,12 +269,9 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
 
   // Despesas por categoria (período selecionado)
   const { data: expensesByCategory } = useQuery({
-    queryKey: ["financial-expenses-by-category", user?.id, profile?.role, filters?.startDate, filters?.endDate],
+    queryKey: ["financial-expenses-by-category", user?.id, profile?.role, keyFrom, keyTo],
     queryFn: async () => {
       if (!user) throw new Error("Usuário não autenticado");
-
-      const monthStart = currentMonthStart;
-      const monthEnd = currentMonthEnd;
 
       const { data } = await supabase
         .from("financial_transactions")
@@ -215,8 +281,8 @@ export const useFinancialMetrics = (filters?: { startDate?: Date; endDate?: Date
         `)
         .eq("type", "saida")
         .eq("status", "concluida")
-        .gte("transaction_date", format(monthStart, "yyyy-MM-dd"))
-        .lte("transaction_date", format(monthEnd, "yyyy-MM-dd"));
+        .gte("transaction_date", keyFrom)
+        .lte("transaction_date", keyTo);
 
       const transactionsData = (data || []) as Array<{
         amount: number;

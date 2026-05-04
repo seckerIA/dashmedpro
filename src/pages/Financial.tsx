@@ -65,7 +65,7 @@ import { getGradient, CHART_COLORS } from "@/lib/chart-colors"
 import { AccountForm } from "@/components/financial/AccountForm"
 import { FinancialRequirementModal } from "@/components/financial/FinancialRequirementModal"
 import { FinancialPageSkeleton } from "@/components/ui/LoadingSkeletons"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -122,8 +122,22 @@ const Financial = () => {
 
   const { metrics, monthlyData, expensesByCategory, costsBreakdown, cashFlowProjection, isLoading } = useFinancialMetrics({
     startDate: dateRange?.from,
-    endDate: dateRange?.to,
+    endDate: dateRange?.to ?? dateRange?.from,
   });
+
+  const revenueDeltaPct = useMemo(() => {
+    const prev = metrics?.monthRevenuePreviousPeriod;
+    if (prev == null || prev <= 0) return null;
+    return ((metrics!.monthRevenue - prev) / prev) * 100;
+  }, [metrics?.monthRevenue, metrics?.monthRevenuePreviousPeriod]);
+
+  const handleDashboardDateRangeSelect = (range: DateRange | undefined) => {
+    if (range?.from && !range.to) {
+      setDateRange({ from: range.from, to: range.from });
+      return;
+    }
+    setDateRange(range);
+  };
   const { accountsSummary, totalBalance, accounts, isLoading: isLoadingAccounts, deleteAccount } = useFinancialAccounts();
   const { transactions } = useFinancialTransactions();
   const [isAccountFormOpen, setIsAccountFormOpen] = useState(false);
@@ -318,7 +332,7 @@ const Financial = () => {
                     mode="range"
                     defaultMonth={dateRange?.from}
                     selected={dateRange}
-                    onSelect={setDateRange}
+                    onSelect={handleDashboardDateRangeSelect}
                     numberOfMonths={2}
                     locale={ptBR}
                     className="p-3"
@@ -427,9 +441,29 @@ const Financial = () => {
                 <p className="text-xl 2xl:text-2xl font-bold text-emerald-500 mb-1" title={formatCurrency(metrics?.monthRevenue || 0)}>
                   <AnimatedCurrency value={metrics?.monthRevenue || 0} duration={1.2} />
                 </p>
-                <div className="flex items-center gap-1">
-                  <TrendingUp className="w-3 h-3 text-emerald-500" />
-                  <span className="text-xs text-muted-foreground">+12.5% vs mês anterior</span>
+                <div className="flex items-center gap-1 flex-wrap">
+                  {revenueDeltaPct != null ? (
+                    <>
+                      {revenueDeltaPct >= 0 ? (
+                        <TrendingUp className="w-3 h-3 text-emerald-500 shrink-0" />
+                      ) : (
+                        <TrendingDown className="w-3 h-3 text-red-500 shrink-0" />
+                      )}
+                      <span
+                        className={cn(
+                          "text-xs text-muted-foreground",
+                          revenueDeltaPct < 0 && "text-red-500"
+                        )}
+                      >
+                        {revenueDeltaPct >= 0 ? "+" : ""}
+                        {revenueDeltaPct.toFixed(1)}% vs mesmo período do mês anterior
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      Entradas concluídas no período (no mesmo mês, do dia 1 até a data final)
+                    </span>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -467,7 +501,7 @@ const Financial = () => {
                     <div className="flex items-center gap-1">
                       <TrendingUp className="w-3 h-3 text-purple-500" />
                       <span className="text-xs text-muted-foreground">
-                        Assessoria + mídia + tributos (planejado)
+                        Planejado + despesas em categorias fixas no mês civil da data final
                       </span>
                     </div>
                   </CardContent>
@@ -485,7 +519,9 @@ const Financial = () => {
                     </p>
                     <div className="flex items-center gap-1">
                       <TrendingUp className="w-3 h-3 text-blue-500" />
-                      <span className="text-xs text-muted-foreground">{metrics?.netProfitMargin.toFixed(2)}% margem</span>
+                      <span className="text-xs text-muted-foreground">
+                        {(metrics?.netProfitMargin ?? 0).toFixed(2)}% margem
+                      </span>
                     </div>
                   </CardContent>
                 </Card>
