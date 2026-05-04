@@ -139,17 +139,14 @@ export function CommercialDashboard() {
     ];
   }, [metrics?.funnelData, marketingDashboard]);
 
-  /** (Nº de consultas no período ÷ leads gerados) × 100 — consultas = etapa “Consultas” do funil; leads = card ao lado. */
+  /** Pacientes novos ÷ leads gerados × 100 (mesmos números dos cards Pacientes Novos e Leads Gerados). */
   const taxaConversaoVsLeadsMarketing = useMemo(() => {
-    const consultas =
-      metrics?.funnelData?.find((s) => s.stage === "Consultas")?.count ?? 0;
     const leads = marketingDashboard?.totalLeads;
-    if (marketingDashboard == null) {
-      return metrics?.conversionRate ?? 0;
-    }
-    if (leads == null || leads <= 0) return 0;
-    return (consultas / leads) * 100;
-  }, [marketingDashboard, metrics?.funnelData, metrics?.conversionRate]);
+    const novos = metrics?.newPatients ?? 0;
+    if (marketingDashboard == null || leads == null) return metrics?.conversionRate ?? 0;
+    if (leads <= 0) return 0;
+    return (novos / leads) * 100;
+  }, [marketingDashboard, metrics?.newPatients, metrics?.conversionRate]);
 
   const metricsLoading = isLoading || isLoadingMarketingLeads;
 
@@ -353,7 +350,7 @@ export function CommercialDashboard() {
               format: "percentage" as const,
               hint:
                 marketingDashboard != null
-                  ? "Consultas no período ÷ leads gerados × 100 (mesma base do card ao lado)"
+                  ? "Pacientes novos ÷ leads gerados × 100 (cards Pacientes Novos e Leads Gerados)"
                   : undefined,
             },
             { title: "Receita Total", value: metrics?.totalRevenue || 0, icon: "dollar-sign" as const, format: "currency" as const },
