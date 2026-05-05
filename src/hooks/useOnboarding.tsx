@@ -500,6 +500,16 @@ export function useOnboarding(): UseOnboardingReturn {
     mutationFn: async () => {
       if (!user?.id) throw new Error('User not authenticated');
 
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('onboarding_completed')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (existingProfile?.onboarding_completed === true) {
+        return { success: true as const, alreadyCompleted: true };
+      }
+
       // Prepare procedures, ensuring at least one consultation matches doctor's input
       let finalProcedures = state.procedures
         .filter(p => p.isSelected)
@@ -527,7 +537,26 @@ export function useOnboarding(): UseOnboardingReturn {
         body: payload,
       });
 
-      if (error) throw error;
+      if (error) {
+        const fromBody =
+          data &&
+          typeof data === 'object' &&
+          data !== null &&
+          'error' in data &&
+          typeof (data as { error: unknown }).error === 'string'
+            ? (data as { error: string }).error
+            : null;
+        const details =
+          data &&
+          typeof data === 'object' &&
+          data !== null &&
+          'details' in data &&
+          typeof (data as { details: unknown }).details === 'string'
+            ? (data as { details: string }).details
+            : null;
+        const composed = [fromBody, details].filter(Boolean).join(' — ');
+        throw new Error(composed || error.message);
+      }
       if (data?.error) throw new Error(data.error);
 
       return data;

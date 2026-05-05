@@ -99,14 +99,72 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // 1. Check if slug is available (final verification)
-    const { data: existingOrg } = await supabaseAdmin
+    // 1. Slug: must be unique. If this user already owns an org with this slug (retry / duplo
+    // clique / redirect falhou), devolvemos 200 de forma idempotente em vez de 400.
+    const { data: existingOrgBySlug } = await supabaseAdmin
       .from('organizations')
-      .select('id')
+      .select('id, name, slug')
       .eq('slug', clinic.slug)
-      .single();
+      .maybeSingle();
 
-    if (existingOrg) {
+    if (existingOrgBySlug) {
+      const { data: myMembership } = await supabaseAdmin
+        .from('organization_members')
+        .select('role')
+        .eq('organization_id', existingOrgBySlug.id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (myMembership) {
+        console.log(
+          `♻️ [complete-onboarding] Idempotent: user ${user.id} já é membro da org ${existingOrgBySlug.id} (slug ${clinic.slug})`,
+        );
+        const profileResume = {
+          id: user.id,
+          email: user.email ?? '',
+          full_name: doctor.fullName,
+          specialty: doctor.specialty,
+          organization_id: existingOrgBySlug.id,
+          onboarding_completed: true,
+          onboarding_completed_at: new Date().toISOString(),
+          role: 'medico' as const,
+          is_active: true,
+        };
+        const { error: idemProfileError } = await supabaseAdmin
+          .from('profiles')
+          .upsert(profileResume, { onConflict: 'id' });
+
+        if (idemProfileError) {
+          console.error('❌ [complete-onboarding] Idempotent profile upsert:', idemProfileError);
+          return new Response(
+            JSON.stringify({
+              error: 'Failed to update profile',
+              details: idemProfileError.message,
+            }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
+
+        await supabaseAdmin.from('onboarding_state').delete().eq('user_id', user.id);
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            organization: {
+              id: existingOrgBySlug.id,
+              name: existingOrgBySlug.name,
+              slug: existingOrgBySlug.slug,
+            },
+            invitedMembers: [],
+            message: 'Onboarding already completed for this account',
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          },
+        );
+      }
+
       return new Response(
         JSON.stringify({ error: 'Slug already taken. Please choose a different one.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -163,7 +221,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     const profileData = {
       id: user.id,
-      email: user.email,
+      email: user.email ?? '',
       full_name: doctor.fullName,
       specialty: doctor.specialty,
       organization_id: organization.id,
