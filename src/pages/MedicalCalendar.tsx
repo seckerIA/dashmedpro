@@ -88,7 +88,7 @@ export default function MedicalCalendar() {
     appointmentType: typeFilter,
     status: statusFilter,
     paymentStatus: paymentFilter,
-    isSecretaria, // Secretária vê todos os agendamentos de todos os médicos
+    isSecretaria, // compat query key; secretária vê agenda org inteira via canViewAll + RLS
   };
 
   const {

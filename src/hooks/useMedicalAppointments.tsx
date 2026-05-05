@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useUserProfile } from './useUserProfile';
-import { useSecretaryDoctors } from './useSecretaryDoctors';
 import { useToast } from '@/hooks/use-toast';
 import { useMemo, useEffect } from 'react';
 import { addDays, isAfter, isBefore, format } from 'date-fns';
@@ -636,9 +635,9 @@ const fetchAppointments = async (
     `);
 
   // Lógica de Filtragem:
-  // 1. Se passarmos doctorIds (filtro manual ou secretaria vinculada), filtramos.
-  // 2. Se NÃO passarmos doctorIds, mas for user privilegiado (canViewAll), NÃO filtramos por user/doctor (vê tudo da organização).
-  // 3. Se usuário comum, vê apenas suas próprias.
+  // 1. Se passarmos doctorIds (filtro manual explícito), filtramos por esses médicos.
+  // 2. Se NÃO passarmos doctorIds, mas canViewAll (admin/dono/secretária), NÃO filtramos — vê tudo na org (RLS).
+  // 3. Usuário comum (médico sem privilégio): vê apenas onde é owner ou doctor_id.
 
   if (doctorIds && doctorIds.length > 0) {
     query = query.in('doctor_id', doctorIds);
@@ -1041,14 +1040,14 @@ const serializeFilters = (filters?: UseMedicalAppointmentsFilters): string => {
 export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) {
   const { user, loading: authLoading } = useAuth();
   const { profile, isSecretaria, isLoading: isLoadingProfile } = useUserProfile();
-  const { doctorIds, isLoading: isLoadingDoctors } = useSecretaryDoctors();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // Secretária usa lista de médicos vinculados se não houver filtro explícito
-  const doctorIdsToUse = filters?.doctorIds && filters.doctorIds.length > 0
-    ? filters.doctorIds
-    : (isSecretaria ? doctorIds : []);
+  // Secretária: mesma abrangência de agenda que admin/dono — todos os agendamentos da
+  // organização (RLS em medical_appointments usa get_user_org_ids()). Só restringe por
+  // médico se filters.doctorIds vier explícito (ex.: componente que fixa um médico).
+  const doctorIdsToUse =
+    filters?.doctorIds && filters.doctorIds.length > 0 ? filters.doctorIds : [];
 
   const queryKey = ['medical-appointments', user?.id, doctorIdsToUse, serializeFilters(filters)];
 
@@ -1086,8 +1085,7 @@ export function useMedicalAppointments(filters?: UseMedicalAppointmentsFilters) 
       !!user?.id &&
       !!profile &&
       !authLoading &&
-      !isLoadingProfile &&
-      (!isSecretaria || !isLoadingDoctors),
+      !isLoadingProfile,
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
     refetchOnMount: false,
