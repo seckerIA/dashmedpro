@@ -99,6 +99,44 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    // 0. If user already completed onboarding and has an organization, return success idempotently.
+    const { data: existingProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('organization_id, onboarding_completed')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (existingProfile?.organization_id) {
+      const { data: existingOrg } = await supabaseAdmin
+        .from('organizations')
+        .select('id, name, slug')
+        .eq('id', existingProfile.organization_id)
+        .maybeSingle();
+
+      if (existingOrg) {
+        console.log(`♻️ [complete-onboarding] User ${user.id} already has org ${existingOrg.id}. Returning idempotent success.`);
+
+        if (!existingProfile.onboarding_completed) {
+          await supabaseAdmin
+            .from('profiles')
+            .update({ onboarding_completed: true, onboarding_completed_at: new Date().toISOString() })
+            .eq('id', user.id);
+        }
+
+        await supabaseAdmin.from('onboarding_state').delete().eq('user_id', user.id);
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            organization: { id: existingOrg.id, name: existingOrg.name, slug: existingOrg.slug },
+            invitedMembers: [],
+            message: 'Onboarding already completed for this account',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } },
+        );
+      }
+    }
+
     // 1. Slug: must be unique. If this user already owns an org with this slug (retry / duplo
     // clique / redirect falhou), devolvemos 200 de forma idempotente em vez de 400.
     const { data: existingOrgBySlug } = await supabaseAdmin
