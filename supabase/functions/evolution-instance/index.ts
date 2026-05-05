@@ -49,10 +49,39 @@ serve(async (req) => {
       });
     }
 
-    // Helper: build Evolution API URL (no prefix — v2 uses root paths)
-    const evoUrl = (baseUrl: string, path: string) => {
-      const base = baseUrl.replace(/\/+$/, '');
-      return `${base}${path}`;
+    /**
+     * Evolution pode estar na raiz ou sob /api (EasyPanel, reverse proxy).
+     * Se a primeira URL retorna 404, tenta `${base}/api${path}`.
+     */
+    const evoRequest = async (
+      baseUrl: string,
+      path: string,
+      init?: RequestInit,
+    ): Promise<Response> => {
+      const root = baseUrl.replace(/\/+$/, '');
+      const primaryUrl = `${root}${path}`;
+      let res = await fetch(primaryUrl, init);
+      if (res.status === 404) {
+        const altUrl = `${root}/api${path}`;
+        const alt = await fetch(altUrl, init);
+        if (alt.status !== 404) {
+          return alt;
+        }
+      }
+      return res;
+    };
+
+    const extractInstanceToken = (row: Record<string, unknown>): string => {
+      const hash = row.hash as Record<string, string> | string | undefined;
+      return (
+        (typeof hash === 'string' ? hash : hash?.apikey)
+        || (row.instanceApiKey as string)
+        || (row.apikey as string)
+        || (row.token as string)
+        || ((row.instance as Record<string, string>)?.token)
+        || ((row.instance as Record<string, string>)?.apikey)
+        || ''
+      );
     };
 
     // ---- ACTION: CREATE ----
@@ -70,8 +99,7 @@ serve(async (req) => {
 
       const webhookUrl = `${supabaseUrl}/functions/v1/evolution-webhook`;
 
-      // Create instance on Evolution API
-      const createRes = await fetch(evoUrl(api_url, '/instance/create'), {
+      const createInit: RequestInit = {
         method: 'POST',
         headers: {
           'apikey': globalApiKey,
@@ -98,28 +126,78 @@ serve(async (req) => {
             ],
           },
         }),
-      });
+      };
+
+      const createRes = await evoRequest(api_url, '/instance/create', createInit);
+
+      let instanceToken = '';
+      let qrCode: string | null = null;
 
       if (!createRes.ok) {
         const errText = await createRes.text();
-        console.error('Evolution create error:', errText);
-        return new Response(JSON.stringify({
-          error: 'Failed to create Evolution instance',
-          details: errText,
-        }), {
-          status: createRes.status === 403 ? 409 : 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        // Instância já existe no servidor Evolution — tentar conectar e obter QR / token
+        const connRes = await evoRequest(api_url, `/instance/connect/${safeName}`, {
+          headers: { 'apikey': globalApiKey },
         });
+        if (connRes.ok) {
+          const qrData = await connRes.json().catch(() => ({}));
+          qrCode = qrData.base64 || qrData.code || null;
+          const listRes = await evoRequest(api_url, '/instance/fetchInstances', {
+            headers: { 'apikey': globalApiKey },
+          });
+          if (listRes.ok) {
+            const raw = await listRes.json().catch(() => null);
+            const instances: Record<string, unknown>[] = Array.isArray(raw)
+              ? raw as Record<string, unknown>[]
+              : (raw && typeof raw === 'object' && Array.isArray((raw as { instances?: unknown }).instances)
+                ? (raw as { instances: Record<string, unknown>[] }).instances
+                : []);
+            const found = instances.find((x) => {
+              const inst = x.instance as Record<string, string> | undefined;
+              const n = (inst?.instanceName || x.instanceName || x.name || inst?.name) as string | undefined;
+              return n === safeName;
+            });
+            if (found) {
+              instanceToken = extractInstanceToken(found);
+            }
+          }
+          console.warn('[evolution-instance] create failed but instance exists; continuing:', errText.slice(0, 500));
+        } else {
+          console.error('Evolution create error:', errText);
+          return new Response(JSON.stringify({
+            error: 'Failed to create Evolution instance',
+            details: errText.slice(0, 2000),
+          }), {
+            status: createRes.status === 403 ? 409 : 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      } else {
+        const createData = await createRes.json().catch(() => null);
+        if (!createData || typeof createData !== 'object') {
+          return new Response(JSON.stringify({
+            error: 'Resposta invalida da Evolution API ao criar instancia',
+          }), {
+            status: 502,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const cd = createData as Record<string, unknown>;
+        instanceToken = extractInstanceToken(cd);
+        try {
+          const qrRes = await evoRequest(api_url, `/instance/connect/${safeName}`, {
+            headers: { 'apikey': globalApiKey },
+          });
+          if (qrRes.ok) {
+            const qrData = await qrRes.json().catch(() => ({}));
+            qrCode = (qrData as { base64?: string; code?: string }).base64
+              || (qrData as { base64?: string; code?: string }).code
+              || null;
+          }
+        } catch (_e) {
+          // QR será obtido no polling
+        }
       }
-
-      const createData = await createRes.json();
-      // Evolution v2: o token da instância pode vir como `hash.apikey` (v1),
-      // `hash` (string), `instance.token`, `instance.apikey` ou `apikey` na raiz.
-      const instanceToken = (typeof createData.hash === 'string' ? createData.hash : createData.hash?.apikey)
-        || createData.instance?.token
-        || createData.instance?.apikey
-        || createData.apikey
-        || '';
 
       // Save to whatsapp_config
       const { error: upsertError } = await sb.from('whatsapp_config').upsert({
@@ -134,24 +212,13 @@ serve(async (req) => {
 
       if (upsertError) {
         console.error('Config upsert error:', upsertError);
-        return new Response(JSON.stringify({ error: 'Failed to save config' }), {
+        return new Response(JSON.stringify({
+          error: 'Failed to save config',
+          details: upsertError.message,
+        }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
-      }
-
-      // Try to get QR code immediately
-      let qrCode = null;
-      try {
-        const qrRes = await fetch(evoUrl(api_url, `/instance/connect/${safeName}`), {
-          headers: { 'apikey': globalApiKey },
-        });
-        if (qrRes.ok) {
-          const qrData = await qrRes.json();
-          qrCode = qrData.base64 || qrData.code || null;
-        }
-      } catch (_e) {
-        // QR will be fetched separately
       }
 
       return new Response(JSON.stringify({
@@ -184,7 +251,7 @@ serve(async (req) => {
         });
       }
 
-      const qrRes = await fetch(evoUrl(apiUrl, `/instance/connect/${instance_name}`), {
+      const qrRes = await evoRequest(apiUrl, `/instance/connect/${instance_name}`, {
         headers: { 'apikey': globalApiKey },
       });
 
@@ -229,7 +296,7 @@ serve(async (req) => {
       // Fetch live status from Evolution
       let liveState = config?.evolution_instance_status || 'disconnected';
       try {
-        const stateRes = await fetch(evoUrl(apiUrl, `/instance/connectionState/${instance_name}`), {
+        const stateRes = await evoRequest(apiUrl, `/instance/connectionState/${instance_name}`, {
           headers: { 'apikey': globalApiKey },
         });
         if (stateRes.ok) {
@@ -272,7 +339,7 @@ serve(async (req) => {
       if (apiUrl) {
         // Delete from Evolution server
         try {
-          await fetch(evoUrl(apiUrl, `/instance/delete/${instance_name}`), {
+          await evoRequest(apiUrl, `/instance/delete/${instance_name}`, {
             method: 'DELETE',
             headers: { 'apikey': globalApiKey },
           });
@@ -304,7 +371,8 @@ serve(async (req) => {
 
   } catch (err) {
     console.error('evolution-instance error:', err);
-    return new Response(JSON.stringify({ error: err.message }), {
+    const message = err instanceof Error ? err.message : String(err);
+    return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

@@ -55,8 +55,25 @@ export function EvolutionSetup() {
       body: { action, ...body },
     });
 
-    if (res.error) throw new Error(res.error.message);
-    if (res.data?.error) throw new Error(res.data.error + (res.data.details ? `: ${res.data.details}` : ''));
+    if (res.error) {
+      let message = res.error.message;
+      const ctx = (res as { response?: Response }).response;
+      if (ctx && typeof ctx.json === 'function') {
+        try {
+          const payload = await ctx.clone().json() as { error?: string; details?: string };
+          if (payload?.error) {
+            message = payload.details ? `${payload.error}: ${payload.details}` : payload.error;
+          }
+        } catch {
+          /* manter message genérica */
+        }
+      }
+      throw new Error(message);
+    }
+    const data = res.data as { error?: string; details?: string } | null;
+    if (data?.error) {
+      throw new Error(data.details ? `${data.error}: ${data.details}` : data.error);
+    }
     return res.data;
   };
 
