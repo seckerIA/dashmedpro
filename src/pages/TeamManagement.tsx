@@ -19,6 +19,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 import { DataTable } from '@/components/datatable/DataTable';
 import { getColumns, Profile } from '@/components/datatable/DataColumns';
+import { ResetSecretaryPasswordsDialog } from '@/components/team/ResetSecretaryPasswordsDialog';
 
 const TeamManagement = () => {
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -29,9 +30,15 @@ const TeamManagement = () => {
   const [doctors, setDoctors] = useState<Array<{ id: string; full_name: string; email: string }>>([]);
   const [loadingDoctors, setLoadingDoctors] = useState(false);
   const [selectedDoctorIds, setSelectedDoctorIds] = useState<string[]>([]); // Para multiplos medicos
-  const [memberLimitReached, setMemberLimitReached] = useState(false);
   const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
-  const [memberLimitInfo, setMemberLimitInfo] = useState<{ current: number; limit: number; price: number } | null>(null);
+  const [memberLimitInfo, setMemberLimitInfo] = useState<{
+    current: number;
+    limit: number;
+    price: number;
+    adminCount: number;
+    secretaryCount: number;
+    billableCount: number;
+  } | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '12345678',
@@ -46,6 +53,15 @@ const TeamManagement = () => {
   const { isAdmin, isMedico, profile } = useUserProfile();
   const isAdminOrDono = isAdmin; // isAdmin já inclui 'dono'
   const isMedicoOnly = isMedico && !isAdmin;
+
+  const getAuthHeaders = async () => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData?.session?.access_token;
+    if (!accessToken) {
+      throw new Error('Sessão expirada. Faça login novamente para continuar.');
+    }
+    return { Authorization: `Bearer ${accessToken}` };
+  };
 
   const fetchProfiles = async () => {
     try {
@@ -144,6 +160,30 @@ const TeamManagement = () => {
     }
   };
 
+  const calculateBillableCount = (
+    roles: string[],
+    newRole?: string
+  ) => {
+    const allRoles = newRole ? [...roles, newRole] : roles;
+    const adminCount = allRoles.filter((r) => r === 'admin').length;
+    const secretaryCount = allRoles.filter((r) => r === 'secretaria').length;
+    const otherCount = allRoles.filter((r) => r !== 'admin' && r !== 'secretaria').length;
+
+    // Inclusos no plano:
+    // - 1 admin
+    // - 1 secretária
+    const billableAdmins = Math.max(adminCount - 1, 0);
+    const billableSecretaries = Math.max(secretaryCount - 1, 0);
+    const billableOthers = otherCount; // outros cargos são sempre adicionais
+
+    return {
+      adminCount,
+      secretaryCount,
+      billableCount: billableAdmins + billableSecretaries + billableOthers,
+      totalCount: allRoles.length,
+    };
+  };
+
   // Verificar limite de membros da organização
   const checkMemberLimit = async () => {
     try {
@@ -167,32 +207,45 @@ const TeamManagement = () => {
       const org = orgMember.organization as any;
       const ownerId = org?.owner_id;
 
-      // Buscar contagem de membros EXCLUINDO o dono (owner não conta no limite)
-      let countQuery = supabase
-        .from('organization_members')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', orgMember.organization_id);
+      // Buscar roles ativas da organização (excluindo owner)
+      let membersQuery = supabase
+        .from('profiles')
+        .select('id, role')
+        .eq('organization_id', orgMember.organization_id)
+        .eq('is_active', true);
 
-      // Se temos owner_id, excluir da contagem
       if (ownerId) {
-        countQuery = countQuery.neq('user_id', ownerId);
+        membersQuery = membersQuery.neq('id', ownerId);
       }
 
-      const { count } = await countQuery;
+      const { data: membersData } = await membersQuery;
+      const roles = (membersData || []).map((m: any) => m.role as string);
+      const billable = calculateBillableCount(roles);
 
-      const currentMembers = count || 0;
-      // Usar valores da organização ou defaults
-      const limit = org?.member_limit ?? 1;
+      const currentMembers = billable.totalCount;
+      // `member_limit` representa assentos ADICIONAIS já contratados
+      const limit = org?.member_limit ?? 0;
       const price = org?.additional_member_price ?? 89.90;
 
-      setMemberLimitInfo({ current: currentMembers, limit, price });
-      // Limite atingido se membros adicionais >= limite permitido
-      setMemberLimitReached(currentMembers >= limit);
+      setMemberLimitInfo({
+        current: currentMembers,
+        limit,
+        price,
+        adminCount: billable.adminCount,
+        secretaryCount: billable.secretaryCount,
+        billableCount: billable.billableCount,
+      });
     } catch (error) {
       console.error('Erro ao verificar limite de membros:', error);
       // Em caso de erro, usar valores padrão seguros
-      setMemberLimitInfo({ current: 0, limit: 1, price: 89.90 });
-      setMemberLimitReached(false);
+      setMemberLimitInfo({
+        current: 0,
+        limit: 0,
+        price: 89.90,
+        adminCount: 0,
+        secretaryCount: 0,
+        billableCount: 0,
+      });
     }
   };
 
@@ -292,8 +345,25 @@ const TeamManagement = () => {
           delete createData.consultation_value;
         }
 
+        // Regra comercial:
+        // - 1 admin incluso
+        // - 1 secretária inclusa
+        // - acima disso: assento adicional (member_limit)
+        const activeRoles = profiles
+          .filter((p) => p.is_active)
+          .map((p) => p.role as string);
+        const projected = calculateBillableCount(activeRoles, formData.role);
+        const paidSlots = memberLimitInfo?.limit ?? 0;
+        if (projected.billableCount > paidSlots) {
+          setUpgradeDialogOpen(true);
+          setLoading(false);
+          return;
+        }
+
+        const headers = await getAuthHeaders();
         const { data, error } = await supabase.functions.invoke('create-team-user', {
-          body: createData
+          body: createData,
+          headers,
         });
 
         if (error) {
@@ -386,8 +456,10 @@ const TeamManagement = () => {
         updateData.consultation_value = null;
       }
 
+      const headers = await getAuthHeaders();
       const { data, error } = await supabase.functions.invoke('update-team-user', {
-        body: updateData
+        body: updateData,
+        headers,
       });
 
       if (error) {
@@ -453,8 +525,10 @@ const TeamManagement = () => {
       setLoading(true);
 
       // Chama edge function para excluir usuário
+      const headers = await getAuthHeaders();
       const { data, error } = await supabase.functions.invoke('delete-team-user', {
-        body: { userId }
+        body: { userId },
+        headers,
       });
 
       if (error) {
@@ -519,7 +593,7 @@ const TeamManagement = () => {
                 Limite de Membros Atingido
               </DialogTitle>
               <DialogDescription>
-                Seu plano atual permite apenas {memberLimitInfo?.limit || 1} membro(s) na equipe.
+                Seu plano inclui 1 admin e 1 secretária. Membros adicionais exigem assento pago.
               </DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-4">
@@ -527,13 +601,16 @@ const TeamManagement = () => {
                 <CreditCard className="h-4 w-4" />
                 <AlertTitle>Adicionar mais membros</AlertTitle>
                 <AlertDescription>
-                  Para adicionar mais pessoas à sua equipe, é necessário um pagamento adicional de{' '}
+                  Para adicionar membros acima de 1 admin + 1 secretária, é necessário pagamento de{' '}
                   <strong>R$ {(memberLimitInfo?.price || 89.90).toFixed(2).replace('.', ',')}</strong> por membro.
                 </AlertDescription>
               </Alert>
               <div className="text-sm text-muted-foreground">
                 <p>Membros atuais: <strong>{memberLimitInfo?.current || 0}</strong></p>
-                <p>Limite do plano: <strong>{memberLimitInfo?.limit || 1}</strong></p>
+                <p>Admins ativos: <strong>{memberLimitInfo?.adminCount || 0}</strong> (1 incluso)</p>
+                <p>Secretárias ativas: <strong>{memberLimitInfo?.secretaryCount || 0}</strong> (1 inclusa)</p>
+                <p>Membros adicionais em uso: <strong>{memberLimitInfo?.billableCount || 0}</strong></p>
+                <p>Assentos adicionais contratados: <strong>{memberLimitInfo?.limit || 0}</strong></p>
               </div>
             </div>
             <DialogFooter className="flex gap-2">
@@ -552,21 +629,21 @@ const TeamManagement = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Botão de adicionar membro - verifica limite antes de abrir dialog */}
-        <Button onClick={() => {
-          // Verificar limite antes de abrir o dialog
-          if (memberLimitReached) {
-            setUpgradeDialogOpen(true);
-          } else {
+        <div className="flex items-center gap-2">
+          {/* Reset em massa das senhas das secretárias */}
+          <ResetSecretaryPasswordsDialog />
+
+          {/* Botão de adicionar membro */}
+          <Button onClick={() => {
             setEditingProfile(null);
             setFormData({ email: '', password: '12345678', full_name: '', role: 'vendedor', doctor_id: '', consultation_value: '' });
             setSelectedDoctorIds([]);
             setDialogOpen(true);
-          }
-        }}>
-          <UserPlus className="mr-2 h-4 w-4" />
-          Adicionar Membro
-        </Button>
+          }}>
+            <UserPlus className="mr-2 h-4 w-4" />
+            Adicionar Membro
+          </Button>
+        </div>
 
         <Dialog open={dialogOpen} onOpenChange={(open) => {
           setDialogOpen(open);

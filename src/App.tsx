@@ -84,6 +84,7 @@ const SecretaryFinancial = React.lazy(() => import("./pages/SecretaryFinancial")
 const TransactionForm = React.lazy(() => import("./components/financial/TransactionForm"));
 const ProspectingGuide = React.lazy(() => import("./pages/ProspectingGuide"));
 const Commercial = React.lazy(() => import("./pages/Commercial"));
+const PerformanceComercial = React.lazy(() => import("./pages/PerformanceComercial"));
 const FollowUpPage = React.lazy(() => import("./pages/FollowUpPage"));
 const FollowUps = React.lazy(() => import("./pages/FollowUps"));
 const MedicalRecords = React.lazy(() => import("./pages/MedicalRecords"));
@@ -548,6 +549,14 @@ const AppRoutes = () => {
           />
           <Route path="/tarefas" element={<Navigate to="/" replace />} />
           <Route path="/marketing" element={<Navigate to="/comercial?tab=campaigns" replace />} />
+          <Route
+            path="/performance-comercial"
+            element={
+              <RoleProtectedRoute allowedRoles={['admin', 'dono', 'medico']}>
+                <PerformanceComercial />
+              </RoleProtectedRoute>
+            }
+          />
           <Route path="/comercial" element={<Commercial />} />
           <Route
             path="/financeiro"

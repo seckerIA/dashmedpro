@@ -30,7 +30,8 @@ import {
   Building2,
   Zap,
   CircleDollarSign,
-  Package
+  Package,
+  Trophy
 } from "lucide-react"
 import { NavLink, useLocation, useNavigate } from "react-router-dom"
 import {
@@ -85,6 +86,7 @@ const navigationGroups: Array<{
     {
       label: "Vendas",
       items: [
+        { title: "Performance Comercial", url: "/performance-comercial", icon: Trophy, medicoOnly: true, badge: "Novo", variant: "new" as const },
         {
           title: "CRM",
           url: "/comercial",

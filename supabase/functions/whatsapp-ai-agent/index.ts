@@ -298,6 +298,9 @@ function sanitizeAIText(text: string): string {
   if (!text) return '';
   var t = text;
   t = t.replace(/https?:\/\/[^\s<>"']*\/storage\/v1\/object\/public\/whatsapp-(?:media|testimonials)\/[^\s<>"']+/gi, '');
+  t = t.replace(/\*\s*\[[^\]]*(?:[Ss]istema|sistema|automatic|depoi|depoimento|v[ií]deo|MP4|whatsapp)[^\]]*\]\s*\*/gi, '');
+  t = t.replace(/\[[^\]]*(?:[Ss]istema|sistema\s+envia|automaticamente)[^\]]*\]/gi, '');
+  t = t.replace(/\(\s*[^)]*(?:[Ss]istema\s+envia|envia\s+(?:os\s+)?\d+\s+videos?)[^)]*\)/gi, '');
   t = t.replace(/\[\s*(?:v[ií]deo(?:\s+de\s+depoimento)?|video[\s-]?testemunho|audio|imagem|foto|file|midia|media)\s*\]/gi, '');
   t = t.replace(/[ \t]+/g, ' ');
   t = t.replace(/\n{3,}/g, '\n\n');
@@ -483,20 +486,34 @@ async function sendVideoWA(cfg: any, to: string, videoUrl: string, caption: stri
       });
       // Evolution API v2 espera mediatype/media/caption NO NÍVEL RAIZ.
       // Mantemos mediaMessage como fallback para versões antigas.
-      wr = await fetch(cfg.evolution_api_url.replace(/\/+$/, '') + '/message/sendMedia/' + cfg.evolution_instance_name, {
+      var evoSendUrl = cfg.evolution_api_url.replace(/\/+$/, '') + '/message/sendMedia/' + cfg.evolution_instance_name;
+      var evoPayload = {
+        number: cleanNumber,
+        mediatype: 'video',
+        media: mediaPayloadV,
+        caption: caption || '',
+        mimetype: mimeV,
+        delay: 1500,
+        mediaMessage: { mediatype: 'video', media: mediaPayloadV, caption: caption || '' },
+        options: { delay: 1500 },
+      };
+      wr = await fetch(evoSendUrl, {
         method: 'POST',
         headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          number: cleanNumber,
-          mediatype: 'video',
-          media: mediaPayloadV,
-          caption: caption || '',
-          mimetype: mimeV,
-          delay: 1500,
-          mediaMessage: { mediatype: 'video', media: mediaPayloadV, caption: caption || '' },
-          options: { delay: 1500 },
-        }),
+        body: JSON.stringify(evoPayload),
       });
+      if (!wr.ok && dlV && videoUrl) {
+        await safeDebugLog(sb, 'sendVideoWA Evolution retry with public URL', { cid });
+        wr = await fetch(evoSendUrl, {
+          method: 'POST',
+          headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify(Object.assign({}, evoPayload, {
+            media: videoUrl,
+            mimetype: 'video/mp4',
+            mediaMessage: { mediatype: 'video', media: videoUrl, caption: caption || '' },
+          })),
+        });
+      }
     } else {
       wr = await fetch('https://graph.facebook.com/v18.0/' + cfg.phone_number_id + '/messages', {
         method: 'POST',
@@ -1347,6 +1364,10 @@ async function handler(req: Request): Promise<Response> {
     // Se ancoragem de video foi enviada mas nenhum MP4 entregou, o GPT precisa recuperar o fio
     var videoAnchorsButSendFailed = false;
 
+    // Videos cadastrados (mesma logica que o envio deterministico — alimenta prompts e STEP 6c)
+    var testimonialVideosList = await getTestimonialVideoUrls(sb, conv.user_id);
+    var hasTestimonialVideosInAccount = testimonialVideosList.length > 0;
+
     // STEP 6b: AVALIAR ENVIO DE VÍDEO DE DEPOIMENTO (antes de gerar prompt)
     var inboundHistoryText = inb.map(function(m: any) { return m.content || ''; }).join('\n');
     var willSendVideo = shouldSendTestimonialNow(
@@ -1358,6 +1379,10 @@ async function handler(req: Request): Promise<Response> {
       userTurnCount,
       inboundHistoryText,
     );
+    if (willSendVideo && !wac) {
+      await safeDebugLog(sb, 'Skip testimonial flow: WhatsApp credentials unavailable', { cid: cid });
+      willSendVideo = false;
+    }
 
     // STEP 6c: SE FOR ENVIAR VÍDEO AGORA, FAZ O FLUXO DETERMINÍSTICO:
     //   ancoragem (texto curto) -> 3 vídeos -> RETURN (sem chamar GPT).
@@ -1365,7 +1390,7 @@ async function handler(req: Request): Promise<Response> {
     //   Na próxima inbound, GPT volta com videoSent=true e fala preço/CTA.
     if (willSendVideo && wac) {
       try {
-        var videosPre = await getTestimonialVideoUrls(sb, conv.user_id);
+        var videosPre = testimonialVideosList;
         if (videosPre.length > 0) {
           var firstName = (conv.contact_name || '').trim().split(/\s+/)[0] || '';
           var anchorMsg1 = (firstName ? firstName + ', a' : 'A') + 'ntes de te falar sobre o investimento, quero te mostrar o relato de um paciente com um caso parecido com o seu 👇';
@@ -1456,6 +1481,7 @@ async function handler(req: Request): Promise<Response> {
       shouldSendVideoNow: willSendVideo,
       videoSent: videosAlreadySent,
       softClose: softCloseSignal,
+      hasTestimonialVideos: hasTestimonialVideosInAccount,
     });
     var ext = '';
 

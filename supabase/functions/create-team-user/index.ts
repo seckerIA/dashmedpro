@@ -16,6 +16,19 @@ interface CreateUserRequest {
   consultation_value?: number;
 }
 
+const calculateBillableCount = (roles: string[], newRole?: string) => {
+  const allRoles = newRole ? [...roles, newRole] : roles;
+  const adminCount = allRoles.filter((r) => r === "admin").length;
+  const secretaryCount = allRoles.filter((r) => r === "secretaria").length;
+  const otherCount = allRoles.filter((r) => r !== "admin" && r !== "secretaria").length;
+
+  const billableAdmins = Math.max(adminCount - 1, 0);
+  const billableSecretaries = Math.max(secretaryCount - 1, 0);
+  const billableOthers = otherCount;
+
+  return billableAdmins + billableSecretaries + billableOthers;
+};
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -57,6 +70,48 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (!email || !role) {
       return new Response(JSON.stringify({ error: 'Email and role are required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Regra comercial de assentos:
+    // - 1 admin incluso
+    // - 1 secretária inclusa
+    // - membros adicionais usam assentos pagos (organizations.member_limit)
+    if (profile.organization_id) {
+      const { data: org } = await supabaseAdmin
+        .from('organizations')
+        .select('member_limit, owner_id, additional_member_price')
+        .eq('id', profile.organization_id)
+        .single();
+
+      const paidSlots = org?.member_limit ?? 0;
+
+      let membersQuery = supabaseAdmin
+        .from('profiles')
+        .select('id, role')
+        .eq('organization_id', profile.organization_id)
+        .eq('is_active', true);
+
+      if (org?.owner_id) {
+        membersQuery = membersQuery.neq('id', org.owner_id);
+      }
+
+      const { data: membersData } = await membersQuery;
+      const currentRoles = (membersData || []).map((m: any) => m.role as string);
+      const projectedBillable = calculateBillableCount(currentRoles, role);
+
+      if (projectedBillable > paidSlots) {
+        const price = org?.additional_member_price ?? 89.90;
+        return new Response(
+          JSON.stringify({
+            error: `Limite de assentos adicionais atingido. Este plano inclui 1 admin e 1 secretária. Membro adicional custa R$ ${Number(price).toFixed(2).replace('.', ',')}.`,
+            code: 'MEMBER_LIMIT_REACHED',
+            required_additional_slots: projectedBillable,
+            paid_slots: paidSlots,
+            additional_member_price: price,
+          }),
+          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({

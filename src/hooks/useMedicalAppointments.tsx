@@ -707,11 +707,25 @@ const createAppointment = async (
     throw new Error('duration_minutes é obrigatório');
   }
 
+  // Resolver scheduled_by: usar valor fornecido OU auth.uid() (usuário logado).
+  // Isso permite metrificar a performance individual de quem agendou (geralmente a secretária),
+  // separando do dono do agendamento (médico = user_id/doctor_id).
+  let resolvedScheduledBy: string | null | undefined = appointmentData.scheduled_by;
+  if (resolvedScheduledBy === undefined) {
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      resolvedScheduledBy = authData?.user?.id ?? null;
+    } catch {
+      resolvedScheduledBy = null;
+    }
+  }
+
   const { data: insertedRows, error } = await supabase
     .from('medical_appointments')
     .insert({
       ...appointmentData,
       doctor_id: appointmentData.doctor_id || appointmentData.user_id,
+      scheduled_by: resolvedScheduledBy ?? null,
       paid_in_advance: appointmentData.paid_in_advance ?? false,
     })
     .select(`

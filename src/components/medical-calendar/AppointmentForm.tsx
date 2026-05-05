@@ -40,6 +40,7 @@ import { Badge } from '@/components/ui/badge';
 import { useSinalReceipts } from '@/hooks/useSinalReceipts';
 import { useFinancialAccounts } from '@/hooks/useFinancialAccounts';
 import { StockUsageSelector, StockUsageItem } from '@/components/inventory/StockUsageSelector';
+import { ScheduledBySelector } from '@/components/medical-calendar/ScheduledBySelector';
 
 // Ensure ptBR is available (defensive check)
 const locale = ptBR || undefined;
@@ -50,6 +51,7 @@ import { formatCurrencyInput, parseCurrencyToNumber, formatCurrency } from '@/li
 
 const appointmentSchema = z.object({
   doctor_id: z.string().uuid().optional(),
+  scheduled_by: z.string().uuid().optional(),
   contact_id: z.string().uuid({ message: 'Paciente é obrigatório' }),
   appointment_type: z.enum(['first_visit', 'return', 'procedure', 'urgent', 'follow_up', 'exam']),
   title: z.string().min(3, 'Título deve ter pelo menos 3 caracteres'),
@@ -329,6 +331,9 @@ export function AppointmentForm({
       const submitData = {
         user_id: user.id,
         doctor_id: data.doctor_id || user.id,
+        // Se o usuário escolheu uma secretária no dropdown "Agendado por", grava o ID dela.
+        // Senão, deixa undefined → o hook usa auth.uid() como fallback (quem está logado).
+        scheduled_by: data.scheduled_by || undefined,
         contact_id: data.contact_id,
         title: data.title,
         appointment_type: data.appointment_type,
@@ -401,6 +406,7 @@ export function AppointmentForm({
       setEstimatedValueDisplay(estimatedValueFormatted);
       reset({
         doctor_id: appointment.doctor_id || undefined,
+        scheduled_by: (appointment as any).scheduled_by || undefined,
         contact_id: appointment.contact_id,
         appointment_type: appointment.appointment_type,
         title: appointment.title,
@@ -447,6 +453,7 @@ export function AppointmentForm({
       const fromSlot = slotDurationMinutes(prefilledStart, prefilledEnd);
       reset({
         doctor_id: undefined,
+        scheduled_by: undefined,
         appointment_type: 'first_visit',
         status: 'scheduled',
         duration_minutes: fromSlot ?? 30,
@@ -840,6 +847,13 @@ export function AppointmentForm({
               )}
             </div>
           )}
+
+          {/* Agendado por (atribuição manual da secretária) */}
+          <ScheduledBySelector
+            value={watch('scheduled_by')}
+            onChange={(v) => setValue('scheduled_by', v)}
+            doctorId={watch('doctor_id')}
+          />
 
           {/* Appointment Type */}
           <div className="grid grid-cols-2 gap-4">

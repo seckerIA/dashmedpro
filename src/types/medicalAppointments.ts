@@ -43,6 +43,8 @@ export interface MedicalAppointment {
   id: string;
   user_id: string;
   doctor_id?: string | null;
+  /** Usuário que efetivamente criou/agendou (geralmente a secretária). */
+  scheduled_by?: string | null;
   contact_id: string;
 
   title: string;
@@ -99,6 +101,8 @@ export interface MedicalAppointmentWithRelations extends MedicalAppointment {
 export interface MedicalAppointmentInsert {
   user_id: string;
   doctor_id?: string | null;
+  /** Usuário que está criando o agendamento (auth.uid()). Preenchido automaticamente no hook. */
+  scheduled_by?: string | null;
   contact_id: string;
   title: string;
   appointment_type: AppointmentType;
