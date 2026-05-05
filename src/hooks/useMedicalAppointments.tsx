@@ -719,11 +719,26 @@ const createAppointment = async (
     }
   }
 
+  let resolvedOrganizationId = appointmentData.organization_id;
+  if (!resolvedOrganizationId) {
+    const attendId = appointmentData.doctor_id || appointmentData.user_id;
+    if (attendId) {
+      const { data: attendProfile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', attendId)
+        .maybeSingle();
+      resolvedOrganizationId = (attendProfile as { organization_id?: string } | null)?.organization_id
+        ?? resolvedOrganizationId;
+    }
+  }
+
   const { data: insertedRows, error } = await supabase
     .from('medical_appointments')
     .insert({
       ...appointmentData,
       doctor_id: appointmentData.doctor_id || appointmentData.user_id,
+      organization_id: resolvedOrganizationId ?? appointmentData.organization_id,
       scheduled_by: resolvedScheduledBy ?? null,
       paid_in_advance: appointmentData.paid_in_advance ?? false,
     })

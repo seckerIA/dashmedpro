@@ -66,14 +66,9 @@ export function useSecretaryMetrics() {
   const { profile } = useUserProfile();
 
   return useQuery({
-    queryKey: ['secretary-metrics', user?.id, profile?.doctor_id],
+    queryKey: ['secretary-metrics', user?.id],
     queryFn: async ({ signal }): Promise<SecretaryMetrics> => {
       if (!user?.id) return emptyMetrics;
-
-      // Se secretária estiver vinculada a um médico, usar doctor_id para filtrar
-      const doctorIdFilter = profile?.role === 'secretaria' && profile?.doctor_id
-        ? profile.doctor_id
-        : null;
 
       const now = new Date();
       const todayStart = startOfDay(now).toISOString();
@@ -102,21 +97,11 @@ export function useSecretaryMetrics() {
         .limit(500) // Limitar resultados para evitar queries pesadas
         .order('start_time', { ascending: true });
 
-      // Se secretária estiver vinculada, mostrar apenas consultas do médico vinculado
-      if (doctorIdFilter) {
-        appointmentsQuery = appointmentsQuery.eq('doctor_id', doctorIdFilter);
-      }
-
-      // Buscar médicos - se vinculada, mostrar apenas o médico vinculado
-      let doctorsQuery = supabase
+      const doctorsQuery = supabase
         .from('profiles')
         .select('id, full_name, email, role')
         .in('role', ['dono', 'medico'])
         .eq('is_active', true);
-
-      if (doctorIdFilter) {
-        doctorsQuery = doctorsQuery.eq('id', doctorIdFilter);
-      }
 
       // Buscar contatos - filtrar por user_id do médico vinculado se houver
       // Nota: contatos não têm doctor_id direto, então filtramos pelos contatos
@@ -136,13 +121,6 @@ export function useSecretaryMetrics() {
       let totalContactsQuery = supabase
         .from('crm_contacts')
         .select('id', { count: 'exact' });
-
-      // Se secretária estiver vinculada, filtrar contatos por user_id do médico
-      if (doctorIdFilter) {
-        contactsTodayQuery = contactsTodayQuery.eq('user_id', doctorIdFilter);
-        contactsWeekQuery = contactsWeekQuery.eq('user_id', doctorIdFilter);
-        totalContactsQuery = totalContactsQuery.eq('user_id', doctorIdFilter);
-      }
 
       // Consultas agendadas por mim (user_id = secretária)
       const myAppointmentsQuery = supabase
