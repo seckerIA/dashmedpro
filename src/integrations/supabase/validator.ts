@@ -3,10 +3,13 @@
  * Garante que todas as requisições vão para o projeto correto
  */
 
-import { supabase, CURRENT_PROJECT_REF, SUPABASE_URL } from './client';
-
-export const EXPECTED_PROJECT_REF = 'adzaqkduxnpckbcuqpmg';
-export const EXPECTED_SUPABASE_URL = 'https://adzaqkduxnpckbcuqpmg.supabase.co';
+import {
+  supabase,
+  CURRENT_PROJECT_REF,
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY,
+  projectRefFromSupabaseUrl,
+} from './client';
 
 /**
  * Valida se o cliente Supabase está configurado para o projeto correto
@@ -19,23 +22,24 @@ export function validateSupabaseProject(): {
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  // Verificar URL
-  if (SUPABASE_URL !== EXPECTED_SUPABASE_URL) {
+  if (!SUPABASE_URL?.includes('supabase.co')) {
     errors.push(
-      `URL do Supabase incorreta! Esperado: ${EXPECTED_SUPABASE_URL}, Atual: ${SUPABASE_URL}`
+      'URL do Supabase inválida ou ausente. Defina VITE_SUPABASE_URL no arquivo .env (raiz do projeto).'
     );
   }
 
-  // Verificar Project Ref
-  if (CURRENT_PROJECT_REF !== EXPECTED_PROJECT_REF) {
+  const refFromUrl = projectRefFromSupabaseUrl(SUPABASE_URL);
+  if (refFromUrl && CURRENT_PROJECT_REF !== refFromUrl) {
     errors.push(
-      `Project Ref incorreto! Esperado: ${EXPECTED_PROJECT_REF}, Atual: ${CURRENT_PROJECT_REF}`
+      `VITE_SUPABASE_PROJECT_ID (${CURRENT_PROJECT_REF}) não corresponde ao host em VITE_SUPABASE_URL (${refFromUrl}). Ajuste o .env.`
     );
   }
 
-  // Verificar se o cliente está usando a URL correta
-  // Nota: supabaseUrl é protegido, então verificamos via SUPABASE_URL exportado
-  // A validação já foi feita no client.ts com throw Error
+  if (!SUPABASE_PUBLISHABLE_KEY?.trim()) {
+    errors.push(
+      'Chave pública do Supabase ausente. Use VITE_SUPABASE_PUBLISHABLE_KEY ou VITE_SUPABASE_ANON_KEY no .env.'
+    );
+  }
 
   // Verificar localStorage para sessões de outros projetos
   if (typeof window !== 'undefined') {
@@ -46,7 +50,7 @@ export function validateSupabaseProject(): {
     const otherProjectKeys = allKeys.filter(
       (key) =>
         (key.startsWith('sb-') || key.includes('supabase')) &&
-        !key.includes(EXPECTED_PROJECT_REF)
+        !key.includes(CURRENT_PROJECT_REF)
     );
 
     if (otherProjectKeys.length > 0) {
@@ -155,9 +159,9 @@ export async function validateSession(): Promise<{
       );
       const issuer = payload.iss || '';
 
-      if (!issuer.includes(EXPECTED_PROJECT_REF)) {
+      if (!issuer.includes(CURRENT_PROJECT_REF)) {
         errors.push(
-          `Sessão é de outro projeto! Issuer: ${issuer}, Esperado: ${EXPECTED_PROJECT_REF}`
+          `Sessão é de outro projeto! Issuer: ${issuer}, Esperado projeto: ${CURRENT_PROJECT_REF}`
         );
         return {
           isValid: false,

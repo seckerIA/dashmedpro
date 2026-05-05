@@ -73,8 +73,8 @@ const Dashboard = () => {
     return <SecretaryDashboard />;
   }
 
-  // Se for médico, mostrar nova interface focada em agenda
-  if (isMedico || profile?.role === 'medico') {
+  // Dono da clínica (cadastro onboarding) deve ver o mesmo hub focado em agenda que o médico
+  if (isMedico || profile?.role === 'medico' || profile?.role === 'dono') {
     return <DashboardWrapper />;
   }
 

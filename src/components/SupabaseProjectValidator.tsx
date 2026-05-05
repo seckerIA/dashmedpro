@@ -4,7 +4,11 @@
  */
 
 import { useEffect, useState } from 'react';
-import { validateSupabaseProject, validateSession } from '@/integrations/supabase/validator';
+import {
+  validateSupabaseProject,
+  validateSession,
+} from '@/integrations/supabase/validator';
+import { CURRENT_PROJECT_REF, SUPABASE_URL } from '@/integrations/supabase/client';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -143,10 +147,10 @@ export function SupabaseProjectValidator({ children }: { children: React.ReactNo
           <AlertDescription>
             <div className="mt-2 space-y-1 text-sm">
               <p>
-                <strong>Project Ref:</strong> adzaqkduxnpckbcuqpmg
+                <strong>Project Ref:</strong> {CURRENT_PROJECT_REF}
               </p>
               <p>
-                <strong>URL:</strong> https://adzaqkduxnpckbcuqpmg.supabase.co
+                <strong>URL:</strong> {SUPABASE_URL}
               </p>
             </div>
           </AlertDescription>

@@ -2,9 +2,35 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-export const SUPABASE_URL = "https://adzaqkduxnpckbcuqpmg.supabase.co";
-export const CURRENT_PROJECT_REF = "adzaqkduxnpckbcuqpmg";
-export const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkemFxa2R1eG5wY2tiY3VxcG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5ODgyMDksImV4cCI6MjA4MTU2NDIwOX0.WO9-vzv_Vuh86TQWgNWuQ45cXa-L4GoGQfpSbvQiVMc";
+const DEFAULT_SUPABASE_URL = 'https://adzaqkduxnpckbcuqpmg.supabase.co';
+const DEFAULT_PUBLISHABLE_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkemFxa2R1eG5wY2tiY3VxcG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5ODgyMDksImV4cCI6MjA4MTU2NDIwOX0.WO9-vzv_Vuh86TQWgNWuQ45cXa-L4GoGQfpSbvQiVMc';
+
+function normalizeSupabaseUrl(url: string): string {
+  return url.replace(/\/+$/, '');
+}
+
+/** Extrai o project ref do host `*.supabase.co`. */
+export function projectRefFromSupabaseUrl(url: string): string | null {
+  const m = url.match(/https?:\/\/([a-z0-9_-]+)\.supabase\.co/i);
+  return m?.[1] ?? null;
+}
+
+const configuredUrl =
+  import.meta.env.VITE_SUPABASE_URL?.trim() || DEFAULT_SUPABASE_URL;
+
+export const SUPABASE_URL = normalizeSupabaseUrl(configuredUrl);
+
+export const SUPABASE_PUBLISHABLE_KEY =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() ||
+  import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() ||
+  DEFAULT_PUBLISHABLE_KEY;
+
+const refFromEnv = import.meta.env.VITE_SUPABASE_PROJECT_ID?.trim();
+const refFromUrl = projectRefFromSupabaseUrl(SUPABASE_URL);
+
+export const CURRENT_PROJECT_REF =
+  refFromEnv || refFromUrl || 'adzaqkduxnpckbcuqpmg';
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
@@ -14,7 +40,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-  }
+  },
 });
 
 /**

@@ -13,6 +13,17 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { Loader2 } from 'lucide-react';
 
+/** Conta já passou pelo cadastro da clínica (flag ou organização vinculada). */
+function isOnboardingDone(profile: {
+  onboarding_completed?: boolean | null;
+  organization_id?: string | null;
+} | null): boolean {
+  if (!profile) return false;
+  if (profile.onboarding_completed === true) return true;
+  // complete-onboarding sempre define organization_id; se flag vier null por inconsistência, não prende no wizard
+  return Boolean(profile.organization_id);
+}
+
 export default function Onboarding() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
@@ -27,7 +38,7 @@ export default function Onboarding() {
 
   // Redirect to dashboard if onboarding is already completed
   useEffect(() => {
-    if (!profileLoading && profile?.onboarding_completed === true) {
+    if (!profileLoading && profile && isOnboardingDone(profile)) {
       navigate('/', { replace: true });
     }
   }, [profile, profileLoading, navigate]);
@@ -45,7 +56,12 @@ export default function Onboarding() {
   }
 
   // If user is authenticated and hasn't completed onboarding, show wizard
-  if (user && (!profile?.onboarding_completed)) {
+  if (user && profile && !isOnboardingDone(profile)) {
+    return <OnboardingWizard />;
+  }
+
+  // Sem linha em profiles ainda — primeiro acesso / trigger pendente
+  if (user && !profile) {
     return <OnboardingWizard />;
   }
 

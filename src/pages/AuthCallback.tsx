@@ -16,6 +16,10 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 const dashmedLogo = '/dashmed-logo.png';
 
+/** Somente desenvolvimento: libera login Google sem `payment_confirmed` em `allowed_emails`. Nunca use em produção. */
+const SKIP_ALLOWED_EMAIL_PAYMENT_CHECK =
+  import.meta.env.VITE_AUTH_SKIP_ALLOWED_EMAIL_PAYMENT_CHECK === 'true';
+
 // Whitelist agora é gerenciada via tabela `allowed_emails` no banco de dados
 // Para adicionar um novo cliente: INSERT INTO allowed_emails (email, name, plan) VALUES ('email@example.com', 'Nome', 'basic');
 
@@ -72,7 +76,7 @@ const AuthCallback = () => {
         // 3. MODO "APENAS LOGIN" - Verificar se usuário já existe
         const { data: existingProfile, error: profileError } = await supabase
           .from('profiles')
-          .select('id, email, full_name, role, is_super_admin, onboarding_completed')
+          .select('id, email, full_name, role, is_super_admin, onboarding_completed, organization_id')
           .eq('id', user.id)
           .single();
 
@@ -109,13 +113,16 @@ const AuthCallback = () => {
             console.error('❌ [AuthCallback] Erro ao verificar whitelist:', allowedError);
           }
 
-          // Verificar se email está permitido, não expirou E o pagamento foi confirmado
+          // Verificar se email está permitido, não expirou E o pagamento foi confirmado (ou bypass via .env em dev)
           const isExpired = allowedEmail?.expires_at && new Date(allowedEmail.expires_at) < new Date();
-          const isPaid = allowedEmail?.payment_confirmed === true;
-          const isEmailAllowed = allowedEmail && !isExpired && isPaid;
+          const isPaid =
+            SKIP_ALLOWED_EMAIL_PAYMENT_CHECK || allowedEmail?.payment_confirmed === true;
+          const isEmailAllowed =
+            SKIP_ALLOWED_EMAIL_PAYMENT_CHECK ||
+            (Boolean(allowedEmail) && !isExpired && isPaid);
 
           // Mensagem específica para quem não pagou
-          if (allowedEmail && !isPaid) {
+          if (!SKIP_ALLOWED_EMAIL_PAYMENT_CHECK && allowedEmail && !isPaid) {
             setStatus('error');
             setErrorMessage('Pagamento pendente. Seu cadastro está aguardando confirmação de pagamento. Entre em contato com o suporte.');
 
@@ -213,17 +220,17 @@ const AuthCallback = () => {
 
         // 6. Redirecionar baseado no status de onboarding
         setTimeout(() => {
-          // Super admin vai direto para /admin
-          if (existingProfile?.is_super_admin) {
+          if (!existingProfile) return;
+          const onboardingFinished =
+            existingProfile.onboarding_completed === true ||
+            Boolean(existingProfile.organization_id);
+
+          if (existingProfile.is_super_admin) {
             navigate('/admin');
-          }
-          // Usuário que não completou onboarding vai para /onboarding
-          else if (existingProfile?.onboarding_completed === false) {
+          } else if (!onboardingFinished) {
             navigate('/onboarding');
-          }
-          // Usuário normal vai para dashboard - força reload para evitar race condition
-          else {
-            window.location.replace('/');
+          } else {
+            navigate('/', { replace: true });
           }
         }, 1500);
 

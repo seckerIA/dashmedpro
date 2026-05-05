@@ -445,7 +445,7 @@ const RoleProtectedRoute = ({
 
 const AppRoutes = () => {
   const { user, loading, isSuperAdmin } = useAuth();
-  const { profile, isLoading: profileLoading, error: profileError } = useUserProfile();
+  const { profile, isLoading: profileLoading } = useUserProfile();
   const location = useLocation();
 
   if (loading) {
@@ -490,8 +490,8 @@ const AppRoutes = () => {
     );
   }
 
-  // Usuário autenticado mas sem perfil = precisa fazer onboarding
-  if (!profile || profileError) {
+  // Sem dados de perfil após o load → onboarding. Com dados válidos, não redirecionar mesmo se houve erro em refetch em background (evita loop pós-onboarding).
+  if (profile == null) {
     console.log('📝 [AppRoutes] Perfil não encontrado, redirecionando para onboarding...');
     return <Navigate to="/onboarding" replace />;
   }

@@ -41,6 +41,111 @@ interface CompleteOnboardingRequest {
   teamMembers: OnboardingTeamMember[];
 }
 
+/** Garante whitelist OAuth (`allowed_emails.payment_confirmed`) após onboarding bem-sucedido. */
+async function ensureAllowedEmailForCompletedUser(
+  admin: ReturnType<typeof createClient>,
+  email: string | undefined,
+  displayName: string,
+): Promise<void> {
+  const normalized = email?.trim().toLowerCase();
+  if (!normalized) return;
+
+  const { error } = await admin.from("allowed_emails").upsert(
+    {
+      email: normalized,
+      name: displayName,
+      plan: "basic",
+      payment_confirmed: true,
+      used_at: new Date().toISOString(),
+    },
+    { onConflict: "email" },
+  );
+
+  if (error) {
+    console.error("[complete-onboarding] allowed_emails upsert:", error);
+    return;
+  }
+  console.log(`✅ [complete-onboarding] Email autorizado na whitelist: ${normalized}`);
+}
+
+type ExistingOrgRow = { id: string; name: string; slug: string };
+
+/** Atualiza org + perfil + whitelist + tenta conta financeira (idempotente / recuperação). */
+async function finalizeExistingOrgForUser(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  user: { id: string; email?: string | null },
+  doctor: OnboardingDoctorData,
+  clinic: OnboardingClinicData,
+  org: ExistingOrgRow,
+): Promise<Response> {
+  await supabaseAdmin
+    .from('organizations')
+    .update({
+      name: clinic.name,
+      phone: clinic.phone || null,
+      city: clinic.city || null,
+    })
+    .eq('id', org.id);
+
+  const profileResume = {
+    id: user.id,
+    email: user.email ?? '',
+    full_name: doctor.fullName,
+    specialty: doctor.specialty,
+    organization_id: org.id,
+    onboarding_completed: true,
+    onboarding_completed_at: new Date().toISOString(),
+    role: 'dono' as const,
+    is_active: true,
+  };
+
+  const { error: idemProfileError } = await supabaseAdmin
+    .from('profiles')
+    .upsert(profileResume, { onConflict: 'id' });
+
+  if (idemProfileError) {
+    console.error('❌ [complete-onboarding] finalizeExistingOrg profile upsert:', idemProfileError);
+    return new Response(
+      JSON.stringify({
+        error: 'Failed to update profile',
+        details: idemProfileError.message,
+      }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
+  }
+
+  await supabaseAdmin.from('onboarding_state').delete().eq('user_id', user.id);
+
+  await ensureAllowedEmailForCompletedUser(supabaseAdmin, user.email ?? undefined, doctor.fullName);
+
+  const { error: accountError } = await supabaseAdmin.from('financial_accounts').insert({
+    user_id: user.id,
+    name: 'Conta Principal',
+    type: 'checking',
+    initial_balance: 0,
+    current_balance: 0,
+    color: '#10B981',
+    is_active: true,
+  });
+  if (accountError && !String(accountError.message ?? '').toLowerCase().includes('duplicate')) {
+    console.warn('[complete-onboarding] financial_accounts (opcional):', accountError.message);
+  }
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      organization: {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+      },
+      invitedMembers: [],
+      message: 'Onboarding completed successfully',
+    }),
+    { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } },
+  );
+}
+
 const handler = async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -91,6 +196,9 @@ const handler = async (req: Request): Promise<Response> => {
     // Parse request body
     const { clinic, doctor, procedures, teamMembers }: CompleteOnboardingRequest = await req.json();
 
+    // Normalizar slug (único no banco; evita duplicata por maiúsculas)
+    clinic.slug = clinic.slug.trim().toLowerCase();
+
     // Validate required fields
     if (!clinic?.name || !clinic?.slug || !doctor?.fullName || !doctor?.specialty) {
       return new Response(
@@ -125,6 +233,12 @@ const handler = async (req: Request): Promise<Response> => {
 
         await supabaseAdmin.from('onboarding_state').delete().eq('user_id', user.id);
 
+        await ensureAllowedEmailForCompletedUser(
+          supabaseAdmin,
+          user.email ?? undefined,
+          doctor.fullName,
+        );
+
         return new Response(
           JSON.stringify({
             success: true,
@@ -157,55 +271,60 @@ const handler = async (req: Request): Promise<Response> => {
         console.log(
           `♻️ [complete-onboarding] Idempotent: user ${user.id} já é membro da org ${existingOrgBySlug.id} (slug ${clinic.slug})`,
         );
-        const profileResume = {
-          id: user.id,
-          email: user.email ?? '',
-          full_name: doctor.fullName,
-          specialty: doctor.specialty,
-          organization_id: existingOrgBySlug.id,
-          onboarding_completed: true,
-          onboarding_completed_at: new Date().toISOString(),
-          role: 'medico' as const,
-          is_active: true,
-        };
-        const { error: idemProfileError } = await supabaseAdmin
-          .from('profiles')
-          .upsert(profileResume, { onConflict: 'id' });
+        return finalizeExistingOrgForUser(supabaseAdmin, user, doctor, clinic, existingOrgBySlug);
+      }
 
-        if (idemProfileError) {
-          console.error('❌ [complete-onboarding] Idempotent profile upsert:', idemProfileError);
+      const { count: memberCount, error: countErr } = await supabaseAdmin
+        .from('organization_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', existingOrgBySlug.id);
+
+      if (countErr) {
+        console.error('❌ [complete-onboarding] membership count:', countErr);
+        return new Response(
+          JSON.stringify({
+            error: 'Não foi possível verificar o slug. Tente novamente.',
+            details: countErr.message,
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+
+      const orphan = (memberCount ?? 0) === 0;
+
+      if (orphan) {
+        console.warn(
+          `♻️ [complete-onboarding] Recuperando org órfã slug=${existingOrgBySlug.slug} para user=${user.id}`,
+        );
+        const { error: linkErr } = await supabaseAdmin.from('organization_members').insert({
+          organization_id: existingOrgBySlug.id,
+          user_id: user.id,
+          role: 'dono',
+        });
+        if (linkErr) {
+          console.error('❌ [complete-onboarding] orphan org membership insert:', linkErr);
           return new Response(
             JSON.stringify({
-              error: 'Failed to update profile',
-              details: idemProfileError.message,
+              error: 'Não foi possível vincular à clínica existente.',
+              details: linkErr.message,
             }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
           );
         }
-
-        await supabaseAdmin.from('onboarding_state').delete().eq('user_id', user.id);
-
-        return new Response(
-          JSON.stringify({
-            success: true,
-            organization: {
-              id: existingOrgBySlug.id,
-              name: existingOrgBySlug.name,
-              slug: existingOrgBySlug.slug,
-            },
-            invitedMembers: [],
-            message: 'Onboarding already completed for this account',
-          }),
-          {
-            status: 200,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders },
-          },
-        );
+        return finalizeExistingOrgForUser(supabaseAdmin, user, doctor, clinic, existingOrgBySlug);
       }
 
+      const suffix = crypto.randomUUID().replace(/-/g, '').slice(0, 8);
+      const suggestedSlug = `${clinic.slug}-${suffix}`;
+
       return new Response(
-        JSON.stringify({ error: 'Slug already taken. Please choose a different one.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({
+          error:
+            'Este endereço web (slug) já está em uso por outra clínica. Altere o slug no primeiro passo ou use a sugestão abaixo.',
+          code: 'SLUG_TAKEN',
+          suggestedSlug,
+        }),
+        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
@@ -265,7 +384,7 @@ const handler = async (req: Request): Promise<Response> => {
       organization_id: organization.id,
       onboarding_completed: true,
       onboarding_completed_at: new Date().toISOString(),
-      role: 'medico',
+      role: 'dono',
       is_active: true,
     };
 
@@ -484,6 +603,12 @@ const handler = async (req: Request): Promise<Response> => {
       .eq('user_id', user.id);
 
     console.log(`✅ [complete-onboarding] Onboarding completed for ${user.email}`);
+
+    await ensureAllowedEmailForCompletedUser(
+      supabaseAdmin,
+      user.email ?? undefined,
+      doctor.fullName,
+    );
 
     return new Response(
       JSON.stringify({

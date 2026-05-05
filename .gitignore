@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dev-dist/
 *.local
 
 # Editor directories and files
@@ -26,6 +27,7 @@ dist-ssr
 # Environment variables — NEVER commit secrets
 .env
 .env.*
+dashmed .env
 !.env.example
 scripts/.env
 !scripts/.env.example
@@ -39,3 +41,7 @@ nul
 .claude/skills/react-hook-form-zod/
 .claude/skills/sql-query-optimization/
 .claude/skills/web-performance-optimization/
+
+_mcp_*.json
+_mcp_github_push*.json
+_deploy_complete_onboarding.json

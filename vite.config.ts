@@ -20,6 +20,10 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: 'autoUpdate',
+      /** Evita /manifest.webmanifest cair no fallback HTML em dev (Syntax error no browser). */
+      devOptions: {
+        enabled: true,
+      },
       includeAssets: ['dashmed-logo.png', 'favicon.ico'],
       manifest: {
         name: 'DashMed Pro',
@@ -40,7 +44,7 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api/, /^\/auth/],
+        navigateFallbackDenylist: [/^\/api/, /^\/auth/, /\.webmanifest$/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

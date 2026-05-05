@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -28,6 +29,52 @@ import {
 // Constants
 // ============================================
 const DEFAULT_MEMBER_LIMIT = 1; // Free tier: 1 team member
+
+async function parseEdgeFunctionPayload(invokeError: unknown): Promise<{
+  message: string;
+  suggestedSlug?: string;
+}> {
+  const fallbackMsg =
+    invokeError instanceof Error
+      ? invokeError.message
+      : 'Edge Function returned a non-2xx status code';
+  const ctx =
+    invokeError &&
+    typeof invokeError === 'object' &&
+    'context' in invokeError &&
+    (invokeError as { context: unknown }).context instanceof Response
+      ? (invokeError as { context: Response }).context
+      : null;
+  if (!ctx) return { message: fallbackMsg };
+
+  try {
+    const clone = ctx.clone();
+    const ct = clone.headers.get('content-type') ?? '';
+    if (ct.includes('application/json')) {
+      const j = (await clone.json()) as {
+        error?: string;
+        details?: string;
+        message?: string;
+        code?: string;
+        suggestedSlug?: string;
+      };
+      const parts = [j.error, j.details, j.message].filter(
+        (x): x is string => typeof x === 'string' && x.length > 0,
+      );
+      const message = parts.length > 0 ? parts.join(' — ') : fallbackMsg;
+      const suggestedSlug =
+        typeof j.suggestedSlug === 'string' && j.suggestedSlug.trim().length > 0
+          ? j.suggestedSlug.trim().toLowerCase()
+          : undefined;
+      return { message, suggestedSlug };
+    }
+    const text = (await clone.text()).trim();
+    if (text) return { message: text.slice(0, 800) };
+  } catch {
+    /* ignore */
+  }
+  return { message: fallbackMsg };
+}
 
 // ============================================
 // Hook Return Type
@@ -80,6 +127,7 @@ interface UseOnboardingReturn {
 // Main Hook
 // ============================================
 export function useOnboarding(): UseOnboardingReturn {
+  const navigate = useNavigate();
   const { user, refreshOrganization } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -468,23 +516,21 @@ export function useOnboarding(): UseOnboardingReturn {
   // Slug Availability Check
   // ============================================
   const checkSlugAvailability = useCallback(async (slug: string) => {
-    if (!slug.trim()) {
+    const normalized = slug.trim().toLowerCase();
+    if (!normalized) {
       setIsSlugAvailable(null);
       return;
     }
 
     setCheckingSlug(true);
     try {
-      const { data, error } = await (supabase.from('organizations' as any) as any)
-        .select('id')
-        .eq('slug', slug.toLowerCase())
-        .maybeSingle();
+      const { data, error } = await supabase.rpc('is_organization_slug_available', {
+        p_slug: normalized,
+      });
 
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
+      if (error) throw error;
 
-      setIsSlugAvailable(!data); // Available if no matching org found
+      setIsSlugAvailable(data === true);
     } catch (error) {
       console.error('Error checking slug:', error);
       setIsSlugAvailable(null);
@@ -533,58 +579,78 @@ export function useOnboarding(): UseOnboardingReturn {
       };
 
       // Call Edge Function
-      const { data, error } = await supabase.functions.invoke('complete-onboarding', {
+      const invokeResult = await supabase.functions.invoke('complete-onboarding', {
         body: payload,
       });
+      const { data, error: invokeError } = invokeResult;
 
-      if (error) {
-        const fromBody =
-          data &&
-          typeof data === 'object' &&
-          data !== null &&
-          'error' in data &&
-          typeof (data as { error: unknown }).error === 'string'
-            ? (data as { error: string }).error
-            : null;
-        const details =
-          data &&
-          typeof data === 'object' &&
-          data !== null &&
-          'details' in data &&
-          typeof (data as { details: unknown }).details === 'string'
-            ? (data as { details: string }).details
-            : null;
-        const composed = [fromBody, details].filter(Boolean).join(' — ');
-        throw new Error(composed || error.message);
+      if (invokeError) {
+        const parsed = await parseEdgeFunctionPayload(invokeError);
+        const err = new Error(parsed.message) as Error & { suggestedSlug?: string };
+        if (parsed.suggestedSlug) err.suggestedSlug = parsed.suggestedSlug;
+        throw err;
       }
       if (data?.error) throw new Error(data.error);
 
       return data;
     },
     onSuccess: async () => {
-      // 1. Limpar cache do profile (localStorage/Redis) PRIMEIRO
       if (user?.id) {
         await cacheDelete(CacheKeys.userProfile(user.id));
       }
 
-      // 2. Limpar TODAS as queries do React Query (evita cache stale)
-      queryClient.clear();
+      await refreshOrganization();
 
-      // 3. Toast antes do redirect
+      // Não usar queryClient.clear(): zera o perfil e o AppRoutes redireciona para /onboarding antes do refetch terminar.
+      await queryClient.invalidateQueries({ queryKey: ['onboarding-state', user?.id] });
+      await queryClient.invalidateQueries({ queryKey: ['user-profile', user?.id] });
+
+      const uid = user?.id;
+      if (uid) {
+        for (let i = 0; i < 8; i++) {
+          await queryClient.refetchQueries({ queryKey: ['user-profile', uid] });
+          const cached = queryClient.getQueryData<{
+            organization_id?: string | null;
+            onboarding_completed?: boolean | null;
+          } | null>(['user-profile', uid]);
+          if (cached?.organization_id || cached?.onboarding_completed === true) {
+            break;
+          }
+          await new Promise((r) => setTimeout(r, 400));
+        }
+      }
+
+      await refreshOrganization();
+
       toast({
         title: 'Configuração concluída!',
         description: 'Sua clínica está pronta para uso.',
       });
 
-      // 4. Forçar reload completo para garantir estado limpo no dashboard
-      window.location.replace('/');
+      navigate('/', { replace: true });
     },
     onError: (error: Error) => {
       console.error('Onboarding completion error:', error);
+      const slugFix = (error as Error & { suggestedSlug?: string }).suggestedSlug;
+      if (slugFix) {
+        setState((prev) => {
+          const next = {
+            ...prev,
+            clinicData: { ...prev.clinicData, slug: slugFix },
+            currentStep: 1,
+          };
+          saveState(next);
+          return next;
+        });
+        setIsSlugAvailable(null);
+      }
       toast({
         variant: 'destructive',
         title: 'Erro ao finalizar',
-        description: error.message || 'Tente novamente.',
+        description:
+          slugFix != null
+            ? `${error.message} Abrimos o passo 1 com um slug alternativo sugerido (${slugFix}); confira e avance novamente.`
+            : error.message || 'Tente novamente.',
       });
     },
   });

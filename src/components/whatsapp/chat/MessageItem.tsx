@@ -27,7 +27,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { MediaViewer } from './MediaViewer';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL } from '@/integrations/supabase/client';
 import {
   Tooltip,
   TooltipContent,
@@ -430,7 +430,7 @@ function AudioPlayer({
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { setError(true); return null; }
 
-      const proxyUrl = `${import.meta.env.VITE_SUPABASE_URL || ''}/functions/v1/whatsapp-media-proxy?media_id=${proxyId}`;
+      const proxyUrl = `${SUPABASE_URL}/functions/v1/whatsapp-media-proxy?media_id=${proxyId}`;
       const res = await fetch(proxyUrl, {
         headers: { 'Authorization': `Bearer ${session.access_token}` },
       });
