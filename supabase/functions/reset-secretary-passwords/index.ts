@@ -37,14 +37,21 @@ const generatePassword = (length = 10) => {
   return pwd;
 };
 
+const bearerJwt = (req: Request): string | null => {
+  const h = req.headers.get("Authorization") ?? req.headers.get("authorization");
+  if (!h?.trim()) return null;
+  const m = /^Bearer\s+(\S+)/i.exec(h.trim());
+  return m?.[1] ?? null;
+};
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
+    const jwt = bearerJwt(req);
+    if (!jwt) {
       return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -60,13 +67,16 @@ const handler = async (req: Request): Promise<Response> => {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: authHeader } } },
+      {
+        auth: { autoRefreshToken: false, persistSession: false },
+        global: { headers: { Authorization: `Bearer ${jwt}` } },
+      },
     );
 
     // 1) Identificar caller e checar permissão
-    const { data: authData, error: authError } = await supabase.auth.getUser();
+    const { data: authData, error: authError } = await supabase.auth.getUser(jwt);
     if (authError || !authData?.user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      return new Response(JSON.stringify({ error: authError?.message || "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

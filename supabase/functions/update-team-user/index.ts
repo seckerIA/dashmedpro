@@ -7,6 +7,13 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE"
 };
 
+const bearerJwt = (req: Request): string | null => {
+  const h = req.headers.get("Authorization") ?? req.headers.get("authorization");
+  if (!h?.trim()) return null;
+  const m = /^Bearer\s+(\S+)/i.exec(h.trim());
+  return m?.[1] ?? null;
+};
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -16,9 +23,36 @@ const handler = async (req: Request): Promise<Response> => {
   // return new Response(JSON.stringify({ debug: true }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Missing Authorization header' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    const jwt = bearerJwt(req);
+    if (!jwt) {
+      return new Response(JSON.stringify({ error: "Missing Authorization header" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const supabaseUser = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      {
+        auth: { autoRefreshToken: false, persistSession: false },
+        global: { headers: { Authorization: `Bearer ${jwt}` } },
+      },
+    );
+
+    const { data: { user }, error: authErr } = await supabaseUser.auth.getUser(jwt);
+    if (authErr || !user) {
+      return new Response(
+        JSON.stringify({ error: authErr?.message || "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const { data: callerProfile, error: callerErr } = await supabaseUser
+      .from("profiles")
+      .select("role, organization_id")
+      .eq("id", user.id)
+      .single();
+
+    if (callerErr || !callerProfile || !["admin", "dono", "medico"].includes(callerProfile.role)) {
+      return new Response(JSON.stringify({ error: "Insufficient permissions" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const body = await req.json();
@@ -42,6 +76,10 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (targetError) {
       return new Response(JSON.stringify({ error: 'Target user not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    if (targetProfile?.organization_id !== callerProfile.organization_id) {
+      return new Response(JSON.stringify({ error: 'Insufficient permissions' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const orgId = targetProfile?.organization_id;

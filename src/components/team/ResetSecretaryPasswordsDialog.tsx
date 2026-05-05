@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { KeyRound, Copy, CheckCircle2, AlertTriangle, Loader2, Printer } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { getEdgeFunctionInvokeHeaders } from '@/lib/supabaseFunctionHeaders';
 import { useToast } from '@/hooks/use-toast';
 
 interface Credential {
@@ -28,16 +29,6 @@ export function ResetSecretaryPasswordsDialog() {
   const [isLoading, setIsLoading] = useState(false);
   const [credentials, setCredentials] = useState<Credential[]>([]);
 
-  const getAuthHeaders = async () => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const accessToken = sessionData?.session?.access_token;
-    if (!accessToken) {
-      throw new Error('Sessão expirada. Faça login novamente para continuar.');
-    }
-    return { Authorization: `Bearer ${accessToken}` };
-  };
-
-  const reset = () => {
     setConfirmStep(true);
     setIsLoading(false);
     setCredentials([]);
@@ -46,7 +37,7 @@ export function ResetSecretaryPasswordsDialog() {
   const handleConfirm = async () => {
     setIsLoading(true);
     try {
-      const headers = await getAuthHeaders();
+      const headers = await getEdgeFunctionInvokeHeaders();
       const { data, error } = await supabase.functions.invoke('reset-secretary-passwords', {
         body: {},
         headers,

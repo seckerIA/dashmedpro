@@ -18,6 +18,14 @@ interface CreateUserRequest {
   consultation_value?: number;
 }
 
+/** JWT do usuário (Edge / gateway podem não preencher o client global só com o header bruto). */
+const bearerJwt = (req: Request): string | null => {
+  const h = req.headers.get("Authorization") ?? req.headers.get("authorization");
+  if (!h?.trim()) return null;
+  const m = /^Bearer\s+(\S+)/i.exec(h.trim());
+  return m?.[1] ?? null;
+};
+
 const calculateBillableCount = (roles: string[], newRole?: string) => {
   const allRoles = newRole ? [...roles, newRole] : roles;
   const adminCount = allRoles.filter((r) => r === "admin").length;
@@ -37,7 +45,10 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization')!;
+    const jwt = bearerJwt(req);
+    if (!jwt) {
+      return new Response(JSON.stringify({ error: "Missing Authorization header" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -48,12 +59,18 @@ const handler = async (req: Request): Promise<Response> => {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
+      {
+        auth: { autoRefreshToken: false, persistSession: false },
+        global: { headers: { Authorization: `Bearer ${jwt}` } },
+      },
     );
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await supabase.auth.getUser(jwt);
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(
+        JSON.stringify({ error: authError?.message || "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     const { data: profile } = await supabase.from('profiles').select('role, organization_id').eq('id', user.id).single();

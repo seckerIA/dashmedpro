@@ -20,6 +20,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { DataTable } from '@/components/datatable/DataTable';
 import { getColumns, Profile } from '@/components/datatable/DataColumns';
 import { ResetSecretaryPasswordsDialog } from '@/components/team/ResetSecretaryPasswordsDialog';
+import { getEdgeFunctionInvokeHeaders } from '@/lib/supabaseFunctionHeaders';
 
 type EdgeFunctionJsonError = { error?: string; code?: string; message?: string };
 
@@ -81,15 +82,6 @@ const TeamManagement = () => {
   const { isAdmin, isMedico, profile } = useUserProfile();
   const isAdminOrDono = isAdmin; // isAdmin já inclui 'dono'
   const isMedicoOnly = isMedico && !isAdmin;
-
-  const getAuthHeaders = async () => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const accessToken = sessionData?.session?.access_token;
-    if (!accessToken) {
-      throw new Error('Sessão expirada. Faça login novamente para continuar.');
-    }
-    return { Authorization: `Bearer ${accessToken}` };
-  };
 
   const fetchProfiles = async () => {
     try {
@@ -390,7 +382,7 @@ const TeamManagement = () => {
           return;
         }
 
-        const headers = await getAuthHeaders();
+        const headers = await getEdgeFunctionInvokeHeaders();
         const { data, error } = await supabase.functions.invoke('create-team-user', {
           body: createData,
           headers,
@@ -488,7 +480,7 @@ const TeamManagement = () => {
         updateData.consultation_value = null;
       }
 
-      const headers = await getAuthHeaders();
+      const headers = await getEdgeFunctionInvokeHeaders();
       const { data, error } = await supabase.functions.invoke('update-team-user', {
         body: updateData,
         headers,
@@ -558,7 +550,7 @@ const TeamManagement = () => {
       setLoading(true);
 
       // Chama edge function para excluir usuário
-      const headers = await getAuthHeaders();
+      const headers = await getEdgeFunctionInvokeHeaders();
       const { data, error } = await supabase.functions.invoke('delete-team-user', {
         body: { userId },
         headers,
