@@ -56,6 +56,9 @@ export function AppointmentCard({
   const patientPhone = appointment.contact?.phone || 'Sem telefone';
   const appointmentType = APPOINTMENT_TYPE_LABELS[appointment.appointment_type] || appointment.appointment_type;
   const doctorName = appointment.doctor?.full_name || appointment.doctor?.email;
+  const endTimeStr = appointment.end_time
+    ? format(parseISO(appointment.end_time), 'HH:mm', { locale: ptBR })
+    : null;
 
   const isActive = appointment.status !== 'completed' &&
     appointment.status !== 'no_show' &&
@@ -74,7 +77,14 @@ export function AppointmentCard({
             "flex flex-col items-center justify-center px-2.5 sm:px-4 py-3 min-w-[56px] sm:min-w-[72px] shrink-0",
             statusTimeBgColors[appointment.status] || 'bg-blue-500/10 text-blue-700'
           )}>
-            <span className="text-base sm:text-lg font-bold leading-none">{startTime}</span>
+            <span className="text-base sm:text-lg font-bold leading-none">
+              {startTime}
+              {endTimeStr ? (
+                <span className="text-[10px] sm:text-xs font-semibold opacity-90 block text-center">
+                  até {endTimeStr}
+                </span>
+              ) : null}
+            </span>
             <span className="text-[10px] font-medium mt-1 opacity-70">{dayOfWeek}</span>
           </div>
 

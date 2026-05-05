@@ -10,6 +10,8 @@ export interface Conflict {
   title: string;
   start_time: string;
   end_time: string;
+  /** Médico da consulta em conflito (útil para secretária ver de quem é o horário) */
+  doctorLabel?: string;
 }
 
 export interface AvailabilityCheck {
@@ -68,17 +70,26 @@ export function useAvailability(
 
   // Cache de períodos ocupados
   const busySlots = useMemo(() => {
-    const slots: Array<{ start: Date; end: Date; type: 'appointment' | 'meeting'; id: string; title: string }> = [];
+    const slots: Array<{
+      start: Date;
+      end: Date;
+      type: 'appointment' | 'meeting';
+      id: string;
+      title: string;
+      doctorLabel?: string;
+    }> = [];
 
     // Adicionar consultas médicas (sempre ocupam o horário)
     (appointments || []).forEach((appt) => {
       if (appt.status === 'scheduled' || appt.status === 'confirmed' || appt.status === 'in_progress') {
+        const dn = appt.doctor?.full_name || appt.doctor?.email;
         slots.push({
           start: parseISO(appt.start_time),
           end: parseISO(appt.end_time),
           type: 'appointment',
           id: appt.id,
           title: appt.title,
+          doctorLabel: dn ? (dn.startsWith('Dr') ? dn : `Dr(a). ${dn}`) : undefined,
         });
       }
     });
@@ -123,6 +134,7 @@ export function useAvailability(
           title: slot.title,
           start_time: slot.start.toISOString(),
           end_time: slot.end.toISOString(),
+          doctorLabel: slot.doctorLabel,
         });
       }
     });

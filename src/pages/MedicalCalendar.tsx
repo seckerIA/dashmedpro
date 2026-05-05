@@ -21,6 +21,7 @@ import { AttendanceChecklist } from '@/components/medical-calendar/AttendanceChe
 import { PaymentConfirmationModal } from '@/components/medical-calendar/PaymentConfirmationModal';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { MedicalCalendarPageSkeleton } from '@/components/ui/LoadingSkeletons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
@@ -574,6 +575,16 @@ export default function MedicalCalendar() {
           </Button>
         </div>
       </div>
+
+      {isSecretaria && (
+        <Alert className="border-primary/30 bg-primary/5">
+          <AlertDescription className="text-xs sm:text-sm text-foreground/90">
+            Você vê a agenda de <strong>todos os médicos</strong> da clínica (horário, paciente e profissional).
+            Em <strong>Nova consulta</strong>, escolha o médico: o sistema <strong>não permite</strong> marcar
+            em horário já ocupado <strong>desse médico</strong>.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Metrics Cards */}
       <AppointmentMetrics appointments={filteredAppointments} meetings={meetings} />

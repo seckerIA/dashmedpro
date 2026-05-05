@@ -261,9 +261,13 @@ export function AppointmentForm({
   });
 
   const watchedDoctorId = watch('doctor_id');
+  const watchedStartDate = watch('start_date');
+
+  // Intervalo do mês da data do formulário (não só "hoje"): evita falso "livre" ao marcar em outro mês.
+  const availabilityRangeStart = watchedStartDate ?? prefilledStart ?? new Date();
   const { checkAvailability } = useAvailability(
-    undefined,
-    undefined,
+    availabilityRangeStart,
+    availabilityRangeStart,
     watchedDoctorId?.trim() ? watchedDoctorId : undefined,
     canScheduleForOthers
   );
@@ -298,7 +302,8 @@ export function AppointmentForm({
         const conflictMessages = availability.conflicts.map((conflict) => {
           const conflictType = conflict.type === 'appointment' ? 'Consulta médica' : 'Reunião';
           const conflictTime = format(parseISO(conflict.start_time), 'HH:mm', { locale: ptBR });
-          return `${conflictType}: ${conflict.title} às ${conflictTime}`;
+          const who = conflict.doctorLabel ? ` (${conflict.doctorLabel})` : '';
+          return `${conflictType}${who}: ${conflict.title} às ${conflictTime}`;
         });
 
         setAvailabilityError(

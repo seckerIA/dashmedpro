@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -22,11 +22,12 @@ export function MonthlyCalendarView({
   appointments,
   meetings = [],
 }: MonthlyCalendarViewProps) {
-  const [currentMonth, setCurrentMonth] = useState(startOfMonth(selectedDate));
+  // Mês exibido deve ser o mesmo usado em useMedicalAppointments ( MedicalCalendar monthStart/end ).
+  // Antes: estado interno currentMonth nas setas dessincronizava o grid do intervalo carregado — métricas/lista zeravam ou sumiam consultas.
+  const viewMonthStart = startOfMonth(selectedDate);
 
-  // Calcular dias do mês
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(currentMonth);
+  const monthStart = viewMonthStart;
+  const monthEnd = endOfMonth(viewMonthStart);
 
   // Começar do domingo da semana que contém o primeiro dia do mês
   const startDate = new Date(monthStart);
@@ -78,17 +79,15 @@ export function MonthlyCalendarView({
   }, [appointments, meetings]);
 
   const handlePrevMonth = () => {
-    setCurrentMonth(subMonths(currentMonth, 1));
+    onDateSelect(subMonths(selectedDate, 1));
   };
 
   const handleNextMonth = () => {
-    setCurrentMonth(addMonths(currentMonth, 1));
+    onDateSelect(addMonths(selectedDate, 1));
   };
 
   const handleToday = () => {
-    const today = new Date();
-    setCurrentMonth(startOfMonth(today));
-    onDateSelect(today);
+    onDateSelect(new Date());
   };
 
   const weekDays = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
@@ -108,7 +107,7 @@ export function MonthlyCalendarView({
           </Button>
 
           <h3 className="text-sm sm:text-base font-semibold capitalize text-foreground">
-            {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
+            {format(viewMonthStart, 'MMMM yyyy', { locale: ptBR })}
           </h3>
 
           <Button
@@ -141,7 +140,7 @@ export function MonthlyCalendarView({
             const hasAppointments = dayEvents?.appointments > 0;
             const hasMeetings = dayEvents?.meetings > 0;
             const hasEvents = hasAppointments || hasMeetings;
-            const isCurrentMonth = isSameMonth(day, currentMonth);
+            const isCurrentMonth = isSameMonth(day, viewMonthStart);
             const isSelected = isSameDay(day, selectedDate);
             const isCurrentDay = isToday(day);
 
