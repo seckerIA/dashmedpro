@@ -73,14 +73,24 @@ export async function validateSession(): Promise<{
 }> {
   const errors: string[] = [];
 
-  // Pular validação completamente se estiver no callback de auth
-  // (o AuthCallback vai criar o perfil para novos usuários)
-  if (typeof window !== 'undefined' && window.location.pathname.includes('/auth/callback')) {
-    return {
-      isValid: true,
-      isFromCorrectProject: true,
-      errors: [],
-    };
+  // Rotas onde ainda não existe linha em `profiles` — não bloquear a UI inteira
+  // (AuthCallback cria perfil; Onboarding completa cadastro; Login sem perfil redireciona depois)
+  if (typeof window !== 'undefined') {
+    const p = window.location.pathname;
+    if (
+      p.includes('/auth/callback') ||
+      p === '/onboarding' ||
+      p === '/login' ||
+      p === '/reset-password' ||
+      p === '/privacy-policy' ||
+      p === '/terms-of-service'
+    ) {
+      return {
+        isValid: true,
+        isFromCorrectProject: true,
+        errors: [],
+      };
+    }
   }
 
   try {
@@ -148,33 +158,6 @@ export async function validateSession(): Promise<{
       if (!issuer.includes(EXPECTED_PROJECT_REF)) {
         errors.push(
           `Sessão é de outro projeto! Issuer: ${issuer}, Esperado: ${EXPECTED_PROJECT_REF}`
-        );
-        return {
-          isValid: false,
-          isFromCorrectProject: false,
-          errors,
-        };
-      }
-
-      // Verificar se o usuário existe no banco correto
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, email')
-        .eq('id', session.user.id)
-        .single();
-
-      if (profileError || !profile) {
-        // Se estamos no callback de auth, permitir (o AuthCallback vai criar o perfil)
-        if (typeof window !== 'undefined' && window.location.pathname.includes('/auth/callback')) {
-          return {
-            isValid: true,
-            isFromCorrectProject: true,
-            errors: [],
-          };
-        }
-
-        errors.push(
-          `Usuário autenticado não existe no banco de dados atual! User ID: ${session.user.id}`
         );
         return {
           isValid: false,

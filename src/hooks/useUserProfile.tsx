@@ -47,6 +47,11 @@ export function useUserProfile() {
           signal
         );
 
+        // Sem linha em profiles: comum após signup antes do trigger/callback — não lançar
+        if (profileError?.code === 'PGRST116' || (!profileData && !profileError)) {
+          return null;
+        }
+
         // Se erro 42703 (coluna não existe) ou 406, tentar buscar sem doctor_id
         if (profileError && profileError.code !== 'PGRST116') {
           const isColumnError = profileError.code === '42703' ||
@@ -95,7 +100,7 @@ export function useUserProfile() {
         }
 
         if (!profileData) {
-          throw new Error('Profile not found');
+          return null;
         }
 
         // Tentar buscar enable_agenda_alerts separadamente (pode não existir se migration não foi executada)
