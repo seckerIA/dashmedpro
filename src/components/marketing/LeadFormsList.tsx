@@ -481,7 +481,7 @@ export function LeadFormsList() {
             </div>
           )}
           <div className="flex items-center gap-2">
-            <Button onClick={() => syncForms()} disabled={isSyncing}>
+            <Button onClick={() => (syncForms as any)()} disabled={isSyncing}>
               {isSyncing ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
@@ -522,7 +522,7 @@ export function LeadFormsList() {
               {pageGroups.length} página(s) conectada(s), mas nenhum formulário de Lead Ads foi encontrado.
               Crie um formulário no Meta Business Suite e clique em "Sincronizar".
             </p>
-            <Button variant="outline" onClick={() => syncForms()} disabled={isSyncing}>
+            <Button variant="outline" onClick={() => (syncForms as any)()} disabled={isSyncing}>
               {isSyncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
               Sincronizar Formulários
             </Button>

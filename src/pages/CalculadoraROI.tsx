@@ -55,7 +55,7 @@ const CalculadoraROI = () => {
     }
 
     const totalLeads = deals.length;
-    const wonDeals = deals.filter(d => ['finalizado', 'fechado_ganho'].includes(d.stage_id || ''));
+    const wonDeals = deals.filter(d => ['finalizado', 'fechado_ganho'].includes((d as any).stage_id || (d as any).stage || ''));
     const conversionRate = totalLeads > 0 ? (wonDeals.length / totalLeads) * 100 : 0;
     
     const wonDealsWithValue = wonDeals.filter(d => d.value && d.value > 0);

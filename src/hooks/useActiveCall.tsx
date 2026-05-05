@@ -134,7 +134,7 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
 
     // Duration Timer
     useEffect(() => {
-        let interval: NodeJS.Timeout;
+        let interval: ReturnType<typeof setInterval>;
         if (activeCall && activeCall.status === 'in_progress') {
             interval = setInterval(() => {
                 setActiveCall((prev) => {

@@ -471,7 +471,7 @@ const TransactionForm = () => {
             }))
 
           if (costsToCreate.length > 0) {
-            await createMultipleCosts.mutateAsync(costsToCreate)
+            await createMultipleCosts.mutateAsync(costsToCreate as any)
             console.log('Custos criados com sucesso!')
           }
         }
@@ -497,7 +497,7 @@ const TransactionForm = () => {
             }))
 
           if (costsToCreate.length > 0) {
-            await createMultipleCosts.mutateAsync(costsToCreate)
+            await createMultipleCosts.mutateAsync(costsToCreate as any)
             console.log('Custos criados com sucesso!')
           }
         }

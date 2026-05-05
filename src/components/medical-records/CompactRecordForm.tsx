@@ -360,7 +360,7 @@ export function CompactRecordForm({
         <div>
           <Label className="text-xs font-semibold text-muted-foreground uppercase">Próximo Retorno</Label>
           <div className="mt-1">
-            <DatePicker date={nextAppointmentDate} onSelect={setNextAppointmentDate} />
+            <DatePicker date={nextAppointmentDate} {...({ onSelect: setNextAppointmentDate } as any)} />
           </div>
         </div>
       </div>

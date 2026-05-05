@@ -239,7 +239,7 @@ export default function WhatsAppSettings() {
               </Button>
               <EvolutionSetup />
             </>
-          ) : selectedProvider === 'meta' || (isConfigured && provider !== 'evolution') ? (
+          ) : selectedProvider === 'meta' || (isConfigured && (provider as string) !== 'evolution') ? (
             <>
               {!isConfigured && (
                 <Button variant="ghost" size="sm" onClick={() => setSelectedProvider(null)} className="mb-2">

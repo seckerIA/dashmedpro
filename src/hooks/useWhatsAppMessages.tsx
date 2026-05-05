@@ -439,7 +439,7 @@ export function useWhatsAppMessages(options: UseWhatsAppMessagesOptions) {
           content,
           direction: 'outbound',
           message_type: 'text',
-          status: 'pending',
+          status: 'pending' as any,
           sent_at: new Date().toISOString(),
           conversation_id: conversationId,
         };
