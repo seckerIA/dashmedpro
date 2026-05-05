@@ -76,6 +76,13 @@ async function parseEdgeFunctionPayload(invokeError: unknown): Promise<{
   return { message: fallbackMsg };
 }
 
+interface CompleteOnboardingResponse {
+  success?: boolean;
+  organization?: { id: string; name: string; slug: string };
+  error?: string;
+  invitedMembers?: Array<{ email: string; success: boolean; error?: string }>;
+}
+
 // ============================================
 // Hook Return Type
 // ============================================
@@ -592,35 +599,51 @@ export function useOnboarding(): UseOnboardingReturn {
       }
       if (data?.error) throw new Error(data.error);
 
-      return data;
+      return {
+        api: data as CompleteOnboardingResponse,
+        doctorSnapshot: { ...state.doctorData },
+      };
     },
-    onSuccess: async () => {
-      if (user?.id) {
-        await cacheDelete(CacheKeys.userProfile(user.id));
-      }
-
-      await refreshOrganization();
-
-      // Não usar queryClient.clear(): zera o perfil e o AppRoutes redireciona para /onboarding antes do refetch terminar.
-      await queryClient.invalidateQueries({ queryKey: ['onboarding-state', user?.id] });
-      await queryClient.invalidateQueries({ queryKey: ['user-profile', user?.id] });
-
+    onSuccess: async (result) => {
       const uid = user?.id;
       if (uid) {
-        for (let i = 0; i < 8; i++) {
-          await queryClient.refetchQueries({ queryKey: ['user-profile', uid] });
-          const cached = queryClient.getQueryData<{
-            organization_id?: string | null;
-            onboarding_completed?: boolean | null;
-          } | null>(['user-profile', uid]);
-          if (cached?.organization_id || cached?.onboarding_completed === true) {
-            break;
-          }
-          await new Promise((r) => setTimeout(r, 400));
-        }
+        await cacheDelete(CacheKeys.userProfile(uid));
+      }
+
+      if ('alreadyCompleted' in result && result.alreadyCompleted) {
+        await refreshOrganization();
+        await queryClient.invalidateQueries({ queryKey: ['onboarding-state', uid] });
+        await queryClient.invalidateQueries({ queryKey: ['user-profile', uid] });
+        navigate('/', { replace: true });
+        return;
+      }
+
+      const { api, doctorSnapshot } = result;
+      const orgId = api?.organization?.id;
+      const now = new Date().toISOString();
+      if (uid && orgId) {
+        queryClient.setQueryData(['user-profile', uid], {
+          id: uid,
+          email: user.email ?? '',
+          full_name: doctorSnapshot.fullName,
+          role: 'medico',
+          is_active: true,
+          avatar_url: null,
+          created_at: now,
+          updated_at: now,
+          invited_by: null,
+          doctor_id: null,
+          organization_id: orgId,
+          enable_agenda_alerts: true,
+          onboarding_completed: true,
+          onboarding_completed_at: now,
+          specialty: doctorSnapshot.specialty,
+          force_password_change: null,
+        });
       }
 
       await refreshOrganization();
+      await queryClient.invalidateQueries({ queryKey: ['onboarding-state', uid] });
 
       toast({
         title: 'Configuração concluída!',
@@ -628,6 +651,12 @@ export function useOnboarding(): UseOnboardingReturn {
       });
 
       navigate('/', { replace: true });
+
+      if (uid) {
+        window.setTimeout(() => {
+          void queryClient.invalidateQueries({ queryKey: ['user-profile', uid] });
+        }, 5000);
+      }
     },
     onError: (error: Error) => {
       console.error('Onboarding completion error:', error);

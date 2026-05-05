@@ -10,6 +10,7 @@ import { ActiveCallProvider } from "./hooks/useActiveCall";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { useUserProfile } from "./hooks/useUserProfile";
 import { SupabaseProjectValidator } from "./components/SupabaseProjectValidator";
+import { Button } from "@/components/ui/button";
 import { initHeartbeatRecovery, isPostRecoveryMode } from "@/lib/heartbeatRecovery";
 
 // Componente para inicializar o Heartbeat de recuperação
@@ -445,7 +446,7 @@ const RoleProtectedRoute = ({
 
 const AppRoutes = () => {
   const { user, loading, isSuperAdmin } = useAuth();
-  const { profile, isLoading: profileLoading } = useUserProfile();
+  const { profile, isLoading: profileLoading, error: profileError } = useUserProfile();
   const location = useLocation();
 
   if (loading) {
@@ -486,6 +487,33 @@ const AppRoutes = () => {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center text-muted-foreground animate-pulse">Carregando perfil...</div>
+      </div>
+    );
+  }
+
+  // Erro real na query de perfil (não confundir com "sem linha" → null)
+  if (profileError) {
+    console.error('❌ [AppRoutes] Erro ao carregar perfil:', profileError);
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 bg-background">
+        <p className="text-muted-foreground text-center max-w-md">
+          Não foi possível carregar seu perfil. Pode ser rede, sessão ou permissão. Tente recarregar ou sair e entrar de novo.
+        </p>
+        <div className="flex flex-wrap gap-3 justify-center">
+          <Button type="button" variant="default" onClick={() => window.location.reload()}>
+            Recarregar página
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={async () => {
+              await supabase.auth.signOut();
+              window.location.assign('/login');
+            }}
+          >
+            Sair e entrar de novo
+          </Button>
+        </div>
       </div>
     );
   }

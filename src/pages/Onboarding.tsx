@@ -7,7 +7,7 @@
  */
 
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { OnboardingWizard } from '@/components/onboarding';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
@@ -36,13 +36,6 @@ export default function Onboarding() {
     }
   }, [user, authLoading, navigate]);
 
-  // Redirect to dashboard if onboarding is already completed
-  useEffect(() => {
-    if (!profileLoading && profile && isOnboardingDone(profile)) {
-      navigate('/', { replace: true });
-    }
-  }, [profile, profileLoading, navigate]);
-
   // Show loading while checking auth/profile
   if (authLoading || profileLoading) {
     return (
@@ -55,13 +48,11 @@ export default function Onboarding() {
     );
   }
 
-  // If user is authenticated and hasn't completed onboarding, show wizard
-  if (user && profile && !isOnboardingDone(profile)) {
-    return <OnboardingWizard />;
+  if (user && profile && isOnboardingDone(profile)) {
+    return <Navigate to="/" replace />;
   }
 
-  // Sem linha em profiles ainda — primeiro acesso / trigger pendente
-  if (user && !profile) {
+  if (user && (!profile || !isOnboardingDone(profile))) {
     return <OnboardingWizard />;
   }
 

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase, SUPABASE_URL, CURRENT_PROJECT_REF } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
 import { cacheSet, CacheKeys, CacheTTL } from '@/lib/cache';
@@ -23,6 +23,47 @@ interface Profile {
   force_password_change: boolean | null;
 }
 
+const SELECT_FULL =
+  'id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by, doctor_id, organization_id, onboarding_completed, onboarding_completed_at, specialty, force_password_change';
+
+const SELECT_BASIC =
+  'id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by, organization_id, force_password_change';
+
+const SELECT_MINIMAL = 'id, email, full_name, role';
+
+function profileFromJsonRow(row: Record<string, unknown>): Profile | null {
+  if (!row || typeof row.id !== 'string') return null;
+  return {
+    id: row.id,
+    email: typeof row.email === 'string' ? row.email : '',
+    full_name: row.full_name != null ? String(row.full_name) : null,
+    role: row.role != null ? String(row.role) : '',
+    is_active: row.is_active !== false && row.is_active !== null ? Boolean(row.is_active) : true,
+    avatar_url: row.avatar_url != null ? String(row.avatar_url) : null,
+    created_at: row.created_at != null ? String(row.created_at) : '',
+    updated_at: row.updated_at != null ? String(row.updated_at) : '',
+    invited_by: row.invited_by != null ? String(row.invited_by) : null,
+    doctor_id: row.doctor_id != null ? String(row.doctor_id) : null,
+    organization_id: row.organization_id != null ? String(row.organization_id) : null,
+    enable_agenda_alerts:
+      typeof row.enable_agenda_alerts === 'boolean' ? row.enable_agenda_alerts : true,
+    onboarding_completed:
+      typeof row.onboarding_completed === 'boolean' ? row.onboarding_completed : null,
+    onboarding_completed_at:
+      row.onboarding_completed_at != null ? String(row.onboarding_completed_at) : null,
+    specialty: row.specialty != null ? String(row.specialty) : null,
+    force_password_change:
+      typeof row.force_password_change === 'boolean' ? row.force_password_change : null,
+  };
+}
+
+function isSchemaMismatchError(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  if (error.code === '42703' || error.code === 'PGRST204') return true;
+  const m = error.message ?? '';
+  return m.includes('does not exist') || m.includes('column');
+}
+
 export function useUserProfile() {
   const { user, loading: authLoading } = useAuth();
 
@@ -33,114 +74,82 @@ export function useUserProfile() {
       const cacheKey = CacheKeys.userProfile(user.id);
 
       try {
-        // Buscar perfil com timeout de 15s
-        // Nota: enable_agenda_alerts pode não existir se a migration não foi executada
-        const profileQuery = supabase
-          .from('profiles')
-          .select('id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by, doctor_id, organization_id, onboarding_completed, onboarding_completed_at, specialty, force_password_change')
-          .eq('id', user.id)
-          .single();
-
-        const { data: profileData, error: profileError } = await supabaseQueryWithTimeout(
-          profileQuery as any,
-          15000, // 15s - profile é query simples (1 row by PK)
-          signal
-        );
-
-        // Sem linha em profiles: comum após signup antes do trigger/callback — não lançar
-        if (profileError?.code === 'PGRST116' || (!profileData && !profileError)) {
-          return null;
-        }
-
-        // Se erro 42703 (coluna não existe) ou 406, tentar buscar sem doctor_id
-        if (profileError && profileError.code !== 'PGRST116') {
-          const isColumnError = profileError.code === '42703' ||
-            profileError.message?.includes('does not exist') ||
-            profileError.message?.includes('doctor_id');
-
-          if (isColumnError || profileError.code === 'PGRST116' ||
-            profileError.message?.includes('406') || profileError.code === '406') {
-            // Tentar buscar sem doctor_id mas COM organization_id
-            const basicQuery = supabase
-              .from('profiles')
-              .select('id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by, organization_id, force_password_change')
-              .eq('id', user.id)
-              .single();
-
-            const basicResult = await supabaseQueryWithTimeout(basicQuery as any, 10000);
-            const { data: basicData, error: basicError } = basicResult;
-
-            if (basicError && basicError.code !== 'PGRST116') {
-              // Se ainda falhar, tentar apenas colunas essenciais
-              const minimalQuery = supabase
-                .from('profiles')
-                .select('id, email, full_name, role')
-                .eq('id', user.id)
-                .single();
-
-              const minimalResult = await supabaseQueryWithTimeout(minimalQuery as any, 10000);
-              const { data: minimalData, error: minimalError } = minimalResult;
-
-              if (minimalError && minimalError.code !== 'PGRST116') {
-                throw minimalError;
-              }
-              // Adicionar campos faltantes com defaults
-              const result = { ...(minimalData as any), doctor_id: undefined, enable_agenda_alerts: true };
-              // Salvar no cache
-              cacheSet(cacheKey, result, CacheTTL.MEDIUM).catch(() => { });
-              return result;
-            }
-            // Adicionar campos faltantes com defaults
-            const result = { ...(basicData as any), doctor_id: undefined, enable_agenda_alerts: true };
-            // Salvar no cache
-            cacheSet(cacheKey, result, CacheTTL.MEDIUM).catch(() => { });
-            return result;
+        const rpcQuery = supabase.rpc('get_my_profile');
+        const rpcResult = await supabaseQueryWithTimeout<unknown>(rpcQuery as any, 15000, signal);
+        if (!rpcResult.error && rpcResult.data != null && typeof rpcResult.data === 'object') {
+          const fromRpc = profileFromJsonRow(rpcResult.data as Record<string, unknown>);
+          if (fromRpc) {
+            cacheSet(cacheKey, fromRpc, CacheTTL.MEDIUM).catch(() => {});
+            console.log('useUserProfile - Profile via get_my_profile():', fromRpc.id);
+            return fromRpc;
           }
-          throw profileError;
         }
 
+        const fetchRow = async (columns: string) => {
+          const q = supabase.from('profiles').select(columns).eq('id', user.id).maybeSingle();
+          return supabaseQueryWithTimeout<Record<string, unknown> | null>(q as any, 15000, signal);
+        };
+
+        let { data: profileData, error: profileError } = await fetchRow(SELECT_FULL);
+
+        if (!profileData && isSchemaMismatchError(profileError)) {
+          const second = await fetchRow(SELECT_BASIC);
+          profileData = second.data as Record<string, unknown> | null;
+          profileError = second.error;
+        }
+
+        if (!profileData && isSchemaMismatchError(profileError)) {
+          const third = await fetchRow(SELECT_MINIMAL);
+          profileData = third.data as Record<string, unknown> | null;
+          profileError = third.error;
+        }
+
+        // maybeSingle: 0 linhas → data null, error null. Qualquer erro restante: log e segue como sem perfil (evita tela morta)
         if (!profileData) {
+          if (profileError) {
+            console.warn('useUserProfile: perfil não retornado', profileError.code ?? '', profileError.message ?? '');
+          }
           return null;
         }
 
-        // Tentar buscar enable_agenda_alerts separadamente (pode não existir se migration não foi executada)
-        let enableAgendaAlerts: boolean | null = true; // default true
+        let enableAgendaAlerts: boolean | null = true;
         try {
-          const { data: alertsData, error: alertsError } = await supabase
-            .from('profiles')
-            .select('enable_agenda_alerts')
-            .eq('id', user.id)
-            .single();
-
-          if (!alertsError && alertsData && 'enable_agenda_alerts' in alertsData) {
-            enableAgendaAlerts = (alertsData as any).enable_agenda_alerts ?? true;
-          } else if (alertsError) {
-            // Coluna não existe ainda, usar default
-            console.log('useUserProfile - enable_agenda_alerts column not found, using default true');
+          const alertsQ = supabase.from('profiles').select('enable_agenda_alerts').eq('id', user.id).maybeSingle();
+          const { data: alertsData, error: alertsError } = await supabaseQueryWithTimeout(alertsQ as any, 8000, signal);
+          if (!alertsError && alertsData && typeof alertsData === 'object' && 'enable_agenda_alerts' in alertsData) {
+            enableAgendaAlerts = (alertsData as { enable_agenda_alerts?: boolean }).enable_agenda_alerts ?? true;
           }
         } catch {
-          // Erro inesperado, usar default
-          console.log('useUserProfile - enable_agenda_alerts fetch failed, using default true');
+          // opcional
         }
 
-        const result = { ...(profileData as any), enable_agenda_alerts: enableAgendaAlerts } as Profile;
-        console.log('useUserProfile - Profile carregado com sucesso:', result);
+        const merged = { ...profileData, enable_agenda_alerts: enableAgendaAlerts };
+        const result = profileFromJsonRow(merged as Record<string, unknown>);
+        if (!result) return null;
+        cacheSet(cacheKey, result, CacheTTL.MEDIUM).catch(() => {});
+        console.log('useUserProfile - Profile carregado com sucesso:', result.id);
         return result;
-
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const isTimeout = msg.includes('Timeout') || msg.includes('timeout');
+        const isAbort = msg.includes('cancelada') || msg.includes('Abort');
+        if (isTimeout || isAbort) {
+          console.warn('useUserProfile: timeout/abort ao buscar perfil — tratando como sem perfil neste ciclo');
+          return null;
+        }
         console.error('useUserProfile - Erro:', err);
         throw err;
       }
     },
-    enabled: !!user?.id && !authLoading, // Aguardar auth terminar de carregar
+    enabled: !!user?.id && !authLoading,
     retry: 2,
     retryDelay: 1000,
     refetchOnWindowFocus: false,
-    staleTime: 10 * 60 * 1000, // 10 minutos
-    gcTime: 30 * 60 * 1000, // 30 minutos para idle longo
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     refetchInterval: () => {
       if (typeof document !== 'undefined' && document.hidden) return false;
-      return 10 * 60 * 1000; // 10 minutos
+      return 10 * 60 * 1000;
     },
     refetchIntervalInBackground: false,
   });

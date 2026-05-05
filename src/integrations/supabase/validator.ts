@@ -11,6 +11,19 @@ import {
   projectRefFromSupabaseUrl,
 } from './client';
 
+/** Rotas onde a sessão pode ser válida no projeto certo mas `profiles` ainda não existe (onboarding / redirecionamento). */
+function allowsSessionWithoutProfileRow(): boolean {
+  if (typeof window === 'undefined') return false;
+  const p = window.location.pathname;
+  return (
+    p === '/' ||
+    p === '/onboarding' ||
+    p === '/login' ||
+    p.startsWith('/reset-password') ||
+    p.includes('/auth/callback')
+  );
+}
+
 /**
  * Valida se o cliente Supabase está configurado para o projeto correto
  */
@@ -162,6 +175,31 @@ export async function validateSession(): Promise<{
       if (!issuer.includes(CURRENT_PROJECT_REF)) {
         errors.push(
           `Sessão é de outro projeto! Issuer: ${issuer}, Esperado projeto: ${CURRENT_PROJECT_REF}`
+        );
+        return {
+          isValid: false,
+          isFromCorrectProject: false,
+          errors,
+        };
+      }
+
+      if (allowsSessionWithoutProfileRow()) {
+        return {
+          isValid: true,
+          isFromCorrectProject: true,
+          errors: [],
+        };
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      if (profileError || !profile) {
+        errors.push(
+          `Usuário autenticado não existe no banco de dados atual! User ID: ${session.user.id}`
         );
         return {
           isValid: false,
