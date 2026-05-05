@@ -14,6 +14,68 @@ export type Database = {
   }
   public: {
     Tables: {
+      ad_campaign_daily_metrics: {
+        Row: {
+          campaign_sync_id: string
+          clicks: number | null
+          conversion_value: number | null
+          conversions: number | null
+          cpc: number | null
+          cpm: number | null
+          created_at: string
+          ctr: number | null
+          id: string
+          impressions: number | null
+          metric_date: string
+          reach: number | null
+          spend: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          campaign_sync_id: string
+          clicks?: number | null
+          conversion_value?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          cpm?: number | null
+          created_at?: string
+          ctr?: number | null
+          id?: string
+          impressions?: number | null
+          metric_date: string
+          reach?: number | null
+          spend?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          campaign_sync_id?: string
+          clicks?: number | null
+          conversion_value?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          cpm?: number | null
+          created_at?: string
+          ctr?: number | null
+          id?: string
+          impressions?: number | null
+          metric_date?: string
+          reach?: number | null
+          spend?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_campaign_daily_metrics_campaign_sync_id_fkey"
+            columns: ["campaign_sync_id"]
+            isOneToOne: false
+            referencedRelation: "ad_campaigns_sync"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ad_campaigns_sync: {
         Row: {
           budget: number | null
@@ -105,6 +167,7 @@ export type Database = {
           id: string
           is_active: boolean
           last_sync_at: string | null
+          parent_account_id: string | null
           platform: Database["public"]["Enums"]["ad_platform"]
           refresh_token: string | null
           sync_status: Database["public"]["Enums"]["sync_status"] | null
@@ -121,6 +184,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           last_sync_at?: string | null
+          parent_account_id?: string | null
           platform: Database["public"]["Enums"]["ad_platform"]
           refresh_token?: string | null
           sync_status?: Database["public"]["Enums"]["sync_status"] | null
@@ -137,6 +201,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           last_sync_at?: string | null
+          parent_account_id?: string | null
           platform?: Database["public"]["Enums"]["ad_platform"]
           refresh_token?: string | null
           sync_status?: Database["public"]["Enums"]["sync_status"] | null
@@ -1354,6 +1419,7 @@ export type Database = {
           created_at: string | null
           icon: string | null
           id: string
+          is_fixed: boolean | null
           is_system: boolean | null
           name: string
           organization_id: string | null
@@ -1366,6 +1432,7 @@ export type Database = {
           created_at?: string | null
           icon?: string | null
           id?: string
+          is_fixed?: boolean | null
           is_system?: boolean | null
           name: string
           organization_id?: string | null
@@ -1378,6 +1445,7 @@ export type Database = {
           created_at?: string | null
           icon?: string | null
           id?: string
+          is_fixed?: boolean | null
           is_system?: boolean | null
           name?: string
           organization_id?: string | null
@@ -2090,6 +2158,93 @@ export type Database = {
           },
         ]
       }
+      lead_form_submissions: {
+        Row: {
+          ad_id: string | null
+          ad_name: string | null
+          adset_id: string | null
+          adset_name: string | null
+          campaign_id: string | null
+          campaign_name: string | null
+          created_at: string | null
+          crm_contact_id: string | null
+          crm_deal_id: string | null
+          email: string | null
+          field_data: Json
+          form_id: string
+          form_name: string | null
+          full_name: string | null
+          id: string
+          is_processed: boolean | null
+          leadgen_id: string
+          page_id: string
+          phone_number: string | null
+          processed_at: string | null
+          user_id: string
+        }
+        Insert: {
+          ad_id?: string | null
+          ad_name?: string | null
+          adset_id?: string | null
+          adset_name?: string | null
+          campaign_id?: string | null
+          campaign_name?: string | null
+          created_at?: string | null
+          crm_contact_id?: string | null
+          crm_deal_id?: string | null
+          email?: string | null
+          field_data?: Json
+          form_id: string
+          form_name?: string | null
+          full_name?: string | null
+          id?: string
+          is_processed?: boolean | null
+          leadgen_id: string
+          page_id: string
+          phone_number?: string | null
+          processed_at?: string | null
+          user_id: string
+        }
+        Update: {
+          ad_id?: string | null
+          ad_name?: string | null
+          adset_id?: string | null
+          adset_name?: string | null
+          campaign_id?: string | null
+          campaign_name?: string | null
+          created_at?: string | null
+          crm_contact_id?: string | null
+          crm_deal_id?: string | null
+          email?: string | null
+          field_data?: Json
+          form_id?: string
+          form_name?: string | null
+          full_name?: string | null
+          id?: string
+          is_processed?: boolean | null
+          leadgen_id?: string
+          page_id?: string
+          phone_number?: string | null
+          processed_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_form_submissions_crm_contact_id_fkey"
+            columns: ["crm_contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_form_submissions_crm_deal_id_fkey"
+            columns: ["crm_deal_id"]
+            isOneToOne: false
+            referencedRelation: "crm_deals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_score_history: {
         Row: {
           calculated_at: string | null
@@ -2165,6 +2320,70 @@ export type Database = {
         }
         Relationships: []
       }
+      medical_appointment_reminders: {
+        Row: {
+          appointment_id: string
+          contact_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          message: string | null
+          reminder_type: string
+          scheduled_for: string
+          sent_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          appointment_id: string
+          contact_id: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message?: string | null
+          reminder_type?: string
+          scheduled_for: string
+          sent_at?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          appointment_id?: string
+          contact_id?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message?: string | null
+          reminder_type?: string
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medical_appointment_reminders_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "medical_appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_appointment_reminders_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_appointment_reminders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       medical_appointments: {
         Row: {
           appointment_type: Database["public"]["Enums"]["appointment_type"]
@@ -2184,6 +2403,7 @@ export type Database = {
           organization_id: string | null
           paid_in_advance: boolean | null
           payment_status: Database["public"]["Enums"]["payment_status"] | null
+          scheduled_by: string | null
           sinal_amount: number | null
           sinal_paid: boolean | null
           sinal_paid_at: string | null
@@ -2212,6 +2432,7 @@ export type Database = {
           organization_id?: string | null
           paid_in_advance?: boolean | null
           payment_status?: Database["public"]["Enums"]["payment_status"] | null
+          scheduled_by?: string | null
           sinal_amount?: number | null
           sinal_paid?: boolean | null
           sinal_paid_at?: string | null
@@ -2240,6 +2461,7 @@ export type Database = {
           organization_id?: string | null
           paid_in_advance?: boolean | null
           payment_status?: Database["public"]["Enums"]["payment_status"] | null
+          scheduled_by?: string | null
           sinal_amount?: number | null
           sinal_paid?: boolean | null
           sinal_paid_at?: string | null
@@ -2284,6 +2506,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_appointments_scheduled_by_fkey"
+            columns: ["scheduled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -2486,6 +2715,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      meta_lead_forms: {
+        Row: {
+          created_at: string | null
+          form_name: string
+          id: string
+          last_synced_at: string | null
+          leads_count: number | null
+          meta_form_id: string
+          page_id: string
+          page_name: string | null
+          questions: Json | null
+          status: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          form_name: string
+          id?: string
+          last_synced_at?: string | null
+          leads_count?: number | null
+          meta_form_id: string
+          page_id: string
+          page_name?: string | null
+          questions?: Json | null
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          form_name?: string
+          id?: string
+          last_synced_at?: string | null
+          leads_count?: number | null
+          meta_form_id?: string
+          page_id?: string
+          page_name?: string | null
+          questions?: Json | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       meta_oauth_sessions: {
         Row: {
@@ -3339,6 +3613,42 @@ export type Database = {
           },
         ]
       }
+      sofia_knowledge_base: {
+        Row: {
+          category: string
+          content: string
+          created_at: string | null
+          embedding: string | null
+          id: string
+          is_active: boolean | null
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          content: string
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          is_active?: boolean | null
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          is_active?: boolean | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       specialty_procedures: {
         Row: {
           category: string
@@ -3993,6 +4303,8 @@ export type Database = {
         Row: {
           agent_greeting: string | null
           agent_name: string | null
+          ai_reply_delay_max_seconds: number
+          ai_reply_delay_min_seconds: number
           already_known_info: string | null
           analysis_cooldown_minutes: number | null
           auto_analyze: boolean | null
@@ -4003,6 +4315,10 @@ export type Database = {
           created_at: string | null
           custom_prompt_instructions: string | null
           doctor_info: string | null
+          followup_enabled: boolean
+          followup_max_attempts: number
+          followup_window_end_hour: number
+          followup_window_start_hour: number
           id: string
           include_emojis: boolean | null
           is_enabled: boolean | null
@@ -4010,8 +4326,6 @@ export type Database = {
           max_suggestions_per_conversation: number | null
           openai_api_key_encrypted: string | null
           pre_investment_videos: string | null
-          ai_reply_delay_min_seconds: number
-          ai_reply_delay_max_seconds: number
           specialist_name: string | null
           suggestion_language: string | null
           suggestion_tone: string | null
@@ -4021,6 +4335,8 @@ export type Database = {
         Insert: {
           agent_greeting?: string | null
           agent_name?: string | null
+          ai_reply_delay_max_seconds?: number
+          ai_reply_delay_min_seconds?: number
           already_known_info?: string | null
           analysis_cooldown_minutes?: number | null
           auto_analyze?: boolean | null
@@ -4031,6 +4347,10 @@ export type Database = {
           created_at?: string | null
           custom_prompt_instructions?: string | null
           doctor_info?: string | null
+          followup_enabled?: boolean
+          followup_max_attempts?: number
+          followup_window_end_hour?: number
+          followup_window_start_hour?: number
           id?: string
           include_emojis?: boolean | null
           is_enabled?: boolean | null
@@ -4038,8 +4358,6 @@ export type Database = {
           max_suggestions_per_conversation?: number | null
           openai_api_key_encrypted?: string | null
           pre_investment_videos?: string | null
-          ai_reply_delay_min_seconds?: number
-          ai_reply_delay_max_seconds?: number
           specialist_name?: string | null
           suggestion_language?: string | null
           suggestion_tone?: string | null
@@ -4049,6 +4367,8 @@ export type Database = {
         Update: {
           agent_greeting?: string | null
           agent_name?: string | null
+          ai_reply_delay_max_seconds?: number
+          ai_reply_delay_min_seconds?: number
           already_known_info?: string | null
           analysis_cooldown_minutes?: number | null
           auto_analyze?: boolean | null
@@ -4059,6 +4379,10 @@ export type Database = {
           created_at?: string | null
           custom_prompt_instructions?: string | null
           doctor_info?: string | null
+          followup_enabled?: boolean
+          followup_max_attempts?: number
+          followup_window_end_hour?: number
+          followup_window_start_hour?: number
           id?: string
           include_emojis?: boolean | null
           is_enabled?: boolean | null
@@ -4066,8 +4390,6 @@ export type Database = {
           max_suggestions_per_conversation?: number | null
           openai_api_key_encrypted?: string | null
           pre_investment_videos?: string | null
-          ai_reply_delay_min_seconds?: number
-          ai_reply_delay_max_seconds?: number
           specialist_name?: string | null
           suggestion_language?: string | null
           suggestion_tone?: string | null
@@ -4315,10 +4637,15 @@ export type Database = {
           business_account_id: string | null
           created_at: string | null
           display_phone_number: string | null
+          evolution_api_url: string | null
+          evolution_instance_name: string | null
+          evolution_instance_status: string | null
+          evolution_instance_token: string | null
           id: string
           is_active: boolean | null
           last_synced_at: string | null
           phone_number_id: string | null
+          provider: Database["public"]["Enums"]["whatsapp_provider"]
           updated_at: string | null
           user_id: string
           verified_name: string | null
@@ -4330,10 +4657,15 @@ export type Database = {
           business_account_id?: string | null
           created_at?: string | null
           display_phone_number?: string | null
+          evolution_api_url?: string | null
+          evolution_instance_name?: string | null
+          evolution_instance_status?: string | null
+          evolution_instance_token?: string | null
           id?: string
           is_active?: boolean | null
           last_synced_at?: string | null
           phone_number_id?: string | null
+          provider?: Database["public"]["Enums"]["whatsapp_provider"]
           updated_at?: string | null
           user_id: string
           verified_name?: string | null
@@ -4345,10 +4677,15 @@ export type Database = {
           business_account_id?: string | null
           created_at?: string | null
           display_phone_number?: string | null
+          evolution_api_url?: string | null
+          evolution_instance_name?: string | null
+          evolution_instance_status?: string | null
+          evolution_instance_token?: string | null
           id?: string
           is_active?: boolean | null
           last_synced_at?: string | null
           phone_number_id?: string | null
+          provider?: Database["public"]["Enums"]["whatsapp_provider"]
           updated_at?: string | null
           user_id?: string
           verified_name?: string | null
@@ -4515,6 +4852,7 @@ export type Database = {
       whatsapp_conversations: {
         Row: {
           ai_autonomous_mode: boolean | null
+          ai_lock_until: string | null
           ai_processing: boolean | null
           ai_processing_started_at: string | null
           assigned_to: string | null
@@ -4522,16 +4860,21 @@ export type Database = {
           contact_name: string | null
           contact_profile_picture: string | null
           created_at: string | null
+          followup_attempts: number
+          followup_disabled: boolean
           id: string
           is_muted: boolean | null
+          last_followup_at: string | null
           last_message_at: string | null
           last_message_direction: string | null
           last_message_preview: string | null
+          last_message_status: string | null
           metadata: Json | null
           organization_id: string | null
           phone_number: string
           phone_number_id: string | null
           priority: Database["public"]["Enums"]["whatsapp_priority"] | null
+          provider: Database["public"]["Enums"]["whatsapp_provider"] | null
           status: Database["public"]["Enums"]["whatsapp_conversation_status"]
           unread_count: number | null
           updated_at: string | null
@@ -4539,6 +4882,7 @@ export type Database = {
         }
         Insert: {
           ai_autonomous_mode?: boolean | null
+          ai_lock_until?: string | null
           ai_processing?: boolean | null
           ai_processing_started_at?: string | null
           assigned_to?: string | null
@@ -4546,16 +4890,21 @@ export type Database = {
           contact_name?: string | null
           contact_profile_picture?: string | null
           created_at?: string | null
+          followup_attempts?: number
+          followup_disabled?: boolean
           id?: string
           is_muted?: boolean | null
+          last_followup_at?: string | null
           last_message_at?: string | null
           last_message_direction?: string | null
           last_message_preview?: string | null
+          last_message_status?: string | null
           metadata?: Json | null
           organization_id?: string | null
           phone_number: string
           phone_number_id?: string | null
           priority?: Database["public"]["Enums"]["whatsapp_priority"] | null
+          provider?: Database["public"]["Enums"]["whatsapp_provider"] | null
           status?: Database["public"]["Enums"]["whatsapp_conversation_status"]
           unread_count?: number | null
           updated_at?: string | null
@@ -4563,6 +4912,7 @@ export type Database = {
         }
         Update: {
           ai_autonomous_mode?: boolean | null
+          ai_lock_until?: string | null
           ai_processing?: boolean | null
           ai_processing_started_at?: string | null
           assigned_to?: string | null
@@ -4570,16 +4920,21 @@ export type Database = {
           contact_name?: string | null
           contact_profile_picture?: string | null
           created_at?: string | null
+          followup_attempts?: number
+          followup_disabled?: boolean
           id?: string
           is_muted?: boolean | null
+          last_followup_at?: string | null
           last_message_at?: string | null
           last_message_direction?: string | null
           last_message_preview?: string | null
+          last_message_status?: string | null
           metadata?: Json | null
           organization_id?: string | null
           phone_number?: string
           phone_number_id?: string | null
           priority?: Database["public"]["Enums"]["whatsapp_priority"] | null
+          provider?: Database["public"]["Enums"]["whatsapp_provider"] | null
           status?: Database["public"]["Enums"]["whatsapp_conversation_status"]
           unread_count?: number | null
           updated_at?: string | null
@@ -4650,6 +5005,71 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_lead_qualifications: {
+        Row: {
+          como_conheceu: string | null
+          convenio: string | null
+          conversation_id: string
+          created_at: string | null
+          data_agendamento: string | null
+          doctor_id: string | null
+          id: string
+          nome: string | null
+          perfil_paciente: string | null
+          phone_number: string | null
+          procedimento_desejado: string | null
+          status: string | null
+          temperatura_lead: string | null
+          updated_at: string | null
+          urgencia: string | null
+          videos_sent_at: string | null
+        }
+        Insert: {
+          como_conheceu?: string | null
+          convenio?: string | null
+          conversation_id: string
+          created_at?: string | null
+          data_agendamento?: string | null
+          doctor_id?: string | null
+          id?: string
+          nome?: string | null
+          perfil_paciente?: string | null
+          phone_number?: string | null
+          procedimento_desejado?: string | null
+          status?: string | null
+          temperatura_lead?: string | null
+          updated_at?: string | null
+          urgencia?: string | null
+          videos_sent_at?: string | null
+        }
+        Update: {
+          como_conheceu?: string | null
+          convenio?: string | null
+          conversation_id?: string
+          created_at?: string | null
+          data_agendamento?: string | null
+          doctor_id?: string | null
+          id?: string
+          nome?: string | null
+          perfil_paciente?: string | null
+          phone_number?: string | null
+          procedimento_desejado?: string | null
+          status?: string | null
+          temperatura_lead?: string | null
+          updated_at?: string | null
+          urgencia?: string | null
+          videos_sent_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_lead_qualifications_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: true
+            referencedRelation: "whatsapp_conversations"
             referencedColumns: ["id"]
           },
         ]
@@ -4733,6 +5153,7 @@ export type Database = {
           organization_id: string | null
           phone_number: string
           phone_number_id: string | null
+          provider: Database["public"]["Enums"]["whatsapp_provider"] | null
           read_at: string | null
           reply_to_message_id: string | null
           sent_at: string
@@ -4758,6 +5179,7 @@ export type Database = {
           organization_id?: string | null
           phone_number: string
           phone_number_id?: string | null
+          provider?: Database["public"]["Enums"]["whatsapp_provider"] | null
           read_at?: string | null
           reply_to_message_id?: string | null
           sent_at: string
@@ -4783,6 +5205,7 @@ export type Database = {
           organization_id?: string | null
           phone_number?: string
           phone_number_id?: string | null
+          provider?: Database["public"]["Enums"]["whatsapp_provider"] | null
           read_at?: string | null
           reply_to_message_id?: string | null
           sent_at?: string
@@ -4884,6 +5307,63 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_testimonial_videos: {
+        Row: {
+          caption: string | null
+          created_at: string
+          display_order: number
+          duration_seconds: number | null
+          id: string
+          is_active: boolean
+          mime_type: string | null
+          organization_id: string | null
+          storage_path: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          display_order?: number
+          duration_seconds?: number | null
+          id?: string
+          is_active?: boolean
+          mime_type?: string | null
+          organization_id?: string | null
+          storage_path: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          display_order?: number
+          duration_seconds?: number | null
+          id?: string
+          is_active?: boolean
+          mime_type?: string | null
+          organization_id?: string | null
+          storage_path?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_testimonial_videos_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_testimonial_videos_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -5150,7 +5630,30 @@ export type Database = {
         Args: { p_conversation_id: string; p_user_id: string }
         Returns: undefined
       }
+      match_knowledge: {
+        Args: {
+          p_match_count?: number
+          p_match_threshold?: number
+          p_query_embedding: string
+          p_user_id: string
+        }
+        Returns: {
+          category: string
+          content: string
+          id: string
+          similarity: number
+          title: string
+        }[]
+      }
+      release_ai_lock: {
+        Args: { p_conversation_id: string }
+        Returns: undefined
+      }
       reset_and_seed_imperius: { Args: never; Returns: undefined }
+      try_acquire_ai_lock: {
+        Args: { p_conversation_id: string; p_lock_seconds?: number }
+        Returns: boolean
+      }
     }
     Enums: {
       account_type: "conta_corrente" | "poupanca" | "caixa" | "investimento"
@@ -5328,6 +5831,7 @@ export type Database = {
         | "interactive"
         | "reaction"
       whatsapp_priority: "low" | "normal" | "high" | "urgent"
+      whatsapp_provider: "meta" | "evolution"
       whatsapp_sentiment: "positivo" | "neutro" | "negativo"
       whatsapp_suggestion_type:
         | "quick_reply"
@@ -5660,6 +6164,7 @@ export const Constants = {
         "reaction",
       ],
       whatsapp_priority: ["low", "normal", "high", "urgent"],
+      whatsapp_provider: ["meta", "evolution"],
       whatsapp_sentiment: ["positivo", "neutro", "negativo"],
       whatsapp_suggestion_type: [
         "quick_reply",
