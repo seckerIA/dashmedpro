@@ -13,6 +13,8 @@ interface CreateUserRequest {
   full_name?: string;
   role: 'admin' | 'dono' | 'vendedor' | 'gestor_trafego' | 'secretaria' | 'medico';
   doctor_ids?: string[];
+  /** Compat: front antigo envia só doctor_id */
+  doctor_id?: string;
   consultation_value?: number;
 }
 
@@ -60,8 +62,15 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const body: CreateUserRequest = await req.json();
-    const { email, full_name, role, doctor_ids, consultation_value } = body;
+    const { email, full_name, role, consultation_value } = body;
     let { password } = body;
+
+    const resolvedDoctorIds: string[] = (() => {
+      const fromArr = (body.doctor_ids || []).filter(Boolean);
+      if (fromArr.length > 0) return fromArr;
+      if (body.doctor_id) return [body.doctor_id];
+      return [];
+    })();
 
     // Usar senha padrão se não for fornecida
     if (!password || password.trim() === '') {
@@ -70,6 +79,13 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (!email || !role) {
       return new Response(JSON.stringify({ error: 'Email and role are required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    if (role === 'secretaria' && resolvedDoctorIds.length === 0) {
+      return new Response(
+        JSON.stringify({ error: 'Selecione pelo menos um médico para vincular à secretária.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
     }
 
     // Regra comercial de assentos:
@@ -97,7 +113,7 @@ const handler = async (req: Request): Promise<Response> => {
 
       const { data: membersData } = await membersQuery;
       const currentRoles = (membersData || []).map((m: any) => m.role as string);
-      const projectedBillable = calculateBillableCount(currentRoles, role);
+      const projectedBillable = calculateBillableCount(currentRoles, role as string);
 
       if (projectedBillable > paidSlots) {
         const price = org?.additional_member_price ?? 89.90;
@@ -134,24 +150,32 @@ const handler = async (req: Request): Promise<Response> => {
         force_password_change: true // Obriga a troca no primeiro login
       };
 
-      if (doctor_ids && doctor_ids.length > 0) {
-        updateData.doctor_id = doctor_ids[0];
+      if (resolvedDoctorIds.length > 0) {
+        updateData.doctor_id = resolvedDoctorIds[0];
       }
 
       if ((role === 'medico' || role === 'dono') && consultation_value) {
         updateData.consultation_value = consultation_value;
       }
 
-      await supabaseAdmin.from('profiles').update(updateData).eq('id', newUser.user.id);
+      const { error: profileUpdateError } = await supabaseAdmin.from('profiles').update(updateData).eq('id', newUser.user.id);
+      if (profileUpdateError) {
+        await supabaseAdmin.auth.admin.deleteUser(newUser.user.id);
+        return new Response(JSON.stringify({ error: profileUpdateError.message }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
 
       // Sync links
-      if (doctor_ids && doctor_ids.length > 0 && profile.organization_id) {
-        const links = doctor_ids.map(docId => ({
+      if (resolvedDoctorIds.length > 0 && profile.organization_id) {
+        const links = resolvedDoctorIds.map(docId => ({
           secretary_id: newUser.user.id,
           doctor_id: docId,
           organization_id: profile.organization_id
         }));
-        await supabaseAdmin.from('secretary_doctor_links').insert(links);
+        const { error: linksError } = await supabaseAdmin.from('secretary_doctor_links').insert(links);
+        if (linksError) {
+          await supabaseAdmin.auth.admin.deleteUser(newUser.user.id);
+          return new Response(JSON.stringify({ error: linksError.message }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
       }
 
       // Create consultation procedure

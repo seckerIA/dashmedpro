@@ -21,6 +21,34 @@ import { DataTable } from '@/components/datatable/DataTable';
 import { getColumns, Profile } from '@/components/datatable/DataColumns';
 import { ResetSecretaryPasswordsDialog } from '@/components/team/ResetSecretaryPasswordsDialog';
 
+type EdgeFunctionJsonError = { error?: string; code?: string; message?: string };
+
+async function readEdgeFunctionFailure(error: unknown): Promise<{
+  message: string;
+  code?: string;
+  status?: number;
+}> {
+  if (error && typeof error === 'object' && 'context' in error) {
+    const ctx = (error as { context?: unknown }).context;
+    if (ctx instanceof Response) {
+      const status = ctx.status;
+      try {
+        const contentType = ctx.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const body = (await ctx.clone().json()) as EdgeFunctionJsonError;
+          const msg = body.error || body.message;
+          if (msg) return { message: msg, code: body.code, status };
+        }
+      } catch {
+        /* ignore */
+      }
+      return { message: `Erro ao chamar o servidor (${status}).`, status };
+    }
+  }
+  if (error instanceof Error) return { message: error.message };
+  return { message: 'Não foi possível completar a operação.' };
+}
+
 const TeamManagement = () => {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(false);
@@ -312,9 +340,11 @@ const TeamManagement = () => {
           }
           // Usar o primeiro medico como doctor_id principal (compatibilidade)
           createData.doctor_id = selectedDoctorIds[0];
+          createData.doctor_ids = [...selectedDoctorIds];
         } else {
           // Remover doctor_id se nao for secretaria
           delete createData.doctor_id;
+          delete createData.doctor_ids;
         }
 
         // Validacao para medico/dono - consultation_value obrigatorio
@@ -368,12 +398,14 @@ const TeamManagement = () => {
 
         if (error) {
           console.error('Erro na Edge Function:', error);
-          // Tentar ler o corpo da resposta se disponível no erro (depende da versão do client)
-          // Se for erro genérico, lançar erro customizado
-          if (error.message && error.message.includes('non-2xx')) {
-            throw new Error('Erro ao criar usuário. Verifique se o email já está cadastrado ou se você tem permissões suficientes.');
+          const parsed = await readEdgeFunctionFailure(error);
+          if (parsed.status === 402 || parsed.code === 'MEMBER_LIMIT_REACHED') {
+            setUpgradeDialogOpen(true);
           }
-          throw error;
+          throw new Error(parsed.message);
+        }
+        if (data && typeof data === 'object' && 'error' in data && (data as { error?: string }).error) {
+          throw new Error((data as { error: string }).error);
         }
 
         toast({
@@ -463,7 +495,8 @@ const TeamManagement = () => {
       });
 
       if (error) {
-        throw error;
+        const parsed = await readEdgeFunctionFailure(error);
+        throw new Error(parsed.message);
       }
 
       toast({
@@ -532,7 +565,8 @@ const TeamManagement = () => {
       });
 
       if (error) {
-        throw error;
+        const parsed = await readEdgeFunctionFailure(error);
+        throw new Error(parsed.message);
       }
 
       toast({
