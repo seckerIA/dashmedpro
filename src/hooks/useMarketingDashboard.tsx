@@ -301,7 +301,7 @@ export function useMarketingDashboard(filters?: { startDate?: Date; endDate?: Da
       const periodCampaignMap =
         hasDailyMetrics && campaignsData.length > 0
           ? (() => {
-              const m = aggregateCampaignsFromDailyRows(activeRows);
+              const m = aggregateCampaignsFromDailyRows(activeRows as any);
               attachSyncedAtFromCampaigns(m, campaignsData);
               return m;
             })()

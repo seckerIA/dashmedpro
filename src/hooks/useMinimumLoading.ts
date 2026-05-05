@@ -16,7 +16,7 @@ import { useState, useEffect, useRef } from 'react'
 export function useMinimumLoading(isLoading: boolean, minTime = 500): boolean {
   const [showLoading, setShowLoading] = useState(false)
   const startTimeRef = useRef(0)
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     // Cleanup on unmount
@@ -65,7 +65,7 @@ export function useMinimumLoading(isLoading: boolean, minTime = 500): boolean {
  */
 export function useDelayedLoading(isLoading: boolean, delay = 200): boolean {
   const [showLoading, setShowLoading] = useState(false)
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     return () => {

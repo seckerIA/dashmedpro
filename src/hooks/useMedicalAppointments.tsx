@@ -719,7 +719,7 @@ const createAppointment = async (
     }
   }
 
-  let resolvedOrganizationId = appointmentData.organization_id;
+  let resolvedOrganizationId = (appointmentData as any).organization_id;
   if (!resolvedOrganizationId) {
     const attendId = appointmentData.doctor_id || appointmentData.user_id;
     if (attendId) {
@@ -738,7 +738,7 @@ const createAppointment = async (
     .insert({
       ...appointmentData,
       doctor_id: appointmentData.doctor_id || appointmentData.user_id,
-      organization_id: resolvedOrganizationId ?? appointmentData.organization_id,
+      organization_id: resolvedOrganizationId ?? (appointmentData as any).organization_id,
       scheduled_by: resolvedScheduledBy ?? null,
       paid_in_advance: appointmentData.paid_in_advance ?? false,
     })

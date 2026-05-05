@@ -50,7 +50,7 @@ export function MarketingReports() {
       `# Receita Total,${metrics.total_revenue.toFixed(2)}`,
       `# ROI,${metrics.roi.toFixed(1)}%`,
       `# ROAS,${metrics.average_roas.toFixed(2)}x`,
-      `# Leads,${reportData.leadMetrics.totalLeads}`,
+      `# Leads,${(reportData as any).leadMetrics?.totalLeads ?? 0}`,
       '',
     ];
     const headers = ['Campanha', 'Plataforma', 'Gasto', 'Receita', 'Conversões', 'ROAS'];

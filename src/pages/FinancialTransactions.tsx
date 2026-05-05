@@ -77,8 +77,8 @@ const FinancialTransactions = ({ embedded = false }: FinancialTransactionsProps)
     // Aplicar ordenação
     return [...result].sort((a, b) => {
       // Se for virtual, mantém no topo se order for desc
-      if (a.isVirtual) return sortOrder === "desc" ? -1 : 1;
-      if (b.isVirtual) return sortOrder === "desc" ? 1 : -1;
+      if ((a as any).isVirtual) return sortOrder === "desc" ? -1 : 1;
+      if ((b as any).isVirtual) return sortOrder === "desc" ? 1 : -1;
 
       const dateA = parseLocalDate(a.transaction_date).getTime()
       const dateB = parseLocalDate(b.transaction_date).getTime()
