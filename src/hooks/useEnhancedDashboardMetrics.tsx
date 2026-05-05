@@ -48,7 +48,7 @@ const fetchEnhancedMetrics = async (
   try {
     let dealsQuery = supabase
       .from('crm_deals')
-      .select('*, contact:crm_contacts(id, full_name, email, phone)')
+      .select('*')
       .limit(2000);
 
     if (!isAdminOrDono) {

@@ -89,13 +89,11 @@ const fetchDashboardMetrics = async (
   signal?: AbortSignal,
   doctorIds?: string[] // IDs dos médicos vinculados (para secretárias)
 ): Promise<DashboardMetrics> => {
-  // Buscar deals com contatos
+  // Deals sem embed de crm_contacts — o embed dispara GET em crm_contacts com id.in.(milhares)
+  // e estoura limite de URL no PostgREST (400). Contatos vêm de loadCrmContactsForDashboard (chunks).
   let dealsQuery = (supabase
     .from('crm_deals' as any) as any)
-    .select(`
-      *,
-      contact:crm_contacts(*)
-    `)
+    .select('*')
     .limit(2000);
 
   // Aplicar filtros baseados no papel do usuário
