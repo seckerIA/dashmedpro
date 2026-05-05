@@ -29,6 +29,7 @@ export function ResetSecretaryPasswordsDialog() {
   const [isLoading, setIsLoading] = useState(false);
   const [credentials, setCredentials] = useState<Credential[]>([]);
 
+  const reset = () => {
     setConfirmStep(true);
     setIsLoading(false);
     setCredentials([]);
