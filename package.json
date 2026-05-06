@@ -21,6 +21,7 @@
     "test:qa:flow5": "npx tsx scripts/qa/test-flow-5-medical-records.ts",
     "test:qa:flow6": "npx tsx scripts/qa/test-flow-6-whatsapp-auto-lead.ts",
     "test:qa:flow7": "npx tsx scripts/qa/test-flow-7-secretary-permissions.ts",
+    "test:qa:ai": "npx tsx scripts/qa/test-ai-behavior.ts",
     "mcp:check": "node scripts/mcp-handshake-check.mjs"
   },
   "dependencies": {
