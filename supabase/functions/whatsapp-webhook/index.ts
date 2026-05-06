@@ -152,7 +152,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   const supabaseAdmin = createClient(
-    Deno.env.get('SUPABASE_URL') || 'https://adzaqkduxnpckbcuqpmg.supabase.co',
+    Deno.env.get('SUPABASE_URL') || 'https://brrhnniybfabtnuxybal.supabase.co',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     { auth: { autoRefreshToken: false, persistSession: false } }
   );

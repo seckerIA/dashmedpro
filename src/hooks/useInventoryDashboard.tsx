@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { useUserProfile } from "./useUserProfile";
 import { addDays, differenceInDays } from "date-fns";
 import { createVisibilityAwareInterval } from "@/lib/queryUtils";
 import { supabaseQueryWithTimeout } from "@/utils/supabaseQuery";
@@ -40,12 +41,22 @@ export type DashboardMetrics = {
 
 export function useInventoryDashboard() {
     const { user } = useAuth();
+    const { profile, isLoading: isLoadingProfile } = useUserProfile();
+
+    /** Plataforma: sem `.eq('organization_id')` — RLS permite multi-tenant */
+    const bypassOrgScopedFilter =
+        profile?.role === "admin" || profile?.is_super_admin === true;
+    const scopeOrgId = profile?.organization_id ?? null;
 
     const dashboardQuery = useQuery({
-        queryKey: ["inventory-dashboard", user?.id],
+        queryKey: ["inventory-dashboard", user?.id, scopeOrgId, bypassOrgScopedFilter],
         queryFn: async (): Promise<DashboardMetrics> => {
-            const itemsQuery = fromTable("inventory_items")
+            let itemsQuery = fromTable("inventory_items")
                 .select(`id, name, category, unit, min_stock, sell_price, inventory_batches (id, batch_number, quantity, expiration_date, is_active)`);
+
+            if (scopeOrgId && !bypassOrgScopedFilter) {
+                itemsQuery = itemsQuery.eq("organization_id", scopeOrgId);
+            }
 
             const { data: itemsData, error: itemsError } = await supabaseQueryWithTimeout(itemsQuery, 20000);
             if (itemsError) throw itemsError;
@@ -105,9 +116,15 @@ export function useInventoryDashboard() {
                 alerts, recentMovements,
             };
         },
-        enabled: !!user,
+        enabled: Boolean(user?.id) && !isLoadingProfile,
+        retry: 1,
         refetchInterval: createVisibilityAwareInterval(60000),
     });
 
-    return { metrics: dashboardQuery.data, isLoading: dashboardQuery.isLoading, error: dashboardQuery.error, refetch: dashboardQuery.refetch };
+    return {
+        metrics: dashboardQuery.data,
+        isLoading: dashboardQuery.isLoading || isLoadingProfile,
+        error: dashboardQuery.error,
+        refetch: dashboardQuery.refetch,
+    };
 }

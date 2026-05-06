@@ -15,32 +15,49 @@ CREATE TABLE IF NOT EXISTS public.crm_follow_ups (
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 
--- Índices para performance
-CREATE INDEX idx_crm_follow_ups_deal_id ON public.crm_follow_ups(deal_id);
-CREATE INDEX idx_crm_follow_ups_user_id ON public.crm_follow_ups(user_id);
-CREATE INDEX idx_crm_follow_ups_scheduled_date ON public.crm_follow_ups(scheduled_date);
-CREATE INDEX idx_crm_follow_ups_status ON public.crm_follow_ups(status);
+ALTER TABLE public.crm_follow_ups ADD COLUMN IF NOT EXISTS scheduled_time TIME;
+ALTER TABLE public.crm_follow_ups ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE public.crm_follow_ups ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pendente';
+ALTER TABLE public.crm_follow_ups ADD COLUMN IF NOT EXISTS completed_notes TEXT;
+ALTER TABLE public.crm_follow_ups ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT now();
 
--- RLS Policies
+CREATE INDEX IF NOT EXISTS idx_crm_follow_ups_deal_id ON public.crm_follow_ups(deal_id);
+CREATE INDEX IF NOT EXISTS idx_crm_follow_ups_user_id ON public.crm_follow_ups(user_id);
+CREATE INDEX IF NOT EXISTS idx_crm_follow_ups_scheduled_date ON public.crm_follow_ups(scheduled_date);
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns c
+    WHERE c.table_schema = 'public' AND c.table_name = 'crm_follow_ups' AND c.column_name = 'status'
+  ) THEN
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_crm_follow_ups_status ON public.crm_follow_ups(status)';
+  END IF;
+END $$;
+
 ALTER TABLE public.crm_follow_ups ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view their own follow-ups" ON public.crm_follow_ups;
 CREATE POLICY "Users can view their own follow-ups"
   ON public.crm_follow_ups FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert their own follow-ups" ON public.crm_follow_ups;
 CREATE POLICY "Users can insert their own follow-ups"
   ON public.crm_follow_ups FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own follow-ups" ON public.crm_follow_ups;
 CREATE POLICY "Users can update their own follow-ups"
   ON public.crm_follow_ups FOR UPDATE
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete their own follow-ups" ON public.crm_follow_ups;
 CREATE POLICY "Users can delete their own follow-ups"
   ON public.crm_follow_ups FOR DELETE
   USING (auth.uid() = user_id);
 
--- Trigger para atualizar updated_at
+DROP TRIGGER IF EXISTS update_crm_follow_ups_updated_at ON public.crm_follow_ups;
 CREATE TRIGGER update_crm_follow_ups_updated_at
   BEFORE UPDATE ON public.crm_follow_ups
   FOR EACH ROW
@@ -59,7 +76,7 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('task-images', 'task-images', false)
 ON CONFLICT (id) DO NOTHING;
 
--- Storage policies para task-images
+DROP POLICY IF EXISTS "Users can upload their task images" ON storage.objects;
 CREATE POLICY "Users can upload their task images"
   ON storage.objects FOR INSERT
   WITH CHECK (
@@ -67,6 +84,7 @@ CREATE POLICY "Users can upload their task images"
     auth.uid()::text = (storage.foldername(name))[1]
   );
 
+DROP POLICY IF EXISTS "Users can view their task images" ON storage.objects;
 CREATE POLICY "Users can view their task images"
   ON storage.objects FOR SELECT
   USING (
@@ -74,6 +92,7 @@ CREATE POLICY "Users can view their task images"
     auth.uid()::text = (storage.foldername(name))[1]
   );
 
+DROP POLICY IF EXISTS "Users can update their task images" ON storage.objects;
 CREATE POLICY "Users can update their task images"
   ON storage.objects FOR UPDATE
   USING (
@@ -81,6 +100,7 @@ CREATE POLICY "Users can update their task images"
     auth.uid()::text = (storage.foldername(name))[1]
   );
 
+DROP POLICY IF EXISTS "Users can delete their task images" ON storage.objects;
 CREATE POLICY "Users can delete their task images"
   ON storage.objects FOR DELETE
   USING (

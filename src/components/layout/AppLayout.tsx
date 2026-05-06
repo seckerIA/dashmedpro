@@ -30,6 +30,7 @@ import { useVisualViewport, useInputScrollIntoView } from "@/hooks/useVisualView
 import { getProfileDisplayData } from "@/utils/nameUtils"
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Menu } from "lucide-react"
+import { OrganizationBrandingRoot } from "./OrganizationBrandingRoot"
 
 interface AppLayoutProps {
   children: ReactNode
@@ -136,6 +137,7 @@ export function AppLayout({ children, hideSidebar = false, title: explicitTitle,
 
   return (
     <>
+      <OrganizationBrandingRoot />
       <SkipLink />
       <TooltipProvider>
         <ResizablePanelGroup

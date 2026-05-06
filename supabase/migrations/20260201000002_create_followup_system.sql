@@ -7,48 +7,45 @@
 -- ENUMS
 -- =====================================================
 
-CREATE TYPE followup_trigger_type AS ENUM (
-  'pre_appointment',              -- 24h antes da consulta
-  'post_appointment_immediate',   -- 2h após consulta
-  'post_appointment_7d',          -- 7 dias após consulta
-  'post_appointment_30d',         -- 30 dias após consulta
-  'post_treatment',               -- Fim de tratamento
-  'payment_reminder',             -- Lembrete de pagamento
-  'inactive_patient',             -- Paciente inativo >90 dias
-  'birthday',                     -- Aniversário
-  'custom'                        -- Personalizado
-);
+DO $$ BEGIN
+  CREATE TYPE followup_trigger_type AS ENUM (
+    'pre_appointment',
+    'post_appointment_immediate',
+    'post_appointment_7d',
+    'post_appointment_30d',
+    'post_treatment',
+    'payment_reminder',
+    'inactive_patient',
+    'birthday',
+    'custom'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-CREATE TYPE followup_channel AS ENUM (
-  'whatsapp',
-  'sms',
-  'email',
-  'call'
-);
+DO $$ BEGIN
+  CREATE TYPE followup_channel AS ENUM ('whatsapp', 'sms', 'email', 'call');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-CREATE TYPE followup_status AS ENUM (
-  'pending',      -- Agendado, aguardando envio
-  'sent',         -- Enviado
-  'responded',    -- Paciente respondeu
-  'failed',       -- Falha no envio
-  'cancelled'     -- Cancelado
-);
+DO $$ BEGIN
+  CREATE TYPE followup_status AS ENUM ('pending', 'sent', 'responded', 'failed', 'cancelled');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-CREATE TYPE followup_sentiment AS ENUM (
-  'positive',     -- Feedback positivo
-  'neutral',      -- Feedback neutro
-  'negative'      -- Feedback negativo
-);
+DO $$ BEGIN
+  CREATE TYPE followup_sentiment AS ENUM ('positive', 'neutral', 'negative');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- =====================================================
 -- TABLES
 -- =====================================================
 
--- Templates de follow-up configuráveis
-CREATE TABLE followup_templates (
+-- organization_id: FK para public.organizations adicionada em 20260220000001 (tabela ainda não existe aqui).
+CREATE TABLE public.followup_templates (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+  organization_id UUID,
 
   -- Configurações básicas
   name TEXT NOT NULL,
@@ -77,17 +74,16 @@ CREATE TABLE followup_templates (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Follow-ups agendados
-CREATE TABLE followup_scheduled (
+CREATE TABLE public.followup_scheduled (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
-  template_id UUID REFERENCES followup_templates(id) ON DELETE SET NULL,
+  organization_id UUID,
+  template_id UUID REFERENCES public.followup_templates(id) ON DELETE SET NULL,
 
   -- Relacionamentos (pelo menos um obrigatório)
-  appointment_id UUID REFERENCES medical_appointments(id) ON DELETE CASCADE,
-  contact_id UUID NOT NULL REFERENCES crm_contacts(id) ON DELETE CASCADE,
-  deal_id UUID REFERENCES crm_deals(id) ON DELETE SET NULL,
+  appointment_id UUID REFERENCES public.medical_appointments(id) ON DELETE CASCADE,
+  contact_id UUID NOT NULL REFERENCES public.crm_contacts(id) ON DELETE CASCADE,
+  deal_id UUID REFERENCES public.crm_deals(id) ON DELETE SET NULL,
 
   -- Agendamento
   scheduled_for TIMESTAMPTZ NOT NULL,
@@ -101,8 +97,8 @@ CREATE TABLE followup_scheduled (
   message_sent TEXT,
 
   -- Integração WhatsApp
-  conversation_id UUID REFERENCES whatsapp_conversations(id) ON DELETE SET NULL,
-  whatsapp_message_id UUID REFERENCES whatsapp_messages(id) ON DELETE SET NULL,
+  conversation_id UUID REFERENCES public.whatsapp_conversations(id) ON DELETE SET NULL,
+  whatsapp_message_id UUID REFERENCES public.whatsapp_messages(id) ON DELETE SET NULL,
 
   -- Tentativas de envio
   attempts INTEGER DEFAULT 0,
@@ -114,11 +110,10 @@ CREATE TABLE followup_scheduled (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Respostas de follow-up
-CREATE TABLE followup_responses (
+CREATE TABLE public.followup_responses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  followup_id UUID NOT NULL REFERENCES followup_scheduled(id) ON DELETE CASCADE,
-  contact_id UUID NOT NULL REFERENCES crm_contacts(id) ON DELETE CASCADE,
+  followup_id UUID NOT NULL REFERENCES public.followup_scheduled(id) ON DELETE CASCADE,
+  contact_id UUID NOT NULL REFERENCES public.crm_contacts(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
 
   -- Scores
@@ -139,7 +134,7 @@ CREATE TABLE followup_responses (
   -- Ação tomada
   action_taken BOOLEAN DEFAULT false,
   action_description TEXT,
-  task_created_id UUID REFERENCES tasks(id),
+  task_created_id UUID REFERENCES public.tasks(id),
   deal_updated BOOLEAN DEFAULT false,
 
   -- Timestamps
@@ -148,11 +143,10 @@ CREATE TABLE followup_responses (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Métricas agregadas por período
-CREATE TABLE followup_metrics (
+CREATE TABLE public.followup_metrics (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+  organization_id UUID,
 
   -- Período
   period_start DATE NOT NULL,
@@ -194,108 +188,116 @@ CREATE TABLE followup_metrics (
 -- INDEXES
 -- =====================================================
 
-CREATE INDEX idx_followup_scheduled_user ON followup_scheduled(user_id);
-CREATE INDEX idx_followup_scheduled_status ON followup_scheduled(status);
-CREATE INDEX idx_followup_scheduled_scheduled_for ON followup_scheduled(scheduled_for);
-CREATE INDEX idx_followup_scheduled_appointment ON followup_scheduled(appointment_id);
-CREATE INDEX idx_followup_scheduled_contact ON followup_scheduled(contact_id);
+CREATE INDEX IF NOT EXISTS idx_followup_scheduled_user ON public.followup_scheduled(user_id);
+CREATE INDEX IF NOT EXISTS idx_followup_scheduled_status ON public.followup_scheduled(status);
+CREATE INDEX IF NOT EXISTS idx_followup_scheduled_scheduled_for ON public.followup_scheduled(scheduled_for);
+CREATE INDEX IF NOT EXISTS idx_followup_scheduled_appointment ON public.followup_scheduled(appointment_id);
+CREATE INDEX IF NOT EXISTS idx_followup_scheduled_contact ON public.followup_scheduled(contact_id);
 
-CREATE INDEX idx_followup_responses_followup ON followup_responses(followup_id);
-CREATE INDEX idx_followup_responses_contact ON followup_responses(contact_id);
-CREATE INDEX idx_followup_responses_nps ON followup_responses(nps_score);
-CREATE INDEX idx_followup_responses_sentiment ON followup_responses(sentiment);
-CREATE INDEX idx_followup_responses_responded_at ON followup_responses(responded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_followup_responses_followup ON public.followup_responses(followup_id);
+CREATE INDEX IF NOT EXISTS idx_followup_responses_contact ON public.followup_responses(contact_id);
+CREATE INDEX IF NOT EXISTS idx_followup_responses_nps ON public.followup_responses(nps_score);
+CREATE INDEX IF NOT EXISTS idx_followup_responses_sentiment ON public.followup_responses(sentiment);
+CREATE INDEX IF NOT EXISTS idx_followup_responses_responded_at ON public.followup_responses(responded_at DESC);
 
-CREATE INDEX idx_followup_templates_user ON followup_templates(user_id);
-CREATE INDEX idx_followup_templates_trigger ON followup_templates(trigger_type);
-CREATE INDEX idx_followup_templates_active ON followup_templates(is_active);
+CREATE INDEX IF NOT EXISTS idx_followup_templates_user ON public.followup_templates(user_id);
+CREATE INDEX IF NOT EXISTS idx_followup_templates_trigger ON public.followup_templates(trigger_type);
+CREATE INDEX IF NOT EXISTS idx_followup_templates_active ON public.followup_templates(is_active);
 
-CREATE INDEX idx_followup_metrics_user_period ON followup_metrics(user_id, period_start, period_end);
+CREATE INDEX IF NOT EXISTS idx_followup_metrics_user_period ON public.followup_metrics(user_id, period_start, period_end);
 
 -- =====================================================
 -- RLS POLICIES
 -- =====================================================
 
--- followup_templates
-ALTER TABLE followup_templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.followup_templates ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "followup_templates_select" ON followup_templates
+DROP POLICY IF EXISTS "followup_templates_select" ON public.followup_templates;
+CREATE POLICY "followup_templates_select" ON public.followup_templates
   FOR SELECT USING (
     user_id = auth.uid()
     OR EXISTS (
-      SELECT 1 FROM secretary_doctor_links
+      SELECT 1 FROM public.secretary_doctor_links
       WHERE secretary_id = auth.uid() AND doctor_id = followup_templates.user_id
     )
     OR EXISTS (
-      SELECT 1 FROM secretary_doctor_links
+      SELECT 1 FROM public.secretary_doctor_links
       WHERE doctor_id = auth.uid() AND secretary_id = followup_templates.user_id
     )
   );
 
-CREATE POLICY "followup_templates_insert" ON followup_templates
+DROP POLICY IF EXISTS "followup_templates_insert" ON public.followup_templates;
+CREATE POLICY "followup_templates_insert" ON public.followup_templates
   FOR INSERT WITH CHECK (user_id = auth.uid());
 
-CREATE POLICY "followup_templates_update" ON followup_templates
+DROP POLICY IF EXISTS "followup_templates_update" ON public.followup_templates;
+CREATE POLICY "followup_templates_update" ON public.followup_templates
   FOR UPDATE USING (user_id = auth.uid());
 
-CREATE POLICY "followup_templates_delete" ON followup_templates
+DROP POLICY IF EXISTS "followup_templates_delete" ON public.followup_templates;
+CREATE POLICY "followup_templates_delete" ON public.followup_templates
   FOR DELETE USING (user_id = auth.uid());
 
--- followup_scheduled
-ALTER TABLE followup_scheduled ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.followup_scheduled ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "followup_scheduled_select" ON followup_scheduled
+DROP POLICY IF EXISTS "followup_scheduled_select" ON public.followup_scheduled;
+CREATE POLICY "followup_scheduled_select" ON public.followup_scheduled
   FOR SELECT USING (
     user_id = auth.uid()
     OR EXISTS (
-      SELECT 1 FROM secretary_doctor_links
+      SELECT 1 FROM public.secretary_doctor_links
       WHERE secretary_id = auth.uid() AND doctor_id = followup_scheduled.user_id
     )
     OR EXISTS (
-      SELECT 1 FROM secretary_doctor_links
+      SELECT 1 FROM public.secretary_doctor_links
       WHERE doctor_id = auth.uid() AND secretary_id = followup_scheduled.user_id
     )
   );
 
-CREATE POLICY "followup_scheduled_insert" ON followup_scheduled
+DROP POLICY IF EXISTS "followup_scheduled_insert" ON public.followup_scheduled;
+CREATE POLICY "followup_scheduled_insert" ON public.followup_scheduled
   FOR INSERT WITH CHECK (user_id = auth.uid());
 
-CREATE POLICY "followup_scheduled_update" ON followup_scheduled
+DROP POLICY IF EXISTS "followup_scheduled_update" ON public.followup_scheduled;
+CREATE POLICY "followup_scheduled_update" ON public.followup_scheduled
   FOR UPDATE USING (user_id = auth.uid());
 
-CREATE POLICY "followup_scheduled_delete" ON followup_scheduled
+DROP POLICY IF EXISTS "followup_scheduled_delete" ON public.followup_scheduled;
+CREATE POLICY "followup_scheduled_delete" ON public.followup_scheduled
   FOR DELETE USING (user_id = auth.uid());
 
--- followup_responses
-ALTER TABLE followup_responses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.followup_responses ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "followup_responses_select" ON followup_responses
+DROP POLICY IF EXISTS "followup_responses_select" ON public.followup_responses;
+CREATE POLICY "followup_responses_select" ON public.followup_responses
   FOR SELECT USING (
     user_id = auth.uid()
     OR EXISTS (
-      SELECT 1 FROM secretary_doctor_links
+      SELECT 1 FROM public.secretary_doctor_links
       WHERE secretary_id = auth.uid() AND doctor_id = followup_responses.user_id
     )
     OR EXISTS (
-      SELECT 1 FROM secretary_doctor_links
+      SELECT 1 FROM public.secretary_doctor_links
       WHERE doctor_id = auth.uid() AND secretary_id = followup_responses.user_id
     )
   );
 
-CREATE POLICY "followup_responses_insert" ON followup_responses
+DROP POLICY IF EXISTS "followup_responses_insert" ON public.followup_responses;
+CREATE POLICY "followup_responses_insert" ON public.followup_responses
   FOR INSERT WITH CHECK (user_id = auth.uid());
 
-CREATE POLICY "followup_responses_update" ON followup_responses
+DROP POLICY IF EXISTS "followup_responses_update" ON public.followup_responses;
+CREATE POLICY "followup_responses_update" ON public.followup_responses
   FOR UPDATE USING (user_id = auth.uid());
 
--- followup_metrics
-ALTER TABLE followup_metrics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.followup_metrics ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "followup_metrics_select" ON followup_metrics
+DROP POLICY IF EXISTS "followup_metrics_select" ON public.followup_metrics;
+CREATE POLICY "followup_metrics_select" ON public.followup_metrics
   FOR SELECT USING (
     user_id = auth.uid()
     OR EXISTS (
-      SELECT 1 FROM secretary_doctor_links
+      SELECT 1 FROM public.secretary_doctor_links
       WHERE secretary_id = auth.uid() AND doctor_id = followup_metrics.user_id
     )
   );
@@ -305,7 +307,7 @@ CREATE POLICY "followup_metrics_select" ON followup_metrics
 -- =====================================================
 
 -- Auto-update updated_at
-CREATE OR REPLACE FUNCTION update_followup_updated_at()
+CREATE OR REPLACE FUNCTION public.update_followup_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = now();
@@ -313,24 +315,27 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS followup_templates_updated_at ON public.followup_templates;
 CREATE TRIGGER followup_templates_updated_at
-  BEFORE UPDATE ON followup_templates
-  FOR EACH ROW EXECUTE FUNCTION update_followup_updated_at();
+  BEFORE UPDATE ON public.followup_templates
+  FOR EACH ROW EXECUTE FUNCTION public.update_followup_updated_at();
 
+DROP TRIGGER IF EXISTS followup_scheduled_updated_at ON public.followup_scheduled;
 CREATE TRIGGER followup_scheduled_updated_at
-  BEFORE UPDATE ON followup_scheduled
-  FOR EACH ROW EXECUTE FUNCTION update_followup_updated_at();
+  BEFORE UPDATE ON public.followup_scheduled
+  FOR EACH ROW EXECUTE FUNCTION public.update_followup_updated_at();
 
+DROP TRIGGER IF EXISTS followup_responses_updated_at ON public.followup_responses;
 CREATE TRIGGER followup_responses_updated_at
-  BEFORE UPDATE ON followup_responses
-  FOR EACH ROW EXECUTE FUNCTION update_followup_updated_at();
+  BEFORE UPDATE ON public.followup_responses
+  FOR EACH ROW EXECUTE FUNCTION public.update_followup_updated_at();
 
 -- =====================================================
 -- RPC FUNCTIONS
 -- =====================================================
 
 -- Calcular NPS para um período
-CREATE OR REPLACE FUNCTION calculate_nps(
+CREATE OR REPLACE FUNCTION public.calculate_nps(
   p_user_id UUID,
   p_start_date TIMESTAMPTZ,
   p_end_date TIMESTAMPTZ
@@ -356,7 +361,7 @@ BEGIN
     COUNT(*) FILTER (WHERE nps_score <= 6) AS detractors,
     COUNT(*) AS total
   INTO v_promoters, v_passives, v_detractors, v_total
-  FROM followup_responses
+  FROM public.followup_responses
   WHERE user_id = p_user_id
     AND nps_score IS NOT NULL
     AND responded_at BETWEEN p_start_date AND p_end_date;
@@ -373,14 +378,14 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Obter follow-ups pendentes para envio
-CREATE OR REPLACE FUNCTION get_pending_followups(
+CREATE OR REPLACE FUNCTION public.get_pending_followups(
   p_limit INTEGER DEFAULT 50
 )
-RETURNS SETOF followup_scheduled AS $$
+RETURNS SETOF public.followup_scheduled AS $$
 BEGIN
   RETURN QUERY
   SELECT *
-  FROM followup_scheduled
+  FROM public.followup_scheduled
   WHERE status = 'pending'
     AND scheduled_for <= now()
     AND attempts < 3
@@ -390,7 +395,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Agendar follow-up automaticamente após consulta
-CREATE OR REPLACE FUNCTION schedule_post_appointment_followup(
+CREATE OR REPLACE FUNCTION public.schedule_post_appointment_followup(
   p_appointment_id UUID,
   p_delay_minutes INTEGER DEFAULT 120
 )
@@ -408,9 +413,9 @@ BEGIN
     c.full_name AS patient_name,
     p.full_name AS doctor_name
   INTO v_appointment
-  FROM medical_appointments ma
-  JOIN crm_contacts c ON ma.contact_id = c.id
-  JOIN profiles p ON ma.doctor_id = p.id
+  FROM public.medical_appointments ma
+  JOIN public.crm_contacts c ON ma.contact_id = c.id
+  JOIN public.profiles p ON ma.doctor_id = p.id
   WHERE ma.id = p_appointment_id;
 
   IF NOT FOUND THEN
@@ -420,7 +425,7 @@ BEGIN
   -- Buscar template ativo de pós-consulta
   SELECT *
   INTO v_template
-  FROM followup_templates
+  FROM public.followup_templates
   WHERE user_id = v_appointment.doctor_id
     AND trigger_type = 'post_appointment_immediate'
     AND is_active = true
@@ -444,9 +449,8 @@ BEGIN
   END IF;
 
   -- Criar follow-up agendado
-  INSERT INTO followup_scheduled (
+  INSERT INTO public.followup_scheduled (
     user_id,
-    organization_id,
     template_id,
     appointment_id,
     contact_id,
@@ -455,7 +459,6 @@ BEGIN
     status
   ) VALUES (
     v_appointment.doctor_id,
-    v_appointment.organization_id,
     v_template.id,
     p_appointment_id,
     v_appointment.contact_id,
@@ -473,33 +476,32 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- TRIGGER AUTOMÁTICO: Agendar follow-up quando consulta for concluída
 -- =====================================================
 
-CREATE OR REPLACE FUNCTION auto_schedule_followup_on_appointment_complete()
+CREATE OR REPLACE FUNCTION public.auto_schedule_followup_on_appointment_complete()
 RETURNS TRIGGER AS $$
 BEGIN
-  -- Se status mudou para 'completed', agendar follow-up
   IF NEW.status = 'completed' AND (OLD.status IS NULL OR OLD.status != 'completed') THEN
-    PERFORM schedule_post_appointment_followup(NEW.id);
+    PERFORM public.schedule_post_appointment_followup(NEW.id);
   END IF;
 
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_auto_schedule_followup ON public.medical_appointments;
 CREATE TRIGGER trigger_auto_schedule_followup
-  AFTER INSERT OR UPDATE OF status ON medical_appointments
+  AFTER INSERT OR UPDATE OF status ON public.medical_appointments
   FOR EACH ROW
-  EXECUTE FUNCTION auto_schedule_followup_on_appointment_complete();
+  EXECUTE FUNCTION public.auto_schedule_followup_on_appointment_complete();
 
 -- =====================================================
 -- TEMPLATES PADRÃO (Seed Data)
 -- =====================================================
 
 -- Função para criar templates padrão para novos usuários
-CREATE OR REPLACE FUNCTION create_default_followup_templates(p_user_id UUID)
+CREATE OR REPLACE FUNCTION public.create_default_followup_templates(p_user_id UUID)
 RETURNS VOID AS $$
 BEGIN
-  -- Template: Pós-consulta imediato (2h depois)
-  INSERT INTO followup_templates (
+  INSERT INTO public.followup_templates (
     user_id,
     name,
     description,
@@ -528,7 +530,7 @@ BEGIN
   );
 
   -- Template: Confirmação pré-consulta (24h antes)
-  INSERT INTO followup_templates (
+  INSERT INTO public.followup_templates (
     user_id,
     name,
     description,
@@ -553,7 +555,7 @@ BEGIN
   );
 
   -- Template: Follow-up 7 dias
-  INSERT INTO followup_templates (
+  INSERT INTO public.followup_templates (
     user_id,
     name,
     description,
@@ -585,11 +587,11 @@ $$ LANGUAGE plpgsql;
 -- COMMENTS
 -- =====================================================
 
-COMMENT ON TABLE followup_templates IS 'Templates configuráveis de follow-up automático';
-COMMENT ON TABLE followup_scheduled IS 'Follow-ups agendados para envio';
-COMMENT ON TABLE followup_responses IS 'Respostas de pacientes aos follow-ups com NPS/CSAT';
-COMMENT ON TABLE followup_metrics IS 'Métricas agregadas de satisfação por período';
+COMMENT ON TABLE public.followup_templates IS 'Templates configuráveis de follow-up automático';
+COMMENT ON TABLE public.followup_scheduled IS 'Follow-ups agendados para envio';
+COMMENT ON TABLE public.followup_responses IS 'Respostas de pacientes aos follow-ups com NPS/CSAT';
+COMMENT ON TABLE public.followup_metrics IS 'Métricas agregadas de satisfação por período';
 
-COMMENT ON FUNCTION calculate_nps IS 'Calcula NPS score para um período específico';
-COMMENT ON FUNCTION schedule_post_appointment_followup IS 'Agenda follow-up automaticamente após consulta';
-COMMENT ON FUNCTION create_default_followup_templates IS 'Cria templates padrão para novos usuários';
+COMMENT ON FUNCTION public.calculate_nps IS 'Calcula NPS score para um período específico';
+COMMENT ON FUNCTION public.schedule_post_appointment_followup IS 'Agenda follow-up automaticamente após consulta';
+COMMENT ON FUNCTION public.create_default_followup_templates IS 'Cria templates padrão para novos usuários';

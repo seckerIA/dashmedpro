@@ -1,6 +1,7 @@
 -- =====================================================
 -- Migration: Add secretaria/medico roles and doctor_id
 -- =====================================================
+-- public.user_role: ver 20250127000001_extend_user_role_secretaria_medico.sql
 
 -- 1. Criar o enum app_role se não existir, ou adicionar novos valores
 DO $$

@@ -10,14 +10,18 @@ const fromTable = (table: string) => (supabase.from(table as any) as any);
 
 export const useInventory = () => {
     const { user } = useAuth();
-    const { profile } = useUserProfile();
+    const { profile, isLoading: isLoadingProfile } = useUserProfile();
     const { toast } = useToast();
     const queryClient = useQueryClient();
 
-    const { data: items, isLoading } = useQuery({
-        queryKey: ["inventory-items"],
+    const bypassOrgScopedFilter =
+        profile?.role === "admin" || profile?.is_super_admin === true;
+    const scopeOrgId = profile?.organization_id ?? null;
+
+    const { data: items, isLoading: itemsQueryLoading } = useQuery({
+        queryKey: ["inventory-items", scopeOrgId, bypassOrgScopedFilter],
         queryFn: async () => {
-            const itemsQuery = fromTable("inventory_items")
+            let itemsQuery = fromTable("inventory_items")
                 .select(`
                     *,
                     batches:inventory_batches(*),
@@ -25,6 +29,10 @@ export const useInventory = () => {
                 `)
                 .order("name")
                 .limit(1000);
+
+            if (scopeOrgId && !bypassOrgScopedFilter) {
+                itemsQuery = itemsQuery.eq("organization_id", scopeOrgId);
+            }
 
             const { data: itemsData, error: itemsError } = await supabaseQueryWithTimeout(itemsQuery, 20000);
 
@@ -37,7 +45,7 @@ export const useInventory = () => {
 
             return itemsWithTotal as InventoryItem[];
         },
-        enabled: !!user,
+        enabled: Boolean(user) && !isLoadingProfile,
     });
 
     const createItem = useMutation({
@@ -57,6 +65,7 @@ export const useInventory = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["inventory-items"] });
+            queryClient.invalidateQueries({ queryKey: ["inventory-dashboard"] });
             toast({ title: "Produto criado com sucesso" });
         },
         onError: (error) => {
@@ -76,6 +85,7 @@ export const useInventory = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["inventory-items"] });
+            queryClient.invalidateQueries({ queryKey: ["inventory-dashboard"] });
             toast({ title: "Produto atualizado" });
         }
     });
@@ -110,6 +120,7 @@ export const useInventory = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["inventory-items"] });
+            queryClient.invalidateQueries({ queryKey: ["inventory-dashboard"] });
             toast({ title: "Lote adicionado com sucesso" });
         },
         onError: (error) => {
@@ -133,6 +144,7 @@ export const useInventory = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["inventory-items"] });
+            queryClient.invalidateQueries({ queryKey: ["inventory-dashboard"] });
         },
         onError: (error) => {
             toast({ title: "Erro na movimentação", description: error.message, variant: "destructive" });
@@ -202,6 +214,7 @@ export const useInventory = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["inventory-items"] });
+            queryClient.invalidateQueries({ queryKey: ["inventory-dashboard"] });
             toast({ title: "Produto excluído com sucesso" });
         },
         onError: (error) => {
@@ -211,7 +224,7 @@ export const useInventory = () => {
 
     return {
         items,
-        isLoading,
+        isLoading: itemsQueryLoading || isLoadingProfile,
         createItem,
         updateItem,
         deleteItem,

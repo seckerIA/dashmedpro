@@ -8,6 +8,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import type { OrganizationPortalSettings } from '@/types/organization';
+import {
+    OrganizationPortalSettingsDialog,
+    type AdminOrgRow,
+} from '@/components/admin/OrganizationPortalSettingsDialog';
+import { updateOrganizationPortalSettings } from '@/lib/adminPortalClient';
 import {
     Search,
     Building2,
@@ -20,7 +26,8 @@ import {
     Play,
     Trash2,
     RefreshCcw,
-    Loader2
+    Loader2,
+    Palette,
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -55,6 +62,7 @@ interface Organization {
     status: string;
     plan: string;
     created_at: string;
+    portal_settings?: OrganizationPortalSettings | null;
 }
 
 interface OrgDetails {
@@ -80,6 +88,8 @@ export default function AdminClinics() {
     const [isEditPlanOpen, setIsEditPlanOpen] = useState(false);
     const [editingOrg, setEditingOrg] = useState<Organization | null>(null);
     const [newPlan, setNewPlan] = useState('');
+    const [portalDialogOrg, setPortalDialogOrg] = useState<AdminOrgRow | null>(null);
+    const [portalSaving, setPortalSaving] = useState(false);
 
     const fetchOrganizations = async () => {
         setIsLoading(true);
@@ -207,6 +217,38 @@ export default function AdminClinics() {
     };
 
     return (
+        <>
+        <OrganizationPortalSettingsDialog
+            open={portalDialogOrg !== null}
+            onOpenChange={(open) => {
+                if (!open) setPortalDialogOrg(null);
+            }}
+            organization={portalDialogOrg}
+            saving={portalSaving}
+            onSave={async (organizationId, settings) => {
+                setPortalSaving(true);
+                try {
+                    await updateOrganizationPortalSettings(organizationId, settings);
+                    toast({
+                        title: 'Portal atualizado',
+                        description:
+                            portalDialogOrg?.name !== undefined
+                                ? `Marca e módulos da clínica ${portalDialogOrg.name} foram salvos.`
+                                : 'Marca e módulos foram salvos.',
+                    });
+                    setPortalDialogOrg(null);
+                    await fetchOrganizations();
+                } catch (e: unknown) {
+                    toast({
+                        variant: 'destructive',
+                        title: 'Erro ao salvar portal',
+                        description: e instanceof Error ? e.message : 'Tente novamente.',
+                    });
+                } finally {
+                    setPortalSaving(false);
+                }
+            }}
+        />
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
@@ -325,6 +367,19 @@ export default function AdminClinics() {
                                                 <DropdownMenuItem onClick={() => fetchOrgDetails(org.id)}>
                                                     <Eye className="mr-2 h-4 w-4" />
                                                     Ver Detalhes
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    onClick={() =>
+                                                        setPortalDialogOrg({
+                                                            id: org.id,
+                                                            name: org.name,
+                                                            slug: org.slug,
+                                                            portal_settings: org.portal_settings ?? null,
+                                                        })
+                                                    }
+                                                >
+                                                    <Palette className="mr-2 h-4 w-4" />
+                                                    Marca e portal
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem onClick={() => {
                                                     setEditingOrg(org);
@@ -487,5 +542,6 @@ export default function AdminClinics() {
                 </AlertDialogContent>
             </AlertDialog>
         </div>
+        </>
     );
 }

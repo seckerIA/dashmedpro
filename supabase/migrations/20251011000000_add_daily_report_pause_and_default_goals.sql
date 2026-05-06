@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS public.user_daily_goals (
 -- Enable RLS na tabela user_daily_goals
 ALTER TABLE public.user_daily_goals ENABLE ROW LEVEL SECURITY;
 
--- Criar política RLS para user_daily_goals - usuários podem acessar apenas suas próprias metas
+DROP POLICY IF EXISTS "Users can only access their own daily goals" ON public.user_daily_goals;
 CREATE POLICY "Users can only access their own daily goals" 
 ON public.user_daily_goals 
 FOR ALL 
@@ -37,6 +37,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_update_user_daily_goals_updated_at ON public.user_daily_goals;
 CREATE TRIGGER trigger_update_user_daily_goals_updated_at
   BEFORE UPDATE ON public.user_daily_goals
   FOR EACH ROW

@@ -1,11 +1,19 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
+const DEFAULT_SUPABASE_ORIGIN_FOR_PROXY = "https://brrhnniybfabtnuxybal.supabase.co";
+
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+  const supabaseProxyTarget =
+    (env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_ORIGIN_FOR_PROXY).trim().replace(/\/+$/, "") ||
+    DEFAULT_SUPABASE_ORIGIN_FOR_PROXY;
+
+  return ({
   server: {
     host: "::",
     port: 8080,
@@ -14,6 +22,15 @@ export default defineConfig(({ mode }) => ({
       ".ngrok-free.dev",
       ".ngrok.io",
     ],
+    /** Dev só: mesmo origin para /auth/v1 — evita CORS falso quando a CDN devolve erro sem ACAO. */
+    proxy: {
+      "/__sb_proxy": {
+        target: supabaseProxyTarget,
+        changeOrigin: true,
+        secure: true,
+        rewrite: (p) => p.replace(/^\/__sb_proxy/, ""),
+      },
+    },
   },
   plugins: [
     react(),
@@ -91,4 +108,5 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-}));
+  });
+});

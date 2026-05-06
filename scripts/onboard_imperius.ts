@@ -2,7 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Configuration
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://adzaqkduxnpckbcuqpmg.supabase.co';
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://brrhnniybfabtnuxybal.supabase.co';
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!SERVICE_ROLE_KEY) {

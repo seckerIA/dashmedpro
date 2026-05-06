@@ -3,10 +3,10 @@
  * Com suporte a OAuth do Facebook para conexão automática
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { SUPABASE_URL } from '@/integrations/supabase/client';
 import { MessageCircle, Settings, ArrowLeft, Loader2, Users, Phone, CheckCircle, XCircle, Sparkles, FileText, QrCode } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, Navigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,9 +20,20 @@ import { ProviderSelector } from '@/components/whatsapp/settings/ProviderSelecto
 import { EvolutionSetup } from '@/components/whatsapp/settings/EvolutionSetup';
 import { useWhatsAppConfig, useTeamWhatsAppConfigs } from '@/hooks/useWhatsAppConfig';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { useAuth } from '@/hooks/useAuth';
+import { resolveOrganizationPortal } from '@/lib/organizationPortal';
 import type { WhatsAppProvider } from '@/types/whatsapp';
 
 export default function WhatsAppSettings() {
+  const { organization } = useAuth();
+  const portal = useMemo(
+    () =>
+      resolveOrganizationPortal(organization?.portal_settings ?? null, {
+        organizationName: organization?.name,
+        organizationSlug: organization?.slug,
+      }),
+    [organization?.portal_settings, organization?.name, organization?.slug],
+  );
   const { config, isLoading, isConfigured, isActive } = useWhatsAppConfig();
   const { isAdmin } = useUserProfile();
   const { teamConfigs, isLoading: isLoadingTeam } = useTeamWhatsAppConfigs();
@@ -40,6 +51,10 @@ export default function WhatsAppSettings() {
     setWebhookUrl(url);
     setWebhookVerifyToken(token);
   };
+
+  if (!portal.features.module_whatsapp) {
+    return <Navigate to="/" replace />;
+  }
 
   if (isLoading) {
     return (

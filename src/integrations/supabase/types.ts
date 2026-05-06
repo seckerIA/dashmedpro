@@ -2923,6 +2923,7 @@ export type Database = {
           owner_id: string | null
           phone: string | null
           plan: string | null
+          portal_settings: Json
           slug: string
           status: string | null
           updated_at: string
@@ -2937,6 +2938,7 @@ export type Database = {
           owner_id?: string | null
           phone?: string | null
           plan?: string | null
+          portal_settings?: Json
           slug: string
           status?: string | null
           updated_at?: string
@@ -2951,6 +2953,7 @@ export type Database = {
           owner_id?: string | null
           phone?: string | null
           plan?: string | null
+          portal_settings?: Json
           slug?: string
           status?: string | null
           updated_at?: string
@@ -4644,6 +4647,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           last_synced_at: string | null
+          organization_id: string | null
           phone_number_id: string | null
           provider: Database["public"]["Enums"]["whatsapp_provider"]
           updated_at: string | null
@@ -4664,6 +4668,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_synced_at?: string | null
+          organization_id?: string | null
           phone_number_id?: string | null
           provider?: Database["public"]["Enums"]["whatsapp_provider"]
           updated_at?: string | null
@@ -4684,6 +4689,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_synced_at?: string | null
+          organization_id?: string | null
           phone_number_id?: string | null
           provider?: Database["public"]["Enums"]["whatsapp_provider"]
           updated_at?: string | null

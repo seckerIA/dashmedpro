@@ -1,5 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useAdminPortal } from '@/hooks/useAdminPortal';
+import {
+    OrganizationPortalSettingsDialog,
+} from '@/components/admin/OrganizationPortalSettingsDialog';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -47,7 +50,14 @@ const GROWTH_DATA = [
 
 export default function SuperAdminDashboard() {
     const { user } = useAuth();
-    const { organizations, isLoading, listOrganizations, createOrganization } = useAdminPortal();
+    const { organizations, isLoading, listOrganizations, createOrganization, updatePortalSettings } =
+        useAdminPortal();
+
+    const [portalOrgId, setPortalOrgId] = useState<string | null>(null);
+    const portalOrg = useMemo(
+        () => (portalOrgId ? organizations.find((o) => o.id === portalOrgId) ?? null : null),
+        [organizations, portalOrgId],
+    );
 
     const [isNewOrgOpen, setIsNewOrgOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -55,7 +65,8 @@ export default function SuperAdminDashboard() {
         name: '',
         slug: '',
         adminEmail: '',
-        adminName: ''
+        adminName: '',
+        adminPassword: '',
     });
 
     useEffect(() => {
@@ -64,14 +75,14 @@ export default function SuperAdminDashboard() {
             console.log('📊 [SuperAdminDashboard] User autenticado. Buscando organizações...');
             listOrganizations();
         }
-    }, [user]);  // Dependência do user
+    }, [user, listOrganizations]);  // Dependência do user
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
             await createOrganization(formData);
             setIsNewOrgOpen(false);
-            setFormData({ name: '', slug: '', adminEmail: '', adminName: '' });
+            setFormData({ name: '', slug: '', adminEmail: '', adminName: '', adminPassword: '' });
         } catch (e) {
             // Error handled by hook
         }
@@ -94,6 +105,19 @@ export default function SuperAdminDashboard() {
     }, [organizations, searchTerm]);
 
     return (
+        <>
+        <OrganizationPortalSettingsDialog
+            open={portalOrgId !== null}
+            onOpenChange={(next) => {
+                if (!next) setPortalOrgId(null);
+            }}
+            organization={portalOrg}
+            saving={isLoading}
+            onSave={async (_id, settings) => {
+                await updatePortalSettings(_id, settings);
+                setPortalOrgId(null);
+            }}
+        />
         <div className="space-y-6">
             {/* Metrics Grid */}
             <div className="grid gap-4 md:grid-cols-4">
@@ -262,6 +286,21 @@ export default function SuperAdminDashboard() {
                                                 required
                                             />
                                         </div>
+                                        <div>
+                                            <Label htmlFor="adminPassword">Senha inicial do dono (opcional)</Label>
+                                            <Input
+                                                id="adminPassword"
+                                                type="password"
+                                                autoComplete="new-password"
+                                                placeholder="Padrão do sistema: DashMed@2026"
+                                                value={formData.adminPassword}
+                                                onChange={e => setFormData({ ...formData, adminPassword: e.target.value })}
+                                            />
+                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                Se deixar em branco, a senha será <span className="font-mono">DashMed@2026</span>.
+                                                O dono usa o mesmo endereço da app e a rota <span className="font-mono">/login</span>.
+                                            </p>
+                                        </div>
                                         <DialogFooter>
                                             <Button type="submit" disabled={isLoading} className="w-full">
                                                 {isLoading ? 'Criando...' : 'Criar Clínica'}
@@ -314,6 +353,9 @@ export default function SuperAdminDashboard() {
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuLabel>Ações Rápidas</DropdownMenuLabel>
                                                 <DropdownMenuSeparator />
+                                                <DropdownMenuItem onClick={() => setPortalOrgId(org.id)}>
+                                                    Marca / portal (white-label)
+                                                </DropdownMenuItem>
                                                 <DropdownMenuItem onClick={() => navigator.clipboard.writeText(org.id)}>
                                                     Copiar ID
                                                 </DropdownMenuItem>
@@ -333,5 +375,6 @@ export default function SuperAdminDashboard() {
                 </CardContent>
             </Card>
         </div>
+        </>
     );
 }

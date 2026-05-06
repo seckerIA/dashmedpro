@@ -330,7 +330,6 @@ CREATE POLICY "Secretaries can view linked doctor analysis"
       SELECT 1 FROM public.secretary_doctor_links sdl
       WHERE sdl.secretary_id = auth.uid()
         AND sdl.doctor_id = whatsapp_conversation_analysis.user_id
-        AND sdl.is_active = TRUE
     )
   );
 
@@ -359,7 +358,6 @@ CREATE POLICY "Secretaries can view linked doctor suggestions"
       SELECT 1 FROM public.secretary_doctor_links sdl
       WHERE sdl.secretary_id = auth.uid()
         AND sdl.doctor_id = whatsapp_ai_suggestions.user_id
-        AND sdl.is_active = TRUE
     )
   );
 
@@ -370,7 +368,6 @@ CREATE POLICY "Secretaries can update linked doctor suggestions"
       SELECT 1 FROM public.secretary_doctor_links sdl
       WHERE sdl.secretary_id = auth.uid()
         AND sdl.doctor_id = whatsapp_ai_suggestions.user_id
-        AND sdl.is_active = TRUE
     )
   );
 

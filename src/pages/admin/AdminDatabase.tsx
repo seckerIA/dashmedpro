@@ -111,7 +111,7 @@ export default function AdminDatabase() {
                 <div className="flex gap-2">
                     <Button variant="outline" asChild>
                         <a
-                            href="https://supabase.com/dashboard/project/adzaqkduxnpckbcuqpmg"
+                            href="https://supabase.com/dashboard/project/brrhnniybfabtnuxybal"
                             target="_blank"
                             rel="noopener noreferrer"
                         >

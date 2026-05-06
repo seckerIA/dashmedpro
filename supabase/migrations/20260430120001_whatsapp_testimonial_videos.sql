@@ -36,10 +36,9 @@ CREATE POLICY "users_view_own_testimonial_videos" ON whatsapp_testimonial_videos
   FOR SELECT USING (
     user_id = auth.uid()
     OR EXISTS (
-      SELECT 1 FROM secretary_doctor_links l
+      SELECT 1 FROM public.secretary_doctor_links l
       WHERE l.secretary_id = auth.uid()
         AND l.doctor_id = whatsapp_testimonial_videos.user_id
-        AND l.is_active = true
     )
   );
 

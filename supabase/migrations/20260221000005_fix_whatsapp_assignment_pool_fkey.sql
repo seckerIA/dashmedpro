@@ -1,30 +1,19 @@
--- Rename constraint if it exists with a different name, or create it if missing
+-- FK secretary_id → profiles apenas se whatsapp_assignment_pool existir.
+
 DO $$
 BEGIN
-    -- Check if constraint exists with a different name (standard Postgres naming)
-    IF EXISTS (
-        SELECT 1 
-        FROM pg_constraint 
-        WHERE conrelid = 'whatsapp_assignment_pool'::regclass 
-        AND contype = 'f' 
-        AND conname != 'whatsapp_assignment_pool_secretary_id_fkey'
-        AND confrelid = 'profiles'::regclass
+  IF to_regclass('public.whatsapp_assignment_pool') IS NOT NULL THEN
+    ALTER TABLE public.whatsapp_assignment_pool
+      DROP CONSTRAINT IF EXISTS whatsapp_assignment_pool_secretary_id_fkey;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint c
+      WHERE c.conrelid = 'public.whatsapp_assignment_pool'::regclass
+        AND c.conname = 'whatsapp_assignment_pool_secretary_id_fkey'
     ) THEN
-        -- Drop the old constraint (we will recreate it with correct name)
-        -- Note: We can't easily dynamic SQL drop unknown names in a DO block without more complex logic,
-        -- but we can try to drop the most likely default name or just add the new one.
-        -- Use specific name if known, but here we enforce our target name.
-        NULL;
+      ALTER TABLE public.whatsapp_assignment_pool
+        ADD CONSTRAINT whatsapp_assignment_pool_secretary_id_fkey
+        FOREIGN KEY (secretary_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
     END IF;
+  END IF;
 END $$;
-
--- Drop correct name if it exists to be safe (idempotent)
-ALTER TABLE IF EXISTS whatsapp_assignment_pool
-DROP CONSTRAINT IF EXISTS whatsapp_assignment_pool_secretary_id_fkey;
-
--- Add the constraint with the EXACT name required by the frontend
-ALTER TABLE whatsapp_assignment_pool
-ADD CONSTRAINT whatsapp_assignment_pool_secretary_id_fkey
-FOREIGN KEY (secretary_id)
-REFERENCES profiles(id)
-ON DELETE CASCADE;

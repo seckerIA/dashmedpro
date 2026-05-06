@@ -1,46 +1,45 @@
--- Migration: Add member_limit to organizations
--- Description: Limits number of members per organization. Default is 1 (owner only).
---              Additional members require upgrade payment.
+-- Migration: Add member_limit to organizations (tabela só existe após 20260220000000_create_organizations em bases novas)
+-- Limits number of members per organization.
 
--- ============================================
--- 1. Add member_limit column to organizations
--- ============================================
-ALTER TABLE public.organizations
-ADD COLUMN IF NOT EXISTS member_limit integer DEFAULT 1;
+DO $$
+BEGIN
+  IF to_regclass('public.organizations') IS NULL THEN
+    RETURN;
+  END IF;
 
--- ============================================
--- 2. Add additional_member_price column
--- ============================================
-ALTER TABLE public.organizations
-ADD COLUMN IF NOT EXISTS additional_member_price decimal(10,2) DEFAULT 89.90;
+  ALTER TABLE public.organizations
+    ADD COLUMN IF NOT EXISTS member_limit integer DEFAULT 1;
 
--- ============================================
--- 3. Add comments
--- ============================================
-COMMENT ON COLUMN public.organizations.member_limit IS 'Maximum number of members allowed in this organization. Default is 1 (just the owner).';
-COMMENT ON COLUMN public.organizations.additional_member_price IS 'Price to add one additional member (in BRL). Default is R$89,90.';
+  ALTER TABLE public.organizations
+    ADD COLUMN IF NOT EXISTS additional_member_price decimal(10,2) DEFAULT 89.90;
 
--- ============================================
--- 4. Create function to count organization members
--- ============================================
-CREATE OR REPLACE FUNCTION public.get_organization_member_count(org_id uuid)
-RETURNS integer
-LANGUAGE sql
-SECURITY DEFINER
-AS $$
+  COMMENT ON COLUMN public.organizations.member_limit IS 'Maximum members in org. Default 1 (owner only).';
+  COMMENT ON COLUMN public.organizations.additional_member_price IS 'Price to add one additional member (BRL).';
+END $$;
+
+DO $$
+BEGIN
+  IF to_regclass('public.organizations') IS NULL OR to_regclass('public.organization_members') IS NULL THEN
+    RETURN;
+  END IF;
+
+  CREATE OR REPLACE FUNCTION public.get_organization_member_count(org_id uuid)
+  RETURNS integer
+  LANGUAGE sql
+  SECURITY DEFINER
+  SET search_path = public
+  AS $func$
     SELECT COUNT(*)::integer
     FROM public.organization_members
     WHERE organization_id = org_id;
-$$;
+  $func$;
 
--- ============================================
--- 5. Create function to check if organization can add members
--- ============================================
-CREATE OR REPLACE FUNCTION public.can_add_member(org_id uuid)
-RETURNS boolean
-LANGUAGE sql
-SECURITY DEFINER
-AS $$
+  CREATE OR REPLACE FUNCTION public.can_add_member(org_id uuid)
+  RETURNS boolean
+  LANGUAGE sql
+  SECURITY DEFINER
+  SET search_path = public
+  AS $func$
     SELECT (
         SELECT COUNT(*)::integer
         FROM public.organization_members
@@ -50,11 +49,9 @@ AS $$
         FROM public.organizations
         WHERE id = org_id
     );
-$$;
+  $func$;
 
--- ============================================
--- 6. Update existing organizations to have unlimited members (for backwards compatibility)
--- ============================================
-UPDATE public.organizations
-SET member_limit = 999
-WHERE member_limit IS NULL OR member_limit = 1;
+  UPDATE public.organizations
+  SET member_limit = 999
+  WHERE member_limit IS NULL OR member_limit = 1;
+END $$;

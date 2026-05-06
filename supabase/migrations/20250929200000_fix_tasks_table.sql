@@ -1,11 +1,12 @@
 -- Fix tasks table to work without teams table
--- Drop existing policies first
 DROP POLICY IF EXISTS "Allow team members to view tasks" ON public.tasks;
 DROP POLICY IF EXISTS "Allow team members to insert tasks" ON public.tasks;
 DROP POLICY IF EXISTS "Allow team members to update tasks" ON public.tasks;
 DROP POLICY IF EXISTS "Allow team members to delete tasks" ON public.tasks;
 
--- Make team_id nullable and add user_id
+-- complete_database_schema não define team_id; migração Lovable assume a coluna
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS team_id UUID;
+
 ALTER TABLE public.tasks ALTER COLUMN team_id DROP NOT NULL;
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
 

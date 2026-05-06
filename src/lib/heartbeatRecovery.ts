@@ -11,7 +11,7 @@
 
 import { QueryClient } from '@tanstack/react-query';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { CURRENT_PROJECT_REF } from '@/integrations/supabase/client';
+import { CURRENT_PROJECT_REF, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/integrations/supabase/client';
 
 // ============================================================================
 // CONFIGURAÇÃO
@@ -308,12 +308,10 @@ async function networkWarmup(): Promise<boolean> {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
 
-        const response = await fetch('https://adzaqkduxnpckbcuqpmg.supabase.co/rest/v1/', {
+        const response = await fetch(`${SUPABASE_URL.replace(/\/+$/, '')}/rest/v1/`, {
             method: 'HEAD',
             signal: controller.signal,
-            headers: {
-                'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkemFxa2R1eG5wY2tiY3VxcG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5ODgyMDksImV4cCI6MjA4MTU2NDIwOX0.WO9-vzv_Vuh86TQWgNWuQ45cXa-L4GoGQfpSbvQiVMc',
-            },
+            headers: { apikey: SUPABASE_PUBLISHABLE_KEY },
         });
 
         clearTimeout(timeoutId);

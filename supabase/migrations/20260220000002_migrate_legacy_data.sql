@@ -43,6 +43,16 @@ BEGIN
     UPDATE public.inventory_transactions SET organization_id = default_org_id WHERE organization_id IS NULL;
     UPDATE public.inventory_batches SET organization_id = default_org_id WHERE organization_id IS NULL;
 
+    IF to_regclass('public.followup_templates') IS NOT NULL THEN
+      UPDATE public.followup_templates SET organization_id = default_org_id WHERE organization_id IS NULL;
+    END IF;
+    IF to_regclass('public.followup_scheduled') IS NOT NULL THEN
+      UPDATE public.followup_scheduled SET organization_id = default_org_id WHERE organization_id IS NULL;
+    END IF;
+    IF to_regclass('public.followup_metrics') IS NOT NULL THEN
+      UPDATE public.followup_metrics SET organization_id = default_org_id WHERE organization_id IS NULL;
+    END IF;
+
     -- 4. Set Constraint NOT NULL (Optional, but good for enforcement)
     -- We will do this in a separate step or leave as nullable for now to avoid locking issues if tables are huge.
     -- Decision: Leave NULLABLE for now in this script.

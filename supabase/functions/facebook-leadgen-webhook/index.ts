@@ -8,7 +8,7 @@
  * Configuração:
  * 1. Setar LEADGEN_VERIFY_TOKEN no Supabase Secrets
  * 2. No Facebook App Dashboard → Webhooks → Page → leadgen:
- *    Callback URL: https://adzaqkduxnpckbcuqpmg.supabase.co/functions/v1/facebook-leadgen-webhook
+ *    Callback URL: https://brrhnniybfabtnuxybal.supabase.co/functions/v1/facebook-leadgen-webhook
  *    Verify Token: (mesmo valor de LEADGEN_VERIFY_TOKEN)
  */
 

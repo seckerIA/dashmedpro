@@ -4,9 +4,10 @@
  */
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Settings, MessageCircle, Loader2, Zap } from 'lucide-react';
+import { useNavigate, useSearchParams, Navigate } from 'react-router-dom';
+import { Settings, MessageCircle, Loader2, Zap, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { WhatsAppLayout } from '@/components/whatsapp/WhatsAppLayout';
 import { ConversationList } from '@/components/whatsapp/inbox/ConversationList';
 import { ConversationFilters } from '@/components/whatsapp/inbox/ConversationFilters';
@@ -20,6 +21,7 @@ import { useDoctorSecretaries } from '@/hooks/useDoctorSecretaries';
 import { useSecretaryDoctors } from '@/hooks/useSecretaryDoctors';
 import { useWhatsAppRealtime } from '@/hooks/useWhatsAppRealtime';
 import { useAuth } from '@/hooks/useAuth';
+import { resolveOrganizationPortal } from '@/lib/organizationPortal';
 import type {
   WhatsAppConversationWithRelations,
   WhatsAppConversationFilters,
@@ -28,7 +30,7 @@ import type {
 export default function WhatsAppInbox() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, organization } = useAuth();
   const { doctorIds } = useSecretaryDoctors();
 
   // Config check
@@ -66,6 +68,15 @@ export default function WhatsAppInbox() {
     if (doctorIds && doctorIds.length === 1) return doctorIds[0];
     return user?.id;
   }, [selectedConversation?.user_id, doctorIds, user?.id]);
+
+  const portal = useMemo(
+    () =>
+      resolveOrganizationPortal(organization?.portal_settings ?? null, {
+        organizationName: organization?.name,
+        organizationSlug: organization?.slug,
+      }),
+    [organization?.portal_settings, organization?.name, organization?.slug],
+  );
 
   const [showSidebar, setShowSidebar] = useState(false);
 
@@ -158,6 +169,10 @@ export default function WhatsAppInbox() {
     }
   }, [selectedConversation?.id, selectedConversation?.unread_count, markAsRead, isMarkingAsRead]);
 
+  if (!portal.features.module_whatsapp) {
+    return <Navigate to="/" replace />;
+  }
+
   // Loading state
   if (isLoadingConfig || isLoadingSecretaries) {
     return (
@@ -216,6 +231,22 @@ export default function WhatsAppInbox() {
   // Inbox content
   const inboxContent = (
     <div className="flex flex-col h-full">
+      <Alert variant="default" className="rounded-none border-x-0 border-t-0 bg-muted/30 py-3">
+        <Shield className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+        <AlertDescription className="text-xs leading-snug text-muted-foreground sm:text-sm">
+          <span className="font-medium text-foreground">Isolamento por clínica.</span>{' '}
+          Conversas, mensagens e instâncias de WhatsApp ficam apenas na sua organização
+          {organization?.name ? (
+            <>
+              {' '}(<span className="font-medium text-foreground">{organization.name}</span>
+              ), sem mistura com outras clínicas da plataforma.
+            </>
+          ) : (
+            <> — sem mistura com outras clínicas na plataforma.</>
+          )}
+        </AlertDescription>
+      </Alert>
+
       {/* Seletor de Secretária + Follow-Up (apenas para médicos) */}
       {hasLinkedSecretaries && (
         <div className="p-2 border-b flex items-center gap-2">

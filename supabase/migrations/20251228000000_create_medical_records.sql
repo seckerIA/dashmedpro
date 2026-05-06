@@ -53,17 +53,28 @@ CREATE TABLE IF NOT EXISTS medical_records (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Colunas esperadas nesta migração (prontuário anterior em 20250128000000 pode não tê-las)
+ALTER TABLE public.medical_records ADD COLUMN IF NOT EXISTS cid_codes TEXT[];
+
 -- =====================================================
 -- ÍNDICES
 -- =====================================================
 
-CREATE INDEX IF NOT EXISTS idx_medical_records_contact ON medical_records(contact_id);
-CREATE INDEX IF NOT EXISTS idx_medical_records_doctor ON medical_records(doctor_id);
-CREATE INDEX IF NOT EXISTS idx_medical_records_user ON medical_records(user_id);
-CREATE INDEX IF NOT EXISTS idx_medical_records_appointment ON medical_records(appointment_id);
-CREATE INDEX IF NOT EXISTS idx_medical_records_created ON medical_records(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_medical_records_type ON medical_records(record_type);
-CREATE INDEX IF NOT EXISTS idx_medical_records_cid ON medical_records USING GIN(cid_codes);
+CREATE INDEX IF NOT EXISTS idx_medical_records_contact ON public.medical_records(contact_id);
+CREATE INDEX IF NOT EXISTS idx_medical_records_doctor ON public.medical_records(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_medical_records_user ON public.medical_records(user_id);
+CREATE INDEX IF NOT EXISTS idx_medical_records_appointment ON public.medical_records(appointment_id);
+CREATE INDEX IF NOT EXISTS idx_medical_records_created ON public.medical_records(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_medical_records_type ON public.medical_records(record_type);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'medical_records' AND column_name = 'cid_codes'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_medical_records_cid ON public.medical_records USING GIN (cid_codes);
+  END IF;
+END $$;
 
 -- =====================================================
 -- TRIGGER: Atualizar updated_at
@@ -77,19 +88,20 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_medical_records_updated_at ON public.medical_records;
 CREATE TRIGGER trigger_medical_records_updated_at
-  BEFORE UPDATE ON medical_records
+  BEFORE UPDATE ON public.medical_records
   FOR EACH ROW
-  EXECUTE FUNCTION update_medical_records_updated_at();
+  EXECUTE FUNCTION public.update_medical_records_updated_at();
 
 -- =====================================================
 -- ROW LEVEL SECURITY (RLS)
 -- =====================================================
 
-ALTER TABLE medical_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.medical_records ENABLE ROW LEVEL SECURITY;
 
--- Política SELECT: Médico vê seus prontuários OU admin/dono vê tudo
-CREATE POLICY "medical_records_select_policy" ON medical_records
+DROP POLICY IF EXISTS "medical_records_select_policy" ON public.medical_records;
+CREATE POLICY "medical_records_select_policy" ON public.medical_records
   FOR SELECT USING (
     doctor_id = auth.uid()
     OR user_id = auth.uid()
@@ -100,8 +112,8 @@ CREATE POLICY "medical_records_select_policy" ON medical_records
     )
   );
 
--- Política INSERT: Qualquer médico autenticado pode criar
-CREATE POLICY "medical_records_insert_policy" ON medical_records
+DROP POLICY IF EXISTS "medical_records_insert_policy" ON public.medical_records;
+CREATE POLICY "medical_records_insert_policy" ON public.medical_records
   FOR INSERT WITH CHECK (
     auth.uid() IS NOT NULL
     AND (
@@ -114,8 +126,8 @@ CREATE POLICY "medical_records_insert_policy" ON medical_records
     )
   );
 
--- Política UPDATE: Médico pode editar seus próprios prontuários
-CREATE POLICY "medical_records_update_policy" ON medical_records
+DROP POLICY IF EXISTS "medical_records_update_policy" ON public.medical_records;
+CREATE POLICY "medical_records_update_policy" ON public.medical_records
   FOR UPDATE USING (
     doctor_id = auth.uid()
     OR EXISTS (
@@ -125,8 +137,8 @@ CREATE POLICY "medical_records_update_policy" ON medical_records
     )
   );
 
--- Política DELETE: Apenas admin/dono podem deletar
-CREATE POLICY "medical_records_delete_policy" ON medical_records
+DROP POLICY IF EXISTS "medical_records_delete_policy" ON public.medical_records;
+CREATE POLICY "medical_records_delete_policy" ON public.medical_records
   FOR DELETE USING (
     EXISTS (
       SELECT 1 FROM profiles
@@ -166,15 +178,15 @@ CREATE TABLE IF NOT EXISTS prescriptions (
 );
 
 -- Índices para prescriptions
-CREATE INDEX idx_prescriptions_record ON prescriptions(medical_record_id);
-CREATE INDEX idx_prescriptions_contact ON prescriptions(contact_id);
-CREATE INDEX idx_prescriptions_doctor ON prescriptions(doctor_id);
-CREATE INDEX idx_prescriptions_date ON prescriptions(prescription_date DESC);
+CREATE INDEX IF NOT EXISTS idx_prescriptions_record ON public.prescriptions(medical_record_id);
+CREATE INDEX IF NOT EXISTS idx_prescriptions_contact ON public.prescriptions(contact_id);
+CREATE INDEX IF NOT EXISTS idx_prescriptions_doctor ON public.prescriptions(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_prescriptions_date ON public.prescriptions(prescription_date DESC);
 
--- RLS para prescriptions
-ALTER TABLE prescriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.prescriptions ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "prescriptions_select_policy" ON prescriptions
+DROP POLICY IF EXISTS "prescriptions_select_policy" ON public.prescriptions;
+CREATE POLICY "prescriptions_select_policy" ON public.prescriptions
   FOR SELECT USING (
     doctor_id = auth.uid()
     OR EXISTS (
@@ -184,10 +196,12 @@ CREATE POLICY "prescriptions_select_policy" ON prescriptions
     )
   );
 
-CREATE POLICY "prescriptions_insert_policy" ON prescriptions
+DROP POLICY IF EXISTS "prescriptions_insert_policy" ON public.prescriptions;
+CREATE POLICY "prescriptions_insert_policy" ON public.prescriptions
   FOR INSERT WITH CHECK (doctor_id = auth.uid());
 
-CREATE POLICY "prescriptions_update_policy" ON prescriptions
+DROP POLICY IF EXISTS "prescriptions_update_policy" ON public.prescriptions;
+CREATE POLICY "prescriptions_update_policy" ON public.prescriptions
   FOR UPDATE USING (doctor_id = auth.uid());
 
 -- =====================================================

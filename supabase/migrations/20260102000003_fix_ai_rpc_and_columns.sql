@@ -68,7 +68,7 @@ BEGIN
       OR 
       (v_role = 'secretaria' AND EXISTS (
         SELECT 1 FROM public.secretary_doctor_links sdl
-        WHERE sdl.secretary_id = p_user_id AND sdl.doctor_id = c.user_id AND sdl.is_active = TRUE
+        WHERE sdl.secretary_id = p_user_id AND sdl.doctor_id = c.user_id
       ))
       OR
       (v_role IN ('admin', 'dono'))
@@ -111,7 +111,7 @@ BEGIN
       OR 
       (v_role = 'secretaria' AND EXISTS (
         SELECT 1 FROM public.secretary_doctor_links sdl
-        WHERE sdl.secretary_id = p_user_id AND sdl.doctor_id = c.user_id AND sdl.is_active = TRUE
+        WHERE sdl.secretary_id = p_user_id AND sdl.doctor_id = c.user_id
       ))
       OR
       (v_role IN ('admin', 'dono'))

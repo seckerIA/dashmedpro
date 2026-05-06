@@ -1,4 +1,5 @@
-project_id = "adzaqkduxnpckbcuqpmg"
+# Após migrar para novo projeto: `npx supabase link --project-ref <novo>` atualiza o link local.
+project_id = "brrhnniybfabtnuxybal"
 
 [functions.whatsapp-webhook]
 verify_jwt = false
@@ -13,4 +14,8 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.facebook-leadgen-webhook]
+verify_jwt = false
+
+# Browser chama OPTIONS sem JWT; verify_jwt na gateway quebra preflight/CORS antes do handler.
+[functions.complete-onboarding]
 verify_jwt = false

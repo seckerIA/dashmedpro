@@ -1,8 +1,13 @@
--- Create enum for user roles
-CREATE TYPE public.user_role AS ENUM ('admin', 'dono', 'vendedor', 'gestor_trafego');
+-- Create enum for user roles (já criado em 20250120000000_complete_database_schema.sql)
+DO $$
+BEGIN
+  CREATE TYPE public.user_role AS ENUM ('admin', 'dono', 'vendedor', 'gestor_trafego');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
--- Create profiles table to store user profile data and roles
-CREATE TABLE public.profiles (
+-- Create profiles / team_invitations só se ainda não existirem (schema completo vem da complete_database_schema)
+CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT NOT NULL,
   full_name TEXT,
@@ -14,11 +19,9 @@ CREATE TABLE public.profiles (
   is_active BOOLEAN DEFAULT true
 );
 
--- Enable RLS on profiles
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
--- Create table for team invitations
-CREATE TABLE public.team_invitations (
+CREATE TABLE IF NOT EXISTS public.team_invitations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email TEXT NOT NULL,
   role user_role NOT NULL,
@@ -27,10 +30,9 @@ CREATE TABLE public.team_invitations (
   expires_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '7 days'),
   accepted_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(email, accepted_at) -- Prevent duplicate active invitations
+  UNIQUE(email, accepted_at)
 );
 
--- Enable RLS on team_invitations
 ALTER TABLE public.team_invitations ENABLE ROW LEVEL SECURITY;
 
 -- Create security definer function to get user role
@@ -73,32 +75,38 @@ AS $$
 $$;
 
 -- RLS Policies for profiles
+DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
 CREATE POLICY "Users can view their own profile"
 ON public.profiles FOR SELECT
 TO authenticated
 USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 CREATE POLICY "Users can update their own profile"
 ON public.profiles FOR UPDATE
 TO authenticated
 USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Admin and Dono can view all profiles" ON public.profiles;
 CREATE POLICY "Admin and Dono can view all profiles"
 ON public.profiles FOR SELECT
 TO authenticated
 USING (public.is_admin_or_dono(auth.uid()));
 
+DROP POLICY IF EXISTS "Admin and Dono can update profiles" ON public.profiles;
 CREATE POLICY "Admin and Dono can update profiles"
 ON public.profiles FOR UPDATE
 TO authenticated
 USING (public.is_admin_or_dono(auth.uid()));
 
+DROP POLICY IF EXISTS "Admin and Dono can insert profiles" ON public.profiles;
 CREATE POLICY "Admin and Dono can insert profiles"
 ON public.profiles FOR INSERT
 TO authenticated
 WITH CHECK (public.is_admin_or_dono(auth.uid()));
 
 -- RLS Policies for team_invitations
+DROP POLICY IF EXISTS "Admin and Dono can manage invitations" ON public.team_invitations;
 CREATE POLICY "Admin and Dono can manage invitations"
 ON public.team_invitations FOR ALL
 TO authenticated
@@ -157,7 +165,8 @@ END;
 $$;
 
 -- Trigger to create profile when user signs up
-CREATE OR REPLACE TRIGGER on_auth_user_created
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user_from_invitation();
 
@@ -175,6 +184,7 @@ END;
 $$;
 
 -- Trigger to update updated_at on profiles
+DROP TRIGGER IF EXISTS update_profiles_updated_at ON public.profiles;
 CREATE TRIGGER update_profiles_updated_at
   BEFORE UPDATE ON public.profiles
   FOR EACH ROW

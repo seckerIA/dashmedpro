@@ -20,7 +20,6 @@ BEGIN
     FROM public.secretary_doctor_links s
     WHERE s.secretary_id = p_secretary
       AND s.doctor_id = p_doctor
-      AND COALESCE(s.is_active, true)
   );
 END;
 $fn$;
@@ -39,7 +38,6 @@ BEGIN
       SELECT doctor_id
       FROM public.secretary_doctor_links
       WHERE secretary_id = auth.uid()
-        AND COALESCE(is_active, true)
     ),
     ARRAY[]::uuid[]
   );
@@ -72,10 +70,7 @@ TO authenticated
 USING (
   auth.uid() = secretary_id
   OR auth.uid() = doctor_id
-  OR (
-    organization_id IS NOT NULL
-    AND organization_id = ANY(COALESCE(public.get_user_org_ids(), ARRAY[]::uuid[]))
-  )
+  OR public.is_admin_or_dono(auth.uid())
 );
 
 CREATE POLICY "sdl_insert_doctor_or_admin"

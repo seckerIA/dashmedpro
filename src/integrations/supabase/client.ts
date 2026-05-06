@@ -2,9 +2,9 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const DEFAULT_SUPABASE_URL = 'https://adzaqkduxnpckbcuqpmg.supabase.co';
-const DEFAULT_PUBLISHABLE_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkemFxa2R1eG5wY2tiY3VxcG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5ODgyMDksImV4cCI6MjA4MTU2NDIwOX0.WO9-vzv_Vuh86TQWgNWuQ45cXa-L4GoGQfpSbvQiVMc';
+const DEFAULT_SUPABASE_URL = 'https://brrhnniybfabtnuxybal.supabase.co';
+/** Só fallback de dev; produção deve definir VITE_SUPABASE_PUBLISHABLE_KEY ou VITE_SUPABASE_ANON_KEY. */
+const DEFAULT_PUBLISHABLE_KEY = '';
 
 function normalizeSupabaseUrl(url: string): string {
   return url.replace(/\/+$/, '');
@@ -30,18 +30,81 @@ const refFromEnv = import.meta.env.VITE_SUPABASE_PROJECT_ID?.trim();
 const refFromUrl = projectRefFromSupabaseUrl(SUPABASE_URL);
 
 export const CURRENT_PROJECT_REF =
-  refFromEnv || refFromUrl || 'adzaqkduxnpckbcuqpmg';
+  refFromEnv || refFromUrl || 'brrhnniybfabtnuxybal';
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
+/** Em dev (Vite), auth HTTP passa pelo proxy — mesmo origin evita CORS falso quando há falha na edge. */
+const DEV_SB_AUTH_PROXY_PREFIX = '/__sb_proxy';
+
+function resolveRequestUrl(input: RequestInfo | URL): string {
+  if (typeof input === 'string') return input;
+  if (input instanceof URL) return input.href;
+  return (input as Request).url;
+}
+
+/** Só redes `.../auth/v1/*`; PostgREST/realtime continuam direto ao host. */
+async function devSupabaseFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  let backendHostname = '';
+  try {
+    backendHostname = new URL(SUPABASE_URL).hostname;
+  } catch {
+    /* ignore */
+  }
+
+  const urlStr = resolveRequestUrl(input);
+
+  const useProxy =
+    import.meta.env.DEV &&
+    typeof window !== 'undefined' &&
+    Boolean(backendHostname) &&
+    urlStr.includes(backendHostname) &&
+    urlStr.includes('/auth/v1/');
+
+  if (!useProxy) {
+    return fetch(input, init as RequestInit);
+  }
+
+  const u = new URL(urlStr);
+  const proxied = `${DEV_SB_AUTH_PROXY_PREFIX}${u.pathname}${u.search}`;
+
+  if (typeof input === 'string') {
+    return fetch(proxied, init);
+  }
+  if (input instanceof URL) {
+    return fetch(proxied, init);
+  }
+
+  const req = input as Request;
+  const method = req.method;
+  let body: BodyInit | null | undefined;
+  if (method === 'GET' || method === 'HEAD') {
+    body = undefined;
+  } else {
+    body = await req.clone().arrayBuffer();
+  }
+  return fetch(proxied, {
+    method,
+    headers: req.headers,
+    body,
+  });
+}
+
+export const supabase = createClient<Database>(
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY,
+  {
+    auth: {
+      storage: localStorage,
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+    ...(import.meta.env.DEV && typeof window !== 'undefined'
+      ? { global: { fetch: devSupabaseFetch } }
+      : {}),
   },
-});
+);
 
 /**
  * Check if the current token is valid, attempt refresh if needed.

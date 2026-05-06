@@ -45,7 +45,7 @@ END $$;
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS voip_config (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
 
   -- ========== TWILIO CREDENTIALS (for WebRTC Browser) ==========
@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS voip_config (
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS voip_call_sessions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
 
   -- Related entities
@@ -202,7 +202,6 @@ CREATE POLICY "voip_config_select_secretary"
       SELECT 1 FROM secretary_doctor_links sdl
       WHERE sdl.secretary_id = auth.uid()
         AND sdl.doctor_id = voip_config.user_id
-        AND sdl.is_active = true
     )
   );
 
@@ -243,7 +242,6 @@ CREATE POLICY "voip_sessions_select_secretary"
       SELECT 1 FROM secretary_doctor_links sdl
       WHERE sdl.secretary_id = auth.uid()
         AND sdl.doctor_id = voip_call_sessions.user_id
-        AND sdl.is_active = true
     )
   );
 
@@ -255,7 +253,6 @@ CREATE POLICY "voip_sessions_insert_secretary"
       SELECT 1 FROM secretary_doctor_links sdl
       WHERE sdl.secretary_id = auth.uid()
         AND sdl.doctor_id = voip_call_sessions.user_id
-        AND sdl.is_active = true
     )
   );
 
@@ -267,7 +264,6 @@ CREATE POLICY "voip_sessions_update_secretary"
       SELECT 1 FROM secretary_doctor_links sdl
       WHERE sdl.secretary_id = auth.uid()
         AND sdl.doctor_id = voip_call_sessions.user_id
-        AND sdl.is_active = true
     )
   );
 

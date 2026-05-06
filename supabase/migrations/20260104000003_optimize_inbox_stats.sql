@@ -26,7 +26,6 @@ BEGIN
         SELECT 1 FROM secretary_doctor_links sdl
         WHERE sdl.secretary_id = p_user_id 
           AND sdl.doctor_id = wc.user_id
-          AND sdl.is_active = true
       )
     );
 

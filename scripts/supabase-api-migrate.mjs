@@ -1,19 +1,41 @@
 /**
- * Script de Migração via Supabase REST API
- * Usa a API REST do Supabase para copiar dados (não requer conexão direta PostgreSQL)
+ * Migração parcial DashMed via REST (service_role em origem e destino).
+ *
+ * Cobre apenas as tabelas listadas em TABLES. NÃO migra:
+ * - auth.users (use painel/auth export oficial ou usuários fazem novo login/onboarding onde aplicável)
+ * - Storage (buckets/objetos: copiar com CLI, script ou Dashboard)
+ * - Secrets das Edge Functions
+ *
+ * Fluxo esperado no projeto NOVO:
+ *   1) Aplicar migrations (supabase db push / link remoto).
+ *   2) Opcionalmente rodar este script para dados.
+ *   3) UPDATE public.app_supabase_config SET api_url = 'https://<novo-ref>.supabase.co' WHERE singleton = true;
+ *   4) Deploy functions + configurar URLs webhooks externos (Meta/WhatsApp/etc.).
+ *
+ * Variáveis: SOURCE_URL, SOURCE_SERVICE_ROLE_KEY, DEST_URL, DEST_SERVICE_ROLE_KEY
  */
 
 import { createClient } from '@supabase/supabase-js';
 
-// FONTE (Produção) - usando service_role para bypass RLS
-const SOURCE_URL = 'https://adzaqkduxnpckbcuqpmg.supabase.co';
-const SOURCE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkemFxa2R1eG5wY2tiY3VxcG1nIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTk4ODIwOSwiZXhwIjoyMDgxNTY0MjA5fQ.S3WAA-ZP85pXHaGe8m4eRirT9bEl7nEsUPik0WpgBxk';
+/**
+ * Credenciais somente por variáveis de ambiente (não commitar secrets).
+ *
+ * SOURCE_URL / SOURCE_SERVICE_ROLE_KEY  — projeto atual (DashMed origem)
+ * DEST_URL / DEST_SERVICE_ROLE_KEY      — projeto novo (DashMed destino)
+ */
+function requireEnv(name) {
+  const v = process.env[name]?.trim();
+  if (!v) {
+    console.error(`Defina ${name} (ex.: no PowerShell: $env:SOURCE_URL=\"https://xxxx.supabase.co\")`);
+    process.exit(1);
+  }
+  return v;
+}
 
-// DESTINO (Backup/Dev)
-const DEST_URL = 'https://puylqvsnooquefkingki.supabase.co';
-const DEST_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB1eWxxdnNub29xdWVma2luZ2tpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTgwODI0MSwiZXhwIjoyMDg1Mzg0MjQxfQ.PoQHyK3CbjkfI3iWLxsgo92YDAoX5g0CsT9E7z9SxLE';
-
-// Criar clientes (usando service_role para bypass RLS)
+const SOURCE_URL = requireEnv('SOURCE_URL').replace(/\/+$/, '');
+const SOURCE_SERVICE_KEY = requireEnv('SOURCE_SERVICE_ROLE_KEY');
+const DEST_URL = requireEnv('DEST_URL').replace(/\/+$/, '');
+const DEST_SERVICE_KEY = requireEnv('DEST_SERVICE_ROLE_KEY');
 const sourceClient = createClient(SOURCE_URL, SOURCE_SERVICE_KEY);
 const destClient = createClient(DEST_URL, DEST_SERVICE_KEY);
 

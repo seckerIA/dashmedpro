@@ -21,6 +21,12 @@ interface CacheRequest {
     pattern?: string;
 }
 
+function redisConfigured(): boolean {
+    const url = Deno.env.get("UPSTASH_REDIS_REST_URL")?.trim();
+    const token = Deno.env.get("UPSTASH_REDIS_REST_TOKEN")?.trim();
+    return Boolean(url && token);
+}
+
 // Função helper para chamar a REST API do Upstash
 async function upstashRequest(command: string[]): Promise<any> {
     const url = Deno.env.get("UPSTASH_REDIS_REST_URL");
@@ -47,6 +53,19 @@ async function upstashRequest(command: string[]): Promise<any> {
     return await response.json();
 }
 
+function degradedResponse(action: CacheRequest["action"] | null): Response {
+    if (action === "get") {
+        return new Response(
+            JSON.stringify({ value: null, skipped: true }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+    }
+    return new Response(
+        JSON.stringify({ success: true, skipped: true }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+}
+
 Deno.serve(async (req: Request) => {
     // Handle CORS preflight
     if (req.method === "OPTIONS") {
@@ -61,6 +80,8 @@ Deno.serve(async (req: Request) => {
             { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
     }
+
+    let parsedAction: CacheRequest["action"] | null = null;
 
     try {
         // Create Supabase client to verify token
@@ -83,6 +104,11 @@ Deno.serve(async (req: Request) => {
 
         const body: CacheRequest = await req.json();
         const { action, key, value, ttl, pattern } = body;
+        parsedAction = action;
+
+        if (!redisConfigured()) {
+            return degradedResponse(action);
+        }
 
         switch (action) {
             case "get": {
@@ -181,20 +207,15 @@ Deno.serve(async (req: Request) => {
                     { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                 );
         }
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("[redis-cache] Error:", error);
+        const message = error instanceof Error ? error.message : String(error);
 
-        // Se Redis não está configurado, retorna gracefully
-        if (error.message?.includes("not configured")) {
-            return new Response(
-                JSON.stringify({ value: null, warning: "Redis not configured" }),
-                { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
+        if (message.includes("not configured")) {
+            return degradedResponse(parsedAction);
         }
 
-        return new Response(
-            JSON.stringify({ error: error.message || "Internal error" }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        console.warn("[redis-cache] Degraded (no 500):", message);
+        return degradedResponse(parsedAction);
     }
 });

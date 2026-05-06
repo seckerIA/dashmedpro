@@ -15,13 +15,15 @@ ALTER TABLE public.profiles
 ADD COLUMN IF NOT EXISTS specialty text;
 
 -- ============================================
--- 2. Add fields to organizations table
+-- 2. Add fields to organizations table (20260220000000_create_organizations cria a tabela depois)
 -- ============================================
-ALTER TABLE public.organizations
-ADD COLUMN IF NOT EXISTS phone text;
-
-ALTER TABLE public.organizations
-ADD COLUMN IF NOT EXISTS city text;
+DO $$
+BEGIN
+  IF to_regclass('public.organizations') IS NOT NULL THEN
+    ALTER TABLE public.organizations ADD COLUMN IF NOT EXISTS phone text;
+    ALTER TABLE public.organizations ADD COLUMN IF NOT EXISTS city text;
+  END IF;
+END $$;
 
 -- ============================================
 -- 3. Create onboarding_state table (wizard progress persistence)
@@ -42,7 +44,7 @@ CREATE TABLE IF NOT EXISTS public.onboarding_state (
 -- Enable RLS
 ALTER TABLE public.onboarding_state ENABLE ROW LEVEL SECURITY;
 
--- RLS Policy: Users can only access their own onboarding state
+DROP POLICY IF EXISTS "Users manage own onboarding state" ON public.onboarding_state;
 CREATE POLICY "Users manage own onboarding state"
 ON public.onboarding_state
 FOR ALL
@@ -67,7 +69,7 @@ CREATE TABLE IF NOT EXISTS public.specialty_procedures (
 -- Enable RLS
 ALTER TABLE public.specialty_procedures ENABLE ROW LEVEL SECURITY;
 
--- RLS Policy: Anyone can read specialty procedures (public reference data)
+DROP POLICY IF EXISTS "Anyone can read specialty procedures" ON public.specialty_procedures;
 CREATE POLICY "Anyone can read specialty procedures"
 ON public.specialty_procedures
 FOR SELECT

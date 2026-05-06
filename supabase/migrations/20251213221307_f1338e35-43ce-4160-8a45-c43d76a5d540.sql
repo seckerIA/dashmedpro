@@ -1,12 +1,18 @@
--- Create pipeline stage enum
-CREATE TYPE public.crm_pipeline_stage AS ENUM (
-  'lead_novo', 'qualificado', 'apresentacao', 'proposta', 'negociacao', 'fechado_ganho', 'fechado_perdido'
-);
+DO $$
+BEGIN
+  CREATE TYPE public.crm_pipeline_stage AS ENUM (
+    'lead_novo', 'qualificado', 'apresentacao', 'proposta', 'negociacao', 'fechado_ganho', 'fechado_perdido'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
--- Create activity type enum
-CREATE TYPE public.crm_activity_type AS ENUM (
-  'call', 'email', 'whatsapp', 'meeting', 'note', 'task', 'ai_interaction'
-);
+DO $$
+BEGIN
+  CREATE TYPE public.crm_activity_type AS ENUM (
+    'call', 'email', 'whatsapp', 'meeting', 'note', 'task', 'ai_interaction'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Add missing columns to crm_contacts
 ALTER TABLE public.crm_contacts 
@@ -15,8 +21,7 @@ ALTER TABLE public.crm_contacts
   ADD COLUMN IF NOT EXISTS service_value DECIMAL(15,2),
   ADD COLUMN IF NOT EXISTS tags TEXT[];
 
--- Create crm_deals table (different from the generic deals table)
-CREATE TABLE public.crm_deals (
+CREATE TABLE IF NOT EXISTS public.crm_deals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   contact_id UUID REFERENCES public.crm_contacts(id) ON DELETE CASCADE,
   user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -36,17 +41,19 @@ CREATE TABLE public.crm_deals (
 
 ALTER TABLE public.crm_deals ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Authenticated users can view crm_deals" ON public.crm_deals;
 CREATE POLICY "Authenticated users can view crm_deals" ON public.crm_deals
   FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Authenticated users can manage crm_deals" ON public.crm_deals;
 CREATE POLICY "Authenticated users can manage crm_deals" ON public.crm_deals
   FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
+DROP TRIGGER IF EXISTS update_crm_deals_updated_at ON public.crm_deals;
 CREATE TRIGGER update_crm_deals_updated_at BEFORE UPDATE ON public.crm_deals
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
--- Create crm_activities table
-CREATE TABLE public.crm_activities (
+CREATE TABLE IF NOT EXISTS public.crm_activities (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   contact_id UUID REFERENCES public.crm_contacts(id) ON DELETE CASCADE,
   deal_id UUID REFERENCES public.crm_deals(id) ON DELETE CASCADE,
@@ -62,9 +69,11 @@ CREATE TABLE public.crm_activities (
 
 ALTER TABLE public.crm_activities ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Authenticated users can view crm_activities" ON public.crm_activities;
 CREATE POLICY "Authenticated users can view crm_activities" ON public.crm_activities
   FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Authenticated users can manage crm_activities" ON public.crm_activities;
 CREATE POLICY "Authenticated users can manage crm_activities" ON public.crm_activities
   FOR ALL TO authenticated USING (true) WITH CHECK (true);
 

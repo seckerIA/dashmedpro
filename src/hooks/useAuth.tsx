@@ -46,34 +46,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   useEffect(() => {
+    let cancelled = false;
+
     const loadSession = async () => {
       try {
         const { data: { session: currentSession } } = await supabase.auth.getSession();
+        if (cancelled) return;
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
 
         if (currentSession?.user) {
-          // Check for Super Admin status first (needed for global redirect)
-          const { data: profile } = await (supabase
-            .from('profiles') as any)
-            .select('is_super_admin')
-            .eq('id', currentSession.user.id)
-            .single();
+          const uid = currentSession.user.id;
+          /** Só colunas que existem no baseline antigo/Lovable — evita 400 ao pedir `is_super_admin`. */
+          const prof = await (supabase.from('profiles') as any)
+            .select('role, organization_id')
+            .eq('id', uid)
+            .maybeSingle();
+          if (cancelled) return;
+          const row = prof.data as { role?: string; organization_id?: string | null } | null;
+          setIsSuperAdmin(
+            row?.role === 'admin' && (row.organization_id == null || row.organization_id === ''),
+          );
 
-          if ((profile as any)?.is_super_admin) {
-            setIsSuperAdmin(true);
-            // Super Admin doesn't necessarily need a specific organization loaded here,
-            // but we might want to load one if they choose to "impersonate".
-            // For now, we leave org null or try to load one?
-            // Let's assume they might be members of none.
-          }
-
-          // Fetch user's organization (only if NOT forcing null, or even if Super Admin is also a member)
           const { data: memberData, error } = await (supabase
             .from('organization_members' as any) as any)
             .select('role, organization:organizations(*)')
             .eq('user_id', currentSession.user.id)
             .maybeSingle();
+          if (cancelled) return;
 
           if (!error && memberData && (memberData as any).organization) {
             setOrganization((memberData as any).organization as any);
@@ -85,35 +85,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } catch (error) {
         console.error('Erro ao carregar sessão:', error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
+
+    /** Evita deadlock: getSession competindo com INITIAL_SESSION no mesmo tick (GoTrue + Web Locks). */
+    let loadSessionTimer = window.setTimeout(() => void loadSession(), 0);
+
+    /** Se auth travar por rede/cliente, nunca ficar eternamente em “Carregando…”. */
+    const safetyRelease = window.setTimeout(() => {
+      setLoading((was) => {
+        if (was) {
+          console.warn('[useAuth] Timeout de segurança: liberando loading após espera pela sessão');
+        }
+        return false;
+      });
+    }, 15000);
 
     // IMPORTANT: Do NOT use await inside onAuthStateChange callback!
     // This causes deadlocks in supabase-js due to Web Locks API.
     // See: https://github.com/supabase/gotrue-js/issues/762
-    // Solution: Use setTimeout(0) to defer Supabase operations after callback completes.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, currentSession) => {
-        // Synchronous operations - safe to do immediately
+      (_event, currentSession) => {
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
 
         if (currentSession?.user) {
-          // Defer Supabase operations to avoid deadlock
           setTimeout(async () => {
             try {
-              // Check Super Admin on auth change
-              const { data: profile } = await (supabase
-                .from('profiles') as any)
-                .select('is_super_admin')
-                .eq('id', currentSession.user.id)
-                .single();
+              const uid = currentSession.user.id;
+              const prof = await (supabase.from('profiles') as any)
+                .select('role, organization_id')
+                .eq('id', uid)
+                .maybeSingle();
+              const row = prof.data as { role?: string; organization_id?: string | null } | null;
+              setIsSuperAdmin(
+                row?.role === 'admin' &&
+                  (row.organization_id == null || row.organization_id === ''),
+              );
 
-              if ((profile as any)?.is_super_admin) setIsSuperAdmin(true);
-              else setIsSuperAdmin(false);
-
-              // Fetch organization on auth change (login)
               const { data: memberData } = await (supabase
                 .from('organization_members' as any) as any)
                 .select('role, organization:organizations(*)')
@@ -139,12 +149,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setIsSuperAdmin(false);
           setLoading(false);
         }
-      }
+      },
     );
 
-    loadSession();
-
     return () => {
+      cancelled = true;
+      window.clearTimeout(loadSessionTimer);
+      window.clearTimeout(safetyRelease);
       subscription.unsubscribe();
     };
   }, []);

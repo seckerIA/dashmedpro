@@ -12,20 +12,24 @@ USING (auth.uid() = id)
 WITH CHECK (
   auth.uid() = id
   AND role = (SELECT role FROM public.profiles WHERE id = auth.uid())
-  AND COALESCE(is_super_admin, false) = COALESCE((SELECT is_super_admin FROM public.profiles WHERE id = auth.uid()), false)
 );
 
 -- =========================================================
 -- 2) debug_logs: enable RLS, super-admin only
 -- =========================================================
-ALTER TABLE public.debug_logs ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF to_regclass('public.debug_logs') IS NOT NULL THEN
+    ALTER TABLE public.debug_logs ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Super admins can view debug logs" ON public.debug_logs;
-CREATE POLICY "Super admins can view debug logs"
-ON public.debug_logs
-FOR SELECT
-TO authenticated
-USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_super_admin = true));
+    DROP POLICY IF EXISTS "Super admins can view debug logs" ON public.debug_logs;
+    CREATE POLICY "Super admins can view debug logs"
+    ON public.debug_logs
+    FOR SELECT
+    TO authenticated
+    USING (public.is_admin_or_dono(auth.uid()));
+  END IF;
+END $$;
 
 -- (no INSERT/UPDATE/DELETE policies = denied for clients; service_role bypasses RLS)
 
@@ -69,34 +73,44 @@ USING (true);
 -- =========================================================
 -- 7) crm_follow_ups: drop overly permissive policies
 -- =========================================================
-DROP POLICY IF EXISTS "Authenticated users can manage crm_follow_ups" ON public.crm_follow_ups;
-DROP POLICY IF EXISTS "Authenticated users can view crm_follow_ups" ON public.crm_follow_ups;
+DO $$
+BEGIN
+  IF to_regclass('public.crm_follow_ups') IS NOT NULL THEN
+    DROP POLICY IF EXISTS "Authenticated users can manage crm_follow_ups" ON public.crm_follow_ups;
+    DROP POLICY IF EXISTS "Authenticated users can view crm_follow_ups" ON public.crm_follow_ups;
+  END IF;
+END $$;
 
 -- =========================================================
 -- 8) appointment_stock_usage: org-scoped
 -- =========================================================
-DROP POLICY IF EXISTS "Enable all for authenticated users" ON public.appointment_stock_usage;
+DO $$
+BEGIN
+  IF to_regclass('public.appointment_stock_usage') IS NOT NULL THEN
+    DROP POLICY IF EXISTS "Enable all for authenticated users" ON public.appointment_stock_usage;
 
-CREATE POLICY "Org members can manage appointment stock usage"
-ON public.appointment_stock_usage
-FOR ALL
-TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM public.medical_appointments a
-    JOIN public.profiles p ON p.id = auth.uid()
-    WHERE a.id = appointment_stock_usage.appointment_id
-      AND a.organization_id = p.organization_id
-  )
-)
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM public.medical_appointments a
-    JOIN public.profiles p ON p.id = auth.uid()
-    WHERE a.id = appointment_stock_usage.appointment_id
-      AND a.organization_id = p.organization_id
-  )
-);
+    CREATE POLICY "Org members can manage appointment stock usage"
+    ON public.appointment_stock_usage
+    FOR ALL
+    TO authenticated
+    USING (
+      EXISTS (
+        SELECT 1 FROM public.medical_appointments a
+        JOIN public.profiles p ON p.id = auth.uid()
+        WHERE a.id = appointment_stock_usage.appointment_id
+          AND a.organization_id IS NOT DISTINCT FROM p.organization_id
+      )
+    )
+    WITH CHECK (
+      EXISTS (
+        SELECT 1 FROM public.medical_appointments a
+        JOIN public.profiles p ON p.id = auth.uid()
+        WHERE a.id = appointment_stock_usage.appointment_id
+          AND a.organization_id IS NOT DISTINCT FROM p.organization_id
+      )
+    );
+  END IF;
+END $$;
 
 -- =========================================================
 -- 9) Storage: make buckets private and remove broad policies

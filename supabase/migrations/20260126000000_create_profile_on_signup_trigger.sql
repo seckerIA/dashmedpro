@@ -62,5 +62,4 @@ CREATE TRIGGER on_auth_user_created
 COMMENT ON FUNCTION public.handle_new_user_signup() IS
 'Cria automaticamente um perfil na tabela profiles quando um novo usuário faz signup via OAuth (Google, etc.)';
 
-COMMENT ON TRIGGER on_auth_user_created ON auth.users IS
-'Trigger para criar perfil automaticamente após signup (OAuth ou email/senha)';
+-- COMMENT em trigger em auth.users exige privilégios de owner; omitido no deploy remoto

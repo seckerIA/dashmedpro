@@ -15,25 +15,14 @@ DROP POLICY IF EXISTS "Clinic-based contacts view" ON public.crm_contacts;
 CREATE POLICY "Clinic-based contacts view" ON public.crm_contacts
   FOR SELECT TO authenticated
   USING (
-    -- Admin OU Dono pode ver tudo (usando função is_admin_or_dono que verifica profiles)
     public.is_admin_or_dono(auth.uid()) OR
-    -- Próprio contato
     user_id = auth.uid() OR
     user_id IS NULL OR
-    -- É membro da mesma clínica do dono do contato
     EXISTS (
-      SELECT 1 
-      FROM public.clinic_members cm1
-      INNER JOIN public.clinic_members cm2 ON cm2.clinic_id = cm1.clinic_id
-      WHERE cm1.user_id = auth.uid()
-        AND cm2.user_id = crm_contacts.user_id
-        AND cm1.is_active = true
-        AND cm2.is_active = true
-        AND (
-          cm1.role = 'secretaria' OR 
-          cm1.role = 'dono' OR
-          EXISTS (SELECT 1 FROM public.clinics c WHERE c.id = cm1.clinic_id AND c.owner_id = auth.uid())
-        )
+      SELECT 1
+      FROM public.secretary_doctor_links sdl
+      WHERE sdl.secretary_id = auth.uid()
+        AND sdl.doctor_id = crm_contacts.user_id
     )
   );
 

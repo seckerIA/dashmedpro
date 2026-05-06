@@ -4,7 +4,7 @@
  * Funções auxiliares para garantir sessão válida e outras operações comuns
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { CURRENT_PROJECT_REF, supabase } from '@/integrations/supabase/client';
 import type { Session } from '@supabase/supabase-js';
 
 // Timeout for session operations to prevent extension-related hangs
@@ -36,7 +36,7 @@ export async function ensureValidSession(): Promise<Session> {
     console.log('⏭️ [ensureValidSession] Pulando verificação de rede (retornou de idle)');
 
     // Verificar apenas se existe sessão no localStorage (sem rede)
-    const stored = localStorage.getItem(`sb-adzaqkduxnpckbcuqpmg-auth-token`);
+    const stored = localStorage.getItem(`sb-${CURRENT_PROJECT_REF}-auth-token`);
     if (stored) {
       try {
         const parsed = JSON.parse(stored);

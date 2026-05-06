@@ -1,8 +1,10 @@
 -- ============================================
--- FIX: Criar profile faltante para Dr. Rafael
+-- FIX LEGADO (ids fixos de um projeto específico)
 -- ============================================
--- Execute este SQL no Supabase Dashboard → SQL Editor
--- Projeto: adzaqkduxnpckbcuqpmg (produção)
+-- Preferir: scripts/restore-dr-rafael-account.sql (por email + auth.users atual)
+-- Execute no SQL Editor do Supabase onde a app está ligada:
+--   - produção DashMed típico: ref adzaqkduxnpckbcuqpmg
+--   - Lovable / dev atual no client: ver VITE_SUPABASE_URL (ex.: brrhnniybfabtnuxybal)
 
 -- 1. Primeiro, verificar os dados atuais
 SELECT 'auth.users' as tabela, id, email, raw_user_meta_data

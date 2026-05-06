@@ -59,11 +59,11 @@ const fetchDeals = async (
   viewAsUserIds?: string[],
   signal?: AbortSignal,
   doctorIds?: string[],
-  fetchAll?: boolean
+  fetchAll?: boolean,
+  scopeOrganizationId?: string | null,
+  /** admin / super_admin na plataforma: não restringir por organization_id na query */
+  bypassOrgScopedFilter?: boolean
 ): Promise<CRMDealWithContact[]> => {
-  const shouldFilterByUser = !fetchAll && (!viewAsUserIds || viewAsUserIds.length === 0);
-
-  let orCondition = '';
 
   if (viewAsUserIds && viewAsUserIds.length > 0) {
     const validIds = viewAsUserIds.filter(Boolean);
@@ -79,17 +79,19 @@ const fetchDeals = async (
 
   // Removido 'service' e 'service_value' do select pois estão causando erro 400 no banco (colunas inexistentes)
   // Usando FK explícita para evitar ambiguidade (crm_deals_contact_id_fkey)
-  const queryPromise = supabase
+  let qb = supabase
     .from('crm_deals')
     .select(`*, contact:crm_contacts!crm_deals_contact_id_fkey(id, full_name, email, phone, company)`);
 
-  // Se tivermos uma condição OR (filtro de usuário), aplicamos. Se não, traz TUDO (respeitando RLS)
   if (orCondition) {
-    (queryPromise as any).or(orCondition);
+    qb = (qb as any).or(orCondition);
+  }
+  if (narrowDealsByOrg) {
+    qb = (qb as any).eq('organization_id', scopeOrganizationId as string);
   }
 
   const { data, error } = await supabaseQueryWithTimeout(
-    (queryPromise as any).order('position', { ascending: true }).limit(2000),
+    (qb as any).order('position', { ascending: true }).limit(2000),
     30000,
     signal
   );
@@ -105,6 +107,9 @@ const fetchDeals = async (
     let fallbackQuery = supabase.from('crm_deals').select('*');
     if (orCondition) {
       fallbackQuery = (fallbackQuery as any).or(orCondition);
+    }
+    if (narrowDealsByOrg) {
+      fallbackQuery = (fallbackQuery as any).eq('organization_id', scopeOrganizationId as string);
     }
 
     const fallback = await supabaseQueryWithTimeout(fallbackQuery.limit(2000) as any, 30000, signal);
@@ -289,6 +294,7 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
       const { data: openDealsData } = await ((supabase
         .from('crm_deals' as any) as any)
         .select('id, contact_id')
+        .eq('organization_id', profile.organization_id)
         .not('stage', 'in', '("fechado_ganho","fechado_perdido")')
         .limit(5000));
       const openDealContactIds = new Set((openDealsData || []).map((d: any) => d.contact_id).filter(Boolean));
@@ -420,8 +426,12 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
   // Se for secretaria, passamos doctorIds, mas AGORA vamos usar fetchAll=true também
   const doctorIdsToUse = isSecretaria ? doctorIds : [];
 
-  // Check permission to view all
+  // Check permission to view all (equipe CRM): dono/admin/secretária carregam o quadro inteiro da org via RLS + filtro explícito
   const canViewAll = profile?.role === 'admin' || profile?.role === 'dono' || isSecretaria;
+
+  /** Só conta plataforma: dono deve escopar por organization_id para evitar timeouts */
+  const bypassDealOrgScopedFilter =
+    profile?.role === 'admin' || profile?.is_super_admin === true;
 
   const { data: contacts = [], isLoading: isLoadingContacts, refetch: refetchContacts } = useQuery({
     queryKey: ['crm-contacts', user?.id, fetchAllContacts, doctorIdsToUse],
@@ -434,8 +444,25 @@ export function useCRM(viewAsUserIds?: string[], fetchAllContacts: boolean = fal
   });
 
   const { data: deals = [], isLoading: isLoadingDeals } = useQuery({
-    queryKey: ['crm-deals', user?.id, viewAsUserIds?.join(','), doctorIdsToUse, canViewAll],
-    queryFn: ({ signal }) => fetchDeals(user?.id || '', viewAsUserIds, signal, doctorIdsToUse, canViewAll),
+    queryKey: [
+      'crm-deals',
+      user?.id,
+      viewAsUserIds?.join(','),
+      doctorIdsToUse,
+      canViewAll,
+      profile?.organization_id,
+      bypassDealOrgScopedFilter,
+    ],
+    queryFn: ({ signal }) =>
+      fetchDeals(
+        user?.id || '',
+        viewAsUserIds,
+        signal,
+        doctorIdsToUse,
+        canViewAll,
+        profile?.organization_id ?? null,
+        bypassDealOrgScopedFilter
+      ),
     enabled: (!!user?.id && !loading) || doctorIdsToUse.length > 0,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,

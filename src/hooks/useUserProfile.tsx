@@ -3,12 +3,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { supabaseQueryWithTimeout } from '@/utils/supabaseQuery';
 import { cacheSet, CacheKeys, CacheTTL } from '@/lib/cache';
+import { isProfilesSchemaMismatchError } from '@/utils/profileSchema';
 
 interface Profile {
   id: string;
   email: string;
   full_name: string | null;
   role: string;
+  /** Bypass de escopo por organização (admin plataforma) */
+  is_super_admin?: boolean | null;
   is_active: boolean;
   avatar_url: string | null;
   created_at: string;
@@ -24,10 +27,10 @@ interface Profile {
 }
 
 const SELECT_FULL =
-  'id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by, doctor_id, organization_id, onboarding_completed, onboarding_completed_at, specialty, force_password_change';
+  'id, email, full_name, role, is_super_admin, is_active, avatar_url, created_at, updated_at, invited_by, doctor_id, organization_id, onboarding_completed, onboarding_completed_at, specialty, force_password_change';
 
 const SELECT_BASIC =
-  'id, email, full_name, role, is_active, avatar_url, created_at, updated_at, invited_by, organization_id, force_password_change';
+  'id, email, full_name, role, is_super_admin, is_active, avatar_url, created_at, updated_at, invited_by, organization_id, force_password_change';
 
 const SELECT_MINIMAL = 'id, email, full_name, role';
 
@@ -38,6 +41,12 @@ function profileFromJsonRow(row: Record<string, unknown>): Profile | null {
     email: typeof row.email === 'string' ? row.email : '',
     full_name: row.full_name != null ? String(row.full_name) : null,
     role: row.role != null ? String(row.role) : '',
+    is_super_admin:
+      typeof row.is_super_admin === 'boolean'
+        ? row.is_super_admin
+        : row.is_super_admin === null
+          ? null
+          : undefined,
     is_active: row.is_active !== false && row.is_active !== null ? Boolean(row.is_active) : true,
     avatar_url: row.avatar_url != null ? String(row.avatar_url) : null,
     created_at: row.created_at != null ? String(row.created_at) : '',
@@ -57,11 +66,8 @@ function profileFromJsonRow(row: Record<string, unknown>): Profile | null {
   };
 }
 
-function isSchemaMismatchError(error: { code?: string; message?: string } | null): boolean {
-  if (!error) return false;
-  if (error.code === '42703' || error.code === 'PGRST204') return true;
-  const m = error.message ?? '';
-  return m.includes('does not exist') || m.includes('column');
+function isSchemaMismatchError(error: { code?: string; message?: string; details?: string } | null): boolean {
+  return isProfilesSchemaMismatchError(error);
 }
 
 export function useUserProfile() {

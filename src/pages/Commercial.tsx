@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useState, useEffect, useMemo } from "react";
+import { useSearchParams, Navigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Target, TrendingUp, ShoppingCart, Megaphone, BarChart3, Workflow, Brain, MessageSquare } from "lucide-react";
+import { Target, TrendingUp, ShoppingCart, Megaphone, BarChart3, Workflow, Brain } from "lucide-react";
 import { CommercialDashboard } from "@/components/commercial/CommercialDashboard";
 import { LeadsManagement } from "@/components/commercial/LeadsManagement";
 import { SalesManagement } from "@/components/commercial/SalesManagement";
@@ -10,12 +10,24 @@ import { CommercialReports } from "@/components/commercial/CommercialReports";
 import { PipelineManagement } from "@/components/commercial/PipelineManagement";
 import { ContactForm } from "@/components/crm/ContactForm";
 import { AIInsightsDashboard } from "@/components/commercial/AIInsightsDashboard";
+import { useAuth } from "@/hooks/useAuth";
 import { useUserProfile } from "@/hooks/useUserProfile";
-
+import { resolveOrganizationPortal } from "@/lib/organizationPortal";
+import { cn } from "@/lib/utils";
 
 export default function Commercial() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { organization } = useAuth();
   const { isSecretaria } = useUserProfile();
+  const portal = useMemo(
+    () =>
+      resolveOrganizationPortal(organization?.portal_settings ?? null, {
+        organizationName: organization?.name,
+        organizationSlug: organization?.slug,
+      }),
+    [organization?.portal_settings, organization?.name, organization?.slug],
+  );
+
   const tabFromUrl = searchParams.get("tab") || "dashboard";
   const actionFromUrl = searchParams.get("action");
   const [activeTab, setActiveTab] = useState(tabFromUrl);
@@ -27,9 +39,9 @@ export default function Commercial() {
     }
   }, [tabFromUrl]);
 
-  // Redireciona secretária se tentar acessar a tab de inteligência
+  // Secretárias e tenants sem módulo de inteligência não acessam a tab
   useEffect(() => {
-    if (isSecretaria && activeTab === 'intelligence') {
+    if ((isSecretaria || !portal.features.crm_intelligence_tab) && activeTab === 'intelligence') {
       setActiveTab('dashboard');
       setSearchParams((prev) => {
         const params = new URLSearchParams(prev);
@@ -37,11 +49,17 @@ export default function Commercial() {
         return params;
       });
     }
-  }, [isSecretaria, activeTab, setSearchParams]);
+  }, [isSecretaria, portal.features.crm_intelligence_tab, activeTab, setSearchParams]);
 
   useEffect(() => {
     setIsContactFormOpen(actionFromUrl === "new");
   }, [actionFromUrl]);
+
+  if (!portal.features.module_commercial) {
+    return <Navigate to="/" replace />;
+  }
+
+  const showCrmIntelligence = !isSecretaria && portal.features.crm_intelligence_tab;
 
   const handleTabChange = (nextTab: string) => {
     setActiveTab(nextTab);
@@ -86,7 +104,12 @@ export default function Commercial() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-7 gap-2 h-auto p-1 bg-muted/50">
+        <TabsList
+          className={cn(
+            "grid w-full grid-cols-2 gap-2 h-auto p-1 bg-muted/50",
+            showCrmIntelligence ? "lg:grid-cols-7" : "lg:grid-cols-6"
+          )}
+        >
           <TabsTrigger
             value="dashboard"
             className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-border/50 transition-all duration-200 font-medium py-3"
@@ -108,7 +131,7 @@ export default function Commercial() {
             <TrendingUp className="w-4 h-4 mr-2" />
             Leads & Conversões
           </TabsTrigger>
-          {!isSecretaria && (
+          {showCrmIntelligence && (
             <TabsTrigger
               value="intelligence"
               className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-border/50 transition-all duration-200 font-medium py-3"
@@ -152,7 +175,7 @@ export default function Commercial() {
           <LeadsManagement />
         </TabsContent>
 
-        {!isSecretaria && (
+        {showCrmIntelligence && (
           <TabsContent value="intelligence" className="mt-6">
             <AIInsightsDashboard />
           </TabsContent>

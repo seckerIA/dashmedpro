@@ -27,23 +27,17 @@ ALTER TABLE public.allowed_emails ENABLE ROW LEVEL SECURITY;
 -- 3. RLS Policies
 -- ============================================
 
--- Policy: Anyone can check if an email is allowed (needed for auth callback)
--- This uses service_role for the actual check, but we need a permissive policy
+DROP POLICY IF EXISTS "Allow checking emails during auth" ON public.allowed_emails;
 CREATE POLICY "Allow checking emails during auth"
 ON public.allowed_emails
 FOR SELECT
-USING (true);  -- Allow all reads - the table only contains allowed emails anyway
+USING (true);
 
--- Policy: Super admins can manage all emails
+DROP POLICY IF EXISTS "Super admins manage allowed emails" ON public.allowed_emails;
 CREATE POLICY "Super admins manage allowed emails"
 ON public.allowed_emails
 FOR ALL
-USING (
-    EXISTS (
-        SELECT 1 FROM public.profiles
-        WHERE id = auth.uid() AND is_super_admin = true
-    )
-);
+USING (public.is_admin_or_dono(auth.uid()));
 
 -- ============================================
 -- 4. Create index for fast email lookup

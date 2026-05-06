@@ -34,7 +34,7 @@ CREATE INDEX IF NOT EXISTS idx_meta_oauth_sessions_expires_at ON meta_oauth_sess
 CREATE TABLE IF NOT EXISTS instagram_config (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  organization_id UUID REFERENCES organizations(id),
+  organization_id UUID,
 
   -- Dados do Instagram Business Account
   instagram_account_id TEXT NOT NULL,
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS instagram_config (
 CREATE TABLE IF NOT EXISTS messenger_config (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  organization_id UUID REFERENCES organizations(id),
+  organization_id UUID,
 
   -- Dados da Página do Facebook
   page_id TEXT NOT NULL,
@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS messenger_config (
 CREATE TABLE IF NOT EXISTS instagram_conversations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  organization_id UUID REFERENCES organizations(id),
+  organization_id UUID,
 
   -- Identificadores do Instagram
   instagram_thread_id TEXT NOT NULL,
@@ -165,7 +165,7 @@ CREATE INDEX IF NOT EXISTS idx_instagram_messages_created_at ON instagram_messag
 CREATE TABLE IF NOT EXISTS messenger_conversations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  organization_id UUID REFERENCES organizations(id),
+  organization_id UUID,
 
   -- Identificadores do Messenger
   thread_id TEXT NOT NULL,
@@ -233,7 +233,7 @@ CREATE INDEX IF NOT EXISTS idx_messenger_messages_created_at ON messenger_messag
 CREATE TABLE IF NOT EXISTS lead_form_submissions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  organization_id UUID REFERENCES organizations(id),
+  organization_id UUID,
 
   -- Identificadores do Lead Ad
   leadgen_id TEXT NOT NULL,

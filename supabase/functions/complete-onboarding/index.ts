@@ -3,8 +3,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, cache-control, pragma, connection, expires",
+  "Access-Control-Max-Age": "86400",
 };
 
 interface OnboardingClinicData {
@@ -149,7 +151,7 @@ async function finalizeExistingOrgForUser(
 const handler = async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { status: 200, headers: corsHeaders });
   }
 
   try {

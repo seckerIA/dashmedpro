@@ -30,25 +30,30 @@ async function loadCrmContactsForDashboard(
   isAdminOrDono: boolean,
   doctorIds: string[] | undefined,
   dealsData: any[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  scopeOrganizationId?: string | null,
+  bypassOrgScope?: boolean
 ): Promise<any[]> {
+  const orgFilter =
+    Boolean(scopeOrganizationId) && scopeOrganizationId && !bypassOrgScope;
+
   if (isAdminOrDono) {
-    const contactsResult = await supabaseQueryWithTimeout(
-      supabase.from('crm_contacts').select('*').limit(2000) as any,
-      20000,
-      signal
-    );
+    let adminQ = supabase.from('crm_contacts').select('*').limit(2000);
+    if (orgFilter) {
+      adminQ = (adminQ as any).eq('organization_id', scopeOrganizationId);
+    }
+    const contactsResult = await supabaseQueryWithTimeout(adminQ as any, 20000, signal);
     const { data: contacts, error: contactsError } = contactsResult as { data: any[]; error: any };
     if (contactsError) throw new Error(`Erro ao buscar contatos: ${contactsError.message}`);
     return contacts || [];
   }
 
   if (doctorIds && doctorIds.length > 0) {
-    const contactsResult = await supabaseQueryWithTimeout(
-      supabase.from('crm_contacts').select('*').in('user_id', doctorIds).limit(2000) as any,
-      20000,
-      signal
-    );
+    let secQ = supabase.from('crm_contacts').select('*').in('user_id', doctorIds).limit(2000);
+    if (orgFilter) {
+      secQ = (secQ as any).eq('organization_id', scopeOrganizationId);
+    }
+    const contactsResult = await supabaseQueryWithTimeout(secQ as any, 20000, signal);
     const { data: contacts, error: contactsError } = contactsResult as { data: any[]; error: any };
     if (contactsError) throw new Error(`Erro ao buscar contatos: ${contactsError.message}`);
     return contacts || [];
@@ -87,8 +92,13 @@ const fetchDashboardMetrics = async (
   userId: string,
   isAdminOrDono: boolean,
   signal?: AbortSignal,
-  doctorIds?: string[] // IDs dos médicos vinculados (para secretárias)
+  doctorIds?: string[], // IDs dos médicos vinculados (para secretárias)
+  scopeOrganizationId?: string | null,
+  bypassOrgScopedFilter?: boolean
 ): Promise<DashboardMetrics> => {
+  const narrowDealsByOrg =
+    Boolean(scopeOrganizationId) && scopeOrganizationId && !bypassOrgScopedFilter;
+
   // Deals sem embed de crm_contacts — o embed dispara GET em crm_contacts com id.in.(milhares)
   // e estoura limite de URL no PostgREST (400). Contatos vêm de loadCrmContactsForDashboard (chunks).
   let dealsQuery = (supabase
@@ -104,14 +114,19 @@ const fetchDashboardMetrics = async (
         .map(id => `user_id.eq.${id},assigned_to.eq.${id}`)
         .join(',');
       dealsQuery = dealsQuery.or(orConditions);
+      if (narrowDealsByOrg) {
+        dealsQuery = dealsQuery.eq('organization_id', scopeOrganizationId as string);
+      }
     } else {
       // Outros usuários: ver apenas seus próprios deals
       dealsQuery = dealsQuery.or(`user_id.eq.${userId},assigned_to.eq.${userId}`);
+      if (narrowDealsByOrg) {
+        dealsQuery = dealsQuery.eq('organization_id', scopeOrganizationId as string);
+      }
     }
+  } else if (narrowDealsByOrg) {
+    dealsQuery = dealsQuery.eq('organization_id', scopeOrganizationId as string);
   }
-  // Admin/Dono: ver todos os deals (sem filtro)
-
-  // Passar o query builder (não executado) para permitir abortSignal (timeout: 20s)
   const dealsResult = await supabaseQueryWithTimeout(dealsQuery as any, 20000, signal);
   const { data: deals, error: dealsError } = dealsResult as { data: any[], error: any };
 
@@ -124,7 +139,9 @@ const fetchDashboardMetrics = async (
     isAdminOrDono,
     doctorIds,
     dealsData,
-    signal
+    signal,
+    scopeOrganizationId ?? null,
+    bypassOrgScopedFilter
   );
 
   // Calcular métricas básicas
@@ -320,12 +337,21 @@ export function useDashboardMetrics() {
   const { profile, isSecretaria, isLoading: isLoadingProfile } = useUserProfile();
   const { doctorIds, isLoading: isLoadingDoctors } = useSecretaryDoctors();
   const isAdminOrDono = profile?.role === 'admin' || profile?.role === 'dono';
+  const bypassDealOrgScopedFilter =
+    profile?.role === 'admin' || profile?.is_super_admin === true;
 
   // Secretária usa lista de médicos vinculados para filtrar
   const doctorIdsToUse = isSecretaria ? doctorIds : [];
 
   return useQuery({
-    queryKey: ['dashboard-metrics', user?.id, profile?.role, doctorIdsToUse],
+    queryKey: [
+      'dashboard-metrics',
+      user?.id,
+      profile?.role,
+      profile?.organization_id,
+      bypassDealOrgScopedFilter,
+      doctorIdsToUse,
+    ],
     queryFn: async ({ signal }) => {
       if (!user?.id) {
         throw new Error('Usuário não autenticado');
@@ -335,7 +361,9 @@ export function useDashboardMetrics() {
           user.id,
           isAdminOrDono,
           signal,
-          doctorIdsToUse.length > 0 ? doctorIdsToUse : undefined
+          doctorIdsToUse.length > 0 ? doctorIdsToUse : undefined,
+          profile?.organization_id ?? null,
+          bypassDealOrgScopedFilter
         );
         return result;
       } catch (error: any) {

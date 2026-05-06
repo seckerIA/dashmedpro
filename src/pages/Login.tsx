@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -40,11 +40,7 @@ const Login = () => {
     setSendingResetEmail(true);
 
     try {
-      // Force localhost in development, use window.location.origin otherwise
-      const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const redirectUrl = isDevelopment
-        ? `http://localhost:8080/reset-password`
-        : `${window.location.origin}/reset-password`;
+      const redirectUrl = `${window.location.origin}/reset-password`;
 
       const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
         redirectTo: redirectUrl,
@@ -100,32 +96,65 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
 
+    /** Evita deadlock com GoTrue/Web Locks quando `onAuthStateChange`/`getSession` rodam no mesmo instante. */
+    await new Promise<void>((r) => setTimeout(r, 0));
+
+    const AUTH_DEADLINE_MS = 28_000;
+    let authTimer: ReturnType<typeof setTimeout>;
+    const timeoutRace = new Promise<'timeout'>((resolve) => {
+      authTimer = setTimeout(() => resolve('timeout'), AUTH_DEADLINE_MS);
+    });
+
     try {
       console.log('🔍 DEBUG Login - Tentando login com email:', email);
       console.log('🔍 DEBUG Login - Project Ref esperado:', CURRENT_PROJECT_REF);
 
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const raced = await Promise.race([
+        supabase.auth
+          .signInWithPassword({ email, password })
+          .then((value) => ({ kind: 'result' as const, value })),
+        timeoutRace.then(() => ({ kind: 'timeout' as const })),
+      ]);
+      clearTimeout(authTimer!);
+
+      if ('kind' in raced && raced.kind === 'timeout') {
+        toast({
+          variant: 'destructive',
+          title: 'Tempo esgotado ao entrar',
+          description:
+            'O servidor de autenticação não respondeu a tempo. Verifique a internet, firewall ou VPN, ou tente de novo.',
+        });
+        return;
+      }
+
+      const { data, error } = raced.value;
 
       if (error) {
         console.error('❌ Erro de autenticação:', error);
 
-        // Detectar email não confirmado
         if (error.message.includes('Email not confirmed') || error.message.includes('email_not_confirmed')) {
           toast({
             variant: 'destructive',
             title: 'Email não confirmado',
             description: 'Você precisa confirmar seu email antes de fazer login. Verifique sua caixa de entrada (e spam).',
           });
-        }
-        // Se erro de credenciais inválidas
-        else if (error.message === 'Invalid login credentials' || error.status === 400) {
+        } else if (error.message === 'Invalid login credentials' || error.status === 400) {
           toast({
             variant: 'destructive',
             title: 'Credenciais inválidas',
             description: 'Email ou senha incorretos.',
+          });
+        } else if (
+          (error as { name?: string }).name === 'AuthRetryableFetchError' ||
+          typeof error.message === 'string' &&
+            (error.message.includes('Failed to fetch') ||
+              error.message.includes('fetch') ||
+              error.message.includes('NetworkError'))
+        ) {
+          toast({
+            variant: 'destructive',
+            title: 'Servidor de login indisponível ou rede bloqueada',
+            description: `Erro de rede ou timeout ao falar com o Supabase (ex.: 522); o navegador pode mostrar CORS mesmo quando o problema é a resposta incompleta. Tente sem VPN, confira firewall/antivírus e https://status.supabase.com — e no Dashboard do Supabase, Authentication → URL Configuration, inclua ${window.location.origin}.`,
           });
         } else {
           toast({
@@ -137,42 +166,27 @@ const Login = () => {
         return;
       }
 
-      // Verificar se o usuário existe no perfil após login bem-sucedido
-      if (data?.user) {
-        console.log('✅ Usuário autenticado:', data.user.email);
-        console.log('✅ User ID:', data.user.id);
-
-        // Aguardar um momento para garantir que a sessão foi totalmente estabelecida
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('id, email, full_name, role')
-          .eq('id', data.user.id)
-          .single();
-
-        if (profileError || !profileData) {
-          // Usuário autenticado mas sem perfil = precisa fazer onboarding
-          console.log('📝 Perfil não encontrado, redirecionando para onboarding...');
-          toast({
-            title: 'Bem-vindo!',
-            description: 'Complete seu cadastro para continuar.',
-          });
-          navigate('/onboarding');
-          return;
-        }
+      if (!data?.user) {
+        toast({
+          variant: 'destructive',
+          title: 'Login incompleto',
+          description: 'Não foi possível obter seus dados após entrar. Tente novamente.',
+        });
+        return;
       }
+
+      console.log('✅ Usuário autenticado:', data.user.email);
 
       toast({
         title: 'Login realizado com sucesso!',
-        description: 'Redirecionando para o dashboard...',
+        description: 'Redirecionando…',
       });
 
-      // Limpar cache do React Query para evitar dados stale
-      await queryClient.invalidateQueries();
-
-      navigate('/');
+      // Perfis/onboarding são resolvidos em `AppRoutes` + `useUserProfile` (evita ficar pendurado aqui na tabela profiles).
+      void queryClient.invalidateQueries();
+      navigate('/', { replace: true });
     } catch (error) {
+      clearTimeout(authTimer!);
       console.error('❌ Erro inesperado no login:', error);
       toast({
         variant: 'destructive',
@@ -188,9 +202,7 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const redirectUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        ? 'http://localhost:8080/auth/callback'
-        : `${window.location.origin}/auth/callback`;
+      const redirectUrl = `${window.location.origin}/auth/callback`;
 
       console.log('🔐 [Login] Iniciando Google OAuth. Redirect URL:', redirectUrl);
 
@@ -291,8 +303,7 @@ const Login = () => {
         description: 'Você foi automaticamente logado.',
       });
 
-      // Limpar cache do React Query para evitar dados stale
-      await queryClient.invalidateQueries();
+      void queryClient.invalidateQueries();
 
       navigate('/');
     } catch (error) {

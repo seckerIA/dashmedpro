@@ -22,7 +22,7 @@ const handler = async (req: Request): Promise<Response> => {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error('No authorization');
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || 'https://adzaqkduxnpckbcuqpmg.supabase.co';
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || 'https://brrhnniybfabtnuxybal.supabase.co';
     const supabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
       global: { headers: { Authorization: authHeader } },
     });

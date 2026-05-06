@@ -2,6 +2,8 @@
 -- MEDICAL RECORDS SYSTEM (PRONTUÁRIO MÉDICO)
 -- CFM Compliant - Resolução n° 1638/2002 e CFM 2218/2018
 -- ================================================
+-- Valores user_role secretaria/medico: 20250127000001_extend_user_role_secretaria_medico.sql
+-- (evita 55P04 se ADD VALUE e policy com 'medico' estivessem na mesma transação.)
 
 -- Create ENUMs for medical record types and status
 CREATE TYPE public.medical_record_type AS ENUM (

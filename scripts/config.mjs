@@ -11,6 +11,7 @@ import { dirname, join } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 config({ path: join(__dirname, '.env') });
+config({ path: join(__dirname, '..', '.env') });
 
 // Validar variáveis obrigatórias
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -19,8 +20,8 @@ const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
     console.error('❌ Erro: Variáveis de ambiente não configuradas!');
     console.error('');
-    console.error('Configure o arquivo scripts/.env com:');
-    console.error('  SUPABASE_URL=https://adzaqkduxnpckbcuqpmg.supabase.co');
+    console.error('Configure scripts/.env e/ou .env na raiz com:');
+    console.error('  SUPABASE_URL=https://SEU_REF.supabase.co');
     console.error('  SUPABASE_SERVICE_ROLE_KEY=sua_chave_aqui');
     console.error('');
     console.error('Copie de scripts/.env.example');

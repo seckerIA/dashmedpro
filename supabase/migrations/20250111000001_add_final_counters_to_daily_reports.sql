@@ -1,8 +1,8 @@
--- Adicionar colunas para contadores finais no relatório diário
-ALTER TABLE prospecting_daily_reports 
-ADD COLUMN final_calls INTEGER DEFAULT NULL,
-ADD COLUMN final_contacts INTEGER DEFAULT NULL;
-
--- Comentários para documentação
-COMMENT ON COLUMN prospecting_daily_reports.final_calls IS 'Número final de atendimentos quando o expediente foi finalizado';
-COMMENT ON COLUMN prospecting_daily_reports.final_contacts IS 'Número final de contatos quando o expediente foi finalizado';
+-- Contadores finais em prospecting_daily_reports.
+-- Esta migration vinha antes da tabela (20250120000000). Efeito em 20250120000006.
+DO $$
+BEGIN
+  IF to_regclass('public.prospecting_daily_reports') IS NULL THEN
+    RAISE NOTICE '20250111000001: omitido (prospecting_daily_reports inexistente).';
+  END IF;
+END $$;

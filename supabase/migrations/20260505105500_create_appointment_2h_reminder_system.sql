@@ -36,17 +36,16 @@ CREATE POLICY "Users can view their own appointment reminders"
       FROM public.secretary_doctor_links sdl
       WHERE sdl.secretary_id = auth.uid()
         AND sdl.doctor_id = medical_appointment_reminders.user_id
-        AND sdl.is_active = true
     )
-    OR public.is_admin_or_dono()
+    OR public.is_admin_or_dono(auth.uid())
   );
 
 DROP POLICY IF EXISTS "Users can manage their own appointment reminders" ON public.medical_appointment_reminders;
 CREATE POLICY "Users can manage their own appointment reminders"
   ON public.medical_appointment_reminders
   FOR ALL
-  USING (user_id = auth.uid() OR public.is_admin_or_dono())
-  WITH CHECK (user_id = auth.uid() OR public.is_admin_or_dono());
+  USING (user_id = auth.uid() OR public.is_admin_or_dono(auth.uid()))
+  WITH CHECK (user_id = auth.uid() OR public.is_admin_or_dono(auth.uid()));
 
 -- Agendamento do cron (a cada 5 minutos)
 -- Janela de envio no runtime: consultas entre 1h55 e 2h05 a partir de agora.

@@ -2,9 +2,11 @@
 import React from "react";
 import { useInventoryDashboard, InventoryAlert } from "@/hooks/useInventoryDashboard";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getSupabaseErrorMessage } from "@/lib/supabaseErrors";
 import {
     Package,
     DollarSign,
@@ -48,7 +50,7 @@ const AlertBadge = ({ type }: { type: InventoryAlert["type"] }) => {
 };
 
 export function InventoryDashboard() {
-    const { metrics, isLoading, refetch } = useInventoryDashboard();
+    const { metrics, isLoading, error, refetch } = useInventoryDashboard();
 
     if (isLoading) {
         return (
@@ -69,7 +71,39 @@ export function InventoryDashboard() {
         );
     }
 
-    if (!metrics) return null;
+    if (error) {
+        const message = getSupabaseErrorMessage(
+            error,
+            "Não foi possível carregar os dados do estoque. Verifique a conexão ou tente novamente.",
+        );
+        return (
+            <Alert variant="destructive" className="max-w-2xl">
+                <AlertTitle>Erro ao carregar o estoque</AlertTitle>
+                <AlertDescription className="flex flex-col gap-3 pt-2">
+                    <span className="text-sm">{message}</span>
+                    <Button type="button" variant="outline" size="sm" className="w-fit" onClick={() => refetch()}>
+                        <RefreshCw className="h-4 w-4 mr-2" /> Tentar novamente
+                    </Button>
+                </AlertDescription>
+            </Alert>
+        );
+    }
+
+    if (!metrics) {
+        return (
+            <Alert className="max-w-2xl border-muted bg-muted/30">
+                <AlertTitle>Dados não disponíveis</AlertTitle>
+                <AlertDescription className="flex flex-col gap-3 pt-2">
+                    <span className="text-sm text-muted-foreground">
+                        Não foi possível obter métricas. Confirme se está autenticado e vinculado a uma organização.
+                    </span>
+                    <Button type="button" variant="outline" size="sm" className="w-fit" onClick={() => refetch()}>
+                        <RefreshCw className="h-4 w-4 mr-2" /> Atualizar
+                    </Button>
+                </AlertDescription>
+            </Alert>
+        );
+    }
 
     const totalAlerts = metrics.alerts.length;
     const criticalAlerts = metrics.alerts.filter(a => a.type === "expired" || a.type === "critical").length;

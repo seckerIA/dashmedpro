@@ -295,10 +295,9 @@ CREATE POLICY "Secretaries can view linked doctor settings"
   ON followup_settings FOR SELECT
   USING (
     EXISTS (
-      SELECT 1 FROM secretary_doctor_links
+      SELECT 1 FROM public.secretary_doctor_links
       WHERE secretary_id = auth.uid()
       AND doctor_id = followup_settings.user_id
-      AND is_active = true
     )
   );
 
@@ -315,10 +314,9 @@ CREATE POLICY "Secretaries can view linked doctor logs"
   ON followup_automation_log FOR SELECT
   USING (
     EXISTS (
-      SELECT 1 FROM secretary_doctor_links
+      SELECT 1 FROM public.secretary_doctor_links
       WHERE secretary_id = auth.uid()
       AND doctor_id = followup_automation_log.user_id
-      AND is_active = true
     )
   );
 

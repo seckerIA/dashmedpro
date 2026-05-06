@@ -1,19 +1,22 @@
+DO $$
+BEGIN
+  IF to_regclass('public.problem_status') IS NOT NULL THEN
+    ALTER TABLE public.problem_status ENABLE ROW LEVEL SECURITY;
 
--- 1) Enable RLS on problem_status (admin only)
-ALTER TABLE public.problem_status ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS "Admins can view problem status" ON public.problem_status;
+    CREATE POLICY "Admins can view problem status"
+      ON public.problem_status FOR SELECT
+      TO authenticated
+      USING (public.is_admin_or_dono(auth.uid()));
 
-DROP POLICY IF EXISTS "Admins can view problem status" ON public.problem_status;
-CREATE POLICY "Admins can view problem status"
-  ON public.problem_status FOR SELECT
-  TO authenticated
-  USING (public.is_admin_or_dono(auth.uid()));
-
-DROP POLICY IF EXISTS "Admins can manage problem status" ON public.problem_status;
-CREATE POLICY "Admins can manage problem status"
-  ON public.problem_status FOR ALL
-  TO authenticated
-  USING (public.is_admin_or_dono(auth.uid()))
-  WITH CHECK (public.is_admin_or_dono(auth.uid()));
+    DROP POLICY IF EXISTS "Admins can manage problem status" ON public.problem_status;
+    CREATE POLICY "Admins can manage problem status"
+      ON public.problem_status FOR ALL
+      TO authenticated
+      USING (public.is_admin_or_dono(auth.uid()))
+      WITH CHECK (public.is_admin_or_dono(auth.uid()));
+  END IF;
+END $$;
 
 -- 2) task-attachments storage policies (scoped by task.organization_id)
 DROP POLICY IF EXISTS "Authenticated users can view task attachments" ON storage.objects;
@@ -31,9 +34,15 @@ CREATE POLICY "Org members can view task attachments"
     bucket_id = 'task-attachments'
     AND EXISTS (
       SELECT 1 FROM public.tasks t
-      JOIN public.profiles p ON p.id = auth.uid()
       WHERE t.id::text = (storage.foldername(name))[1]
-        AND t.organization_id IS NOT DISTINCT FROM p.organization_id
+        AND (
+          t.user_id = auth.uid()
+          OR EXISTS (
+            SELECT 1 FROM public.secretary_doctor_links sdl
+            WHERE sdl.secretary_id = auth.uid() AND sdl.doctor_id = t.user_id
+          )
+          OR public.is_admin_or_dono(auth.uid())
+        )
     )
   );
 
@@ -44,9 +53,15 @@ CREATE POLICY "Org members can upload task attachments"
     bucket_id = 'task-attachments'
     AND EXISTS (
       SELECT 1 FROM public.tasks t
-      JOIN public.profiles p ON p.id = auth.uid()
       WHERE t.id::text = (storage.foldername(name))[1]
-        AND t.organization_id IS NOT DISTINCT FROM p.organization_id
+        AND (
+          t.user_id = auth.uid()
+          OR EXISTS (
+            SELECT 1 FROM public.secretary_doctor_links sdl
+            WHERE sdl.secretary_id = auth.uid() AND sdl.doctor_id = t.user_id
+          )
+          OR public.is_admin_or_dono(auth.uid())
+        )
     )
   );
 
@@ -57,9 +72,15 @@ CREATE POLICY "Org members can delete task attachments"
     bucket_id = 'task-attachments'
     AND EXISTS (
       SELECT 1 FROM public.tasks t
-      JOIN public.profiles p ON p.id = auth.uid()
       WHERE t.id::text = (storage.foldername(name))[1]
-        AND t.organization_id IS NOT DISTINCT FROM p.organization_id
+        AND (
+          t.user_id = auth.uid()
+          OR EXISTS (
+            SELECT 1 FROM public.secretary_doctor_links sdl
+            WHERE sdl.secretary_id = auth.uid() AND sdl.doctor_id = t.user_id
+          )
+          OR public.is_admin_or_dono(auth.uid())
+        )
     )
   );
 

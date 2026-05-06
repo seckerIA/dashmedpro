@@ -23,9 +23,11 @@ CREATE TABLE IF NOT EXISTS public.user_daily_goals (
 
 ALTER TABLE public.user_daily_goals ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own daily_goals" ON public.user_daily_goals;
 CREATE POLICY "Users can view own daily_goals" ON public.user_daily_goals
   FOR SELECT TO authenticated USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can manage own daily_goals" ON public.user_daily_goals;
 CREATE POLICY "Users can manage own daily_goals" ON public.user_daily_goals
   FOR ALL TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
 
@@ -45,9 +47,11 @@ CREATE TABLE IF NOT EXISTS public.crm_follow_ups (
 
 ALTER TABLE public.crm_follow_ups ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Authenticated users can view crm_follow_ups" ON public.crm_follow_ups;
 CREATE POLICY "Authenticated users can view crm_follow_ups" ON public.crm_follow_ups
   FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Authenticated users can manage crm_follow_ups" ON public.crm_follow_ups;
 CREATE POLICY "Authenticated users can manage crm_follow_ups" ON public.crm_follow_ups
   FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
@@ -64,9 +68,11 @@ CREATE TABLE IF NOT EXISTS public.financial_attachments (
 
 ALTER TABLE public.financial_attachments ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Authenticated users can view attachments" ON public.financial_attachments;
 CREATE POLICY "Authenticated users can view attachments" ON public.financial_attachments
   FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Authenticated users can manage attachments" ON public.financial_attachments;
 CREATE POLICY "Authenticated users can manage attachments" ON public.financial_attachments
   FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
@@ -84,8 +90,10 @@ CREATE TABLE IF NOT EXISTS public.financial_budgets (
 
 ALTER TABLE public.financial_budgets ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Authenticated users can view budgets" ON public.financial_budgets;
 CREATE POLICY "Authenticated users can view budgets" ON public.financial_budgets
   FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Authenticated users can manage budgets" ON public.financial_budgets;
 CREATE POLICY "Authenticated users can manage budgets" ON public.financial_budgets
   FOR ALL TO authenticated USING (true) WITH CHECK (true);

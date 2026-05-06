@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import {
   BarChart3,
   Calculator,
@@ -13,8 +13,6 @@ import {
   Settings,
   UserPlus,
   LogOut,
-  Sparkles,
-  Compass,
   Calendar,
   RotateCcw,
   ClipboardList,
@@ -27,6 +25,7 @@ import {
   Receipt,
   MessageCircle,
   Phone,
+  Compass,
   Building2,
   Zap,
   CircleDollarSign,
@@ -55,6 +54,8 @@ const dashmedLogo = '/dashmed-logo.png'
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { useInventoryAlerts } from "@/hooks/useInventoryAlerts"
 import { cn } from "@/lib/utils"
+import { resolveOrganizationPortal } from "@/lib/organizationPortal"
+import { isSidebarItemHiddenByPortal } from "@/lib/portalSidebarGates"
 
 type NavigationItem = {
   title: string;
@@ -165,6 +166,28 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
   const { isAdmin, isVendedor, isGestorTrafego, isSecretaria, isMedico, profile, isLoading: isLoadingProfile } = useUserProfile()
   const { criticalCount, hasCritical, totalCount } = useInventoryAlerts()
 
+  const portal = useMemo(
+    () =>
+      resolveOrganizationPortal(organization?.portal_settings ?? null, {
+        organizationName: organization?.name,
+        organizationSlug: organization?.slug,
+      }),
+    [organization?.portal_settings, organization?.name, organization?.slug],
+  )
+
+  const sidebarTitlePrimary =
+    portal.branding.sidebar_title?.trim() || organization?.name || "DASHMED PRO"
+
+  /** Subtítulo abaixo do nome: branco-label custom ou default DashMed Pro / Dashboard */
+  const sidebarSubtitle =
+    portal.branding.sidebar_subtitle !== undefined
+      ? portal.branding.sidebar_subtitle
+      : organization
+        ? "DASHMED PRO"
+        : "Dashboard"
+
+  const logoSrc = portal.branding.logo_url?.trim() || dashmedLogo
+
   const currentPath = location.pathname
   const currentSearch = location.search
 
@@ -244,8 +267,8 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
               )}
             >
               <img
-                src={dashmedLogo}
-                alt="DashMed Pro"
+                src={logoSrc}
+                alt={sidebarTitlePrimary}
                 className={cn(
                   "shrink-0 object-contain transition-smooth",
                   isCollapsed ? "h-9 w-auto" : "h-10 w-auto mt-0.5"
@@ -255,13 +278,15 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span
                     className="text-foreground font-semibold text-sm leading-snug tracking-tight break-words [overflow-wrap:anywhere]"
-                    title={organization?.name || "DASHMED PRO"}
+                    title={sidebarTitlePrimary}
                   >
-                    {organization?.name || "DASHMED PRO"}
+                    {sidebarTitlePrimary}
                   </span>
+                  {sidebarSubtitle ? (
                   <span className="text-muted-foreground text-xs leading-snug break-words [overflow-wrap:anywhere]">
-                    {organization ? "DASHMED PRO" : "Dashboard"}
+                    {sidebarSubtitle}
                   </span>
+                  ) : null}
                 </div>
               )}
             </div>
@@ -284,6 +309,10 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                     '/relatorios', // Relatórios
                   ];
                   if (hiddenUrls.includes(item.url)) {
+                    return false;
+                  }
+
+                  if (isSidebarItemHiddenByPortal(item.url, portal)) {
                     return false;
                   }
 
@@ -424,8 +453,11 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                                 </div>
                                 {item.subItems
                                   ?.filter(subItem => {
+                                    if (isSidebarItemHiddenByPortal(subItem.url, portal)) return false;
                                     // Secretária não pode ver Inteligência
                                     if (isSecretaria && subItem.url === '/comercial?tab=intelligence') return false;
+                                    if (!portal.features.crm_intelligence_tab && subItem.url === '/comercial?tab=intelligence')
+                                      return false;
                                     return true;
                                   })
                                   .map((subItem) => {
@@ -535,8 +567,11 @@ export function AppSidebar({ isCollapsed, onNavigate }: AppSidebarProps) {
                               <div className="pl-4 space-y-0.5 pt-1">
                                 {item.subItems
                                   ?.filter(subItem => {
+                                    if (isSidebarItemHiddenByPortal(subItem.url, portal)) return false;
                                     // Secretária não pode ver Inteligência
                                     if (isSecretaria && subItem.url === '/comercial?tab=intelligence') return false;
+                                    if (!portal.features.crm_intelligence_tab && subItem.url === '/comercial?tab=intelligence')
+                                      return false;
                                     return true;
                                   })
                                   .map((subItem) => {

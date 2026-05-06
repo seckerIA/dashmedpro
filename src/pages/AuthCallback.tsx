@@ -76,7 +76,7 @@ const AuthCallback = () => {
         // 3. MODO "APENAS LOGIN" - Verificar se usuário já existe
         const { data: existingProfile, error: profileError } = await supabase
           .from('profiles')
-          .select('id, email, full_name, role, is_super_admin, onboarding_completed, organization_id')
+          .select('id, email, full_name, role, onboarding_completed, organization_id')
           .eq('id', user.id)
           .single();
 
@@ -225,7 +225,9 @@ const AuthCallback = () => {
             existingProfile.onboarding_completed === true ||
             Boolean(existingProfile.organization_id);
 
-          if (existingProfile.is_super_admin) {
+          const isPlatformSuper =
+            existingProfile.role === 'admin' && !existingProfile.organization_id;
+          if (isPlatformSuper) {
             navigate('/admin');
           } else if (!onboardingFinished) {
             navigate('/onboarding');

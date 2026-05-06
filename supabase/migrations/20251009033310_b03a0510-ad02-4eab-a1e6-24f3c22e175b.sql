@@ -1,5 +1,19 @@
--- Dropar função antiga e recriar com image_url
 DROP FUNCTION IF EXISTS public.get_tasks_with_assignments(UUID);
+
+-- Tabela usada antes de migrações Lovable posteriores; garante FK e colunas usadas pela função RPC
+CREATE TABLE IF NOT EXISTS public.task_assignments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id UUID NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  status public.task_status DEFAULT 'pendente',
+  assigned_at TIMESTAMPTZ DEFAULT now(),
+  completed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT task_assignments_task_user_unique UNIQUE (task_id, user_id)
+);
+ALTER TABLE public.task_assignments ADD COLUMN IF NOT EXISTS status public.task_status DEFAULT 'pendente';
+ALTER TABLE public.task_assignments ADD COLUMN IF NOT EXISTS assigned_at TIMESTAMPTZ DEFAULT now();
+ALTER TABLE public.task_assignments ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
 
 CREATE OR REPLACE FUNCTION public.get_tasks_with_assignments(user_id_param UUID)
 RETURNS TABLE (
